@@ -3,7 +3,60 @@ import { useState, useEffect } from 'react';
 import BookCard, { BookStatusBadge } from '../components/BookCard';
 import { useApp } from '../context/AppContext';
 import { GENRES } from '../data/books';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import './Home.css';
+
+/* ── Notify Me button — writes to Firestore so admin sees it ── */
+function NotifyBtn({ book, e }) {
+  e?.stopPropagation?.();
+  const { user } = useApp();
+  const key = 'eh_notify_' + book.id;
+  const [done, setDone] = useState(!!localStorage.getItem(key));
+  const [busy, setBusy] = useState(false);
+
+  const handle = async ev => {
+    ev.preventDefault(); ev.stopPropagation();
+    if (done) return;
+    if (!user) { window.location.href = '/login'; return; }
+    setBusy(true);
+    try {
+      const docKey = `notify_${book.id}_${user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
+      await setDoc(doc(db, 'notifications', docKey), {
+        bookId: book.id, bookTitle: book.title,
+        userEmail: user.email, userName: user.name,
+        status: book.status, createdAt: serverTimestamp(), notified: false,
+      });
+      // Also write to contact_messages so admin sees it in Messages panel
+      await setDoc(doc(db, 'contact_messages', 'notif_' + docKey), {
+        name: user.name, email: user.email,
+        subject: '🔔 Book Notification Request',
+        message: `${user.name} (${user.email}) requested to be notified when "${book.title}" is available.`,
+        type: 'notification', bookId: book.id, bookTitle: book.title,
+        status: 'new', createdAt: serverTimestamp(),
+      });
+      localStorage.setItem(key, '1');
+      setDone(true);
+    } catch {}
+    setBusy(false);
+  };
+
+  return (
+    <button
+      onClick={handle}
+      disabled={busy || done}
+      style={{
+        display:'inline-flex', alignItems:'center', gap:6,
+        padding:'6px 14px', border:'1px solid rgba(201,168,76,0.35)',
+        borderRadius:20, background: done ? 'rgba(46,204,113,0.1)' : 'rgba(201,168,76,0.08)',
+        color: done ? 'var(--ok)' : 'var(--gold)',
+        fontSize:'0.76rem', fontWeight:600, cursor: done ? 'default' : 'pointer',
+        fontFamily:'inherit', transition:'all 0.15s',
+      }}>
+      {done ? '✅ Saved' : busy ? '⏳' : '🔔 Notify Me'}
+    </button>
+  );
+}
 
 /* ─── Rotating hero sub-phrases ─── */
 const TAGLINES = [
@@ -203,7 +256,7 @@ export default function Home() {
                       <p className="cs-card__inspired">✦ {b.inspiredNote}</p>
                     )}
                     <div className="cs-card__footer">
-                      <span className="cs-card__notify">🔔 Notify Me</span>
+                      <NotifyBtn book={b} />
                       <span className="cs-card__arrow">→</span>
                     </div>
                   </div>

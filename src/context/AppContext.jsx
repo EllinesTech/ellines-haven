@@ -278,14 +278,15 @@ export function AppProvider({ children }) {
         // Reapply covers + chapters onto Firestore books
         const withAll = reapplyLargeFields(fsBooks, coversMap, chaptersMap);
 
-        // For each book, prefer local cover if it's a real uploaded image
+        // Firestore is authoritative for covers — only keep local cover if Firestore
+        // has NO cover for this book (i.e. it was never uploaded to Firestore)
         const localMap = new Map((local || []).map(b => [b.id, b]));
         const finalBooks = withAll.map(b => {
           const loc = localMap.get(b.id);
           if (!loc) return b;
-          if (loc.cover?.startsWith('data:')) return { ...b, cover: loc.cover, coverType: loc.coverType };
-          if (loc.cover && !loc.cover.startsWith('__cover__:') && loc.coverType === 'photo') {
-            return { ...b, cover: loc.cover, coverType: 'photo' };
+          // Only fall back to local cover if Firestore has no cover at all
+          if (!b.cover && loc.cover?.startsWith('data:')) {
+            return { ...b, cover: loc.cover, coverType: loc.coverType };
           }
           return b;
         });
@@ -329,8 +330,15 @@ export function AppProvider({ children }) {
   };
 
   // ── Books admin ───────────────────────────────────────────────────────────
-  const saveBook   = b  => setBooks(p => { const i = p.findIndex(x => x.id === b.id); return i >= 0 ? p.map(x => x.id === b.id ? b : x) : [...p, b]; });
-  const deleteBook = id => setBooks(p => p.filter(b => b.id !== id));
+  const saveBook   = b  => {
+    // Clear local cache so Firestore is re-fetched fresh on next load
+    localStorage.removeItem('eh_books');
+    setBooks(p => { const i = p.findIndex(x => x.id === b.id); return i >= 0 ? p.map(x => x.id === b.id ? b : x) : [...p, b]; });
+  };
+  const deleteBook = id => {
+    localStorage.removeItem('eh_books');
+    setBooks(p => p.filter(b => b.id !== id));
+  };
   const resetBooks = () => setBooks(INITIAL_BOOKS);
 
   // ── Orders ────────────────────────────────────────────────────────────────

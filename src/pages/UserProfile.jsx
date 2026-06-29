@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import './UserProfile.css';
 
@@ -50,6 +50,57 @@ async function notifyAdminDeletion(user, scheduledAt) {
       read:        false,
     });
   } catch {}
+}
+
+/* ── Direct Message to Admin ── */
+function MessageAdminForm({ user, showToast }) {
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [sending,  setSending]  = useState(false);
+  const [sent,     setSent]     = useState(false);
+
+  const send = async () => {
+    if (!subject.trim() || !message.trim()) { showToast('Please fill subject and message', 'err'); return; }
+    setSending(true);
+    try {
+      const id = 'direct_' + Date.now() + '_' + user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+      await setDoc(doc(db, 'contact_messages', id), {
+        name:    user.name,
+        email:   user.email,
+        subject: subject.trim(),
+        message: message.trim(),
+        type:    'direct',
+        userId:  user.id,
+        status:  'new',
+        createdAt: serverTimestamp(),
+        source:  'user_profile',
+      });
+      setSent(true); setSubject(''); setMessage('');
+      showToast('✅ Message sent to admin!');
+      setTimeout(() => setSent(false), 4000);
+    } catch(e) { showToast('❌ ' + e.message, 'err'); }
+    setSending(false);
+  };
+
+  if (sent) return (
+    <div style={{padding:'14px 16px',background:'rgba(46,204,113,0.08)',border:'1px solid rgba(46,204,113,0.25)',borderRadius:'var(--r-sm)',display:'flex',gap:10,alignItems:'center'}}>
+      <span style={{fontSize:'1.4rem'}}>✅</span>
+      <div><strong style={{color:'var(--ok)',display:'block'}}>Message sent!</strong><span style={{fontSize:'0.8rem',color:'var(--muted)'}}>Admin will reply within 24 hours. Check your email.</span></div>
+    </div>
+  );
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      <input className="field" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Subject — What do you need help with?" style={{maxWidth:480}} />
+      <textarea className="field" rows={4} value={message} onChange={e=>setMessage(e.target.value)} placeholder="Describe your issue or question in detail…" style={{resize:'vertical',maxWidth:480}} />
+      <div>
+        <button className="btn btn-primary btn-sm" onClick={send} disabled={sending||!subject.trim()||!message.trim()}>
+          {sending ? '⏳ Sending…' : '📤 Send Message'}
+        </button>
+        <span style={{fontSize:'0.72rem',color:'var(--muted)',marginLeft:12}}>Goes directly to admin inbox · Usually replied within 24hrs</span>
+      </div>
+    </div>
+  );
 }
 
 export default function UserProfile() {
@@ -499,10 +550,21 @@ export default function UserProfile() {
           {tab === 'contact' && (
             <div className="up-panel">
               <div className="up-panel__head">
-                <h2>Contact Ellines Haven</h2>
-                <span>We&apos;re here to help — reach us your way</span>
+                <h2>Contact &amp; Messages</h2>
+                <span>Talk to us directly or use the channels below</span>
               </div>
-              <div className="up-contact-grid">
+
+              {/* Direct message to admin */}
+              <div style={{padding:'20px 24px',borderBottom:'1px solid var(--dim)'}}>
+                <h3 style={{fontSize:'0.92rem',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
+                  💬 Send a Message to Admin
+                  <span style={{fontSize:'0.72rem',fontWeight:600,padding:'2px 8px',borderRadius:20,background:'rgba(46,204,113,0.1)',color:'var(--ok)',border:'1px solid rgba(46,204,113,0.25)'}}>Direct</span>
+                </h3>
+                <MessageAdminForm user={user} showToast={showToast} />
+              </div>
+
+              {/* Contact cards */}
+              <div className="up-contact-grid" style={{padding:'20px 24px'}}>
                 <a href={`https://wa.me/${WA}?text=${encodeURIComponent('Hi Ellines Haven, I need help: ')}`}
                   target="_blank" rel="noopener noreferrer" className="up-contact-card up-contact-card--wa">
                   <span className="up-contact-card__icon">💬</span>
@@ -521,24 +583,24 @@ export default function UserProfile() {
                 </a>
                 <Link to="/contact" className="up-contact-card">
                   <span className="up-contact-card__icon">✉️</span>
-                  <div><strong>Contact Form</strong><span>Send us a detailed message</span></div>
+                  <div><strong>Contact Form</strong><span>Send a detailed message</span></div>
                   <span className="up-contact-card__arrow">→</span>
                 </Link>
                 <Link to="/faq" className="up-contact-card">
                   <span className="up-contact-card__icon">❓</span>
-                  <div><strong>FAQ</strong><span>Quick answers to common questions</span></div>
+                  <div><strong>FAQ</strong><span>Quick answers</span></div>
                   <span className="up-contact-card__arrow">→</span>
                 </Link>
                 <a href={`https://wa.me/${WA}?text=${encodeURIComponent('Hi Ellines Haven, I have an issue with my order. My email is: ' + user.email)}`}
                   target="_blank" rel="noopener noreferrer" className="up-contact-card">
                   <span className="up-contact-card__icon">🛒</span>
-                  <div><strong>Order Support</strong><span>Issues with payments or access</span></div>
+                  <div><strong>Order Support</strong><span>Payment or access issues</span></div>
                   <span className="up-contact-card__arrow">→</span>
                 </a>
               </div>
               <div className="up-contact-hours">
                 <span>⏰</span>
-                <span>Business hours: Mon–Sat, 8am–8pm EAT · WhatsApp replies usually within 1 hour</span>
+                <span>Mon–Sat, 8am–8pm EAT · WhatsApp: usually within 1 hour · Direct message: within 24 hours</span>
               </div>
             </div>
           )}
