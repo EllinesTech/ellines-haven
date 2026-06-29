@@ -239,9 +239,10 @@ export default function UserProfile() {
     ['account','👤','Profile'],
     ['library','📚','My Books'],
     ['activity','🛒','Orders'],
+    ['messages','💬','Messages'],
     ['password','🔑','Security'],
     ['prefs','⚙️','Settings'],
-    ['contact','💬','Contact'],
+    ['contact','📞','Contact'],
     ['danger','⚠️','Danger'],
   ];
 
@@ -544,6 +545,13 @@ export default function UserProfile() {
                   <span className="up-toggle-dot" style={{left:22}} />
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── MESSAGES TAB ── */}
+          {tab === 'messages' && (
+            <div className="up-panel" style={{ padding: 0, overflow: 'hidden' }}>
+              <UserMessages user={user} />
             </div>
           )}
 

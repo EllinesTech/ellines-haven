@@ -3152,7 +3152,7 @@ export default function Admin() {
 
         {/* -- MESSAGES -- */}
         {tab === 'messages' && (
-          <MessagesPanel showToast={showToast} />
+          <MessagesPanel showToast={showToast} users={users} />
         )}
 
         {/* -- SITE CONTROLS -- */}

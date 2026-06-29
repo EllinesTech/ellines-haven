@@ -73,25 +73,34 @@ export default function MessagesPanel({ showToast }) {
 
   // ── Thread listener for selected conversation ──
   useEffect(() => {
-    if (!selected?.threadId) { setThread([]); return; }
+    if (!selected?.id) { setThread([]); return; }
+    // Use threadId if set, otherwise fall back to the message id itself
+    const threadId = selected.threadId || selected.id;
     const q = query(
-      collection(db, 'contact_messages', selected.threadId, 'messages'),
+      collection(db, 'contact_messages', threadId, 'messages'),
       orderBy('createdAt', 'asc')
     );
     let initialLoad = true;
     const unsub = onSnapshot(q, snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      let msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // If subcollection is empty, synthesise the original message so thread isn't blank
+      if (msgs.length === 0 && selected.message) {
+        msgs = [{ id:'msg_0', text:selected.message, sender:'user', senderName:selected.name||'User', senderEmail:selected.email, createdAt:selected.createdAt }];
+      }
       if (!initialLoad) {
-        // A new message arrived while thread is open — play sound if it's from user
         const lastMsg = msgs[msgs.length - 1];
         if (lastMsg?.sender === 'user') playAdminNotifSound();
       }
       initialLoad = false;
       setThread(msgs);
       setTimeout(() => threadRef.current?.scrollIntoView({ behavior:'smooth' }), 100);
-    }, () => {});
+    }, () => {
+      if (selected.message) {
+        setThread([{ id:'msg_0', text:selected.message, sender:'user', senderName:selected.name||'User', senderEmail:selected.email, createdAt:selected.createdAt }]);
+      }
+    });
     return () => unsub();
-  }, [selected?.threadId]);
+  }, [selected?.id]);
 
   const openMessage = async msg => {
     const threadId = msg.threadId || msg.id;

@@ -37,21 +37,47 @@ export default function Register() {
     if (form.password !== form.confirm) { setErr('Passwords do not match'); return; }
     if (form.password.length < 6) { setErr('Password must be at least 6 characters'); return; }
     setBusy(true);
-    await new Promise(r => setTimeout(r, 900));
 
-    // Check email not already taken
-    const existing = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-    if (existing.find(u => u.email.toLowerCase() === form.email.toLowerCase())) {
-      setErr('An account with this email already exists.'); setBusy(false); return;
+    const emailKey = form.email.trim().toLowerCase();
+
+    try {
+      // Check Firestore first
+      const { collection, query, where, getDocs, doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const { db } = await import('../firebase');
+
+      const q = query(collection(db, 'users'), where('email', '==', emailKey));
+      const existing = await getDocs(q);
+      if (!existing.empty) { setErr('An account with this email already exists.'); setBusy(false); return; }
+
+      // Also check legacy localStorage
+      const legacyUsers = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+      if (legacyUsers.find(u => u.email?.toLowerCase() === emailKey)) {
+        setErr('An account with this email already exists.'); setBusy(false); return;
+      }
+
+      const userId = 'u_' + Date.now();
+      const newUser = {
+        id: userId, name: form.name.trim(), email: emailKey,
+        passwordHash: form.password, role: 'user',
+        joined: new Date().toISOString().slice(0, 10),
+        createdAt: serverTimestamp(),
+        status: 'active',
+      };
+
+      // Save to Firestore `users` collection (NOT localStorage)
+      await setDoc(doc(db, 'users', userId), newUser);
+
+      setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
+      navigate('/');
+    } catch (e) {
+      // Fallback: save to localStorage if Firestore fails
+      const legacyUsers = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+      const userId = 'u_' + Date.now();
+      const newUser = { id: userId, name: form.name.trim(), email: emailKey, password: form.password, role: 'user', joined: new Date().toISOString().slice(0, 10) };
+      localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, newUser]));
+      setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
+      navigate('/');
     }
-
-    const newUser = { id: `u_${Date.now()}`, name: form.name, email: form.email, password: form.password, role: 'user', joined: new Date().toISOString().slice(0,10) };
-
-    // Persist so login + admin can see them
-    localStorage.setItem('eh_registered_users', JSON.stringify([...existing, newUser]));
-
-    setUser({ id: newUser.id, name: newUser.name, email: newUser.email, role: 'user' });
-    navigate('/');
     setBusy(false);
   };
 
