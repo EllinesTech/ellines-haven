@@ -98,6 +98,7 @@ function NotifyMeBtn({ book, user }) {
       const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const { db } = await import('../firebase');
       const key = `notify_${book.id}_${user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
+      // Write to notifications collection (user-side, may have restricted read rules)
       await setDoc(doc(db, 'notifications', key), {
         bookId:    book.id,
         bookTitle: book.title,
@@ -106,6 +107,19 @@ function NotifyMeBtn({ book, user }) {
         status:    book.status,
         createdAt: serverTimestamp(),
         notified:  false,
+      });
+      // Also write to contact_messages so admin can see it (contact_messages has open rules)
+      await setDoc(doc(db, 'contact_messages', 'notif_' + key), {
+        name:      user.name,
+        email:     user.email.toLowerCase(),
+        subject:   '🔔 Book Notification Request',
+        message:   `${user.name} (${user.email}) wants to be notified when "${book.title}" is available.`,
+        type:      'notification',
+        bookId:    book.id,
+        bookTitle: book.title,
+        status:    'new',
+        notified:  false,
+        createdAt: serverTimestamp(),
       });
       localStorage.setItem('eh_notify_' + book.id, 'true');
       setState('done');

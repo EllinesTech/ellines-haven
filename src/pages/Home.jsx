@@ -24,7 +24,7 @@ function NotifyBtn({ book, e }) {
       const docKey = `notify_${book.id}_${user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
       await setDoc(doc(db, 'notifications', docKey), {
         bookId: book.id, bookTitle: book.title,
-        userEmail: user.email, userName: user.name,
+        email: user.email.toLowerCase(), name: user.name,
         status: book.status, createdAt: serverTimestamp(), notified: false,
       });
       // Also write to contact_messages so admin sees it in Messages panel

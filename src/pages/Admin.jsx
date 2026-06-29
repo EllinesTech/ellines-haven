@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { BASE_ACCOUNTS } from './Login';
+import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -41,20 +41,21 @@ const BOOK_STATUSES = [
 
 const GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
 
-// buildUserList now accepts a suspendedList from Firestore context (passed in)
-// so the status column reflects real-time Firestore suspension, not localStorage
+// buildUserList — pulls from Firestore-synced localStorage + registered users
+// BASE_ACCOUNTS removed — no hardcoded test users
 function buildUserList(suspendedList = []) {
   const deleted    = JSON.parse(localStorage.getItem('eh_deleted_users')    || '[]');
   const roleChanges= JSON.parse(localStorage.getItem('eh_role_overrides')   || '{}');
   const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-  // Merge Firestore suspended list with legacy localStorage list
   const legacySusp = JSON.parse(localStorage.getItem('eh_suspended_users')  || '[]');
   const suspended  = [...new Set([...suspendedList, ...legacySusp])];
-  const all = BASE_ACCOUNTS
+  // Only the super admin as a known built-in account
+  const adminEntry = [{ id:'admin01', name:'Admin', email: SUPER_ADMIN_EMAIL, role:'superadmin', joined:'', books:0 }];
+  const all = adminEntry
     .filter(a => !deleted.includes(a.email.toLowerCase()))
-    .map(a => ({ id:a.id, name:a.name, email:a.email, role:roleChanges[a.email.toLowerCase()]||a.role, joined:a.joined||'', books:0, status:suspended.includes(a.email.toLowerCase())?'Suspended':'Active' }));
+    .map(a => ({ ...a, role:roleChanges[a.email.toLowerCase()]||a.role, status:suspended.includes(a.email.toLowerCase())?'Suspended':'Active' }));
   registered.forEach(r => {
-    const email = r.email.toLowerCase();
+    const email = (r.email||'').toLowerCase();
     if (deleted.includes(email)) return;
     if (all.find(u => u.email.toLowerCase()===email)) return;
     all.push({ id:r.id, name:r.name, email:r.email, role:roleChanges[email]||r.role||'user', joined:r.joined||'', books:0, status:suspended.includes(email)?'Suspended':'Active' });
@@ -1088,41 +1089,60 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
   const [notifs, setNotifs]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState({});
+  const [fetchErr, setFetchErr] = useState('');
 
   useEffect(() => {
-    getDocs(collection(db, 'notifications'))
-      .then(snap => {
-        const docs = snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toMillis?.() || 0 }));
-        docs.sort((a, b) => b.createdAt - a.createdAt);
+    setFetchErr('');
+    // Read from contact_messages (type='notification') — this collection is
+    // open in Firestore rules. The notifications collection may have restricted
+    // read rules; contact_messages is the reliable fallback that all Notify Me
+    // buttons write to.
+    const q = query(
+      collection(db, 'contact_messages'),
+      orderBy('createdAt', 'desc')
+    );
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        const docs = snap.docs
+          .map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toMillis?.() || 0 }))
+          .filter(d => d.type === 'notification');
         setNotifs(docs);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+        setLoading(false);
+        setFetchErr('');
+      },
+      err => {
+        setFetchErr('Could not load notifications: ' + err.message);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
   }, []);
 
   // Group by book
   const byBook = {};
   notifs.forEach(n => {
-    if (!byBook[n.bookId]) byBook[n.bookId] = { title: n.bookTitle, status: n.status, items: [] };
-    byBook[n.bookId].items.push(n);
+    const bookId = n.bookId;
+    const bookTitle = n.bookTitle || n.subject?.replace('🔔 Book Notification Request — ', '') || 'Unknown';
+    if (!byBook[bookId]) byBook[bookId] = { title: bookTitle, status: n.status, items: [] };
+    byBook[bookId].items.push(n);
   });
 
   const sendNotification = async (bookId) => {
     setSending(s => ({ ...s, [bookId]: true }));
     const group = byBook[bookId];
-    const book  = books.find(b => b.id === bookId);
-    const waMsg = encodeURIComponent(
-      `🎉 *${group.title}* is now available on Ellines Haven!\n\n` +
-      `📖 Read it now: https://ellines-haven.vercel.app/book/${bookId}\n\n` +
-      `— Ellines Haven Team`
-    );
 
     try {
-      // Mark all as notified in Firestore
+      // Mark all as notified in contact_messages
       await Promise.all(group.items.map(n =>
-        setDoc(doc(db, 'notifications', n.id), { notified: true, notifiedAt: serverTimestamp() }, { merge: true })
+        setDoc(doc(db, 'contact_messages', n.id), { notified: true, notifiedAt: serverTimestamp(), status: 'notified' }, { merge: true })
       ));
-      setNotifs(prev => prev.map(n => n.bookId === bookId ? { ...n, notified: true } : n));
+      // Also mark in notifications collection (best-effort — may fail due to rules)
+      await Promise.all(group.items.map(n => {
+        const notifKey = `notify_${bookId}_${(n.email||'').replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
+        return setDoc(doc(db, 'notifications', notifKey), { notified: true, notifiedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+      }));
+      setNotifs(prev => prev.map(n => n.bookId === bookId ? { ...n, notified: true, status: 'notified' } : n));
       addLog('system', `Notifications sent for "${group.title}" to ${group.items.length} user(s)`);
       showToast(`✅ Notified ${group.items.length} user(s) for "${group.title}"`);
     } catch (e) {
@@ -1143,6 +1163,12 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
       <div style={{ background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.2)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginBottom:20, fontSize:'0.82rem' }}>
         💡 When you mark a book as <strong style={{color:'var(--gold)'}}>Complete</strong> or change its status, click <strong>Send Notifications</strong> to alert all waiting users via WhatsApp. The system opens WhatsApp pre-filled for each user's number.
       </div>
+
+      {fetchErr && (
+        <div style={{ background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.35)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.82rem', color:'#e74c3c' }}>
+          ⚠️ {fetchErr}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading notifications…</div>
@@ -1184,17 +1210,17 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
                   {group.items.map(n => (
                     <div key={n.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'rgba(255,255,255,0.02)', borderRadius:'var(--r-sm)', border:'1px solid var(--dim)' }}>
                       <div style={{ width:28, height:28, borderRadius:'50%', background:'rgba(201,168,76,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.78rem', fontWeight:700, flexShrink:0 }}>
-                        {n.name?.charAt(0)?.toUpperCase() || '?'}
+                        {(n.name||n.email||'?').charAt(0).toUpperCase()}
                       </div>
                       <div style={{ flex:1 }}>
-                        <strong style={{ fontSize:'0.82rem' }}>{n.name}</strong>
+                        <strong style={{ fontSize:'0.82rem' }}>{n.name || 'Unknown'}</strong>
                         <span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{n.email}</span>
                       </div>
                       <span style={{ fontSize:'0.7rem', padding:'2px 8px', borderRadius:10, background: n.notified?'rgba(46,204,113,0.1)':'rgba(201,168,76,0.1)', color: n.notified?'var(--ok)':'var(--gold)', border: n.notified?'1px solid rgba(46,204,113,0.3)':'1px solid rgba(201,168,76,0.3)' }}>
                         {n.notified ? '✓ Notified' : '⏳ Pending'}
                       </span>
                       {/* Quick WhatsApp link per user */}
-                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + n.name + ', "' + group.title + '" is now available! 📖 https://ellines-haven.vercel.app/book/' + bookId)}`}
+                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + (n.name||'there') + ', "' + group.title + '" is now available! 📖 https://ellines-haven.vercel.app/book/' + bookId)}`}
                         target="_blank" rel="noopener noreferrer"
                         style={{ fontSize:'0.72rem', padding:'3px 8px', borderRadius:'var(--r-sm)', background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', textDecoration:'none', flexShrink:0 }}>
                         💬 WA

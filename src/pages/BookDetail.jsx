@@ -24,10 +24,24 @@ function NotifyMeDetailBtn({ book }) {
     setState('loading');
     try {
       const key = `notify_${book.id}_${user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
+      // Write to notifications collection
       await setDoc(doc(db, 'notifications', key), {
         bookId: book.id, bookTitle: book.title,
         email: user.email.toLowerCase(), name: user.name,
         status: book.status, createdAt: serverTimestamp(), notified: false,
+      });
+      // Mirror to contact_messages so admin panel can read it (open rules)
+      await setDoc(doc(db, 'contact_messages', 'notif_' + key), {
+        name:      user.name,
+        email:     user.email.toLowerCase(),
+        subject:   '🔔 Book Notification Request',
+        message:   `${user.name} (${user.email}) wants to be notified when "${book.title}" is available.`,
+        type:      'notification',
+        bookId:    book.id,
+        bookTitle: book.title,
+        status:    'new',
+        notified:  false,
+        createdAt: serverTimestamp(),
       });
       localStorage.setItem(storageKey, 'true');
       setState('done');
