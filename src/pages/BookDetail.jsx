@@ -24,13 +24,8 @@ function NotifyMeDetailBtn({ book }) {
     setState('loading');
     try {
       const key = `notify_${book.id}_${user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
-      // Write to notifications collection
-      await setDoc(doc(db, 'notifications', key), {
-        bookId: book.id, bookTitle: book.title,
-        email: user.email.toLowerCase(), name: user.name,
-        status: book.status, createdAt: serverTimestamp(), notified: false,
-      });
-      // Mirror to contact_messages so admin panel can read it (open rules)
+
+      // Write to contact_messages FIRST — admin reads from here, rules are open
       await setDoc(doc(db, 'contact_messages', 'notif_' + key), {
         name:      user.name,
         email:     user.email.toLowerCase(),
@@ -43,6 +38,13 @@ function NotifyMeDetailBtn({ book }) {
         notified:  false,
         createdAt: serverTimestamp(),
       });
+      // Best-effort write to notifications collection
+      setDoc(doc(db, 'notifications', key), {
+        bookId: book.id, bookTitle: book.title,
+        email: user.email.toLowerCase(), name: user.name,
+        status: book.status, createdAt: serverTimestamp(), notified: false,
+      }).catch(() => {});
+
       localStorage.setItem(storageKey, 'true');
       setState('done');
     } catch { setState('idle'); }

@@ -22,19 +22,22 @@ function NotifyBtn({ book, e }) {
     setBusy(true);
     try {
       const docKey = `notify_${book.id}_${user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
-      await setDoc(doc(db, 'notifications', docKey), {
-        bookId: book.id, bookTitle: book.title,
-        email: user.email.toLowerCase(), name: user.name,
-        status: book.status, createdAt: serverTimestamp(), notified: false,
-      });
-      // Also write to contact_messages so admin sees it in Messages panel
+
+      // Write to contact_messages FIRST — admin reads from here, rules are open
       await setDoc(doc(db, 'contact_messages', 'notif_' + docKey), {
-        name: user.name, email: user.email,
+        name: user.name, email: user.email.toLowerCase(),
         subject: '🔔 Book Notification Request',
         message: `${user.name} (${user.email}) requested to be notified when "${book.title}" is available.`,
         type: 'notification', bookId: book.id, bookTitle: book.title,
-        status: 'new', createdAt: serverTimestamp(),
+        status: 'new', notified: false, createdAt: serverTimestamp(),
       });
+      // Best-effort write to notifications collection
+      setDoc(doc(db, 'notifications', docKey), {
+        bookId: book.id, bookTitle: book.title,
+        email: user.email.toLowerCase(), name: user.name,
+        status: book.status, createdAt: serverTimestamp(), notified: false,
+      }).catch(() => {});
+
       localStorage.setItem(key, '1');
       setDone(true);
     } catch {}
