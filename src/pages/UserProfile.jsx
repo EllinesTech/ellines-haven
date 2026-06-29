@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
+import UserMessages from '../components/UserMessages';
 import './UserProfile.css';
 
 const WA = '254748255466';
@@ -554,13 +555,9 @@ export default function UserProfile() {
                 <span>Talk to us directly or use the channels below</span>
               </div>
 
-              {/* Direct message to admin */}
-              <div style={{padding:'20px 24px',borderBottom:'1px solid var(--dim)'}}>
-                <h3 style={{fontSize:'0.92rem',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
-                  💬 Send a Message to Admin
-                  <span style={{fontSize:'0.72rem',fontWeight:600,padding:'2px 8px',borderRadius:20,background:'rgba(46,204,113,0.1)',color:'var(--ok)',border:'1px solid rgba(46,204,113,0.25)'}}>Direct</span>
-                </h3>
-                <MessageAdminForm user={user} showToast={showToast} />
+              {/* Full two-way chat with admin */}
+              <div style={{ padding: '0 0 20px 0' }}>
+                <UserMessages user={user} />
               </div>
 
               {/* Contact cards */}

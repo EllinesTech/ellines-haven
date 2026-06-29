@@ -14,6 +14,23 @@ const STATUS_COLORS = {
   notification:{bg:'rgba(201,168,76,0.1)',color:'var(--gold)',border:'rgba(201,168,76,0.25)'},
 };
 
+// ── Admin notification sound (slightly different tone to distinguish) ─────────
+function playAdminNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o1 = ctx.createOscillator();
+    const o2 = ctx.createOscillator();
+    const g  = ctx.createGain();
+    o1.connect(g); o2.connect(g); g.connect(ctx.destination);
+    o1.type = 'sine'; o1.frequency.setValueAtTime(660, ctx.currentTime);
+    o2.type = 'sine'; o2.frequency.setValueAtTime(880, ctx.currentTime + 0.14);
+    g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    o1.start(ctx.currentTime); o1.stop(ctx.currentTime + 0.2);
+    o2.start(ctx.currentTime + 0.14); o2.stop(ctx.currentTime + 0.6);
+  } catch {}
+}
+
 export default function MessagesPanel({ showToast }) {
   const { user } = useApp();
   const [messages,   setMessages]   = useState([]);
@@ -24,15 +41,31 @@ export default function MessagesPanel({ showToast }) {
   const [replyDraft, setReplyDraft] = useState('');
   const [sending,    setSending]    = useState(false);
   const [search,     setSearch]     = useState('');
-  const [tab,        setTab]        = useState('messages'); // messages | notifications
-  const threadRef = useRef(null);
+  const [tab,        setTab]        = useState('messages');
+  const threadRef   = useRef(null);
+  const prevMsgIds  = useRef(new Set());   // track known message ids
+  const mountedRef  = useRef(false);
 
-  // ── Real-time messages listener ──
+  // ── Real-time messages listener + sound on new message ──
   useEffect(() => {
     setLoading(true);
     const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, snap => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      if (mountedRef.current) {
+        // Play sound if any new message id appeared that isn't from admin
+        const hasNew = fresh.some(m =>
+          !prevMsgIds.current.has(m.id) &&
+          (m.status === 'new' || !m.status) &&
+          m.lastSender !== 'admin'
+        );
+        if (hasNew) playAdminNotifSound();
+      }
+
+      prevMsgIds.current = new Set(fresh.map(m => m.id));
+      mountedRef.current = true;
+      setMessages(fresh);
       setLoading(false);
     }, () => setLoading(false));
     return () => unsub();
@@ -42,18 +75,25 @@ export default function MessagesPanel({ showToast }) {
   useEffect(() => {
     if (!selected?.threadId) { setThread([]); return; }
     const q = query(
-      collection(db, 'message_threads', selected.threadId, 'messages'),
+      collection(db, 'contact_messages', selected.threadId, 'messages'),
       orderBy('createdAt', 'asc')
     );
+    let initialLoad = true;
     const unsub = onSnapshot(q, snap => {
-      setThread(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (!initialLoad) {
+        // A new message arrived while thread is open — play sound if it's from user
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg?.sender === 'user') playAdminNotifSound();
+      }
+      initialLoad = false;
+      setThread(msgs);
       setTimeout(() => threadRef.current?.scrollIntoView({ behavior:'smooth' }), 100);
     }, () => {});
     return () => unsub();
   }, [selected?.threadId]);
 
   const openMessage = async msg => {
-    // Create or get thread
     const threadId = msg.threadId || msg.id;
     const updated = { ...msg, threadId, status: msg.status === 'new' ? 'read' : msg.status };
     setSelected(updated);
@@ -61,10 +101,10 @@ export default function MessagesPanel({ showToast }) {
     if (msg.status === 'new' || !msg.status) {
       await setDoc(doc(db, 'contact_messages', msg.id), { status: 'read', threadId, updatedAt: serverTimestamp() }, { merge: true });
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: 'read', threadId } : m));
-      // Seed thread with original message if thread is new
+      // Seed thread subcollection with the original message if thread is brand new
       if (!msg.threadId) {
-        await setDoc(doc(db, 'message_threads', threadId, 'messages', 'msg_0'), {
-          text: msg.message, sender: 'user', senderName: msg.name,
+        await setDoc(doc(db, 'contact_messages', threadId, 'messages', 'msg_0'), {
+          text: msg.message || '', sender: 'user', senderName: msg.name || 'User',
           senderEmail: msg.email, createdAt: msg.createdAt || serverTimestamp(),
         });
       }
@@ -76,15 +116,21 @@ export default function MessagesPanel({ showToast }) {
     setSending(true);
     const threadId = selected.threadId || selected.id;
     try {
-      // Add to thread
-      await addDoc(collection(db, 'message_threads', threadId, 'messages'), {
+      // Write to contact_messages/{threadId}/messages — same path UserMessages reads
+      await addDoc(collection(db, 'contact_messages', threadId, 'messages'), {
         text: replyDraft.trim(), sender: 'admin', senderName: user?.name || 'Admin',
         senderEmail: user?.email, createdAt: serverTimestamp(),
       });
-      // Update parent message status
+      // Update parent doc so user sees the new reply + unread badge
       await setDoc(doc(db, 'contact_messages', selected.id), {
-        status: 'replied', threadId, lastAdminReply: replyDraft.trim().slice(0, 80),
-        repliedAt: serverTimestamp(),
+        status:         'replied',
+        threadId,
+        lastMsg:        replyDraft.trim().slice(0, 80),
+        lastMsgAt:      serverTimestamp(),
+        lastSender:     'admin',
+        userRead:       false,   // triggers unread badge on user side
+        lastAdminReply: replyDraft.trim().slice(0, 80),
+        repliedAt:      serverTimestamp(),
       }, { merge: true });
       setMessages(prev => prev.map(m => m.id === selected.id ? { ...m, status: 'replied' } : m));
       setReplyDraft('');
