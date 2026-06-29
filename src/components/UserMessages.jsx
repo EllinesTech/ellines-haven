@@ -62,13 +62,20 @@ export default function UserMessages({ user }) {
   useEffect(() => {
     if (!emailKey) return;
     setLoading(true);
+    // Use only where() without orderBy to avoid needing a composite index.
+    // Sort client-side instead.
     const q = query(
       collection(db, 'contact_messages'),
-      where('email', '==', emailKey),
-      orderBy('createdAt', 'desc')
+      where('email', '==', emailKey)
     );
     const unsub = onSnapshot(q, snap => {
-      const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const fresh = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() || a.createdAt || 0;
+          const tb = b.createdAt?.toMillis?.() || b.createdAt || 0;
+          return tb - ta;
+        });
 
       if (mountedRef.current) {
         // Check if any conversation got a new admin reply since last snapshot
