@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560">
+  <defs>
+    <linearGradient id="bg7" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a1a"/>
+      <stop offset="35%" stop-color="#1a1060"/>
+      <stop offset="65%" stop-color="#8020a0"/>
+      <stop offset="85%" stop-color="#e04060"/>
+      <stop offset="100%" stop-color="#ff8020"/>
+    </linearGradient>
+    <linearGradient id="water7" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7010a0" opacity="0.7"/>
+      <stop offset="100%" stop-color="#0a0a20"/>
+    </linearGradient>
+    <linearGradient id="ov7" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="55%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.9)"/>
+    </linearGradient>
+    <radialGradient id="sun7" cx="50%" cy="45%" r="15%">
+      <stop offset="0%" stop-color="#fff0a0"/>
+      <stop offset="40%" stop-color="#ffa030"/>
+      <stop offset="100%" stop-color="rgba(255,80,30,0)"/>
+    </radialGradient>
+    <filter id="blur7"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="400" height="560" fill="url(#bg7)"/>
+
+  <!-- Sun glow -->
+  <circle cx="200" cy="250" r="60" fill="url(#sun7)" opacity="0.8"/>
+  <circle cx="200" cy="250" r="30" fill="#ffe080" opacity="0.5"/>
+
+  <!-- Stars scattered in upper sky -->
+  <g fill="white" opacity="0.6">
+    <circle cx="40" cy="40" r="1.2"/><circle cx="80" cy="25" r="1"/><circle cx="120" cy="55" r="1.3"/>
+    <circle cx="160" cy="20" r="0.9"/><circle cx="250" cy="35" r="1.1"/><circle cx="290" cy="60" r="1.2"/>
+    <circle cx="340" cy="30" r="1"/><circle cx="370" cy="50" r="0.8"/><circle cx="60" cy="70" r="0.9"/>
+    <circle cx="310" cy="80" r="1"/><circle cx="380" cy="90" r="0.8"/>
+  </g>
+
+  <!-- Lake Victoria water reflection -->
+  <rect x="0" y="290" width="400" height="110" fill="url(#water7)" opacity="0.85"/>
+
+  <!-- Sun reflection on water -->
+  <ellipse cx="200" cy="320" rx="15" ry="35" fill="#ffa030" opacity="0.45"/>
+
+  <!-- Distant hills silhouette -->
+  <path d="M0,310 Q60,270 100,285 Q140,270 180,280 Q220,265 260,278 Q300,265 340,280 Q370,270 400,278 L400,310 Z" fill="#0d0a20"/>
+
+  <!-- Fishing boat silhouette -->
+  <g fill="#080810">
+    <path d="M140,295 Q160,285 210,285 Q240,285 260,295 Q255,302 145,302 Z"/>
+    <rect x="185" y="265" width="3" height="25" rx="1"/>
+    <path d="M165,278 L188,268 L188,278 Z"/>
+  </g>
+
+  <!-- Papyrus reeds left -->
+  <g fill="#0a0818" opacity="0.8">
+    <rect x="10" y="275" width="4" height="40" rx="2"/>
+    <ellipse cx="12" cy="270" rx="6" ry="4"/>
+    <rect x="22" y="278" width="3" height="35" rx="2"/>
+    <ellipse cx="23" cy="273" rx="5" ry="3.5"/>
+    <rect x="32" y="280" width="3" height="30" rx="2"/>
+    <ellipse cx="33" cy="276" rx="5" ry="3"/>
+  </g>
+
+  <!-- Papyrus reeds right -->
+  <g fill="#0a0818" opacity="0.8">
+    <rect x="362" y="278" width="4" height="38" rx="2"/>
+    <ellipse cx="364" cy="273" rx="6" ry="4"/>
+    <rect x="374" y="280" width="3" height="33" rx="2"/>
+    <ellipse cx="375" cy="275" rx="5" ry="3.5"/>
+    <rect x="384" y="282" width="3" height="28" rx="2"/>
+    <ellipse cx="385" cy="278" rx="5" ry="3"/>
+  </g>
+
+  <!-- Overlay -->
+  <rect width="400" height="560" fill="url(#ov7)"/>
+
+  <!-- Decorative row of dots (seven sunsets motif) -->
+  <g>
+    <circle cx="110" cy="390" r="4" fill="#c9a84c" opacity="0.9"/>
+    <circle cx="130" cy="390" r="4" fill="#c9a84c" opacity="0.8"/>
+    <circle cx="150" cy="390" r="4" fill="#c9a84c" opacity="0.7"/>
+    <circle cx="170" cy="390" r="4" fill="#c9a84c" opacity="0.6"/>
+    <circle cx="190" cy="390" r="4" fill="#c9a84c" opacity="0.5"/>
+    <circle cx="210" cy="390" r="4" fill="#c9a84c" opacity="0.4"/>
+    <circle cx="230" cy="390" r="4" fill="#c9a84c" opacity="0.3"/>
+    <circle cx="250" cy="390" r="4" fill="#c9a84c" opacity="0.2"/>
+    <circle cx="270" cy="390" r="4" fill="#c9a84c" opacity="0.15"/>
+    <circle cx="290" cy="390" r="4" fill="#c9a84c" opacity="0.1"/>
+  </g>
+
+  <!-- Title -->
+  <text x="200" y="425" font-family="Georgia, serif" font-size="34" font-weight="bold" fill="#fff0d0" text-anchor="middle" letter-spacing="0.5">SEVEN</text>
+  <text x="200" y="463" font-family="Georgia, serif" font-size="34" font-weight="bold" fill="#fff0d0" text-anchor="middle" letter-spacing="0.5">SUNSETS</text>
+
+  <!-- Subtitle line -->
+  <line x1="80" y1="474" x2="320" y2="474" stroke="#c9a84c" stroke-width="1" opacity="0.7"/>
+  <text x="200" y="488" font-family="Georgia, serif" font-size="11" fill="#c9a84c" text-anchor="middle" letter-spacing="2" font-style="italic">Seven Stories — Seven Lives</text>
+
+  <!-- Author -->
+  <text x="200" y="512" font-family="Georgia, serif" font-size="13" fill="#c9a84c" text-anchor="middle" letter-spacing="2" font-style="italic">Elijah Mwangi M</text>
+
+  <!-- Publisher -->
+  <text x="200" y="535" font-family="Arial, sans-serif" font-size="9" fill="#c9a84c" text-anchor="middle" letter-spacing="1.5" opacity="0.7">ELLINES HAVEN</text>
+
+  <!-- Genre tag -->
+  <rect x="150" y="541" width="100" height="16" rx="8" fill="rgba(201,168,76,0.15)" stroke="#c9a84c" stroke-width="0.8" opacity="0.8"/>
+  <text x="200" y="552" font-family="Arial, sans-serif" font-size="8.5" fill="#c9a84c" text-anchor="middle" letter-spacing="1.2">SHORT STORIES</text>
+</svg>

@@ -1,0 +1,102 @@
+.cart-page { min-height: 80vh; }
+.cart-layout { display: grid; grid-template-columns: 1fr 340px; gap: 28px; padding: 48px 0 80px; }
+.cart-items { display: flex; flex-direction: column; gap: 14px; }
+.cart-item { display: flex; align-items: center; gap: 18px; padding: 18px; }
+.cart-item__img { width: 76px; height: 76px; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; }
+.cart-item__info { flex: 1; }
+.cart-item__genre { font-size: .7rem; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+.cart-item__info h3 { font-size: .98rem; margin: 4px 0 3px; }
+.cart-item__info h3 a:hover { color: var(--gold); }
+.cart-item__info p { color: var(--muted); font-size: .83rem; }
+.cart-item__right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.cart-item__price { font-size: 1.1rem; font-weight: 700; }
+.cart-item__rm { color: var(--err); font-size: .8rem; cursor: pointer; padding: 3px; background: none; border: none; }
+.cart-item__rm:hover { text-decoration: underline; }
+.cart-sum { padding: 22px; height: fit-content; position: sticky; top: 100px; }
+.cart-sum h3 { margin-bottom: 18px; }
+.cart-sum__row { display: flex; justify-content: space-between; font-size: .84rem; color: var(--muted); padding: 6px 0; border-bottom: 1px solid var(--dim); }
+.cart-sum__total { display: flex; justify-content: space-between; padding: 16px 0; font-size: 1.05rem; margin-bottom: 14px; }
+.cart-sum__note { color: var(--muted); font-size: .78rem; text-align: center; margin-top: 8px; }
+.cart-empty { text-align: center; padding: 80px 20px; }
+.cart-empty__icon { font-size: 4rem; margin-bottom: 18px; }
+.cart-empty h3 { font-size: 1.4rem; margin-bottom: 10px; }
+.cart-empty p { color: var(--muted); margin-bottom: 24px; }
+.pay-layout { display: grid; grid-template-columns: 1fr 360px; gap: 28px; padding: 48px 0 80px; }
+.pay-form { padding: 30px; }
+.pay-form h3 { margin-bottom: 20px; }
+.pay-methods { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.pay-btn { padding: 10px 16px; border: 2px solid var(--dim); border-radius: var(--r-sm); color: var(--muted); font-size: .85rem; cursor: pointer; transition: all .2s; background: none; }
+.pay-btn--on { border-color: var(--gold); color: var(--text); background: rgba(201,168,76,.08); }
+.pay-total { display: flex; justify-content: space-between; padding: 16px 0; border-top: 1px solid var(--dim); margin: 16px 0; font-size: 1rem; }
+.pay-summary { padding: 22px; height: fit-content; position: sticky; top: 100px; }
+.pay-summary h3 { margin-bottom: 18px; }
+.pay-item { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--dim); }
+.pay-item img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; }
+.pay-item strong { display: block; font-size: .85rem; margin-bottom: 3px; }
+.pay-item span { color: var(--gold); font-size: .8rem; font-weight: 600; }
+.done-box { text-align: center; padding: 80px 20px; }
+.done-box__check { width: 76px; height: 76px; border-radius: 50%; background: rgba(46,204,113,.15); color: var(--ok); font-size: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 22px; border: 2px solid var(--ok); }
+.done-box h2 { font-size: 2rem; margin-bottom: 10px; }
+.done-box p { color: var(--muted); }
+@media (max-width: 768px) {
+  .cart-layout, .pay-layout { grid-template-columns: 1fr; }
+  .cart-sum, .pay-summary { position: static; }
+}
+
+/* ── M-Pesa payment box ── */
+.pay-mpesa-box { background: rgba(255,255,255,0.02); border: 1px solid var(--dim); border-radius: var(--r-sm); padding: 20px; margin-bottom: 8px; }
+.pay-instruction { font-size: .9rem; color: var(--muted); margin-bottom: 16px; }
+.pay-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: .88rem; }
+.pay-detail-row:last-of-type { border-bottom: none; }
+.pay-highlight { font-size: 1.15rem; color: var(--gold); letter-spacing: 1px; }
+.pay-steps { margin-top: 14px; }
+.pay-steps p { font-size: .78rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+.pay-steps ol { padding-left: 18px; }
+.pay-steps li { font-size: .83rem; color: var(--muted); padding: 3px 0; line-height: 1.5; }
+.pay-steps li strong { color: var(--text); }
+.pay-trust { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.pay-trust span { font-size: .75rem; color: var(--muted); }
+.pay-trust span::before { content: '✓  '; color: var(--ok); }
+
+/* ── Pending order screen ── */
+.pending-icon { background: rgba(201,168,76,.15); color: var(--gold); border-color: var(--gold); font-size: 2rem; font-weight: 700; }
+.pending-info { max-width: 400px; margin: 24px auto; padding: 20px; }
+.pending-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: .88rem; }
+.pending-row:last-child { border-bottom: none; }
+.adm-status--pending { background: rgba(201,168,76,0.12); color: var(--gold); border: 1px solid rgba(201,168,76,0.25); display:inline-block; font-size:.7rem; font-weight:700; padding:3px 9px; border-radius:12px; text-transform:uppercase; letter-spacing:.5px; }
+
+/* WhatsApp divider in payment form */
+.pay-wa-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.pay-wa-divider::before,
+.pay-wa-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--dim);
+}
+
+/* WhatsApp alt on pending screen */
+.cart-wa-alt {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: rgba(37,211,102,0.06);
+  border: 1px solid rgba(37,211,102,0.25);
+  border-radius: var(--r-sm);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.cart-wa-alt p {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin: 0;
+}

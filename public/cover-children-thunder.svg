@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560">
+  <defs>
+    <linearGradient id="bgct" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#05000f"/>
+      <stop offset="40%" stop-color="#0f0525"/>
+      <stop offset="75%" stop-color="#1a0840"/>
+      <stop offset="100%" stop-color="#050010"/>
+    </linearGradient>
+    <linearGradient id="land_ct" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f0820"/>
+      <stop offset="100%" stop-color="#030008"/>
+    </linearGradient>
+    <linearGradient id="ov_ct" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.3)"/>
+      <stop offset="40%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.92)"/>
+    </linearGradient>
+    <radialGradient id="lbolt" cx="55%" cy="30%" r="40%">
+      <stop offset="0%" stop-color="rgba(160,120,255,0.6)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <filter id="glow_ct">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="strike_glow">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark sky -->
+  <rect width="400" height="560" fill="url(#bgct)"/>
+
+  <!-- Storm cloud glow -->
+  <ellipse cx="200" cy="120" rx="220" ry="90" fill="#1a0840" opacity="0.9"/>
+  <ellipse cx="150" cy="90" rx="130" ry="60" fill="#220a50" opacity="0.7"/>
+  <ellipse cx="280" cy="100" rx="110" ry="55" fill="#200848" opacity="0.7"/>
+
+  <!-- Lightning glow radial -->
+  <rect width="400" height="400" fill="url(#lbolt)"/>
+
+  <!-- Main lightning bolt -->
+  <g filter="url(#strike_glow)">
+    <path d="M220,20 L195,110 L215,110 L185,220 L205,220 L165,330" stroke="#e0d0ff" stroke-width="3" fill="none" opacity="0.95"/>
+    <path d="M220,20 L195,110 L215,110 L185,220 L205,220 L165,330" stroke="white" stroke-width="1.5" fill="none" opacity="0.9"/>
+  </g>
+
+  <!-- Secondary lightning bolts -->
+  <g opacity="0.45">
+    <path d="M90,40 L72,100 L85,100 L60,170" stroke="#c0a0ff" stroke-width="2" fill="none"/>
+    <path d="M320,55 L340,120 L328,120 L350,185" stroke="#c0a0ff" stroke-width="2" fill="none"/>
+  </g>
+
+  <!-- Stars peeking through clouds -->
+  <g fill="white" opacity="0.5">
+    <circle cx="30" cy="30" r="1"/><circle cx="370" cy="25" r="0.9"/>
+    <circle cx="20" cy="60" r="0.8"/><circle cx="380" cy="60" r="0.8"/>
+    <circle cx="50" cy="15" r="0.7"/><circle cx="350" cy="15" r="0.7"/>
+  </g>
+
+  <!-- Earth / mystical landscape -->
+  <rect x="0" y="295" width="400" height="265" fill="url(#land_ct)"/>
+
+  <!-- Mystical tree (baobab-like, ancient) -->
+  <g>
+    <!-- Trunk -->
+    <path d="M180,380 Q185,340 190,295 Q195,260 200,230 Q205,260 210,295 Q215,340 220,380" fill="#080315" stroke="#180830" stroke-width="1"/>
+    <!-- Roots spread -->
+    <path d="M180,380 Q160,390 135,385" stroke="#080315" stroke-width="6" fill="none"/>
+    <path d="M185,385 Q170,400 150,400" stroke="#080315" stroke-width="5" fill="none"/>
+    <path d="M220,380 Q240,390 265,385" stroke="#080315" stroke-width="6" fill="none"/>
+    <path d="M215,385 Q230,400 250,400" stroke="#080315" stroke-width="5" fill="none"/>
+    <!-- Branches -->
+    <path d="M200,230 Q175,210 155,200" stroke="#080315" stroke-width="5" fill="none"/>
+    <path d="M200,230 Q225,210 245,200" stroke="#080315" stroke-width="5" fill="none"/>
+    <path d="M200,245 Q170,230 145,225" stroke="#080315" stroke-width="4" fill="none"/>
+    <path d="M200,245 Q230,230 255,225" stroke="#080315" stroke-width="4" fill="none"/>
+    <path d="M200,260 Q185,245 175,240" stroke="#080315" stroke-width="3" fill="none"/>
+    <path d="M200,260 Q215,245 225,240" stroke="#080315" stroke-width="3" fill="none"/>
+    <!-- Purple leaf clusters -->
+    <ellipse cx="148" cy="197" rx="22" ry="14" fill="#2a0850" opacity="0.85"/>
+    <ellipse cx="245" cy="197" rx="22" ry="14" fill="#2a0850" opacity="0.85"/>
+    <ellipse cx="136" cy="222" rx="20" ry="12" fill="#350a60" opacity="0.75"/>
+    <ellipse cx="256" cy="222" rx="20" ry="12" fill="#350a60" opacity="0.75"/>
+    <ellipse cx="170" cy="238" rx="18" ry="11" fill="#2a0850" opacity="0.7"/>
+    <ellipse cx="228" cy="238" rx="18" ry="11" fill="#2a0850" opacity="0.7"/>
+    <!-- Bioluminescent fruits -->
+    <circle cx="148" cy="193" r="3" fill="#a060ff" opacity="0.8" filter="url(#glow_ct)"/>
+    <circle cx="247" cy="194" r="3" fill="#a060ff" opacity="0.8" filter="url(#glow_ct)"/>
+    <circle cx="136" cy="218" r="2.5" fill="#8040e0" opacity="0.7" filter="url(#glow_ct)"/>
+    <circle cx="258" cy="219" r="2.5" fill="#8040e0" opacity="0.7" filter="url(#glow_ct)"/>
+  </g>
+
+  <!-- Girl silhouette (the protagonist) -->
+  <g fill="#08030f">
+    <!-- body -->
+    <rect x="193" y="360" width="14" height="22" rx="2"/>
+    <!-- head -->
+    <circle cx="200" cy="354" r="7"/>
+    <!-- hair/crown -->
+    <path d="M193,352 Q196,342 200,348 Q204,342 207,352" fill="#08030f"/>
+    <!-- arms reaching up -->
+    <line x1="193" y1="366" x2="180" y2="350" stroke="#08030f" stroke-width="4" stroke-linecap="round"/>
+    <line x1="207" y1="366" x2="220" y2="350" stroke="#08030f" stroke-width="4" stroke-linecap="round"/>
+    <!-- legs -->
+    <rect x="194" y="381" width="5" height="14" rx="2"/>
+    <rect x="201" y="381" width="5" height="14" rx="2"/>
+  </g>
+
+  <!-- Purple/violet glow around girl's hands (she commands lightning) -->
+  <circle cx="180" cy="350" r="6" fill="#a060ff" opacity="0.5" filter="url(#glow_ct)"/>
+  <circle cx="220" cy="350" r="6" fill="#a060ff" opacity="0.5" filter="url(#glow_ct)"/>
+
+  <!-- Mystical runes/symbols in the ground -->
+  <g stroke="#4010a0" stroke-width="1" fill="none" opacity="0.5">
+    <circle cx="120" cy="420" r="12"/>
+    <text x="120" y="424" font-size="10" fill="#4010a0" text-anchor="middle" font-family="serif">⚡</text>
+    <circle cx="280" cy="420" r="12"/>
+    <text x="280" y="424" font-size="10" fill="#4010a0" text-anchor="middle" font-family="serif">⚡</text>
+  </g>
+
+  <!-- Overlay -->
+  <rect width="400" height="560" fill="url(#ov_ct)"/>
+
+  <!-- Gold accent -->
+  <rect x="0" y="372" width="400" height="2" fill="#c9a84c" opacity="0.5"/>
+
+  <!-- Title -->
+  <text x="200" y="406" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#e8d0ff" text-anchor="middle" letter-spacing="1">CHILDREN OF</text>
+  <text x="200" y="440" font-family="Georgia, serif" font-size="28" font-weight="bold" fill="#e8d0ff" text-anchor="middle" letter-spacing="2">THUNDER</text>
+
+  <!-- Line -->
+  <line x1="80" y1="452" x2="320" y2="452" stroke="#a060ff" stroke-width="1" opacity="0.7"/>
+  <text x="200" y="467" font-family="Georgia, serif" font-size="11" fill="#a060ff" text-anchor="middle" letter-spacing="2" font-style="italic">An Epic East African Fantasy</text>
+
+  <!-- Author -->
+  <text x="200" y="493" font-family="Georgia, serif" font-size="13" fill="#c9a84c" text-anchor="middle" letter-spacing="2" font-style="italic">Elijah Mwangi M</text>
+
+  <!-- Publisher -->
+  <text x="200" y="518" font-family="Arial, sans-serif" font-size="9" fill="#c9a84c" text-anchor="middle" letter-spacing="1.5" opacity="0.7">ELLINES HAVEN</text>
+
+  <!-- Genre -->
+  <rect x="152" y="524" width="96" height="18" rx="9" fill="rgba(160,96,255,0.12)" stroke="#a060ff" stroke-width="0.8" opacity="0.8"/>
+  <text x="200" y="536" font-family="Arial, sans-serif" font-size="8.5" fill="#a060ff" text-anchor="middle" letter-spacing="1.5">EPIC FANTASY</text>
+</svg>

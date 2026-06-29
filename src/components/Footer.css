@@ -1,0 +1,272 @@
+/* ═══════════════════════════════════════════════════════
+   FOOTER  ·  Ellines Haven  ·  Full redesign
+═══════════════════════════════════════════════════════ */
+
+.footer {
+  background: #07071a;
+  margin-top: 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* subtle background texture */
+.footer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 60% at 10% 20%, rgba(201,168,76,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 90% 80%, rgba(80,80,200,0.04) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* ── Top decorative band ────────────────────────────── */
+.footer__topband {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 28px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-top: 48px;
+}
+.footer__topband-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,168,76,0.45), transparent);
+}
+.footer__topband-mark {
+  color: var(--gold);
+  font-size: 1rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* ── Main grid ──────────────────────────────────────── */
+.footer__main {
+  padding: 44px 0 52px;
+  position: relative;
+  z-index: 1;
+}
+.footer__grid {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+/* ── Brand column ───────────────────────────────────── */
+.footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.footer__logo-link {
+  display: inline-block;
+  width: fit-content;
+}
+.footer__logo {
+  height: 52px;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 12px rgba(201,168,76,0.3));
+}
+.footer__tagline {
+  color: rgba(240,236,226,0.5);
+  font-size: 0.88rem;
+  line-height: 1.75;
+  max-width: 320px;
+  margin: 0;
+}
+
+/* Contact chips */
+.footer__contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.footer__contact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: rgba(240,236,226,0.55);
+  padding: 5px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.03);
+  transition: all 0.2s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.footer__contact-chip:hover {
+  color: var(--gold);
+  border-color: rgba(201,168,76,0.35);
+  background: rgba(201,168,76,0.06);
+}
+.footer__contact-chip--wa {
+  color: #25D366;
+  border-color: rgba(37,211,102,0.25);
+  background: rgba(37,211,102,0.05);
+}
+.footer__contact-chip--wa:hover {
+  color: #25D366;
+  border-color: rgba(37,211,102,0.5);
+  background: rgba(37,211,102,0.1);
+}
+.footer__contact-chip--loc { cursor: default; }
+.footer__contact-chip--loc:hover { color: rgba(240,236,226,0.55); border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+
+/* Payment badges */
+.footer__payments {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.footer__pay-label {
+  font-size: 0.72rem;
+  color: rgba(240,236,226,0.35);
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.footer__pay-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(201,168,76,0.09);
+  border: 1px solid rgba(201,168,76,0.22);
+  color: var(--gold);
+}
+
+/* ── Nav columns ────────────────────────────────────── */
+.footer__col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.footer__col-heading {
+  font-family: 'Playfair Display', serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 14px;
+  letter-spacing: 0.5px;
+}
+.footer__link {
+  display: block;
+  color: rgba(240,236,226,0.52);
+  font-size: 0.85rem;
+  padding: 5px 0;
+  transition: color 0.2s, padding-left 0.2s;
+  text-decoration: none;
+  line-height: 1.4;
+}
+.footer__link:hover {
+  color: rgba(240,236,226,0.92);
+  padding-left: 6px;
+}
+.footer__link--ext {
+  color: rgba(201,168,76,0.55);
+  margin-top: 4px;
+}
+.footer__link--ext:hover { color: var(--gold); }
+
+/* ── Quote strip ────────────────────────────────────── */
+.footer__quote-strip {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid rgba(201,168,76,0.1);
+  border-bottom: 1px solid rgba(201,168,76,0.1);
+  padding: 28px 0;
+  background: rgba(201,168,76,0.025);
+}
+.footer__quote {
+  margin: 0;
+  text-align: center;
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(0.88rem, 1.4vw, 1.05rem);
+  font-style: italic;
+  color: rgba(240,236,226,0.45);
+  line-height: 1.6;
+}
+.footer__quote cite {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(201,168,76,0.5);
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+/* ── Bottom bar ─────────────────────────────────────── */
+.footer__bottom {
+  position: relative;
+  z-index: 1;
+  padding: 20px 0 24px;
+}
+.footer__bottom-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.footer__copy {
+  color: rgba(240,236,226,0.28);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.footer__devby {
+  color: rgba(240,236,226,0.28);
+  font-size: 0.78rem;
+  margin: 0;
+}
+.footer__devby a {
+  color: rgba(201,168,76,0.6);
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.footer__devby a:hover { color: var(--gold); }
+
+/* Legal links row */
+.footer__legal-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.footer__legal-link {
+  color: rgba(240,236,226,0.32);
+  font-size: 0.76rem;
+  text-decoration: none;
+  transition: color .2s;
+}
+.footer__legal-link:hover { color: var(--gold); }
+.footer__legal-sep {
+  color: rgba(240,236,226,0.18);
+  font-size: 0.76rem;
+  user-select: none;
+}
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 960px) {
+  .footer__grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+  }
+  .footer__brand { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .footer__grid { grid-template-columns: 1fr; gap: 28px; }
+  .footer__brand { grid-column: auto; }
+  .footer__bottom-inner { flex-direction: column; text-align: center; gap: 8px; }
+  .footer__topband { padding-top: 36px; }
+}

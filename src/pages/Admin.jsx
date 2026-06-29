@@ -1,0 +1,3347 @@
+import { useState, useEffect, useRef } from 'react';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
+import { BASE_ACCOUNTS } from './Login';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../firebase';
+import PageEditorPanel   from './admin-panels/PageEditorPanel';
+import DesignStudioPanel from './admin-panels/DesignStudioPanel';
+import SecurityPanel     from './admin-panels/SecurityPanel';
+import PluginsPanel      from './admin-panels/PluginsPanel';
+import GodModePanel      from './admin-panels/GodModePanel';
+import IntegrationsPanel from './admin-panels/IntegrationsPanel';
+import MessagesPanel     from './admin-panels/MessagesPanel';
+import ReportsPanel      from './admin-panels/ReportsPanel';
+import ReviewsPanel      from './admin-panels/ReviewsPanel';
+import './Admin.css';
+
+const EMPTY_BOOK = {
+  id: '', title: '', author: 'Elijah Mwangi M', cover: null, coverType: 'styled',
+  coverColor: 'linear-gradient(145deg,#0f0f22,#1a1a3a)', coverAccent: '#c9a84c',
+  genre: 'Drama', type: 'novel', price: 250, pages: 0, rating: 5.0, reviews: 0,
+  inspired: true, inspiredNote: '', excerpt: '', description: '',
+  featured: false, isNew: true,
+  status: 'complete',
+  chaptersReleased: 0,  // for ongoing: how many chapters are out now
+  totalChapters: 0,     // for ongoing: total planned chapters (0 = unknown)
+  date: new Date().toISOString().slice(0, 10), readTime: '5 hrs',
+  driveUrl: '', chapters: [],
+};
+
+const BOOK_STATUSES = [
+  { value:'complete',     label:'✅ Complete',       color:'#2ecc71', bg:'rgba(46,204,113,0.12)',  desc:'Fully published, all content available'   },
+  { value:'ongoing',      label:'📖 Ongoing',        color:'#4a9eff', bg:'rgba(74,158,255,0.12)',  desc:'Releasing in chapters / being written'     },
+  { value:'premium',      label:'⭐ Premium',         color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Exclusive paid content, no free preview'   },
+  { value:'free-preview', label:'👀 Free Preview',    color:'#a855f7', bg:'rgba(168,85,247,0.12)',  desc:'First chapters free, rest requires purchase'},
+  { value:'coming-soon',  label:'🔜 Coming Soon',     color:'#e8832a', bg:'rgba(232,131,42,0.12)',  desc:'Announced, not yet available'              },
+  { value:'limited',      label:'⏳ Limited Edition', color:'#e74c3c', bg:'rgba(231,76,60,0.12)',   desc:'Available for a limited time only'         },
+  { value:'draft',        label:'📝 Draft',           color:'#64748b', bg:'rgba(100,116,139,0.12)', desc:'Work in progress — not shown publicly'     },
+];
+
+const GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
+
+// buildUserList now accepts a suspendedList from Firestore context (passed in)
+// so the status column reflects real-time Firestore suspension, not localStorage
+function buildUserList(suspendedList = []) {
+  const deleted    = JSON.parse(localStorage.getItem('eh_deleted_users')    || '[]');
+  const roleChanges= JSON.parse(localStorage.getItem('eh_role_overrides')   || '{}');
+  const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+  // Merge Firestore suspended list with legacy localStorage list
+  const legacySusp = JSON.parse(localStorage.getItem('eh_suspended_users')  || '[]');
+  const suspended  = [...new Set([...suspendedList, ...legacySusp])];
+  const all = BASE_ACCOUNTS
+    .filter(a => !deleted.includes(a.email.toLowerCase()))
+    .map(a => ({ id:a.id, name:a.name, email:a.email, role:roleChanges[a.email.toLowerCase()]||a.role, joined:a.joined||'', books:0, status:suspended.includes(a.email.toLowerCase())?'Suspended':'Active' }));
+  registered.forEach(r => {
+    const email = r.email.toLowerCase();
+    if (deleted.includes(email)) return;
+    if (all.find(u => u.email.toLowerCase()===email)) return;
+    all.push({ id:r.id, name:r.name, email:r.email, role:roleChanges[email]||r.role||'user', joined:r.joined||'', books:0, status:suspended.includes(email)?'Suspended':'Active' });
+  });
+  return all;
+}
+
+const MOCK_REVIEWS_INIT = [
+  { id:'r1', user:'Amina Njeri',   book:'Marriage Is a Scam', rating:5, text:'Absolutely gripping. Read it in one sitting.',          date:'2024-11-02', status:'Published' },
+  { id:'r2', user:'Brian Ochieng', book:'Pain',               rating:5, text:'Rawly honest. Hit close to home.',                      date:'2024-11-04', status:'Published' },
+  { id:'r3', user:'Sarah Kamau',   book:'Seven Sunsets',      rating:4, text:'Beautiful collection. Lake Victoria was my favourite.', date:'2024-11-06', status:'Pending'   },
+  { id:'r4', user:'Grace Akinyi',  book:'The Acacia Road',    rating:5, text:'A tender romance that felt completely real.',           date:'2024-11-10', status:'Published' },
+];
+
+const PROMO_INIT = [
+  { id:'p1', code:'HAVEN10',  discount:'10%',    type:'Percentage', uses:34, active:true,  expires:'2025-02-28' },
+  { id:'p2', code:'LAUNCH50', discount:'KSh 50', type:'Fixed',      uses:12, active:true,  expires:'2025-01-31' },
+  { id:'p3', code:'VIP20',    discount:'20%',    type:'Percentage', uses: 5, active:false, expires:'2024-12-31' },
+];
+
+// ── Photo constants & helpers ────────────────────────────────────────────────
+
+const PUBLIC_COVERS = [
+  { name:'cover-marriage-is-a-scam.png', url:'/cover-marriage-is-a-scam.png', path:'pub/cover-marriage-is-a-scam.png', uploadedAt:1700000001000, size:0, isPublic:true },
+  { name:'cover-pain.png',               url:'/cover-pain.png',               path:'pub/cover-pain.png',               uploadedAt:1700000002000, size:0, isPublic:true },
+  { name:'cover-chasing-her-ghosts.png', url:'/cover-chasing-her-ghosts.png', path:'pub/cover-chasing-her-ghosts.png', uploadedAt:1700000003000, size:0, isPublic:true },
+  { name:'cover-the-last-chapter.png',   url:'/cover-the-last-chapter.png',   path:'pub/cover-the-last-chapter.png',   uploadedAt:1700000004000, size:0, isPublic:true },
+  { name:'cover-19-days.png',            url:'/cover-19-days.png',            path:'pub/cover-19-days.png',            uploadedAt:1700000005000, size:0, isPublic:true },
+  { name:'cover-echoes-savanna.svg',     url:'/cover-echoes-savanna.svg',     path:'pub/cover-echoes-savanna.svg',     uploadedAt:1700000006000, size:0, isPublic:true },
+  { name:'cover-seven-sunsets.svg',      url:'/cover-seven-sunsets.svg',      path:'pub/cover-seven-sunsets.svg',      uploadedAt:1700000007000, size:0, isPublic:true },
+  { name:'cover-midnight-mombasa.svg',   url:'/cover-midnight-mombasa.svg',   path:'pub/cover-midnight-mombasa.svg',   uploadedAt:1700000008000, size:0, isPublic:true },
+  { name:'cover-acacia-road.svg',        url:'/cover-acacia-road.svg',        path:'pub/cover-acacia-road.svg',        uploadedAt:1700000009000, size:0, isPublic:true },
+  { name:'cover-children-thunder.svg',   url:'/cover-children-thunder.svg',   path:'pub/cover-children-thunder.svg',  uploadedAt:1700000010000, size:0, isPublic:true },
+  { name:'cover-nairobi-nights.svg',     url:'/cover-nairobi-nights.svg',     path:'pub/cover-nairobi-nights.svg',     uploadedAt:1700000011000, size:0, isPublic:true },
+];
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+const fmtSize     = b => !b ? '' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+const ALLOWED_IMG = ['image/jpeg','image/png','image/webp','image/svg+xml','image/gif'];
+
+// ── Lightbox viewer with zoom/pan ────────────────────────────────────────────
+function Lightbox({ photo, onClose }) {
+  const [zoom, setZoom] = useState(1);
+  const [pos, setPos]   = useState({ x:0, y:0 });
+  const dragRef         = useRef(null);
+  useEffect(() => {
+    const k = e => { if(e.key==='Escape') onClose(); };
+    window.addEventListener('keydown',k);
+    document.body.style.overflow='hidden';
+    return () => { window.removeEventListener('keydown',k); document.body.style.overflow=''; };
+  },[onClose]);
+  const wheel = e => { e.preventDefault(); setZoom(z=>Math.max(0.5,Math.min(5,z-e.deltaY*0.001))); };
+  const mdown = e => { dragRef.current={sx:e.clientX-pos.x,sy:e.clientY-pos.y}; };
+  const mmove = e => { if(dragRef.current) setPos({x:e.clientX-dragRef.current.sx,y:e.clientY-dragRef.current.sy}); };
+  const mup   = () => { dragRef.current=null; };
+  const reset = () => { setZoom(1); setPos({x:0,y:0}); };
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.93)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}
+      onClick={e=>e.target===e.currentTarget&&onClose()} onMouseMove={mmove} onMouseUp={mup} onWheel={wheel}>
+      <div style={{position:'absolute',top:14,right:14,display:'flex',gap:8,zIndex:1}}>
+        <button onClick={()=>setZoom(z=>Math.min(5,z+0.5))} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:'1.1rem'}}>＋</button>
+        <button onClick={()=>setZoom(z=>Math.max(0.5,z-0.5))} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:'1.1rem'}}>－</button>
+        <button onClick={reset} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'5px 10px',cursor:'pointer',fontSize:'0.78rem'}}>Reset</button>
+        <button onClick={onClose} style={{background:'rgba(231,76,60,0.8)',border:'none',color:'#fff',borderRadius:6,padding:'6px 14px',cursor:'pointer',fontSize:'1rem',fontWeight:700}}>✕</button>
+      </div>
+      <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',color:'rgba(255,255,255,0.45)',fontSize:'0.72rem',whiteSpace:'nowrap'}}>
+        Scroll to zoom · Drag to pan · ESC to close · {Math.round(zoom*100)}%
+      </div>
+      <img src={photo.url} alt={photo.name} onMouseDown={mdown}
+        style={{maxWidth:'90vw',maxHeight:'90vh',objectFit:'contain',borderRadius:8,
+          transform:`scale(${zoom}) translate(${pos.x/zoom}px,${pos.y/zoom}px)`,
+          transformOrigin:'center',transition:dragRef.current?'none':'transform 0.1s',
+          cursor:zoom>1?'grab':'zoom-in',userSelect:'none',display:'block'}} />
+    </div>
+  );
+}
+
+// ── Image compression + base64 storage (no Firebase Storage auth needed) ────
+// Compresses image to max 800px wide / 200KB before storing in Firestore
+
+function compressImage(file, maxW = 600, quality = 0.65) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width  * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // SVG files can't be compressed — use original FileReader
+      const type = file.type === 'image/svg+xml' ? 'image/svg+xml' : 'image/jpeg';
+      if (type === 'image/svg+xml') {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      } else {
+        resolve(canvas.toDataURL(type, quality));
+      }
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function uploadFileToStorage(file) {
+  // Compress first — keeps base64 well under Firestore's 1MB field limit
+  const dataUrl = await compressImage(file);
+  // path is local — no Firebase Storage used
+  const path = `local/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  return { url: dataUrl, path };
+}
+
+function usePhotoUpload(fsKey) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress,  setProgress]  = useState('');
+  const [uploadErr, setUploadErr] = useState('');
+
+  const upload = async (files, currentList, onSaved) => {
+    setUploadErr('');
+    const OK = ['image/jpeg','image/png','image/webp','image/svg+xml','image/gif'];
+    const valid = Array.from(files||[]).filter(f => OK.includes(f.type));
+    if (!valid.length)    { setUploadErr('Only JPG, PNG, WebP, or SVG files'); return; }
+    if (valid.length > 5) { setUploadErr('Max 5 files at a time'); return; }
+    setUploading(true);
+    const added = [];
+    for (let i = 0; i < valid.length; i++) {
+      const file = valid[i];
+      setProgress('Compressing ' + (i+1) + '/' + valid.length + ': ' + file.name);
+      try {
+        const { url, path } = await uploadFileToStorage(file);
+        added.push({ name:file.name, url, path, uploadedAt:Date.now(), size:file.size, isPublic:false });
+      } catch(e) {
+        setUploadErr('Failed: ' + file.name + ' - ' + e.message);
+      }
+    }
+    if (added.length) {
+      setProgress('Saving to library...');
+      try {
+        const merged = [...added, ...(currentList||[])];
+        const meta = merged.map(p => ({ name:p.name, url:p.url, path:p.path, uploadedAt:p.uploadedAt||0, size:p.size||0, isPublic:!!p.isPublic }));
+        await setDoc(doc(db,'site_data',fsKey), { list:meta }, { merge:true });
+        setUploadErr('');
+        onSaved(meta);
+      } catch(e) {
+        setUploadErr('Save failed: ' + e.message);
+        onSaved([...added, ...(currentList||[])]);
+      }
+    }
+    setUploading(false); setProgress('');
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return { fileRef, uploading, progress, uploadErr, setUploadErr, upload };
+}
+
+// ── Shared drop zone ──────────────────────────────────────────────────────────
+function DropZone({uploading,progress,fileRef,onFiles}) {
+  const [over,setOver]=useState(false);
+  return (
+    <div className={'adm-photo-dropzone'+(over?' over':'')}
+      onDragOver={e=>{e.preventDefault();setOver(true);}} onDragLeave={()=>setOver(false)}
+      onDrop={e=>{e.preventDefault();setOver(false);onFiles(e.dataTransfer.files);}}
+      onClick={()=>!uploading&&fileRef.current?.click()}>
+      {uploading
+        ? <><div className="adm-photo-spinner"/><p style={{marginTop:10,color:'var(--gold)',fontWeight:600}}>{progress}</p><p style={{fontSize:'0.75rem',color:'var(--muted)',marginTop:4}}>Please wait…</p></>
+        : <><span style={{fontSize:'2.5rem'}}>📤</span><p style={{marginTop:10,fontWeight:600}}>Drag &amp; drop or <span style={{color:'var(--gold)'}}>click to browse</span></p><p style={{fontSize:'0.75rem',color:'var(--muted)',marginTop:6}}>JPG · PNG · WebP · SVG · max 10 · Stored in Firebase</p></>}
+    </div>
+  );
+}
+
+// ── Photo thumbnail card ──────────────────────────────────────────────────────
+function PhotoThumb({photo,selected,onToggle,actions,usedBy,onPreview}) {
+  const sz = !photo.size?'':photo.size<1048576?(photo.size/1024).toFixed(1)+' KB':(photo.size/1048576).toFixed(1)+' MB';
+  return (
+    <div className={'adm-photo-card card'+(selected?' adm-photo-selected':'')} style={{cursor:'default'}}>
+      <div className="adm-photo-img-wrap" onClick={onPreview} style={{cursor:'zoom-in'}}>
+        <img src={photo.url} alt={photo.name} className="adm-photo-img" loading="lazy"/>
+        <div className="adm-photo-preview-hint">🔍 View</div>
+        <div className={'adm-photo-check'+(selected?' on':'')} onClick={e=>{e.stopPropagation();onToggle();}}>
+          {selected?'✓':''}
+        </div>
+        {usedBy>0&&<div className="adm-photo-used-badge">✓ {usedBy} book{usedBy!==1?'s':''}</div>}
+        {photo.isPublic&&<div className="adm-photo-public-badge">Built-in</div>}
+      </div>
+      <div className="adm-photo-info">
+        <p className="adm-photo-name" title={photo.name}>{photo.name}</p>
+        {sz&&<p className="adm-photo-meta">{sz}</p>}
+        <div className="adm-photo-actions">{actions}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Novel Covers Tab ──────────────────────────────────────────────────────────
+function CoversTab({books,saveBook,showToast}) {
+  const [photos,setPhotos]         = useState([]);
+  const [loading,setLoading]       = useState(true);
+  const [selected,setSelected]     = useState([]);
+  const [assignTo,setAssignTo]     = useState(null);
+  const [preview,setPreview]       = useState(null);
+  const [delOne,setDelOne]         = useState(null);
+  const [bulkDel,setBulkDel]       = useState(false);
+  const {fileRef,uploading,progress,uploadErr,setUploadErr,upload} = usePhotoUpload('novel_covers');
+
+  const FSKEY = 'novel_covers';
+  const sorted = list => [...list].sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+
+  useEffect(()=>{
+    setLoading(true);
+    getDoc(doc(db,'site_data',FSKEY)).then(snap=>{
+      let list = snap.exists()?(snap.data().list||[]):[];
+      const have = new Set(list.map(p=>p.path));
+      const miss = PUBLIC_COVERS.filter(c=>!have.has(c.path));
+      if(miss.length){ list=[...list,...miss]; setDoc(doc(db,'site_data',FSKEY),{list},{ merge:true}); }
+      setPhotos(sorted(list));
+    }).catch(()=>setPhotos([...PUBLIC_COVERS])).finally(()=>setLoading(false));
+  },[]);
+
+  const persist = async list=>{
+    const meta=list.map(p=>({name:p.name,url:p.url,path:p.path,uploadedAt:p.uploadedAt||0,size:p.size||0,isPublic:!!p.isPublic}));
+    await setDoc(doc(db,'site_data',FSKEY),{list:meta},{merge:true});
+    setPhotos(sorted(meta));
+  };
+
+  const removeOne = async p=>{ const next=photos.filter(x=>x.path!==p.path); try{await persist(next);}catch{setPhotos(next);} setSelected(s=>s.filter(x=>x!==p.path)); showToast('Cover removed'); setDelOne(null); };
+  const removeBulk= async ()=>{ const next=photos.filter(p=>!selected.includes(p.path)); try{await persist(next);}catch{setPhotos(next);} showToast(selected.length+' deleted'); setSelected([]); setBulkDel(false); };
+  const assign    = b=>{ saveBook({...b,cover:assignTo.url,coverType:'photo'}); showToast('Cover set for "'+b.title+'"'); setAssignTo(null); };
+  const toggle    = p=>setSelected(s=>s.includes(p)?s.filter(x=>x!==p):[...s,p]);
+  const onSaved   = list=>setPhotos(sorted(list));
+
+  const grid = list => list.map(photo=>{
+    const used=books.filter(b=>b.coverType==='photo'&&b.cover===photo.url).length;
+    return <PhotoThumb key={photo.path} photo={photo} selected={selected.includes(photo.path)}
+      onToggle={()=>toggle(photo.path)} usedBy={used} onPreview={()=>setPreview(photo)}
+      actions={<><button className="adm-act-btn adm-act-edit" onClick={()=>setAssignTo(photo)}>Set as Cover</button><button className="adm-act-btn adm-act-del" onClick={()=>setDelOne(photo)}>Remove</button></>}/>;
+  });
+
+  return (
+    <div className="adm-page">
+      {preview&&<Lightbox photo={preview} onClose={()=>setPreview(null)}/>}
+      {assignTo&&(
+        <div className="adm-overlay">
+          <div className="adm-confirm card" style={{maxWidth:600,textAlign:'left'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <h3 style={{fontSize:'1rem'}}>Set as Book Cover</h3>
+              <button className="adm-close-btn" onClick={()=>setAssignTo(null)}>✕</button>
+            </div>
+            <div style={{display:'flex',gap:16,marginBottom:20}}>
+              <img src={assignTo.url} alt="" style={{width:70,height:98,objectFit:'cover',borderRadius:6,border:'1px solid var(--dim)',flexShrink:0}}/>
+              <p style={{fontSize:'0.8rem',color:'var(--muted)'}}>Click a book to apply this image as its cover. Saves instantly.</p>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,maxHeight:320,overflowY:'auto'}}>
+              {books.map(b=>(
+                <button key={b.id} onClick={()=>assign(b)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:b.cover===assignTo.url?'rgba(201,168,76,0.12)':'rgba(255,255,255,0.03)',border:b.cover===assignTo.url?'1px solid rgba(201,168,76,0.5)':'1px solid var(--dim)',borderRadius:'var(--r-sm)',cursor:'pointer',textAlign:'left',width:'100%',transition:'all 0.15s'}}>
+                  {b.coverType==='photo'&&b.cover?<img src={b.cover} alt="" style={{width:26,height:38,objectFit:'cover',borderRadius:3,flexShrink:0}}/>:<div style={{width:26,height:38,background:b.coverColor||'#1a1a3a',borderRadius:3,flexShrink:0}}/>}
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:'0.78rem',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{b.title}</div>
+                    <div style={{fontSize:'0.68rem',color:b.cover===assignTo.url?'var(--gold)':'var(--muted)'}}>{b.cover===assignTo.url?'✓ Current':'Apply'}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',marginTop:16}}><button className="btn btn-ghost btn-sm" onClick={()=>setAssignTo(null)}>Close</button></div>
+          </div>
+        </div>
+      )}
+      {delOne&&<div className="adm-overlay"><div className="adm-confirm card"><p>Remove <strong style={{color:'var(--gold)'}}>{delOne.name}</strong>?</p><div className="adm-confirm-btns"><button className="btn btn-primary btn-sm" onClick={()=>removeOne(delOne)}>Yes</button><button className="btn btn-ghost btn-sm" onClick={()=>setDelOne(null)}>Cancel</button></div></div></div>}
+      {bulkDel&&<div className="adm-overlay"><div className="adm-confirm card"><p>Delete <strong style={{color:'var(--gold)'}}>{selected.length} cover(s)</strong>?</p><div className="adm-confirm-btns"><button className="btn btn-primary btn-sm" onClick={removeBulk}>Yes</button><button className="btn btn-ghost btn-sm" onClick={()=>setBulkDel(false)}>Cancel</button></div></div></div>}
+
+      <div className="adm-page-head">
+        <div><h1>Novel Covers</h1><span className="adm-page-sub">{photos.length} image(s) — upload covers and assign to books</span></div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          {selected.length>0&&<><span style={{fontSize:'0.82rem',color:'var(--gold)',fontWeight:600}}>{selected.length} selected</span><button className="btn btn-sm" style={{background:'rgba(231,76,60,0.12)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.35)'}} onClick={()=>setBulkDel(true)}>🗑 Delete</button><button className="btn btn-ghost btn-sm" onClick={()=>setSelected([])}>Clear</button></>}
+          {selected.length===0&&photos.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>setSelected(photos.map(p=>p.path))}>Select All</button>}
+          <button className="btn btn-primary" disabled={uploading} onClick={()=>fileRef.current?.click()}>{uploading?'⏳ Uploading…':'+ Upload Covers'}</button>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>upload(e.target.files,photos,onSaved)}/>
+      </div>
+      {uploadErr&&<div style={{background:'rgba(231,76,60,0.1)',border:'1px solid rgba(231,76,60,0.35)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:16,fontSize:'0.82rem',color:'#e74c3c',display:'flex',justifyContent:'space-between'}}><span>{uploadErr}</span><button onClick={()=>setUploadErr('')} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer'}}>✕</button></div>}
+      <DropZone uploading={uploading} progress={progress} fileRef={fileRef} onFiles={files=>upload(files,photos,onSaved)}/>
+      {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading…</div>
+        :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>🎨</div><p>No covers yet. Upload above.</p></div>
+        :<>
+          {photos.some(p=>!p.isPublic)&&<><p style={{fontSize:'0.72rem',color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Uploaded Covers</p><div className="adm-photo-grid" style={{marginBottom:28}}>{grid(photos.filter(p=>!p.isPublic))}</div></>}
+          {photos.some(p=>p.isPublic)&&<><p style={{fontSize:'0.72rem',color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Built-in Covers</p><div className="adm-photo-grid">{grid(photos.filter(p=>p.isPublic))}</div></>}
+        </>}
+    </div>
+  );
+}
+
+// ── Site Photos Tab ───────────────────────────────────────────────────────────
+function PhotosTab({showToast}) {
+  const [photos,setPhotos]     = useState([]);
+  const [loading,setLoading]   = useState(true);
+  const [selected,setSelected] = useState([]);
+  const [preview,setPreview]   = useState(null);
+  const [delOne,setDelOne]     = useState(null);
+  const [bulkDel,setBulkDel]   = useState(false);
+  const [copied,setCopied]     = useState('');
+  const {fileRef,uploading,progress,uploadErr,setUploadErr,upload} = usePhotoUpload('site_photos');
+
+  const FSKEY  = 'site_photos';
+  const sorted = list => [...list].sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+
+  useEffect(()=>{
+    setLoading(true);
+    getDoc(doc(db,'site_data',FSKEY)).then(snap=>{
+      const list=snap.exists()?(snap.data().list||[]):[];
+      setPhotos(sorted(list));
+    }).catch(()=>setPhotos([])).finally(()=>setLoading(false));
+  },[]);
+
+  const persist = async list=>{
+    const meta=list.map(p=>({name:p.name,url:p.url,path:p.path,uploadedAt:p.uploadedAt||0,size:p.size||0,isPublic:false}));
+    await setDoc(doc(db,'site_data',FSKEY),{list:meta},{merge:true});
+    setPhotos(sorted(meta));
+  };
+
+  const removeOne = async p=>{ const next=photos.filter(x=>x.path!==p.path); try{await persist(next);}catch{setPhotos(next);} setSelected(s=>s.filter(x=>x!==p.path)); showToast('Photo removed'); setDelOne(null); };
+  const removeBulk= async ()=>{ const next=photos.filter(p=>!selected.includes(p.path)); try{await persist(next);}catch{setPhotos(next);} showToast(selected.length+' deleted'); setSelected([]); setBulkDel(false); };
+  const toggle    = p=>setSelected(s=>s.includes(p)?s.filter(x=>x!==p):[...s,p]);
+  const onSaved   = list=>setPhotos(sorted(list));
+
+  const copy = url => {
+    navigator.clipboard.writeText(url).then(()=>{ setCopied('URL copied!'); setTimeout(()=>setCopied(''),2000); }).catch(()=>setCopied('Copy failed'));
+  };
+
+  return (
+    <div className="adm-page">
+      {preview&&<Lightbox photo={preview} onClose={()=>setPreview(null)}/>}
+      {delOne&&<div className="adm-overlay"><div className="adm-confirm card"><p>Remove <strong style={{color:'var(--gold)'}}>{delOne.name}</strong>?</p><div className="adm-confirm-btns"><button className="btn btn-primary btn-sm" onClick={()=>removeOne(delOne)}>Yes</button><button className="btn btn-ghost btn-sm" onClick={()=>setDelOne(null)}>Cancel</button></div></div></div>}
+      {bulkDel&&<div className="adm-overlay"><div className="adm-confirm card"><p>Delete <strong style={{color:'var(--gold)'}}>{selected.length} photo(s)</strong>?</p><div className="adm-confirm-btns"><button className="btn btn-primary btn-sm" onClick={removeBulk}>Yes</button><button className="btn btn-ghost btn-sm" onClick={()=>setBulkDel(false)}>Cancel</button></div></div></div>}
+
+      <div className="adm-page-head">
+        <div><h1>Site Photos</h1><span className="adm-page-sub">{photos.length} image(s) — banners, author photos, promotional images</span></div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          {selected.length>0&&<><span style={{fontSize:'0.82rem',color:'var(--gold)',fontWeight:600}}>{selected.length} selected</span><button className="btn btn-sm" style={{background:'rgba(231,76,60,0.12)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.35)'}} onClick={()=>setBulkDel(true)}>🗑 Delete</button><button className="btn btn-ghost btn-sm" onClick={()=>setSelected([])}>Clear</button></>}
+          {selected.length===0&&photos.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>setSelected(photos.map(p=>p.path))}>Select All</button>}
+          <button className="btn btn-primary" disabled={uploading} onClick={()=>fileRef.current?.click()}>{uploading?'⏳ Uploading…':'+ Upload Photos'}</button>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>upload(e.target.files,photos,onSaved)}/>
+      </div>
+      {copied&&<div style={{background:'rgba(46,204,113,0.1)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',padding:'8px 14px',marginBottom:12,fontSize:'0.82rem',color:'var(--ok)'}}>{copied}</div>}
+      {uploadErr&&<div style={{background:'rgba(231,76,60,0.1)',border:'1px solid rgba(231,76,60,0.35)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:16,fontSize:'0.82rem',color:'#e74c3c',display:'flex',justifyContent:'space-between'}}><span>{uploadErr}</span><button onClick={()=>setUploadErr('')} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer'}}>✕</button></div>}
+      <DropZone uploading={uploading} progress={progress} fileRef={fileRef} onFiles={files=>upload(files,photos,onSaved)}/>
+      {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading…</div>
+        :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>🖼️</div><p>No site photos yet. Upload banners or author images above.</p></div>
+        :<div className="adm-photo-grid">
+          {photos.map(photo=>(
+            <PhotoThumb key={photo.path} photo={photo} selected={selected.includes(photo.path)}
+              onToggle={()=>toggle(photo.path)} usedBy={0} onPreview={()=>setPreview(photo)}
+              actions={<><button className="adm-act-btn adm-act-edit" onClick={()=>copy(photo.url)}>Copy URL</button><button className="adm-act-btn adm-act-del" onClick={()=>setDelOne(photo)}>Remove</button></>}/>
+          ))}
+        </div>}
+    </div>
+  );
+}
+
+
+// -- BookForm --
+function BookForm({ initial, onSave, onCancel }) {
+  const [form, setForm] = useState({ ...EMPTY_BOOK, ...(initial||{}) });
+  // If cover is a data: URL or a path (not null/styled), start in 'library' mode
+  const initCoverMode = () => {
+    if (!initial) return 'styled';
+    if (initial.coverType === 'photo' && initial.cover) return 'library';
+    return 'styled';
+  };
+  const [coverMode, setCoverMode] = useState(initCoverMode);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [libPhotos, setLibPhotos] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    getDoc(doc(db,'site_data','novel_covers')).then(snap => {
+      const saved = snap.exists() ? (snap.data().list||[]) : [];
+      const paths = new Set(saved.map(p=>p.path));
+      const all = [...saved, ...PUBLIC_COVERS.filter(c=>!paths.has(c.path))];
+      all.sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+      setLibPhotos(all);
+    }).catch(()=>setLibPhotos([...PUBLIC_COVERS]));
+  }, [pickerOpen]);
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+    setSaving(true);
+    try {
+      onSave({
+        ...form,
+        id: form.id || String(Date.now()),
+        price: Number(form.price),
+        pages: Number(form.pages),
+        rating: Number(form.rating),
+        coverType: coverMode==='styled' ? 'styled' : 'photo',
+        cover: coverMode==='styled' ? null : (form.cover||null),
+      });
+    } catch(err) {
+      console.error('[BookForm] submit error:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="adm-overlay">
+      <div className="adm-bookform card">
+        <div className="adm-bookform-head">
+          <h2>{form.id ? 'Edit Book' : 'Add New Book'}</h2>
+          <button className="adm-close-btn" onClick={onCancel}>X</button>
+        </div>
+        <form onSubmit={handleSubmit} className="adm-bookform-body">
+          <div className="adm-form-grid">
+
+            <div className="adm-field-group adm-col-2">
+              <label>Title *</label>
+              <input className="field" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Book title" required/>
+            </div>
+
+            <div className="adm-field-group">
+              <label>Author</label>
+              <input className="field" value={form.author} onChange={e=>set('author',e.target.value)}/>
+            </div>
+
+            <div className="adm-field-group">
+              <label>Genre</label>
+              <select className="field" value={form.genre} onChange={e=>set('genre',e.target.value)}>
+                {GENRES.map(g=><option key={g}>{g}</option>)}
+              </select>
+            </div>
+
+            <div className="adm-field-group">
+              <label>Type</label>
+              <div className="adm-toggle-row">
+                <button type="button" className={'adm-toggle'+(form.type==='novel'?' on':'')} onClick={()=>set('type','novel')}>Novel</button>
+                <button type="button" className={'adm-toggle'+(form.type==='short-story'?' on':'')} onClick={()=>set('type','short-story')}>Short Story</button>
+              </div>
+            </div>
+
+            <div className="adm-field-group">
+              <label>Price (KSh)</label>
+              <input className="field" type="number" min={0} value={form.price} onChange={e=>set('price',e.target.value)}/>
+            </div>
+            <div className="adm-field-group">
+              <label>Pages</label>
+              <input className="field" type="number" min={0} value={form.pages} onChange={e=>set('pages',e.target.value)}/>
+            </div>
+            <div className="adm-field-group">
+              <label>Read Time</label>
+              <input className="field" value={form.readTime} onChange={e=>set('readTime',e.target.value)} placeholder="e.g. 6 hrs"/>
+            </div>
+            <div className="adm-field-group">
+              <label>Rating (0-5)</label>
+              <input className="field" type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e=>set('rating',e.target.value)}/>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Book Cover</label>
+              <div className="adm-toggle-row" style={{marginBottom:10}}>
+                <button type="button" className={'adm-toggle'+(coverMode==='styled'?' on':'')} onClick={()=>setCoverMode('styled')}>Styled (CSS)</button>
+                <button type="button" className={'adm-toggle'+(coverMode==='url'?' on':'')} onClick={()=>setCoverMode('url')}>Photo URL</button>
+                <button type="button" className={'adm-toggle'+(coverMode==='library'?' on':'')} onClick={()=>{setCoverMode('library');setPickerOpen(true);}}>Photo Library</button>
+              </div>
+
+              {coverMode!=='styled' && form.cover && (
+                <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10,padding:'8px 12px',background:'rgba(201,168,76,0.05)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)'}}>
+                  <img src={form.cover} alt="" style={{width:40,height:56,objectFit:'cover',borderRadius:4,flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{fontSize:'0.78rem',fontWeight:600,marginBottom:2}}>Current cover</p>
+                    <p style={{fontSize:'0.68rem',color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{form.cover&&form.cover.startsWith('data:')?'Uploaded image':form.cover}</p>
+                  </div>
+                  <button type="button" className="adm-act-btn adm-act-del" style={{flexShrink:0}} onClick={()=>set('cover',null)}>Remove</button>
+                </div>
+              )}
+
+              {coverMode==='url' && (
+                <input className="field" value={form.cover||''} onChange={e=>set('cover',e.target.value)} placeholder="https://... or /cover-file.png"/>
+              )}
+
+              {coverMode==='library' && (
+                <div>
+                  <button type="button" className="btn btn-outline btn-sm" style={{marginBottom:10}} onClick={()=>setPickerOpen(p=>!p)}>
+                    {pickerOpen ? 'Close Library' : 'Open Photo Library'}
+                  </button>
+                  {pickerOpen && (
+                    <div style={{border:'1px solid var(--dim)',borderRadius:'var(--r-sm)',padding:12,background:'rgba(0,0,0,0.25)'}}>
+                      <p style={{fontSize:'0.76rem',color:'var(--muted)',marginBottom:10}}>Click a cover to apply it. Upload new covers in the Novel Covers tab.</p>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(80px,1fr))',gap:8,maxHeight:280,overflowY:'auto'}}>
+                        {libPhotos.map(p=>(
+                          <button key={p.path} type="button" onClick={()=>{set('cover',p.url);setPickerOpen(false);}}
+                            style={{padding:0,border:form.cover===p.url?'2px solid var(--gold)':'2px solid transparent',borderRadius:6,overflow:'hidden',cursor:'pointer',background:'none',transition:'border 0.15s'}}>
+                            <img src={p.url} alt={p.name} style={{width:'100%',aspectRatio:'3/4',objectFit:'cover',display:'block'}}/>
+                          </button>
+                        ))}
+                        {libPhotos.length===0 && <p style={{gridColumn:'1/-1',color:'var(--muted)',fontSize:'0.78rem'}}>No covers yet. Upload in the Novel Covers tab.</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {coverMode==='styled' && (
+                <div className="adm-styled-row">
+                  <div className="adm-field-group">
+                    <label>BG Gradient (CSS)</label>
+                    <input className="field" value={form.coverColor} onChange={e=>set('coverColor',e.target.value)} placeholder="linear-gradient(...)"/>
+                  </div>
+                  <div className="adm-field-group">
+                    <label>Accent Colour</label>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <input className="field" value={form.coverAccent} onChange={e=>set('coverAccent',e.target.value)} placeholder="#c9a84c"/>
+                      <input type="color" value={form.coverAccent} onChange={e=>set('coverAccent',e.target.value)} style={{width:36,height:36,border:'none',background:'none',cursor:'pointer'}}/>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Excerpt</label>
+              <input className="field" value={form.excerpt} onChange={e=>set('excerpt',e.target.value)} placeholder="One-line teaser"/>
+            </div>
+            <div className="adm-field-group adm-col-2">
+              <label>Full Description</label>
+              <textarea className="field" rows={4} value={form.description} onChange={e=>set('description',e.target.value)} style={{resize:'vertical'}}/>
+            </div>
+            <div className="adm-field-group adm-col-2">
+              <label>True Story Note</label>
+              <input className="field" value={form.inspiredNote} onChange={e=>set('inspiredNote',e.target.value)} placeholder="What real story inspired this?"/>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Google Drive URL (PDF)</label>
+              <input className="field" value={form.driveUrl||''} onChange={e=>set('driveUrl',e.target.value)} placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing"/>
+              <div style={{marginTop:8,background:'rgba(201,168,76,0.06)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',padding:'10px 14px',fontSize:'0.76rem',color:'var(--muted)',lineHeight:1.8}}>
+                <ol style={{paddingLeft:16,margin:0}}><li>Upload PDF to Google Drive</li><li>Share - "Anyone with the link"</li><li>Copy link and paste above</li></ol>
+              </div>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <div className="adm-flags">
+                <label className="adm-check"><input type="checkbox" checked={form.featured} onChange={e=>set('featured',e.target.checked)}/> Featured on homepage</label>
+                <label className="adm-check"><input type="checkbox" checked={form.isNew} onChange={e=>set('isNew',e.target.checked)}/> Show New badge</label>
+                <label className="adm-check"><input type="checkbox" checked={form.inspired} onChange={e=>set('inspired',e.target.checked)}/> Inspired by true story</label>
+              </div>
+            </div>
+
+            {/* ── Publication Status ── */}
+            <div className="adm-field-group adm-col-2">
+              <label style={{color:'var(--gold)',fontWeight:700,fontSize:'0.82rem',textTransform:'uppercase',letterSpacing:1}}>Publication Status</label>
+              <p style={{fontSize:'0.76rem',color:'var(--muted)',marginBottom:12}}>Shown as a badge on the book card and detail page.</p>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(185px,1fr))',gap:8}}>
+                {BOOK_STATUSES.map(s => (
+                  <button key={s.value} type="button" onClick={() => set('status', s.value)}
+                    style={{
+                      display:'flex', alignItems:'flex-start', gap:10, padding:'10px 12px',
+                      border: form.status===s.value ? `1px solid ${s.color}` : '1px solid var(--dim)',
+                      borderRadius:'var(--r-sm)', cursor:'pointer', textAlign:'left',
+                      background: form.status===s.value ? s.bg : 'rgba(255,255,255,0.02)',
+                      transition:'all 0.15s',
+                    }}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:'0.82rem',fontWeight:700,color: form.status===s.value ? s.color : 'var(--text)',marginBottom:2}}>{s.label}</div>
+                      <div style={{fontSize:'0.7rem',color:'var(--muted)',lineHeight:1.4}}>{s.desc}</div>
+                    </div>
+                    {form.status===s.value && <span style={{color:s.color,fontSize:'0.8rem',flexShrink:0}}>✓</span>}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chapter progress — only for Ongoing books */}
+              {form.status === 'ongoing' && (
+                <div style={{marginTop:14,padding:'14px 16px',background:'rgba(74,158,255,0.06)',border:'1px solid rgba(74,158,255,0.2)',borderRadius:'var(--r-sm)'}}>
+                  <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>📖 Ongoing series — show readers chapter progress (like a TV series)</p>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <div className="adm-field-group" style={{marginBottom:0}}>
+                      <label>Chapters Released</label>
+                      <input className="field" type="number" min={0} value={form.chaptersReleased||0}
+                        onChange={e=>set('chaptersReleased', Number(e.target.value))}
+                        placeholder="e.g. 5" />
+                      <small style={{color:'var(--muted)'}}>Chapters available now</small>
+                    </div>
+                    <div className="adm-field-group" style={{marginBottom:0}}>
+                      <label>Total Planned Chapters</label>
+                      <input className="field" type="number" min={0} value={form.totalChapters||0}
+                        onChange={e=>set('totalChapters', Number(e.target.value))}
+                        placeholder="e.g. 24 (0 = unknown)" />
+                      <small style={{color:'var(--muted)'}}>0 = not announced yet</small>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="adm-field-group adm-col-2" style={{borderTop:'1px solid var(--dim)',paddingTop:18,marginTop:4}}>
+              <label style={{color:'var(--gold)',fontWeight:700,fontSize:'0.88rem',textTransform:'uppercase',letterSpacing:1}}>Book Content - Online Reader</label>
+              <div style={{background:'rgba(201,168,76,0.06)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:14,fontSize:'0.76rem',color:'var(--muted)',lineHeight:1.7}}>
+                <strong style={{color:'var(--gold)'}}>How to paste chapters:</strong> Copy the text from Word/Google Docs and paste directly. Paragraphs separated by blank lines will render correctly. Each chapter is saved separately — no size limit.
+              </div>
+              {(form.chapters||[]).map((ch,i)=>{
+                const words = (ch.text||'').trim().split(/\s+/).filter(Boolean).length;
+                return (
+                  <div key={i} style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--dim)',borderRadius:'var(--r-sm)',padding:14,marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                      <span style={{fontSize:'0.85rem',color:'var(--gold)',fontWeight:700}}>Chapter {i+1}</span>
+                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        {words > 0 && <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>{words.toLocaleString()} words · {(ch.text||'').length.toLocaleString()} chars</span>}
+                        <button type="button" className="adm-act-btn adm-act-del" style={{fontSize:'0.7rem',padding:'2px 8px'}}
+                          onClick={()=>set('chapters',form.chapters.filter((_,j)=>j!==i))}>Remove</button>
+                      </div>
+                    </div>
+                    <div className="adm-field-group" style={{marginBottom:10}}>
+                      <label>Chapter Title</label>
+                      <input className="field" value={ch.title||''} placeholder="e.g. Chapter 1 — The Beginning"
+                        onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,title:e.target.value}:c))}/>
+                    </div>
+                    <div className="adm-field-group" style={{marginBottom:0}}>
+                      <label>Chapter Text <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(paste from Word / Google Docs)</span></label>
+                      <textarea className="field" rows={20} value={ch.text||''} placeholder="Paste full chapter text here...&#10;&#10;Paragraphs separated by blank lines will display correctly in the reader."
+                        style={{resize:'vertical',fontFamily:'Georgia,serif',lineHeight:1.9,fontSize:'0.9rem',minHeight:320}}
+                        onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,text:e.target.value}:c))}/>
+                    </div>
+                  </div>
+                );
+              })}
+              <button type="button" className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:4}}
+                onClick={()=>set('chapters',[...(form.chapters||[]),{title:'Chapter '+((form.chapters||[]).length+1),text:''}])}>
+                + Add Chapter
+              </button>
+            </div>
+
+          </div>
+          <div className="adm-bookform-footer">
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? '⏳ Saving…' : (form.id ? 'Save Changes' : 'Add Book')}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
+// ── UserLibrariesTab ─────────────────────────────────────────────────────────
+function UserLibrariesTab({ users, books, showToast }) {
+  const [libs,        setLibs]        = useState({});
+  const [loading,     setLoading]     = useState(true);
+  const [search,      setSearch]      = useState('');
+  const [expanded,    setExpanded]    = useState({});
+  const [busy,        setBusy]        = useState({});
+  // Deactivation modal state
+  const [deactModal,  setDeactModal]  = useState(null); // { userEmail, bookId, title, mode: 'full'|'read'|'download' }
+  const [deactReason, setDeactReason] = useState('');
+  // Add book modal
+  const [addModal,    setAddModal]    = useState(null); // userEmail
+
+  const libDocId = email => (email||'').toLowerCase().replace(/[^a-z0-9]/g,'_');
+
+  const loadLibs = (userList) => {
+    const nonAdmin = userList.filter(u => u.role === 'user');
+    if (!nonAdmin.length) { setLoading(false); return; }
+    let done = 0; const result = {};
+    nonAdmin.forEach(u => {
+      getDoc(doc(db,'libraries',libDocId(u.email)))
+        .then(snap => { result[u.email.toLowerCase()] = snap.exists() ? (snap.data().books || []) : []; })
+        .catch(() => { result[u.email.toLowerCase()] = []; })
+        .finally(() => { done++; if (done === nonAdmin.length) { setLibs({ ...result }); setLoading(false); } });
+    });
+  };
+
+  useEffect(() => { loadLibs(users); }, [users]); // eslint-disable-line
+
+  // Deactivate with reason — mode: 'full' | 'read' | 'download'
+  const applyDeactivation = async () => {
+    if (!deactModal) return;
+    const { userEmail, bookId, mode } = deactModal;
+    const key = userEmail.toLowerCase();
+    const busyKey = key + '_' + bookId;
+    setBusy(b => ({ ...b, [busyKey]: true }));
+    try {
+      const ref  = doc(db, 'libraries', libDocId(userEmail));
+      const snap = await getDoc(ref);
+      if (!snap.exists()) { showToast('No library for ' + userEmail); return; }
+      const existing = snap.data().books || [];
+      const updated  = existing.map(b => {
+        if (b.id !== bookId) return b;
+        if (mode === 'full')     return { ...b, active: false, readDeactivated: true, downloadDeactivated: true, deactivationReason: deactReason || 'Access restricted by administrator.' };
+        if (mode === 'read')     return { ...b, readDeactivated: true,     deactivationReason: deactReason || 'Online reading restricted by administrator.' };
+        if (mode === 'download') return { ...b, downloadDeactivated: true, deactivationReason: deactReason || 'Downloads restricted by administrator.' };
+        return b;
+      });
+      await setDoc(ref, { books: updated }, { merge: true });
+      setLibs(prev => ({ ...prev, [key]: updated }));
+      showToast('✅ Book access updated for ' + userEmail.split('@')[0]);
+      setDeactModal(null); setDeactReason('');
+    } catch (e) { showToast('Error: ' + e.message); }
+    finally { setBusy(b => { const n={...b}; delete n[busyKey]; return n; }); }
+  };
+
+  // Reactivate — restore all access
+  const reactivateBook = async (userEmail, bookId) => {
+    const key = userEmail.toLowerCase();
+    const busyKey = key + '_' + bookId;
+    setBusy(b => ({ ...b, [busyKey]: true }));
+    try {
+      const ref  = doc(db, 'libraries', libDocId(userEmail));
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const existing = snap.data().books || [];
+      const updated  = existing.map(b => b.id === bookId
+        ? { ...b, active: true, readDeactivated: false, downloadDeactivated: false, deactivationReason: '' }
+        : b
+      );
+      await setDoc(ref, { books: updated }, { merge: true });
+      setLibs(prev => ({ ...prev, [key]: updated }));
+      showToast('✅ Full access restored for ' + userEmail.split('@')[0]);
+    } catch (e) { showToast('Error: ' + e.message); }
+    finally { setBusy(b => { const n={...b}; delete n[busyKey]; return n; }); }
+  };
+
+  // Remove book from library
+  const removeBook = async (userEmail, bookId) => {
+    if (!window.confirm('Remove this book from ' + userEmail.split('@')[0] + "'s library? They will lose access permanently.")) return;
+    const key = userEmail.toLowerCase();
+    try {
+      const ref  = doc(db, 'libraries', libDocId(userEmail));
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      const updated = (snap.data().books || []).filter(b => b.id !== bookId);
+      await setDoc(ref, { books: updated }, { merge: true });
+      setLibs(prev => ({ ...prev, [key]: updated }));
+      showToast('📕 Book removed from ' + userEmail.split('@')[0] + "'s library");
+    } catch (e) { showToast('Error: ' + e.message); }
+  };
+
+  // Add book back to user library
+  const addBook = async (userEmail, bookToAdd) => {
+    const key = userEmail.toLowerCase();
+    try {
+      const ref  = doc(db, 'libraries', libDocId(userEmail));
+      const snap = await getDoc(ref);
+      const existing = snap.exists() ? (snap.data().books || []) : [];
+      if (existing.find(b => b.id === bookToAdd.id)) { showToast('User already has this book'); return; }
+      const updated = [...existing, { ...bookToAdd, downloadUnlocked: true, active: true }];
+      await setDoc(ref, { books: updated }, { merge: true });
+      setLibs(prev => ({ ...prev, [key]: updated }));
+      showToast('✅ "' + bookToAdd.title + '" added to ' + userEmail.split('@')[0] + "'s library");
+      setAddModal(null);
+    } catch (e) { showToast('Error: ' + e.message); }
+  };
+
+  const filteredUsers = users.filter(u =>
+    u.role === 'user' &&
+    (u.name.toLowerCase().includes(search.toLowerCase()) ||
+     u.email.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const totalBooks = Object.values(libs).reduce((s, arr) => s + arr.length, 0);
+
+  return (
+    <div className="adm-page">
+      {/* Deactivation modal */}
+      {deactModal && (
+        <div className="adm-overlay">
+          <div className="adm-confirm card" style={{ maxWidth:460, textAlign:'left' }}>
+            <h3 style={{ marginBottom:8 }}>Restrict Book Access</h3>
+            <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>
+              <strong style={{ color:'var(--gold)' }}>{deactModal.title}</strong> for {deactModal.userEmail.split('@')[0]}
+            </p>
+            <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
+              {['full','read','download'].map(m => (
+                <button key={m} type="button"
+                  className={'adm-toggle' + (deactModal.mode === m ? ' on' : '')}
+                  onClick={() => setDeactModal(d => ({ ...d, mode: m }))}>
+                  {m === 'full' ? '🔒 Block All' : m === 'read' ? '📖 Block Reading' : '⬇ Block Download'}
+                </button>
+              ))}
+            </div>
+            <div className="adm-field-group" style={{ marginBottom:16 }}>
+              <label>Reason shown to user</label>
+              <input className="field" value={deactReason}
+                onChange={e => setDeactReason(e.target.value)}
+                placeholder="e.g. Payment issue — contact support to restore access" />
+            </div>
+            <div className="adm-confirm-btns">
+              <button className="btn btn-primary btn-sm" onClick={applyDeactivation}>Apply</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setDeactModal(null); setDeactReason(''); }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add book modal */}
+      {addModal && (
+        <div className="adm-overlay">
+          <div className="adm-confirm card" style={{ maxWidth:540, textAlign:'left' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <h3>Add Book to {addModal.split('@')[0]}'s Library</h3>
+              <button className="adm-close-btn" onClick={() => setAddModal(null)}>✕</button>
+            </div>
+            <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:14 }}>Select a book to grant access. The user will be able to read and download it immediately.</p>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:8, maxHeight:320, overflowY:'auto' }}>
+              {books.filter(b => {
+                const userLib = libs[addModal] || [];
+                return !userLib.find(lb => lb.id === b.id);
+              }).map(b => (
+                <button key={b.id} type="button" onClick={() => addBook(addModal, b)}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--dim)', borderRadius:'var(--r-sm)', cursor:'pointer', textAlign:'left', width:'100%' }}>
+                  {b.coverType === 'photo' && b.cover
+                    ? <img src={b.cover} alt="" style={{ width:26, height:38, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
+                    : <div style={{ width:26, height:38, background:b.coverColor||'#1a1a3a', borderRadius:3, flexShrink:0 }} />
+                  }
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:'0.78rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text)' }}>{b.title}</div>
+                    <div style={{ fontSize:'0.68rem', color:'var(--muted)' }}>KSh {b.price}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div style={{ display:'flex', justifyContent:'flex-end', marginTop:14 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setAddModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="adm-page-head">
+        <div>
+          <h1>User Libraries</h1>
+          <span className="adm-page-sub">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} · {totalBooks} total books owned</span>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={() => { setLoading(true); setLibs({}); loadLibs(users); }}>Refresh</button>
+      </div>
+
+      <div className="adm-toolbar card" style={{ marginBottom:16 }}>
+        <input className="field adm-search" placeholder="Search users by name or email..."
+          value={search} onChange={e => setSearch(e.target.value)} />
+        <span className="adm-toolbar-count">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign:'center', padding:'60px', color:'var(--muted)' }}>
+          <div className="adm-photo-spinner" style={{ margin:'0 auto 16px' }} />Loading user libraries...
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="adm-empty"><p>No users found.</p></div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          {filteredUsers.map(u => {
+            const userBooks = libs[u.email.toLowerCase()] || [];
+            const isOpen    = !!expanded[u.email];
+            return (
+              <div key={u.id} className="card" style={{ overflow:'hidden' }}>
+                <div onClick={() => setExpanded(p => ({ ...p, [u.email]: !p[u.email] }))}
+                  style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 20px', cursor:'pointer', borderBottom: isOpen ? '1px solid var(--dim)' : 'none' }}>
+                  <div className="adm-user-avatar" style={{ flexShrink:0 }}>{u.name.charAt(0)}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <strong style={{ fontSize:'0.92rem' }}>{u.name}</strong>
+                    <span style={{ display:'block', fontSize:'0.75rem', color:'var(--muted)' }}>{u.email}</span>
+                  </div>
+                  <div style={{ background: userBooks.length > 0 ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.04)', border: userBooks.length > 0 ? '1px solid rgba(201,168,76,0.3)' : '1px solid var(--dim)', borderRadius:20, padding:'3px 12px', fontSize:'0.78rem', fontWeight:600, color: userBooks.length > 0 ? 'var(--gold)' : 'var(--muted)', flexShrink:0 }}>
+                    {userBooks.length} book{userBooks.length !== 1 ? 's' : ''}
+                  </div>
+                  <span style={{ fontSize:'0.75rem', color:'var(--muted)', flexShrink:0 }}>{isOpen ? '▲' : '▼'}</span>
+                </div>
+
+                {isOpen && (
+                  <div style={{ padding:'12px 16px' }}>
+                    {/* Add book button */}
+                    <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10 }}>
+                      <button className="btn btn-outline btn-sm" onClick={() => setAddModal(u.email.toLowerCase())}>
+                        + Add Book to Library
+                      </button>
+                    </div>
+                    {userBooks.length === 0 ? (
+                      <div style={{ padding:'16px 0', color:'var(--muted)', fontSize:'0.85rem', textAlign:'center' }}>This user has no books yet.</div>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                        {userBooks.map(lb => {
+                          const cat        = books.find(b => b.id === lb.id);
+                          const title      = cat?.title      || lb.title || lb.id;
+                          const cover      = cat?.cover      || lb.cover;
+                          const coverType  = cat?.coverType  || lb.coverType;
+                          const coverColor = cat?.coverColor || lb.coverColor || '#1a1a3a';
+                          const coverAccent= cat?.coverAccent|| '#c9a84c';
+                          const isFullOff  = lb.active === false;
+                          const isReadOff  = lb.readDeactivated === true;
+                          const isDlOff    = lb.downloadDeactivated === true;
+                          const anyOff     = isFullOff || isReadOff || isDlOff;
+                          const busyKey    = u.email.toLowerCase() + '_' + lb.id;
+                          return (
+                            <div key={lb.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderRadius:'var(--r-sm)', background: anyOff ? 'rgba(231,76,60,0.05)' : 'rgba(255,255,255,0.03)', border: anyOff ? '1px solid rgba(231,76,60,0.2)' : '1px solid var(--dim)' }}>
+                              {coverType==='photo' && cover
+                                ? <img src={cover} alt="" style={{ width:32,height:44,objectFit:'cover',borderRadius:4,flexShrink:0 }} />
+                                : <div style={{ width:32,height:44,background:coverColor,borderRadius:4,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.55rem',color:coverAccent }}>EH</div>
+                              }
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <strong style={{ fontSize:'0.85rem', display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</strong>
+                                <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
+                                  {lb.downloadUnlocked ? 'Download unlocked' : 'Read only'}
+                                  {isFullOff  && <span style={{ color:'#e74c3c', marginLeft:6 }}>· All access off</span>}
+                                  {!isFullOff && isReadOff   && <span style={{ color:'#e67e22', marginLeft:6 }}>· Reading off</span>}
+                                  {!isFullOff && isDlOff     && <span style={{ color:'#e67e22', marginLeft:6 }}>· Download off</span>}
+                                </span>
+                                {lb.deactivationReason && <span style={{ display:'block', fontSize:'0.68rem', color:'var(--muted)', fontStyle:'italic', marginTop:2 }}>"{lb.deactivationReason}"</span>}
+                              </div>
+                              {/* Status chip */}
+                              <span style={{ flexShrink:0, fontSize:'0.68rem', padding:'2px 8px', borderRadius:10, background: anyOff ? 'rgba(231,76,60,0.12)' : 'rgba(46,204,113,0.12)', color: anyOff ? '#e74c3c' : '#2ecc71', border: anyOff ? '1px solid rgba(231,76,60,0.3)' : '1px solid rgba(46,204,113,0.3)' }}>
+                                {isFullOff ? 'BLOCKED' : isReadOff ? 'READ OFF' : isDlOff ? 'DL OFF' : 'ACTIVE'}
+                              </span>
+                              {/* Restrict button */}
+                              {!anyOff ? (
+                                <button disabled={!!busy[busyKey]} className="adm-flag-btn on"
+                                  onClick={() => setDeactModal({ userEmail: u.email, bookId: lb.id, title, mode:'full' })}>
+                                  Restrict
+                                </button>
+                              ) : (
+                                <button disabled={!!busy[busyKey]} className="adm-flag-btn"
+                                  style={{ borderColor:'#2ecc71', color:'#2ecc71' }}
+                                  onClick={() => reactivateBook(u.email, lb.id)}>
+                                  {busy[busyKey] ? '…' : 'Restore'}
+                                </button>
+                              )}
+                              {/* Remove button */}
+                              <button onClick={() => removeBook(u.email, lb.id)} className="adm-act-btn adm-act-del" title="Remove from library permanently">Remove</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ── SiteControlsPanel ────────────────────────────────────────────────────────
+function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper }) {
+  const sc = siteControls || {};
+  const toggle = async (key) => {
+    const updated = { ...sc, [key]: !sc[key] };
+    await saveSiteControls(updated);
+    showToast((updated[key] ? '✅ Enabled: ' : '❌ Disabled: ') + key.replace(/([A-Z])/g,' $1').toLowerCase());
+  };
+
+  const controls = [
+    { key:'disableRightClick', icon:'🖱️', label:'Disable Right-Click',       desc:'Blocks context menu site-wide. Prevents image/text saving via right-click.', danger:false },
+    { key:'disableTextSelect', icon:'🔤', label:'Disable Text Selection',     desc:'Users cannot select or highlight any text on the site.', danger:false },
+    { key:'disableCopy',       icon:'📋', label:'Disable Copy & Cut',         desc:'Ctrl+C and Ctrl+X are blocked site-wide.', danger:false },
+    { key:'disableDevTools',   icon:'🔧', label:'Block DevTools Shortcuts',   desc:'Blocks F12, Ctrl+Shift+I/J/C, Ctrl+U to deter code inspection.', danger:false },
+    { key:'disablePrint',      icon:'🖨️', label:'Disable Printing',           desc:'Prevents Ctrl+P and browser print dialog from opening.', danger:false },
+    { key:'watermarkAll',      icon:'💧', label:'Watermark All Content',      desc:'Show user name & email watermark on all book and image content.', danger:false },
+    { key:'maintenanceMode',   icon:'🚧', label:'Maintenance Mode',           desc:'Shows a maintenance page to all non-admin visitors. Use during updates.', danger:true },
+    { key:'disableRegistration',icon:'🚫',label:'Disable New Registrations',  desc:'Prevent new users from creating accounts.', danger:false },
+    { key:'disableOrders',     icon:'🛒', label:'Disable All Orders',         desc:'Block all checkout and payment. No new orders can be placed.', danger:true },
+    { key:'readOnlyMode',      icon:'📖', label:'Read-Only Mode',             desc:'Users can browse but cannot purchase, review, or interact.', danger:false },
+  ];
+
+  return (
+    <div className="adm-page">
+      <div className="adm-page-head">
+        <div>
+          <h1>Site Controls</h1>
+          <span className="adm-page-sub">Global security and access controls — changes take effect immediately for all users</span>
+        </div>
+      </div>
+
+      <div style={{ background:'rgba(201,168,76,0.07)', border:'1px solid rgba(201,168,76,0.25)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginBottom:24, fontSize:'0.84rem' }}>
+        ⚡ <strong style={{ color:'var(--gold)' }}>Real-time:</strong> All changes are saved to Firestore and take effect instantly for every visitor — no page reload required.
+      </div>
+
+      <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+        {controls.map(ctrl => (
+          <div key={ctrl.key} className="card" style={{ display:'flex', alignItems:'center', gap:16, padding:'16px 20px', border: sc[ctrl.key] ? (ctrl.danger ? '1px solid rgba(231,76,60,0.4)' : '1px solid rgba(201,168,76,0.3)') : '1px solid var(--dim)', background: sc[ctrl.key] ? (ctrl.danger ? 'rgba(231,76,60,0.06)' : 'rgba(201,168,76,0.04)') : 'rgba(255,255,255,0.02)' }}>
+            <span style={{ fontSize:'1.8rem', flexShrink:0 }}>{ctrl.icon}</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <strong style={{ fontSize:'0.92rem', display:'block', marginBottom:3 }}>{ctrl.label}</strong>
+              <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{ctrl.desc}</span>
+              {ctrl.danger && sc[ctrl.key] && (
+                <span style={{ display:'inline-block', marginTop:4, fontSize:'0.72rem', padding:'2px 8px', borderRadius:10, background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)' }}>
+                  ⚠ Active — affecting all users
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => toggle(ctrl.key)}
+              style={{ flexShrink:0, minWidth:64, padding:'8px 16px', borderRadius:'var(--r-sm)', border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.82rem',
+                background: sc[ctrl.key] ? (ctrl.danger ? '#e74c3c' : 'rgba(201,168,76,0.2)') : 'rgba(255,255,255,0.06)',
+                color: sc[ctrl.key] ? (ctrl.danger ? '#fff' : 'var(--gold)') : 'var(--muted)',
+                transition:'all 0.2s',
+              }}>
+              {sc[ctrl.key] ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Print disabling via CSS injection */}
+      {sc.disablePrint && (
+        <style>{`@media print { body { display: none !important; } }`}</style>
+      )}
+    </div>
+  );
+}
+
+// ── NotificationsPanel ───────────────────────────────────────────────────────
+function NotificationsPanel({ books, showToast, saveBook, addLog }) {
+  const [notifs, setNotifs]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState({});
+
+  useEffect(() => {
+    getDocs(collection(db, 'notifications'))
+      .then(snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toMillis?.() || 0 }));
+        docs.sort((a, b) => b.createdAt - a.createdAt);
+        setNotifs(docs);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Group by book
+  const byBook = {};
+  notifs.forEach(n => {
+    if (!byBook[n.bookId]) byBook[n.bookId] = { title: n.bookTitle, status: n.status, items: [] };
+    byBook[n.bookId].items.push(n);
+  });
+
+  const sendNotification = async (bookId) => {
+    setSending(s => ({ ...s, [bookId]: true }));
+    const group = byBook[bookId];
+    const book  = books.find(b => b.id === bookId);
+    const waMsg = encodeURIComponent(
+      `🎉 *${group.title}* is now available on Ellines Haven!\n\n` +
+      `📖 Read it now: https://ellines-haven.vercel.app/book/${bookId}\n\n` +
+      `— Ellines Haven Team`
+    );
+
+    try {
+      // Mark all as notified in Firestore
+      await Promise.all(group.items.map(n =>
+        setDoc(doc(db, 'notifications', n.id), { notified: true, notifiedAt: serverTimestamp() }, { merge: true })
+      ));
+      setNotifs(prev => prev.map(n => n.bookId === bookId ? { ...n, notified: true } : n));
+      addLog('system', `Notifications sent for "${group.title}" to ${group.items.length} user(s)`);
+      showToast(`✅ Notified ${group.items.length} user(s) for "${group.title}"`);
+    } catch (e) {
+      showToast('❌ Error: ' + e.message);
+    }
+    setSending(s => ({ ...s, [bookId]: false }));
+  };
+
+  return (
+    <div className="adm-page">
+      <div className="adm-page-head">
+        <div>
+          <h1>Notifications</h1>
+          <span className="adm-page-sub">Users who clicked "Notify Me" — send them a WhatsApp/email when their book is ready</span>
+        </div>
+      </div>
+
+      <div style={{ background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.2)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginBottom:20, fontSize:'0.82rem' }}>
+        💡 When you mark a book as <strong style={{color:'var(--gold)'}}>Complete</strong> or change its status, click <strong>Send Notifications</strong> to alert all waiting users via WhatsApp. The system opens WhatsApp pre-filled for each user's number.
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading notifications…</div>
+      ) : Object.keys(byBook).length === 0 ? (
+        <div className="adm-empty">
+          <div style={{ fontSize:'3rem', marginBottom:12 }}>🔔</div>
+          <p>No notification requests yet. When users click "Notify Me" on a book, they'll appear here.</p>
+        </div>
+      ) : (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          {Object.entries(byBook).map(([bookId, group]) => {
+            const book    = books.find(b => b.id === bookId);
+            const pending = group.items.filter(n => !n.notified).length;
+            const total   = group.items.length;
+            return (
+              <div key={bookId} className="card" style={{ padding:20 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
+                  {book?.cover && book?.coverType === 'photo'
+                    ? <img src={book.cover} alt="" style={{ width:44, height:60, objectFit:'cover', borderRadius:4, flexShrink:0 }} />
+                    : <div style={{ width:44, height:60, background:book?.coverColor||'#1a1a3a', borderRadius:4, flexShrink:0 }} />
+                  }
+                  <div style={{ flex:1 }}>
+                    <strong style={{ display:'block', marginBottom:4 }}>{group.title}</strong>
+                    <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>
+                      {total} request{total!==1?'s':''} · {pending} pending
+                    </span>
+                  </div>
+                  {pending > 0 && (
+                    <button className="btn btn-primary btn-sm" disabled={!!sending[bookId]}
+                      onClick={() => sendNotification(bookId)}>
+                      {sending[bookId] ? '⏳ Sending…' : `📣 Notify ${pending} User${pending!==1?'s':''}`}
+                    </button>
+                  )}
+                  {pending === 0 && total > 0 && (
+                    <span style={{ fontSize:'0.78rem', color:'var(--ok)' }}>✅ All notified</span>
+                  )}
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {group.items.map(n => (
+                    <div key={n.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:'rgba(255,255,255,0.02)', borderRadius:'var(--r-sm)', border:'1px solid var(--dim)' }}>
+                      <div style={{ width:28, height:28, borderRadius:'50%', background:'rgba(201,168,76,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.78rem', fontWeight:700, flexShrink:0 }}>
+                        {n.name?.charAt(0)?.toUpperCase() || '?'}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <strong style={{ fontSize:'0.82rem' }}>{n.name}</strong>
+                        <span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{n.email}</span>
+                      </div>
+                      <span style={{ fontSize:'0.7rem', padding:'2px 8px', borderRadius:10, background: n.notified?'rgba(46,204,113,0.1)':'rgba(201,168,76,0.1)', color: n.notified?'var(--ok)':'var(--gold)', border: n.notified?'1px solid rgba(46,204,113,0.3)':'1px solid rgba(201,168,76,0.3)' }}>
+                        {n.notified ? '✓ Notified' : '⏳ Pending'}
+                      </span>
+                      {/* Quick WhatsApp link per user */}
+                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + n.name + ', "' + group.title + '" is now available! 📖 https://ellines-haven.vercel.app/book/' + bookId)}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize:'0.72rem', padding:'3px 8px', borderRadius:'var(--r-sm)', background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', textDecoration:'none', flexShrink:0 }}>
+                        💬 WA
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── PromoCreateForm ───────────────────────────────────────────────────────────
+function PromoCreateForm({ onSave }) {
+  const [form, setForm] = useState({
+    code: '', discount: '', type: 'Percentage', expires: '', maxUses: '', active: true,
+  });
+  const [err, setErr] = useState('');
+
+  const randomCode = () => {
+    const prefix = ['HAVEN','ELLINES','READ','BOOK','KENYA'][Math.floor(Math.random()*5)];
+    setForm(f => ({ ...f, code: prefix + Math.floor(Math.random()*900+100) }));
+  };
+
+  const submit = e => {
+    e.preventDefault();
+    setErr('');
+    if (!form.code.trim())     { setErr('Code is required'); return; }
+    if (!form.discount.trim()) { setErr('Discount value is required'); return; }
+    if (!form.expires)         { setErr('Expiry date is required'); return; }
+    onSave({
+      id: 'p_' + Date.now(),
+      code:     form.code.trim().toUpperCase(),
+      discount: form.discount.trim(),
+      type:     form.type,
+      expires:  form.expires,
+      maxUses:  Number(form.maxUses) || 0,
+      uses:     0,
+      active:   form.active,
+    });
+    setForm({ code:'', discount:'', type:'Percentage', expires:'', maxUses:'', active:true });
+  };
+
+  return (
+    <form onSubmit={submit}>
+      {err && <div style={{ color:'#e74c3c', fontSize:'0.78rem', marginBottom:10 }}>{err}</div>}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr auto', gap:10, alignItems:'end' }}>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Code</label>
+          <div style={{ display:'flex', gap:6 }}>
+            <input className="field" value={form.code} onChange={e => setForm(f=>({...f,code:e.target.value.toUpperCase()}))}
+              placeholder="e.g. SAVE20" style={{ textTransform:'uppercase', letterSpacing:1 }} />
+            <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink:0 }} onClick={randomCode} title="Generate random code">🎲</button>
+          </div>
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Discount</label>
+          <input className="field" value={form.discount} onChange={e => setForm(f=>({...f,discount:e.target.value}))} placeholder="e.g. 20% or KSh 50" />
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Type</label>
+          <select className="field" value={form.type} onChange={e => setForm(f=>({...f,type:e.target.value}))}>
+            <option value="Percentage">Percentage</option>
+            <option value="Fixed">Fixed (KSh)</option>
+            <option value="Free Shipping">Free Shipping</option>
+          </select>
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Expires</label>
+          <input className="field" type="date" value={form.expires} onChange={e => setForm(f=>({...f,expires:e.target.value}))} />
+        </div>
+        <button type="submit" className="btn btn-primary btn-sm" style={{ marginBottom:0 }}>Create</button>
+      </div>
+    </form>
+  );
+}
+
+function ManualUnlockForm({ books, showToast, onUnlock }) {
+  const [email,    setEmail]    = useState('');
+  const [selected, setSelected] = useState([]);
+  const [busy,     setBusy]     = useState(false);
+
+  const toggle = id => setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+
+  const handleSubmit = e => {
+    e.preventDefault();
+    if (!email.trim() || selected.length === 0) { showToast('Enter email and select at least one book'); return; }
+    setBusy(true);
+    onUnlock(email.trim().toLowerCase(), selected);
+    setEmail('');
+    setSelected([]);
+    setBusy(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10,marginBottom:14}}>
+        <input className="field" type="email" placeholder="Customer email e.g. lucymwask@gmail.com"
+          value={email} onChange={e => setEmail(e.target.value)} required />
+        <button type="submit" className="btn btn-primary btn-sm" disabled={busy || !email || selected.length === 0}>
+          {busy ? 'Unlocking...' : 'Unlock Selected Books'}
+        </button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:8}}>
+        {books.map(b => (
+          <label key={b.id} style={{
+            display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
+            background: selected.includes(b.id) ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.03)',
+            border: selected.includes(b.id) ? '1px solid rgba(201,168,76,0.4)' : '1px solid var(--dim)',
+            borderRadius:'var(--r-sm)',cursor:'pointer',transition:'all 0.15s',
+          }}>
+            <input type="checkbox" checked={selected.includes(b.id)} onChange={() => toggle(b.id)}
+              style={{width:14,height:14,accentColor:'var(--gold)',flexShrink:0}} />
+            {b.coverType === 'photo' && b.cover
+              ? <img src={b.cover} alt="" style={{width:28,height:40,objectFit:'cover',borderRadius:3,flexShrink:0}} />
+              : <div style={{width:28,height:40,background:b.coverColor||'#1a1a3a',borderRadius:3,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.55rem',color:b.coverAccent||'var(--gold)'}}>EH</div>
+            }
+            <div style={{minWidth:0}}>
+              <div style={{fontSize:'0.8rem',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{b.title}</div>
+              <div style={{fontSize:'0.7rem',color:'var(--muted)'}}>KSh {b.price}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+      {selected.length > 0 && (
+        <p style={{fontSize:'0.78rem',color:'var(--gold)',marginTop:10}}>
+          {selected.length} book{selected.length !== 1 ? 's' : ''} selected — will be unlocked for {email || 'the email above'}
+        </p>
+      )}
+    </form>
+  );
+}
+export default function Admin() {
+  const { user, books, saveBook, deleteBook, resetBooks, orders, setOrdersState, confirmOrder, rejectOrder, settings, updateSettings, syncOrders, manualUnlock, unlockBooksForBuyer, userPerms, getUserPerms, setPermField, saveUserPerms, suspendedList, isUserSuspended, setSuspended, siteControls, saveSiteControls } = useApp();
+  const location = useLocation();
+  const [tab, setTab] = useState(location.state?.tab || 'dashboard');
+  const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [search, setSearch] = useState('');
+  const [toast, setToast] = useState('');
+  const [orderFilter, setOrderFilter] = useState('all');
+  const [reviews, setReviews] = useState(MOCK_REVIEWS_INIT);
+  const [promos,  setPromos]  = useState(PROMO_INIT);
+
+  // ── Load reviews + promos from Firestore (persist across refresh) ──────────
+  useEffect(() => {
+    getDoc(doc(db, 'site_data', 'reviews')).then(snap => {
+      if (snap.exists() && snap.data().list?.length) setReviews(snap.data().list);
+    }).catch(() => {});
+    getDoc(doc(db, 'site_data', 'promos')).then(snap => {
+      if (snap.exists() && snap.data().list?.length) setPromos(snap.data().list);
+    }).catch(() => {});
+  }, []); // eslint-disable-line
+
+  const saveReviews = async (next) => {
+    setReviews(next);
+    try { await setDoc(doc(db, 'site_data', 'reviews'), { list: next, updatedAt: serverTimestamp() }, { merge: false }); } catch {}
+  };
+  const savePromos = async (next) => {
+    setPromos(next);
+    try { await setDoc(doc(db, 'site_data', 'promos'), { list: next, updatedAt: serverTimestamp() }, { merge: false }); } catch {}
+  };
+
+  // -- Users state  sourced from BASE_ACCOUNTS + registered, persisted deletions survive refresh --
+  const [users, setUsers] = useState(() => buildUserList(suspendedList));
+  const [sForm, setSForm] = useState(settings);
+  const [resetPwUser, setResetPwUser] = useState(null);
+  const [newPw, setNewPw]       = useState('');
+  const [newPayMethod, setNewPayMethod] = useState({ name:'', type:'mobile', number:'', enabled:true });
+  // Add user/admin modal
+  const [addUserModal, setAddUserModal] = useState(null); // 'user' | 'admin'
+  const [addUserForm, setAddUserForm]   = useState({ name:'', email:'', password:'', role:'user' });
+  const [customMethods, setCustomMethods] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('eh_pay_methods')) || []; } catch { return []; }
+  });
+
+  // System logs — stored in Firestore so they are real-time and cross-device
+  const [logFilter, setLogFilter] = useState('all');
+  const [systemLogs, setSystemLogs] = useState([]);
+  const [deletionAlerts, setDeletionAlerts] = useState([]);
+
+  // Load logs from Firestore on mount, real-time
+  useEffect(() => {
+    const logsDoc = doc(db, 'site_data', 'system_logs');
+    const unsub = onSnapshot(logsDoc, (snap) => {
+      const entries = snap.exists() ? (snap.data().logs || []) : [];
+      setSystemLogs(entries);
+    }, () => {
+      // Fallback — try localStorage only (no demo data)
+      try { setSystemLogs(JSON.parse(localStorage.getItem('eh_system_logs') || '[]')); } catch {}
+    });
+    return () => unsub();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Helper to add a real log entry — writes to Firestore immediately
+  const addLog = (type, event, status = 'success') => {
+    const entry = {
+      time: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      type, event, user: user?.email || 'Admin', ip: 'browser', status,
+    };
+    setSystemLogs(prev => {
+      const next = [entry, ...prev].slice(0, 500);
+      const logsDoc = doc(db, 'site_data', 'system_logs');
+      setDoc(logsDoc, { logs: next, updatedAt: serverTimestamp() }, { merge: false })
+        .catch(() => {
+          try { localStorage.setItem('eh_system_logs', JSON.stringify(next)); } catch {}
+        });
+      return next;
+    });
+  };
+  const [tick, setTick] = useState(0);
+  const [liveOrders, setLiveOrders] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('eh_orders') || '[]'); } catch { return []; }
+  });
+
+  // Force a fresh read of liveOrders on mount in case orders were written
+  // between React tree initialization and first render
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+      setLiveOrders(stored);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for localStorage changes from OTHER tabs (e.g. Lucy places an order)
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'eh_orders') {
+        try {
+          const stored = JSON.parse(e.newValue || '[]');
+          setLiveOrders(stored);
+          setTick(t => t + 1);
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => { localStorage.setItem('eh_pay_methods', JSON.stringify(customMethods)); }, [customMethods]);
+  useEffect(() => { setSForm(settings); }, [settings]);
+
+  // One-time: clear any 'undefined' string values that crash JSON.parse
+  useEffect(() => {
+    ['eh_books','eh_orders','eh_registered_users','eh_settings'].forEach(key => {
+      const v = localStorage.getItem(key);
+      if (v === 'undefined' || v === 'null') localStorage.removeItem(key);
+    });
+  }, []);
+
+  // Real-time Firestore listener — orders from ALL users, ALL devices appear instantly
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q,
+      (snap) => {
+        const fsOrders = snap.docs.map(d => {
+          const data = d.data();
+          // Convert Firestore Timestamp to plain number for sorting
+          return { ...data, id: d.id, createdAt: data.createdAt?.toMillis?.() || data.createdAt || 0 };
+        });
+        setOrdersState(fsOrders);
+        setLiveOrders(fsOrders);
+        // Rebuild users with live book counts
+        try {
+          const bookCounts = {};
+          fsOrders.forEach(o => {
+            if (o.status === 'Completed' && o.userEmail) {
+              const k = o.userEmail.toLowerCase();
+              bookCounts[k] = (bookCounts[k] || 0) + (o.items ? o.items.length : 1);
+            }
+          });
+          setUsers(buildUserList(suspendedList).map(u => ({ ...u, books: bookCounts[u.email.toLowerCase()] || 0 })));
+        } catch {}
+        setTick(t => t + 1);
+      },
+      (err) => { console.error('Firestore orders listener error:', err); }
+    );
+    return () => unsub();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) return <Navigate to="/login" replace />;
+  const isSuper = user.role === 'superadmin';
+
+  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3200); };
+
+  // Permissions — wired to AppContext so changes affect the live site immediately
+  const getPerms     = (email) => getUserPerms(email);
+  const localSetPerm = (email, field, val) => {
+    setPermField(email, field, val);
+    showToast('Permission updated for ' + email.split('@')[0]);
+  };
+
+  const setSetting = (k, v) => setSForm(s => ({ ...s, [k]: v }));
+  const saveSettings = section => { updateSettings(sForm); showToast(section + ' saved'); };
+
+  const handleSaveBook = book => {
+    try {
+      saveBook(book);
+      setEditing(null);
+      showToast(book.id ? '✅ Book updated successfully' : '✅ New book added');
+      addLog('book', (book.id ? 'Book updated: ' : 'Book added: ') + book.title);
+    } catch (err) {
+      console.error('[handleSaveBook] error:', err);
+      showToast('❌ Save failed: ' + err.message);
+    }
+  };
+  const handleDeleteBook = id => {
+    const b = books.find(x => x.id === id);
+    deleteBook(id); setDeleting(null);
+    showToast('Book deleted');
+    addLog('book', 'Book deleted: ' + (b?.title || id), 'warning');
+  };
+
+  // Confirm order  immediately refresh via tick
+  const handleConfirmOrder = (orderId, customerName) => {
+    confirmOrder(orderId);
+    setTimeout(() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+        setLiveOrders(stored);
+      } catch {}
+      syncOrders();
+      setTick(t => t + 1);
+    }, 80);
+    showToast('Payment confirmed - books unlocked for ' + customerName);
+  };
+
+  // Reject order  immediately refresh via tick
+  const handleRejectOrder = (orderId) => {
+    rejectOrder(orderId);
+    setTimeout(() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+        setLiveOrders(stored);
+      } catch {}
+      syncOrders();
+      setTick(t => t + 1);
+    }, 80);
+    showToast('Order rejected');
+  };
+
+  // Delete user  persists across refresh via eh_deleted_users blocklist
+  const handleDeleteUser = (u) => {
+    const emailKey = u.email.toLowerCase();
+
+    // 1. Add to permanent deleted blocklist
+    const deleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
+    if (!deleted.includes(emailKey)) {
+      localStorage.setItem('eh_deleted_users', JSON.stringify([...deleted, emailKey]));
+    }
+    // 2. Remove from registered users
+    const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+    localStorage.setItem('eh_registered_users', JSON.stringify(
+      registered.filter(r => r.email.toLowerCase() !== emailKey)
+    ));
+    // 3. Remove ALL their orders
+    const allStoredOrders = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+    localStorage.setItem('eh_orders', JSON.stringify(
+      allStoredOrders.filter(o => o.userId !== u.id && o.userEmail?.toLowerCase() !== emailKey)
+    ));
+    // 4. Remove from suspended list
+    const suspended = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
+    localStorage.setItem('eh_suspended_users', JSON.stringify(suspended.filter(e => e !== emailKey)));
+    // 5. Clear their library data
+    localStorage.removeItem('eh_lib_' + u.id);
+    localStorage.removeItem('eh_lib_email_' + emailKey);
+    // 6. If this user is currently logged in on this browser, log them out
+    const currentSession = JSON.parse(localStorage.getItem('eh_user') || 'null');
+    if (currentSession && currentSession.email?.toLowerCase() === emailKey) {
+      localStorage.removeItem('eh_user');
+    }
+    // 7. Refresh state immediately
+    setUsers(buildUserList(suspendedList));
+    try {
+      const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+      setLiveOrders(stored);
+    } catch {}
+    syncOrders();
+    setTick(t => t + 1);
+    showToast(`User "${u.name}" permanently deleted`);
+  };
+
+  const filtered = books.filter(b =>
+    b.title.toLowerCase().includes(search.toLowerCase()) ||
+    b.genre.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Real orders only — sorted newest first
+  const realOrders = [...liveOrders].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const allOrders = realOrders;
+
+  const revenue      = allOrders.filter(o => o.status === 'Completed').reduce((s, o) => s + (Number(o.amount) || Number(o.total) || 0), 0);
+  const pendingCount = realOrders.filter(o => o.status === 'Pending').length; // only real orders can be pending
+  const filteredOrders = orderFilter === 'all'
+    ? allOrders
+    : allOrders.filter(o => o.status.toLowerCase() === orderFilter);
+
+  const navItems = [
+    /* ── General admin ── */
+    { k:'dashboard',     label:'Dashboard',        icon:'🏠', group:'admin' },
+    { k:'books',         label:'Books',             icon:'📚', group:'admin' },
+    { k:'covers',        label:'Novel Covers',      icon:'🖼️', group:'admin' },
+    { k:'photos',        label:'Site Photos',       icon:'📷', group:'admin' },
+    { k:'orders',        label:'Orders' + (pendingCount > 0 ? ` (${pendingCount})` : ''), icon:'🛒', group:'admin' },
+    { k:'users',         label:'Users',             icon:'👥', group:'admin' },
+    { k:'userbooks',     label:'User Libraries',    icon:'📖', group:'admin' },
+    { k:'permissions',   label:'Permissions',       icon:'🔐', group:'admin' },
+    { k:'reviews',       label:'Reviews',           icon:'⭐', group:'admin' },
+    { k:'promos',        label:'Promo Codes',       icon:'🎟️', group:'admin' },
+    { k:'analytics',     label:'Analytics',         icon:'📊', group:'admin' },
+    { k:'reports',       label:'Reports',           icon:'📈', group:'admin' },
+    { k:'payments',      label:'Payment Methods',   icon:'💳', group:'admin' },
+    { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
+    { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
+    { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
+    { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
+    /* ── Power tools — visible to both admin & superadmin ── */
+    { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
+    { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
+    { k:'security',      label:'Security',          icon:'🔒', group:'power' },
+    { k:'plugins',       label:'Plugins & Tools',   icon:'🧩', group:'power' },
+    { k:'integrations',  label:'Integrations',      icon:'🔌', group:'power' },
+    { k:'logs',          label:'System Logs',       icon:'📋', group:'power' },
+    { k:'backup',        label:'Backup & Restore',  icon:'💾', group:'power' },
+    /* ── Super admin only ── */
+    { k:'admins',        label:'Admin Control',     icon:'🛡️', group:'super' },
+    { k:'godmode',       label:'God Mode',          icon:'⚡', group:'super' },
+  ];
+
+  return (
+    <div className="adm">
+      <aside className="adm-sidebar">
+        <div className="adm-sidebar-logo">
+          <img src="/logo-nobg3.png" alt="Ellines Haven" className="adm-sidebar-logo-img" />
+          <div>
+            <span className="adm-sidebar-brand">Ellines Haven</span>
+            <em>{isSuper ? 'Super Admin Panel' : 'Admin Panel'}</em>
+            {isSuper && <span className="adm-super-tag">SUPER ADMIN</span>}
+          </div>
+        </div>
+        <nav className="adm-nav">
+          {/* ── Manage section ── */}
+          <div className="adm-nav-section adm-nav-section-admin">
+            <span className="adm-nav-section-dot adm-nav-section-dot--admin" />
+            Manage
+          </div>
+          {navItems.filter(n => n.group === 'admin').map(({ k, label, icon }) => (
+            <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>
+              <span className="adm-nav-icon-emoji">{icon}</span>
+              {label}
+            </button>
+          ))}
+
+          {/* ── Power Tools — admin & superadmin ── */}
+          <div className="adm-nav-divider" />
+          <div className="adm-nav-section adm-nav-section-power">
+            <span className="adm-nav-section-dot adm-nav-section-dot--power" />
+            Power Tools
+          </div>
+          {navItems.filter(n => n.group === 'power').map(({ k, label, icon }) => (
+            <button key={k} className={'adm-nav-btn adm-nav-btn--power' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>
+              <span className="adm-nav-icon-emoji">{icon}</span>
+              {label}
+            </button>
+          ))}
+
+          {/* ── Super Admin ── */}
+          {isSuper && (
+            <>
+              <div className="adm-nav-divider" />
+              <div className="adm-nav-section adm-nav-section-super">
+                <span className="adm-nav-section-dot adm-nav-section-dot--super" />
+                Super Admin
+              </div>
+              {navItems.filter(n => n.group === 'super').map(({ k, label, icon }) => (
+                <button key={k} className={'adm-nav-btn adm-nav-btn--super' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>
+                  <span className="adm-nav-icon-emoji">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </>
+          )}
+        </nav>
+        <div className="adm-sidebar-footer">
+          <div className="adm-admin-info">
+            <div className="adm-admin-avatar" style={{ background: isSuper ? 'var(--gold)' : 'rgba(74,158,255,0.8)', color: '#000' }}>
+              {user.name.charAt(0)}
+            </div>
+            <div>
+              <strong>{user.name}</strong>
+              <span style={{ color: isSuper ? 'var(--gold)' : '#7eb6ff' }}>
+                {isSuper ? '⚡ Super Admin' : '🛡️ Admin'}
+              </span>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <Link to="/profile" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>👤 Profile</Link>
+            <Link to="/" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>← Site</Link>
+          </div>
+        </div>
+      </aside>
+
+      <main className="adm-main">
+        {toast && <div className="adm-toast">{toast}</div>}
+        {editing !== null && <BookForm initial={editing} onSave={handleSaveBook} onCancel={() => setEditing(null)} />}
+        {deleting && <Confirm msg="Delete this book? This cannot be undone." onYes={() => handleDeleteBook(deleting)} onNo={() => setDeleting(null)} />}
+
+        {/* Add User / Admin modal */}
+        {addUserModal && (
+          <div className="adm-overlay">
+            <div className="adm-confirm card" style={{ maxWidth:440, textAlign:'left' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+                <h3>Add New {addUserModal === 'admin' ? 'Admin' : 'User'}</h3>
+                <button className="adm-close-btn" onClick={() => { setAddUserModal(null); setAddUserForm({ name:'', email:'', password:'', role: addUserModal === 'admin' ? 'admin' : 'user' }); }}>✕</button>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <div className="adm-field-group">
+                  <label>Full Name *</label>
+                  <input className="field" value={addUserForm.name} onChange={e => setAddUserForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Jane Muthoni" />
+                </div>
+                <div className="adm-field-group">
+                  <label>Email Address *</label>
+                  <input className="field" type="email" value={addUserForm.email} onChange={e => setAddUserForm(f=>({...f,email:e.target.value}))} placeholder="jane@example.com" />
+                </div>
+                <div className="adm-field-group">
+                  <label>Password *</label>
+                  <input className="field" type="text" value={addUserForm.password} onChange={e => setAddUserForm(f=>({...f,password:e.target.value}))} placeholder="Minimum 4 characters" />
+                  <small style={{ color:'var(--muted)' }}>User will use this to log in.</small>
+                </div>
+                {addUserModal === 'admin' && (
+                  <div className="adm-field-group">
+                    <label>Role</label>
+                    <select className="field" value={addUserForm.role} onChange={e => setAddUserForm(f=>({...f,role:e.target.value}))}>
+                      <option value="admin">Admin</option>
+                      {isSuper && <option value="superadmin">Super Admin</option>}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="adm-confirm-btns" style={{ marginTop:20 }}>
+                <button className="btn btn-primary btn-sm" onClick={() => {
+                  const { name, email, password, role } = addUserForm;
+                  if (!name.trim() || !email.trim() || !password.trim()) { showToast('❌ All fields are required'); return; }
+                  if (password.length < 4) { showToast('❌ Password must be at least 4 characters'); return; }
+                  const emailKey = email.trim().toLowerCase();
+                  // Check for duplicates
+                  const existing = users.find(u => u.email.toLowerCase() === emailKey);
+                  if (existing) { showToast('❌ An account with that email already exists'); return; }
+                  // Save password override
+                  const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+                  overrides[emailKey] = password.trim();
+                  localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
+                  // Save role override if admin
+                  const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+                  if (addUserModal === 'admin') {
+                    roleOverrides[emailKey] = role;
+                    localStorage.setItem('eh_role_overrides', JSON.stringify(roleOverrides));
+                  }
+                  // Add to registered users list (localStorage)
+                  const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+                  const newUser = { id: (addUserModal==='admin'?'adm_':'usr_') + Date.now(), name: name.trim(), email: emailKey, role: addUserModal==='admin' ? role : 'user', joined: new Date().toISOString().slice(0,10) };
+                  if (!registered.find(r => r.email.toLowerCase() === emailKey)) registered.push(newUser);
+                  localStorage.setItem('eh_registered_users', JSON.stringify(registered));
+                  // ── Sync to Firestore so other devices can log in ──
+                  setDoc(doc(db, 'site_data', 'registered_users'), {
+                    registered,
+                    pwOverrides: overrides,
+                    roleOverrides,
+                    updatedAt: serverTimestamp(),
+                  }, { merge: false }).catch(e => console.warn('[Users] Firestore sync failed:', e.message));
+                  // Update local UI state
+                  setUsers(prev => [...prev, { ...newUser, books:0, status:'Active' }]);
+                  addLog('user', (addUserModal==='admin'?'Admin':'User') + ' account created: ' + emailKey);
+                  showToast('✅ Account created for ' + name.trim() + ' — password: ' + password.trim());
+                  setAddUserModal(null);
+                  setAddUserForm({ name:'', email:'', password:'', role:'user' });
+                }}>Create Account</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setAddUserModal(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {resetConfirm && (
+          <Confirm
+            msg="Reset all books to defaults? All admin edits will be lost."
+            onYes={() => { resetBooks(); setResetConfirm(false); showToast('Books reset to default'); }}
+            onNo={() => setResetConfirm(false)}
+          />
+        )}
+        {/* DASHBOARD */}
+        {tab === 'dashboard' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div>
+                <h1>Dashboard</h1>
+                <span className="adm-page-sub">
+                  Welcome back, {user.name.split(' ')[0]} ·{' '}
+                  <span style={{ color:'var(--gold)' }}>{new Date().toLocaleDateString('en-KE',{weekday:'long',day:'numeric',month:'long'})}</span>
+                </span>
+              </div>
+              <button className="btn btn-outline btn-sm" onClick={() => { syncOrders(); setTick(t=>t+1); showToast('Dashboard refreshed'); }}>
+                🔄 Refresh
+              </button>
+            </div>
+
+            {/* ── Pending alert ── */}
+            {pendingCount > 0 && (
+              <div className="adm-alert-box" style={{ marginBottom:20, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+                <span>⚠️ You have <strong>{pendingCount} pending order{pendingCount!==1?'s':''}</strong> awaiting payment verification.</span>
+                <button className="btn btn-primary btn-sm" onClick={() => setTab('orders')}>Review Orders →</button>
+              </div>
+            )}
+
+            {/* ── KPI row ── */}
+            <div className="adm-stats-grid cols-4" style={{ marginBottom:20 }}>
+              {[
+                { icon:'📚', label:'Total Books',     value: books.length,                    color:'#c9a84c', bg:'rgba(201,168,76,0.1)',   click: () => setTab('books') },
+                { icon:'👥', label:'Total Readers',   value: users.length,                    color:'#4a9eff', bg:'rgba(74,158,255,0.1)',    click: () => setTab('users') },
+                { icon:'💰', label:'Total Revenue',   value:'KSh ' + revenue.toLocaleString(), color:'#2ecc71', bg:'rgba(46,204,113,0.1)',   click: () => setTab('analytics') },
+                { icon:'🛒', label:'Pending Orders',  value: pendingCount,                    color:'#e8832a', bg:'rgba(232,131,42,0.1)',    click: () => setTab('orders') },
+              ].map(s => (
+                <div key={s.label} className="adm-stat-card card" style={{ cursor:'pointer', transition:'transform .15s' }}
+                  onClick={s.click}
+                  onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform=''}>
+                  <div className="adm-stat-icon" style={{ background:s.bg, fontSize:'1.4rem' }}>{s.icon}</div>
+                  <div className="adm-stat-body">
+                    <strong style={{ color:s.color, fontSize:'1.6rem' }}>{s.value}</strong>
+                    <span>{s.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Secondary stats ── */}
+            <div className="adm-stats-grid cols-4" style={{ marginBottom:24 }}>
+              {[
+                { icon:'✅', label:'Completed Orders', value: allOrders.filter(o=>o.status==='Completed').length, color:'#2ecc71' },
+                { icon:'📖', label:'Featured Books',   value: books.filter(b=>b.featured).length,               color:'#c9a84c' },
+                { icon:'🔜', label:'Coming Soon',      value: books.filter(b=>b.status==='coming-soon').length,  color:'#e8832a' },
+                { icon:'🔔', label:'New This Month',   value: allOrders.filter(o => {
+                    const d = new Date(o.createdAt || o.date);
+                    const n = new Date();
+                    return d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+                  }).length, color:'#a855f7' },
+              ].map(s => (
+                <div key={s.label} className="adm-stat-card card">
+                  <div className="adm-stat-icon" style={{ background:'rgba(255,255,255,0.04)', fontSize:'1.2rem' }}>{s.icon}</div>
+                  <div className="adm-stat-body">
+                    <strong style={{ color:s.color, fontSize:'1.4rem' }}>{s.value}</strong>
+                    <span>{s.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="adm-dash-grid">
+
+              {/* ── Recent orders ── */}
+              <div className="card">
+                <div className="adm-card-head">
+                  <h3>Recent Orders</h3>
+                  {pendingCount > 0 && (
+                    <span style={{ fontSize:'0.7rem', padding:'2px 8px', borderRadius:10, background:'rgba(201,168,76,0.15)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.3)', marginLeft:8 }}>
+                      {pendingCount} pending
+                    </span>
+                  )}
+                  <button className="btn btn-outline btn-sm" style={{ marginLeft:'auto' }} onClick={() => setTab('orders')}>View All</button>
+                </div>
+                {allOrders.slice(0, 8).map(o => {
+                  const bookName = (o.items||[]).map(i=>i.title).join(', ');
+                  const amount   = o.total || o.amount || 0;
+                  const statusColor = o.status==='Completed'?'var(--ok)':o.status==='Pending'?'var(--gold)':'var(--err)';
+                  return (
+                    <div key={o.id} className="adm-order-row"
+                      style={{ borderLeft: o.status==='Pending' ? '3px solid var(--gold)' : '3px solid transparent', paddingLeft:10 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <strong style={{ fontSize:'0.84rem' }}>{o.userName || 'Guest'}</strong>
+                        <span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:200 }}>
+                          {bookName || 'Order'}
+                        </span>
+                      </div>
+                      <div style={{ textAlign:'right', flexShrink:0 }}>
+                        <strong style={{ fontSize:'0.88rem' }}>KSh {amount.toLocaleString()}</strong>
+                        <span style={{ display:'block', fontSize:'0.7rem', color:statusColor, fontWeight:700 }}>{o.status}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {allOrders.length === 0 && (
+                  <p style={{ color:'var(--muted)', fontSize:'0.85rem', padding:16 }}>No orders yet.</p>
+                )}
+              </div>
+
+              {/* ── Right column: quick stats + actions ── */}
+              <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+                {/* Top books */}
+                <div className="card">
+                  <div className="adm-card-head">
+                    <h3>Top Books</h3>
+                    <button className="btn btn-outline btn-sm" onClick={() => setTab('books')}>Manage</button>
+                  </div>
+                  <div style={{ padding:'0 0 8px' }}>
+                    {books.slice(0,5).map((b,i) => (
+                      <div key={b.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ width:20, height:20, borderRadius:'50%', background:'rgba(201,168,76,0.12)', color:'var(--gold)', fontWeight:700, fontSize:'0.68rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</span>
+                        {b.coverType==='photo'&&b.cover
+                          ? <img src={b.cover} alt="" style={{ width:28, height:40, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
+                          : <div style={{ width:28, height:40, background:b.coverColor||'#1a1a3a', borderRadius:3, flexShrink:0 }} />
+                        }
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:'0.82rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</div>
+                          <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>KSh {b.price} · {b.genre}</div>
+                        </div>
+                        <span style={{ fontSize:'0.72rem', padding:'2px 8px', borderRadius:10,
+                          background: b.status==='complete' ? 'rgba(46,204,113,0.1)' : 'rgba(201,168,76,0.1)',
+                          color: b.status==='complete' ? 'var(--ok)' : 'var(--gold)',
+                          border: b.status==='complete' ? '1px solid rgba(46,204,113,0.25)' : '1px solid rgba(201,168,76,0.25)',
+                          flexShrink:0 }}>
+                          {b.status || 'complete'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="card" style={{ padding:20 }}>
+                  <h3 style={{ fontSize:'0.92rem', marginBottom:14 }}>Quick Actions</h3>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    <button className="btn btn-primary btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setEditing({})}>
+                      📚 Add New Book
+                    </button>
+                    <button className="btn btn-outline btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('orders')}>
+                      🛒 Review Orders {pendingCount>0 && `(${pendingCount} pending)`}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('analytics')}>
+                      📊 View Reports
+                    </button>
+                    <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('notifications')}>
+                      🔔 Notifications
+                    </button>
+                    {isSuper && (
+                      <button className="btn btn-sm" style={{ justifyContent:'flex-start', background:'rgba(201,168,76,0.08)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.25)' }}
+                        onClick={() => setTab('godmode')}>
+                        ⚡ God Mode
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* ── System status bar ── */}
+            <div className="card" style={{ padding:'14px 20px', marginTop:20, display:'flex', alignItems:'center', gap:20, flexWrap:'wrap' }}>
+              <span style={{ fontSize:'0.78rem', color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:1 }}>System Status</span>
+              {[
+                { label:'Firestore', ok:true },
+                { label:'Library',  ok:true },
+                { label:'Orders',   ok:true },
+                { label:'Auth',     ok:true },
+              ].map(s => (
+                <span key={s.label} style={{ fontSize:'0.78rem', display:'flex', alignItems:'center', gap:5 }}>
+                  <span style={{ width:7, height:7, borderRadius:'50%', background:s.ok?'var(--ok)':'var(--err)', display:'inline-block', boxShadow:s.ok?'0 0 6px var(--ok)':'' }} />
+                  {s.label}
+                </span>
+              ))}
+              <span style={{ marginLeft:'auto', fontSize:'0.72rem', color:'var(--muted)' }}>
+                Last refreshed: {new Date().toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' })}
+              </span>
+            </div>
+
+          </div>
+        )}
+        {/* BOOKS */}
+        {tab === 'books' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div><h1>Books</h1><span className="adm-page-sub">{books.length} titles in the library</span></div>
+              <div style={{ display:'flex', gap:10 }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setResetConfirm(true)}>Reset Defaults</button>
+                <button className="btn btn-primary" onClick={() => setEditing({})}>+ Add New Book</button>
+              </div>
+            </div>
+            <div className="adm-toolbar card">
+              <input className="field adm-search" placeholder="Search by title or genre..." value={search} onChange={e => setSearch(e.target.value)} />
+              <span className="adm-toolbar-count">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="card" style={{ overflow:'hidden' }}>
+              <table className="adm-table adm-books-table">
+                <thead>
+                  <tr><th>Cover</th><th>Title</th><th>Genre</th><th>Type</th><th>Price</th><th>Status</th><th>Active</th><th>Featured</th><th>New</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {filtered.map(b => {
+                    const statusMeta = BOOK_STATUSES.find(s => s.value === (b.status || 'complete')) || BOOK_STATUSES[0];
+                    return (
+                    <tr key={b.id} style={b.active===false?{opacity:0.45}:{}}>
+                      <td>
+                        {b.coverType === 'photo' && b.cover
+                          ? <img src={b.cover} alt="" className="adm-book-thumb" />
+                          : <div className="adm-book-thumb-styled" style={{ background:b.coverColor || '#1a1a3a' }}>
+                              <span style={{ fontSize:'0.6rem', color:b.coverAccent || '#c9a84c' }}>EH</span>
+                            </div>
+                        }
+                      </td>
+                      <td><strong>{b.title}</strong><span className="adm-book-author">{b.author}</span></td>
+                      <td><span className="adm-badge">{b.genre}</span></td>
+                      <td>{b.type === 'novel' ? 'Novel' : 'Short Story'}</td>
+                      <td>KSh {b.price}</td>
+                      {/* Quick status dropdown */}
+                      <td>
+                        <select
+                          className="field"
+                          style={{ padding:'3px 6px', fontSize:'0.72rem', width:'auto', color: statusMeta.color, background:'rgba(0,0,0,0.3)', border:`1px solid ${statusMeta.color}40` }}
+                          value={b.status || 'complete'}
+                          onChange={e => { saveBook({ ...b, status: e.target.value }); addLog('book', `"${b.title}" status → ${e.target.value}`); showToast(`Status updated: ${e.target.value}`); }}>
+                          {BOOK_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <button
+                          className={'adm-flag-btn' + (b.active!==false ? ' on' : '')}
+                          style={b.active===false?{borderColor:'var(--err)',color:'var(--err)'}:{}}
+                          title={b.active===false?'Hidden from users - click to reactivate':'Live - click to deactivate'}
+                          onClick={() => {
+                            const msg = b.active!==false
+                              ? 'Deactivate "'+b.title+'"? It will be hidden from the public library.'
+                              : 'Reactivate "'+b.title+'"? It will appear in the public library again.';
+                            if(window.confirm(msg)) {
+                              saveBook({ ...b, active: b.active===false ? true : false });
+                              addLog('book', `"${b.title}" ${b.active!==false?'deactivated':'reactivated'}`, b.active!==false?'warning':'success');
+                            }
+                          }}>
+                          {b.active!==false ? 'Live' : 'Off'}
+                        </button>
+                      </td>
+                      <td>
+                        <button className={'adm-flag-btn' + (b.featured ? ' on' : '')} onClick={() => { saveBook({ ...b, featured:!b.featured }); }}>
+                          {b.featured ? 'Yes' : 'No'}
+                        </button>
+                      </td>
+                      <td>
+                        <button className={'adm-flag-btn' + (b.isNew ? ' on' : '')} onClick={() => saveBook({ ...b, isNew:!b.isNew })}>
+                          {b.isNew ? 'New' : '-'}
+                        </button>
+                      </td>
+                      <td className="adm-actions">
+                        <button className="adm-act-btn adm-act-edit" onClick={() => setEditing(b)}>Edit</button>
+                        <button className="adm-act-btn adm-act-del" onClick={() => setDeleting(b.id)}>Delete</button>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {filtered.length === 0 && <div className="adm-empty">No books match your search.</div>}
+            </div>
+          </div>
+        )}
+        {/* NOVEL COVERS */}
+        {tab === 'covers' && (
+          <CoversTab books={books} saveBook={saveBook} showToast={showToast} />
+        )}
+        {/* SITE PHOTOS */}
+        {tab === 'photos' && (
+          <PhotosTab showToast={showToast} />
+        )}
+        {/* ORDERS */}
+        {tab === 'orders' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div>
+                <h1>Orders</h1>
+                <span className="adm-page-sub">{allOrders.length} orders — KSh {revenue.toLocaleString()} revenue — {pendingCount} pending verification</span>
+              </div>
+              {/* Super Admin: clear stale/orphaned orders */}
+              {isSuper && (
+                <button className="btn btn-ghost btn-sm" style={{color:'var(--err)',borderColor:'rgba(231,76,60,0.4)'}}
+                  onClick={() => {
+                    if (!window.confirm('Clear ALL stale/orphaned orders from storage? Real pending orders will also be removed.')) return;
+                    localStorage.removeItem('eh_orders');
+                    setLiveOrders([]);
+                    syncOrders();
+                    setTick(t => t + 1);
+                    showToast('All orders cleared — users can re-order');
+                  }}>
+                  Clear All Stale Orders
+                </button>
+              )}
+            </div>
+            {pendingCount > 0 && (
+              <div className="adm-alert-box">
+                <strong>{pendingCount} order{pendingCount > 1 ? 's' : ''} waiting for your verification.</strong> Check the M-Pesa reference code and confirm payment to unlock the books for the customer.
+              </div>
+            )}
+            <div className="adm-toolbar card" style={{ gap:8 }}>
+              {['all','completed','pending','rejected','refunded'].map(f => (
+                <button key={f} className={'adm-filter-btn' + (orderFilter === f ? ' on' : '')} onClick={() => setOrderFilter(f)}>
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                  {f === 'pending' && pendingCount > 0 && <span className="adm-filter-dot">{pendingCount}</span>}
+                </button>
+              ))}
+              <span className="adm-toolbar-count" style={{ marginLeft:'auto' }}>{filteredOrders.length} orders</span>
+            </div>
+            <div className="card" style={{ overflow:'hidden' }}>
+              <table className="adm-table">
+                <thead>
+                  <tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Method</th><th>Ref / Code</th><th>Status</th><th>Date</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.map(o => {
+                    const isPending = o.status === 'Pending';
+                    const bookNames = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '');
+                    const amount    = o.total  || o.amount || 0;
+                    const customer  = o.userName || o.customer || '';
+                    const email     = o.userEmail || o.email || '';
+                    return (
+                      <tr key={o.id} style={isPending ? { background:'rgba(201,168,76,0.04)' } : {}}>
+                        <td><code className="adm-code">{o.id}</code></td>
+                        <td>
+                          <strong>{customer}</strong>
+                          <span style={{ display:'block', fontSize:'0.75rem', color:'var(--muted)' }}>{email}</span>
+                        </td>
+                        <td style={{ maxWidth:180, fontSize:'0.8rem' }}>{bookNames}</td>
+                        <td><strong>KSh {amount.toLocaleString()}</strong></td>
+                        <td><span className="adm-method-badge">{o.method}</span></td>
+                        <td>
+                          {o.ref
+                            ? <code className="adm-code" style={{ color:'var(--gold)', letterSpacing:1 }}>{o.ref}</code>
+                            : <span style={{ color:'var(--muted)', fontSize:'0.78rem' }}></span>
+                          }
+                        </td>
+                        <td><span className={'adm-status adm-status--' + o.status.toLowerCase()}>{o.status}</span>
+                          {o.status === 'Completed' && o.userName && (
+                            <span style={{ display:'block', fontSize:'0.7rem', color:'var(--ok)', marginTop:3 }}>
+                              Owned by {o.userName}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ color:'var(--muted)', fontSize:'0.78rem' }}>{o.date ? o.date.slice(0,10) : ''}</td>
+                        <td className="adm-actions">
+                          {isPending && (
+                            <>
+                              <button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>
+                                Confirm
+                              </button>
+                              <button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>
+                                Reject
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {filteredOrders.length === 0 && <div className="adm-empty">No orders match this filter.</div>}
+            </div>
+
+            {/* Manual Unlock Tool — Super Admin / Admin can unlock books for any user by email */}
+            {/* This handles cases where user's order is from a different port/session */}
+            <div className="card" style={{padding:24,marginTop:24,border:'1px solid rgba(201,168,76,0.2)'}}>
+              <h3 style={{marginBottom:6,fontSize:'0.95rem'}}>Manual Book Unlock</h3>
+              <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>
+                Use this when a customer has paid but their order is not visible (e.g. placed on a different browser session).
+                Enter their email and select the book to unlock directly.
+              </p>
+              <ManualUnlockForm books={books} showToast={showToast} onUnlock={async (email, bookIds) => {
+                const emailLow = email.trim().toLowerCase();
+                const booksToUnlock = bookIds
+                  .map(bid => books.find(b => b.id === bid))
+                  .filter(Boolean)
+                  .map(b => ({ ...b, downloadUnlocked: true }));
+
+                if (booksToUnlock.length === 0) { showToast('No valid books selected'); return; }
+
+                try {
+                  // Write directly to Firestore — this is what the app reads
+                  await unlockBooksForBuyer(emailLow, booksToUnlock);
+
+                  // Also create an audit order in Firestore so it's traceable
+                  const manualOrder = {
+                    id: 'ORD-MANUAL-' + Date.now(),
+                    userId: null,
+                    userName: emailLow.split('@')[0],
+                    userEmail: emailLow,
+                    items: booksToUnlock.map(b => ({ id: b.id, title: b.title, price: b.price })),
+                    total: booksToUnlock.reduce((s, b) => s + (b.price || 0), 0),
+                    method: 'manual',
+                    ref: 'MANUAL-UNLOCK',
+                    status: 'Completed',
+                    date: new Date().toISOString().slice(0, 10),
+                    createdAt: serverTimestamp(),
+                  };
+                  await setDoc(doc(db, 'orders', manualOrder.id), manualOrder);
+
+                  showToast('✅ Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow + ' — they will see it immediately on their device');
+                  setTick(t => t + 1);
+                } catch (err) {
+                  console.error('Manual unlock failed:', err);
+                  showToast('❌ Unlock failed: ' + err.message);
+                }
+              }} />
+            </div>
+
+          </div>
+        )}
+
+        {/* USERS */}
+        {tab === 'users' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div><h1>Users</h1><span className="adm-page-sub">{users.length} registered accounts</span></div>
+              <button className="btn btn-primary btn-sm" onClick={() => { setAddUserForm({name:'',email:'',password:'',role:'user'}); setAddUserModal('user'); }}>+ Add User</button>
+            </div>
+
+            {/* Password reset modal */}
+            {resetPwUser && (
+              <div className="adm-overlay">
+                <div className="adm-confirm card" style={{ maxWidth:400 }}>
+                  <h3 style={{ marginBottom:16 }}>Reset Password</h3>
+                  <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:16 }}>
+                    Setting new password for <strong style={{ color:'var(--gold)' }}>{resetPwUser.name}</strong> ({resetPwUser.email})
+                  </p>
+                  <div className="adm-field-group">
+                    <label>New Password</label>
+                    <input className="field" type="text" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" autoFocus />
+                  </div>
+                  <div className="adm-confirm-btns" style={{ marginTop:16 }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => {
+                      if (!newPw.trim()) return;
+                      const email = resetPwUser.email.toLowerCase();
+                      const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+                      overrides[email] = newPw;
+                      localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
+                      // Sync to Firestore so password works on all devices
+                      const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+                      const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+                      setDoc(doc(db, 'site_data', 'registered_users'), {
+                        registered, pwOverrides: overrides, roleOverrides,
+                        updatedAt: serverTimestamp(),
+                      }, { merge: false }).catch(() => {});
+                      setUsers(prev => prev.map(u => u.id === resetPwUser.id ? { ...u, password: newPw } : u));
+                      addLog('user', 'Password reset for ' + email);
+                      showToast('✅ Password updated for ' + resetPwUser.name + ' — new password: ' + newPw);
+                      setResetPwUser(null); setNewPw('');
+                    }}>Set Password</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => { setResetPwUser(null); setNewPw(''); }}>Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="card" style={{ overflow:'hidden' }}>
+              <table className="adm-table">
+                <thead>
+                  <tr><th>Avatar</th><th>Name</th><th>Email</th><th>Role</th><th>Books</th><th>Joined</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id}>
+                      <td>
+                        <div className="adm-user-avatar" style={u.role === 'superadmin' ? { background:'linear-gradient(135deg,#c9a84c,#e8c96d)', color:'#000' } : {}}>
+                          {u.name.charAt(0)}
+                        </div>
+                      </td>
+                      <td>
+                        <strong>{u.name}</strong>
+                        {u.role === 'superadmin' && <span style={{ display:'block', fontSize:'0.68rem', color:'var(--gold)', letterSpacing:1, textTransform:'uppercase' }}>Super Admin</span>}
+                      </td>
+                      <td style={{ fontSize:'0.8rem', color:'var(--muted)' }}>{u.email}</td>
+                      <td>
+                        {isSuper && u.id !== user.id ? (
+                          <select className="field" style={{ padding:'3px 8px', fontSize:'0.78rem', width:'auto' }}
+                            value={u.role}
+                            onChange={e => {
+                              const newRole = e.target.value;
+                              setUsers(prev => prev.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+                              // Persist role change so Login reads it
+                              const roleChanges = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+                              roleChanges[u.email.toLowerCase()] = newRole;
+                              localStorage.setItem('eh_role_overrides', JSON.stringify(roleChanges));
+                              showToast('Role updated: ' + newRole + ' for ' + u.name);
+                            }}>
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                            <option value="superadmin">Super Admin</option>
+                          </select>
+                        ) : (
+                          <span className={'adm-role adm-role--' + (u.role === 'superadmin' ? 'admin' : u.role)}>{u.role}</span>
+                        )}
+                      </td>
+                      <td>{u.books}</td>
+                      <td style={{ fontSize:'0.8rem', color:'var(--muted)' }}>{u.joined}</td>
+                      <td>
+                        <span className={'adm-status adm-status--' + (isUserSuspended(u.email) ? 'refunded' : 'completed')}>
+                          {isUserSuspended(u.email) ? 'Suspended' : 'Active'}
+                        </span>
+                      </td>
+                      <td className="adm-actions">
+                        {/* Reset password  superadmin can reset anyone, admin can only reset users */}
+                        {(isSuper || u.role === 'user') && u.id !== user.id && (
+                          <button className="adm-act-btn adm-act-edit" onClick={() => { setResetPwUser(u); setNewPw(''); }}>
+                            Reset PW
+                          </button>
+                        )}
+                        {/* Suspend / Activate — Firestore-backed, takes effect instantly on user's session */}
+                        {u.id !== user.id && u.role !== 'superadmin' && (
+                          <button className="adm-act-btn adm-act-edit" style={{ marginLeft:4 }}
+                            onClick={async () => {
+                              const isSusp = isUserSuspended(u.email);
+                              await setSuspended(u.email, !isSusp);
+                              setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: !isSusp ? 'Suspended' : 'Active' } : x));
+                              showToast(u.name + (!isSusp ? ' suspended — they will be logged out immediately' : ' reactivated ✅'));
+                            }}>
+                            {isUserSuspended(u.email) ? 'Activate' : 'Suspend'}
+                          </button>
+                        )}
+                        {/* Delete user  superadmin only */}
+                        {isSuper && u.id !== user.id && (
+                          <button className="adm-act-btn adm-act-del" style={{ marginLeft:4 }}
+                            onClick={() => handleDeleteUser(u)}>
+                            Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        {/* USER LIBRARIES */}
+        {tab === 'userbooks' && (
+          <UserLibrariesTab users={users} books={books} showToast={showToast} />
+        )}
+        {/* REVIEWS */}
+        {tab === 'reviews' && (
+          <ReviewsPanel books={books} showToast={showToast} isSuper={isSuper} />
+        )}
+
+        {/* PROMO CODES */}
+        {tab === 'promos' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div><h1>Promo Codes</h1><span className="adm-page-sub">Manage discount codes for readers</span></div>
+              <button className="btn btn-primary" onClick={() => {
+                const code = 'HAVEN' + Math.floor(Math.random()*90+10);
+                const next = [...promos, { id:'p_'+Date.now(), code, discount:'15%', type:'Percentage', uses:0, active:true, expires:'2025-12-31' }];
+                savePromos(next);
+                showToast('Promo code ' + code + ' created');
+              }}>+ New Promo</button>
+            </div>
+            {/* Quick stats */}
+            <div className="adm-stats-grid" style={{ gridTemplateColumns:'repeat(4,1fr)', marginBottom:20 }}>
+              {[
+                { label:'Active Codes',  value:promos.filter(p=>p.active).length,            color:'#2ecc71' },
+                { label:'Total Uses',    value:promos.reduce((s,p)=>s+p.uses,0),             color:'#c9a84c' },
+                { label:'Inactive',      value:promos.filter(p=>!p.active).length,           color:'#e8832a' },
+                { label:'Avg Uses/Code', value:Math.round(promos.reduce((s,p)=>s+p.uses,0)/Math.max(promos.length,1)), color:'#4a9eff' },
+              ].map(s=>(
+                <div key={s.label} className="adm-stat-card card">
+                  <div className="adm-stat-body"><strong style={{color:s.color}}>{s.value}</strong><span>{s.label}</span></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Create promo form */}
+            <div className="card" style={{ padding:20, marginBottom:20 }}>
+              <h3 style={{ fontSize:'0.92rem', marginBottom:16, color:'var(--gold)' }}>Create Custom Promo Code</h3>
+              <PromoCreateForm onSave={(newPromo) => { const next = [...promos, newPromo]; savePromos(next); showToast('✅ Promo code ' + newPromo.code + ' created'); }} />
+            </div>
+
+            <div className="card" style={{ overflow:'hidden' }}>
+              <table className="adm-table">
+                <thead><tr><th>Code</th><th>Discount</th><th>Type</th><th>Times Used</th><th>Active</th><th>Expires</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {promos.map(p => (
+                    <tr key={p.id}>
+                      <td>
+                        <code className="adm-code" style={{ fontSize:'0.9rem', color:'var(--gold)' }}>{p.code}</code>
+                        <button onClick={() => { navigator.clipboard.writeText(p.code); showToast('Code copied!'); }}
+                          style={{ marginLeft:8, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.72rem' }}>
+                          📋
+                        </button>
+                      </td>
+                      <td><strong>{p.discount}</strong></td>
+                      <td><span className="adm-badge">{p.type}</span></td>
+                      <td>{p.uses} uses</td>
+                      <td>
+                        <button className={'adm-flag-btn' + (p.active ? ' on' : '')}
+                          onClick={() => savePromos(promos.map(x => x.id === p.id ? { ...x, active:!x.active } : x))}>
+                          {p.active ? 'Active' : 'Off'}
+                        </button>
+                      </td>
+                      <td style={{ fontSize:'0.8rem', color: new Date(p.expires) < new Date() ? '#e74c3c' : 'var(--muted)' }}>
+                        {p.expires}
+                        {new Date(p.expires) < new Date() && <span style={{ marginLeft:4, fontSize:'0.68rem', color:'#e74c3c' }}>(Expired)</span>}
+                      </td>
+                      <td>
+                        <button className="adm-act-btn adm-act-del"
+                          onClick={() => { savePromos(promos.filter(x => x.id !== p.id)); showToast('Promo code removed'); }}>
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        {/* ANALYTICS / REPORTS */}
+        {tab === 'analytics' && (
+          <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+        )}
+        {tab === 'reports' && (
+          <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+        )}
+
+        {/* SETTINGS */}
+        {tab === 'settings' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div><h1>Settings</h1><span className="adm-page-sub">All changes save to the live site instantly</span></div>
+            </div>
+            <div className="adm-settings-grid">
+
+              {/* Site Info  wired to context */}
+              <div className="card adm-settings-card">
+                <h3>Site Info</h3>
+                <div className="adm-field-group"><label>Site Name</label><input className="field" value={sForm.siteName || ''} onChange={e => setSetting('siteName', e.target.value)} /></div>
+                <div className="adm-field-group"><label>Tagline</label><input className="field" value={sForm.tagline || ''} onChange={e => setSetting('tagline', e.target.value)} /></div>
+                <div className="adm-field-group"><label>Contact Email</label><input className="field" value={sForm.email || ''} onChange={e => setSetting('email', e.target.value)} /></div>
+                <div className="adm-field-group"><label>Phone</label><input className="field" value={sForm.phone || ''} onChange={e => setSetting('phone', e.target.value)} /></div>
+                <div className="adm-field-group"><label>Location</label><input className="field" value={sForm.location || ''} onChange={e => setSetting('location', e.target.value)} /></div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Site info')}>Save Changes</button>
+              </div>
+
+              {/* Author Profile  wired */}
+              <div className="card adm-settings-card">
+                <h3>Author Profile</h3>
+                <div className="adm-field-group"><label>Author Name</label><input className="field" value={sForm.authorName || ''} onChange={e => setSetting('authorName', e.target.value)} /></div>
+                <div className="adm-field-group"><label>Short Bio</label><textarea className="field" rows={3} value={sForm.authorBio || ''} onChange={e => setSetting('authorBio', e.target.value)} style={{ resize:'vertical' }} /></div>
+                <div className="adm-field-group"><label>Website</label><input className="field" value={sForm.authorWeb || ''} onChange={e => setSetting('authorWeb', e.target.value)} /></div>
+                <div className="adm-field-group"><label>Twitter / X</label><input className="field" value={sForm.authorTwitter || ''} onChange={e => setSetting('authorTwitter', e.target.value)} placeholder="@handle" /></div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Author profile')}>Save Changes</button>
+              </div>
+
+              {/* Payment settings moved to dedicated Payment Methods tab */}
+              <div className="card adm-settings-card" style={{ gridColumn:'1/-1' }}>
+                <h3>💳 Payment Settings</h3>
+                <div className="adm-info-note">
+                  Payment method configuration has moved to its own dedicated tab.
+                  <button className="btn btn-outline btn-sm" style={{ marginLeft:16 }} onClick={() => setTab('payments')}>
+                    Go to Payment Methods ?
+                  </button>
+                </div>
+              </div>
+              {/* Admin Security  SuperAdmin only */}
+              <div className="card adm-settings-card">
+                <h3>Admin and Security {isSuper && <span style={{ fontSize:'0.68rem', background:'linear-gradient(135deg,#c9a84c,#e8c96d)', color:'#000', padding:'2px 8px', borderRadius:10, marginLeft:8, fontWeight:700, letterSpacing:1 }}>SUPER ADMIN</span>}</h3>
+                <div className="adm-field-group"><label>Admin Email</label><input className="field" defaultValue="ellines.haven@gmail.com" /></div>
+                <div className="adm-field-group"><label>New Password</label><input className="field" type="password" placeholder="Leave blank to keep current" /></div>
+                <div className="adm-field-group"><label>Confirm Password</label><input className="field" type="password" placeholder="Repeat new password" /></div>
+                {isSuper && (
+                  <div className="adm-info-note" style={{ marginBottom:12 }}>
+                    As Super Admin you have full control  user management, payment methods, all settings. Regular admins can manage books, orders and users but cannot change system settings or promote users.
+                  </div>
+                )}
+                <div className="adm-field-group">
+                  <label>Two-Factor Authentication</label>
+                  <label className="adm-check"><input type="checkbox" defaultChecked={false} /> Enable 2FA via email OTP</label>
+                </div>
+                <div className="adm-field-group">
+                  <label>Session Timeout</label>
+                  <select className="field"><option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>Never</option></select>
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => showToast('Security settings saved')}>Update Credentials</button>
+              </div>
+
+              {/* Notifications */}
+              <div className="card adm-settings-card">
+                <h3>Email Notifications</h3>
+                <p style={{ fontSize:'0.78rem', color:'var(--muted)', marginBottom:16 }}>Choose which events trigger email alerts.</p>
+                {['New order placed','New user registered','Review submitted','Payment failed'].map(item => (
+                  <label key={item} className="adm-check" style={{ marginBottom:12 }}>
+                    <input type="checkbox" defaultChecked={true} /> {item}
+                  </label>
+                ))}
+                <div className="adm-field-group" style={{ marginTop:8 }}><label>Notification Email</label><input className="field" value={sForm.email || ''} onChange={e => setSetting('email', e.target.value)} /></div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Notification preferences')}>Save Preferences</button>
+              </div>
+
+              {/* SEO */}
+              <div className="card adm-settings-card">
+                <h3>SEO and Meta</h3>
+                <div className="adm-field-group"><label>Meta Title</label><input className="field" value={'Ellines Haven  ' + (sForm.tagline || '')} onChange={() => {}} /></div>
+                <div className="adm-field-group"><label>Meta Description</label><textarea className="field" rows={3} defaultValue="Discover compelling African novels and short stories by Elijah Mwangi M." style={{ resize:'vertical' }} /></div>
+                <div className="adm-field-group"><label>Google Analytics ID</label><input className="field" defaultValue="" placeholder="G-XXXXXXXXXX" /></div>
+                <div className="adm-field-group"><label>Facebook Pixel ID</label><input className="field" defaultValue="" placeholder="XXXXXXXXXXXXXXX" /></div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => showToast('SEO settings saved')}>Save Changes</button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* -- PAYMENT METHODS TAB -- */}
+        {tab === 'payments' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div><h1>Payment Methods</h1><span className="adm-page-sub">Configure checkout payment options  changes apply instantly</span></div>
+            </div>
+            <div className="adm-settings-grid">
+
+              {/* M-Pesa */}
+              <div className="card adm-settings-card">
+                <h3>📱 M-Pesa</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Customers pay via M-Pesa Send Money or Lipa Na M-Pesa Till.</p>
+                <div className="adm-field-group">
+                  <label>Send Money Number</label>
+                  <input className="field" value={sForm.mpesaPhone || ''} onChange={e => setSetting('mpesaPhone', e.target.value)} placeholder="0748255466" />
+                </div>
+                <div className="adm-field-group">
+                  <label>Lipa Na M-Pesa Till Number</label>
+                  <input className="field" value={sForm.mpesaTill || ''} onChange={e => setSetting('mpesaTill', e.target.value)} placeholder="Leave blank to use phone number" />
+                  <small style={{ color:'var(--muted)', fontSize:'0.75rem' }}>If set, till number takes priority over phone at checkout</small>
+                </div>
+                <div className="adm-field-group">
+                  <label>Business / Account Name</label>
+                  <input className="field" value={sForm.mpesaName || ''} onChange={e => setSetting('mpesaName', e.target.value)} placeholder="Ellines Haven" />
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('M-Pesa settings')}>Save M-Pesa</button>
+              </div>
+
+              {/* Airtel Money */}
+              <div className="card adm-settings-card">
+                <h3>📶 Airtel Money</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Customers pay via Airtel Money.</p>
+                <div className="adm-field-group">
+                  <label>Airtel Money Number</label>
+                  <input className="field" value={sForm.airtelNum || ''} onChange={e => setSetting('airtelNum', e.target.value)} placeholder="073X XXX XXX" />
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Airtel settings')}>Save Airtel</button>
+              </div>
+
+              {/* Card Payments */}
+              <div className="card adm-settings-card">
+                <h3>💳 Card Payments</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Enable Stripe for Visa/Mastercard payments.</p>
+                <div className="adm-field-group">
+                  <label className="adm-check" style={{ marginBottom:12 }}>
+                    <input type="checkbox" checked={!!sForm.stripeEnabled} onChange={e => setSetting('stripeEnabled', e.target.checked)} /> Enable card payments
+                  </label>
+                </div>
+                <div className="adm-field-group">
+                  <label>Stripe Secret Key</label>
+                  <input className="field" type="password" value={sForm.stripeKey || ''} onChange={e => setSetting('stripeKey', e.target.value)} placeholder="sk_live_..." />
+                </div>
+                <div className="adm-field-group">
+                  <label>Currency</label>
+                  <select className="field" value={sForm.currency || 'KES'} onChange={e => setSetting('currency', e.target.value)}>
+                    <option value="KES">KES  Kenyan Shilling</option>
+                    <option value="USD">USD  US Dollar</option>
+                    <option value="EUR">EUR  Euro</option>
+                  </select>
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Card settings')}>Save Card Settings</button>
+              </div>
+
+              {/* Active methods toggle */}
+              <div className="card adm-settings-card">
+                <h3>✅ Active at Checkout</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Toggle which payment methods customers can see at checkout.</p>
+                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                  {[
+                    { key:'mpesa',  label:'M-Pesa',      icon:'📱' },
+                    { key:'airtel', label:'Airtel Money', icon:'📶' },
+                    { key:'card',   label:'Card (Stripe)',icon:'💳' },
+                  ].map(m => {
+                    const active = (sForm.payMethods || ['mpesa','airtel','card']).includes(m.key);
+                    return (
+                      <label key={m.key} className="adm-check" style={{ fontSize:'0.9rem' }}>
+                        <input type="checkbox" checked={active}
+                          onChange={e => {
+                            const cur = sForm.payMethods || ['mpesa','airtel','card'];
+                            setSetting('payMethods', e.target.checked ? [...cur, m.key] : cur.filter(x => x !== m.key));
+                          }}
+                        /> {m.icon} {m.label}
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="adm-info-note" style={{ marginTop:16 }}>
+                  Current flow: customer pays and enters M-Pesa/Airtel transaction code ? admin verifies in Orders tab ? books unlock automatically.
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:14 }} onClick={() => saveSettings('Payment methods')}>Save Active Methods</button>
+              </div>
+
+              {/* Custom Payment Methods */}
+              <div className="card adm-settings-card" style={{ gridColumn:'1/-1' }}>
+                <h3>➕ Custom Payment Methods</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Add bank transfer, Pesalink, PayPal, or any other method. They appear at checkout alongside the built-in methods.</p>
+                {customMethods.length > 0 && (
+                  <table className="adm-table" style={{ marginBottom:20 }}>
+                    <thead><tr><th>Name</th><th>Type</th><th>Account / Number</th><th>Active</th><th>Remove</th></tr></thead>
+                    <tbody>
+                      {customMethods.map((m, i) => (
+                        <tr key={i}>
+                          <td><strong>{m.name}</strong></td>
+                          <td><span className="adm-badge">{m.type}</span></td>
+                          <td style={{ fontSize:'0.82rem' }}>{m.number}</td>
+                          <td>
+                            <button className={'adm-flag-btn' + (m.enabled ? ' on' : '')}
+                              onClick={() => setCustomMethods(prev => prev.map((x,j) => j===i ? {...x, enabled:!x.enabled} : x))}>
+                              {m.enabled ? 'On' : 'Off'}
+                            </button>
+                          </td>
+                          <td>
+                            <button className="adm-act-btn adm-act-del"
+                              onClick={() => { setCustomMethods(prev => prev.filter((_,j) => j!==i)); showToast('Payment method removed'); }}>
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                <div className="adm-pay-add-form">
+                  <p style={{ fontSize:'0.78rem', color:'var(--gold)', fontWeight:700, marginBottom:12, textTransform:'uppercase', letterSpacing:1 }}>Add New Method</p>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr auto', gap:12, alignItems:'end' }}>
+                    <div className="adm-field-group" style={{ marginBottom:0 }}>
+                      <label>Method Name</label>
+                      <input className="field" value={newPayMethod.name} onChange={e => setNewPayMethod(p => ({...p, name:e.target.value}))} placeholder="e.g. Pesalink, PayPal" />
+                    </div>
+                    <div className="adm-field-group" style={{ marginBottom:0 }}>
+                      <label>Type</label>
+                      <select className="field" value={newPayMethod.type} onChange={e => setNewPayMethod(p => ({...p, type:e.target.value}))}>
+                        <option value="mobile">Mobile Money</option>
+                        <option value="bank">Bank Transfer</option>
+                        <option value="card">Card</option>
+                        <option value="digital">Digital Wallet</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="adm-field-group" style={{ marginBottom:0 }}>
+                      <label>Account / Number</label>
+                      <input className="field" value={newPayMethod.number} onChange={e => setNewPayMethod(p => ({...p, number:e.target.value}))} placeholder="Account number or details" />
+                    </div>
+                    <button className="btn btn-primary btn-sm" style={{ height:42 }}
+                      onClick={() => {
+                        if (!newPayMethod.name.trim()) return;
+                        setCustomMethods(prev => [...prev, { ...newPayMethod, id:'pm_'+Date.now() }]);
+                        setNewPayMethod({ name:'', type:'mobile', number:'', enabled:true });
+                        showToast('Payment method added');
+                      }}>+ Add</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* -- PERMISSIONS TAB -- */}
+        {tab === 'permissions' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div>
+                <h1>User Permissions</h1>
+                <span className="adm-page-sub">Grant or deny specific capabilities per user</span>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => {
+                saveUserPerms({});
+                showToast('All permissions reset to defaults');
+              }}>Reset All to Default</button>
+            </div>
+
+            {/* Legend */}
+            <div className="adm-alert-box" style={{ marginBottom:20 }}>
+              <strong>How it works:</strong> Toggle any permission on/off per user. Changes take effect immediately on their next action. Green = allowed, Red = denied.
+            </div>
+
+            <div className="card" style={{ overflow:'auto' }}>
+              <table className="adm-table adm-perms-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th style={{textAlign:'center'}}>Browse</th>
+                    <th style={{textAlign:'center'}}>Purchase</th>
+                    <th style={{textAlign:'center'}}>Reviews</th>
+                    <th style={{textAlign:'center'}}>Download</th>
+                    <th style={{textAlign:'center'}}>Read Online</th>
+                    <th style={{textAlign:'center'}}>My Library</th>
+                    <th style={{textAlign:'center'}}>Book Details</th>
+                    <th style={{textAlign:'center'}}>Place Orders</th>
+                    <th style={{textAlign:'center'}}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.filter(u => u.role !== 'superadmin').map(u => {
+                    const p = getPerms(u.email);
+                    const isSuspended = isUserSuspended(u.email);
+                    const PermToggle = ({ field }) => (
+                      <td style={{textAlign:'center'}}>
+                        <button
+                          className={'adm-perm-btn' + (p[field] && !isSuspended ? ' on' : ' off')}
+                          onClick={() => localSetPerm(u.email, field, !p[field])}
+                          disabled={isSuspended}
+                          title={isSuspended ? 'User is suspended' : (p[field] ? 'Click to deny' : 'Click to allow')}
+                        >
+                          {isSuspended ? '–' : p[field] ? 'ON' : 'OFF'}
+                        </button>
+                      </td>
+                    );
+                    return (
+                      <tr key={u.id} style={isSuspended ? { opacity:0.5 } : {}}>
+                        <td>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <div className="adm-user-avatar" style={{flexShrink:0,width:28,height:28,fontSize:'0.75rem'}}>
+                              {u.name.charAt(0)}
+                            </div>
+                            <div>
+                              <strong style={{fontSize:'0.85rem'}}>{u.name}</strong>
+                              <span style={{display:'block',fontSize:'0.72rem',color:'var(--muted)'}}>{u.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={'adm-role adm-role--' + (u.role === 'admin' ? 'admin' : 'user')}>{u.role}</span>
+                        </td>
+                        <PermToggle field="canBrowse"           />
+                        <PermToggle field="canPurchase"         />
+                        <PermToggle field="canReview"           />
+                        <PermToggle field="canDownload"         />
+                        <PermToggle field="canReadOnline"       />
+                        <PermToggle field="canAccessMyLibrary"  />
+                        <PermToggle field="canViewBookDetails"  />
+                        <PermToggle field="canPlaceOrders"      />
+                        <td style={{textAlign:'center'}}>
+                          {u.id !== user.id && u.role !== 'admin' ? (
+                            <button
+                              className={'adm-perm-btn' + (isSuspended ? ' off' : ' on')}
+                              onClick={async () => {
+                                await setSuspended(u.email, !isSuspended);
+                                setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: !isSuspended ? 'Suspended' : 'Active' } : x));
+                                showToast(u.name + (!isSuspended ? ' suspended — logged out instantly' : ' reactivated ✅'));
+                              }}>
+                              {isSuspended ? 'Suspended' : 'Active'}
+                            </button>
+                          ) : (
+                            <span style={{fontSize:'0.75rem',color:'var(--muted)'}}>Protected</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Quick actions */}
+            {isSuper && (
+              <div className="adm-dash-grid" style={{marginTop:24}}>
+                <div className="card" style={{padding:24}}>
+                  <h3 style={{marginBottom:16,fontSize:'0.95rem'}}>Bulk Actions</h3>
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    {[
+                      { label:'Disable purchases for all users', action: () => {
+                        const updated = {};
+                        users.forEach(u => { updated[u.email.toLowerCase()] = { ...getPerms(u.email), canPurchase: false }; });
+                        saveUserPerms(updated); showToast('Purchases disabled for all users');
+                      }},
+                      { label:'Enable purchases for all users', action: () => {
+                        const updated = {...userPerms};
+                        users.forEach(u => { updated[u.email.toLowerCase()] = { ...getPerms(u.email), canPurchase: true }; });
+                        saveUserPerms(updated); showToast('Purchases enabled for all users');
+                      }},
+                      { label:'Disable reviews site-wide', action: () => {
+                        const updated = {};
+                        users.forEach(u => { updated[u.email.toLowerCase()] = { ...getPerms(u.email), canReview: false }; });
+                        saveUserPerms(updated); showToast('Reviews disabled site-wide');
+                      }},
+                      { label:'Reset all user permissions to default', action: () => {
+                        localStorage.removeItem('eh_user_perms'); saveUserPerms({}); showToast('Permissions reset ?');
+                      }},
+                    ].map(action => (
+                      <button key={action.label} className="btn btn-ghost btn-sm" style={{textAlign:'left',justifyContent:'flex-start'}} onClick={action.action}>
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="card" style={{padding:24}}>
+                  <h3 style={{marginBottom:16,fontSize:'0.95rem'}}>Permission Guide</h3>
+                  {[
+                    { perm:'Browse Library',   desc:'View book catalogue and details page' },
+                    { perm:'Purchase Books',   desc:'Add to cart and checkout' },
+                    { perm:'Write Reviews',    desc:'Submit star ratings and text reviews' },
+                    { perm:'Download PDFs',    desc:'Download purchased books as PDF files' },
+                    { perm:'Read Online',      desc:'Access the online reader for owned books' },
+                    { perm:'My Library',       desc:'Access the My Library page' },
+                    { perm:'Book Details',     desc:'View individual book detail pages' },
+                    { perm:'Place Orders',     desc:'Submit payment and place orders' },
+                    { perm:'Account Status',   desc:'Suspended = blocked from all site actions' },
+                  ].map(g => (
+                    <div key={g.perm} style={{padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <strong style={{fontSize:'0.82rem',color:'var(--gold)'}}>{g.perm}</strong>
+                      <p style={{fontSize:'0.75rem',color:'var(--muted)',margin:'2px 0 0'}}>{g.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* -- SUPER ADMIN: ADMIN CONTROL -- */}
+        {tab === 'admins' && isSuper && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div>
+                <h1>Admin Control <span className="adm-super-tag" style={{verticalAlign:'middle',marginLeft:10}}>SUPER ADMIN</span></h1>
+                <span className="adm-page-sub">Manage admin accounts, permissions and access levels</span>
+              </div>
+              <button className="btn btn-primary" onClick={() => {
+                setAddUserForm({ name:'', email:'', password:'Admin@' + Math.floor(1000+Math.random()*9000), role:'admin' });
+                setAddUserModal('admin');
+              }}>+ Add Admin</button>
+            </div>
+
+            {/* Admin stats */}
+            <div className="adm-stats-grid" style={{ gridTemplateColumns:'repeat(4,1fr)', marginBottom:24 }}>
+              {[
+                { label:'Super Admins',  value: users.filter(u=>u.role==='superadmin').length,  color:'#c9a84c' },
+                { label:'Admins',        value: users.filter(u=>u.role==='admin').length,       color:'#4a9eff' },
+                { label:'Active Admins', value: users.filter(u=>u.role==='admin'&&u.status==='Active').length, color:'#2ecc71' },
+                { label:'Total Staff',   value: users.filter(u=>u.role!=='user').length,        color:'#c97fff' },
+              ].map(s=>(
+                <div key={s.label} className="adm-stat-card card">
+                  <div className="adm-stat-body"><strong style={{color:s.color}}>{s.value}</strong><span>{s.label}</span></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Admin accounts table */}
+            <div className="card" style={{ overflow:'hidden', marginBottom:24 }}>
+              <div className="adm-card-head"><h3>Admin Accounts</h3></div>
+              <table className="adm-table">
+                <thead><tr><th>Avatar</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {users.filter(u => u.role === 'admin' || u.role === 'superadmin').map(u => (
+                    <tr key={u.id}>
+                      <td>
+                        <div className="adm-user-avatar" style={u.role==='superadmin'?{background:'linear-gradient(135deg,#c9a84c,#e8c96d)',color:'#000'}:{}}>
+                          {u.name.charAt(0)}
+                        </div>
+                      </td>
+                      <td>
+                        <strong>{u.name}</strong>
+                        <span style={{display:'block',fontSize:'0.7rem',color:'var(--muted)'}}>
+                          {u.role === 'superadmin' ? 'Full system access' : 'Books, Orders, Users'}
+                        </span>
+                      </td>
+                      <td style={{fontSize:'0.8rem',color:'var(--muted)'}}>{u.email}</td>
+                      <td>
+                        {u.id !== user.id ? (
+                          <select className="field" style={{padding:'3px 8px',fontSize:'0.78rem',width:'auto'}}
+                            value={u.role}
+                            onChange={e => { setUsers(prev=>prev.map(x=>x.id===u.id?{...x,role:e.target.value}:x)); showToast('Role updated for ' + u.name); }}>
+                            <option value="admin">Admin</option>
+                            <option value="superadmin">Super Admin</option>
+                          </select>
+                        ) : (
+                          <span className="adm-role adm-role--admin">{u.role}</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={'adm-status adm-status--' + (isUserSuspended(u.email)?'refunded':'completed')}>
+                          {isUserSuspended(u.email)?'Suspended':'Active'}
+                        </span>
+                      </td>
+                      <td style={{fontSize:'0.78rem',color:'var(--muted)'}}>{u.joined}</td>
+                      <td className="adm-actions">
+                        {u.id !== user.id && (
+                          <>
+                            <button className="adm-act-btn adm-act-edit" onClick={() => { setResetPwUser(u); setNewPw(''); setTab('users'); setTimeout(()=>setTab('admins'),50); }}>
+                              Reset PW
+                            </button>
+                            <button className="adm-act-btn adm-act-edit" style={{marginLeft:4}}
+                              onClick={async () => {
+                                const isSusp = isUserSuspended(u.email);
+                                await setSuspended(u.email, !isSusp);
+                                setUsers(prev=>prev.map(x=>x.id===u.id?{...x,status:!isSusp?'Suspended':'Active'}:x));
+                                showToast(u.name + (!isSusp?' suspended':' reactivated ✅'));
+                              }}>
+                              {isUserSuspended(u.email)?'Activate':'Suspend'}
+                            </button>
+                            {u.role !== 'superadmin' && (
+                              <button className="adm-act-btn adm-act-del" style={{marginLeft:4}}
+                                onClick={() => handleDeleteUser(u)}>
+                                Remove
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Permissions matrix */}
+            <div className="adm-dash-grid">
+              <div className="card" style={{padding:24}}>
+                <h3 style={{marginBottom:18,fontSize:'0.95rem'}}>Permission Matrix</h3>
+                {[
+                  { feature:'Manage Books',        admin:true,  superadmin:true  },
+                  { feature:'Manage Orders',        admin:true,  superadmin:true  },
+                  { feature:'Manage Users',         admin:true,  superadmin:true  },
+                  { feature:'Moderate Reviews',     admin:true,  superadmin:true  },
+                  { feature:'Promo Codes',          admin:true,  superadmin:true  },
+                  { feature:'Analytics',            admin:true,  superadmin:true  },
+                  { feature:'Site Settings',        admin:false, superadmin:true  },
+                  { feature:'Payment Settings',     admin:false, superadmin:true  },
+                  { feature:'Admin Control',        admin:false, superadmin:true  },
+                  { feature:'System Logs',          admin:false, superadmin:true  },
+                  { feature:'Backup & Restore',     admin:false, superadmin:true  },
+                  { feature:'Promote to Admin',     admin:false, superadmin:true  },
+                ].map(row => (
+                  <div key={row.feature} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                    <span style={{fontSize:'0.85rem'}}>{row.feature}</span>
+                    <div style={{display:'flex',gap:12}}>
+                      <span style={{fontSize:'0.78rem',color:row.admin?'var(--ok)':'var(--err)',fontWeight:600,minWidth:50,textAlign:'center'}}>
+                        {row.admin ? '✅ Admin' : '✗ Admin'}
+                      </span>
+                      <span style={{fontSize:'0.78rem',color:'var(--gold)',fontWeight:600,minWidth:70,textAlign:'center'}}>
+                        ✅ Super
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="card" style={{padding:24}}>
+                <h3 style={{marginBottom:18,fontSize:'0.95rem'}}>Recent Admin Activity</h3>
+                {[
+                  { action:'Book "Pain" price updated',        by:'Admin',       time:'2 hrs ago',   type:'edit'   },
+                  { action:'Order ORD-003 confirmed',          by:'Admin',       time:'5 hrs ago',   type:'ok'     },
+                  { action:'User Peter Waweru suspended',      by:'Super Admin', time:'1 day ago',   type:'warn'   },
+                  { action:'Promo HAVEN10 deactivated',        by:'Admin',       time:'2 days ago',  type:'edit'   },
+                  { action:'New book "The Acacia Road" added', by:'Super Admin', time:'3 days ago',  type:'ok'     },
+                  { action:'Review by Sarah Kamau approved',   by:'Admin',       time:'4 days ago',  type:'ok'     },
+                  { action:'Settings: M-Pesa number updated',  by:'Super Admin', time:'5 days ago',  type:'edit'   },
+                ].map((a,i) => (
+                  <div key={i} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.04)',alignItems:'flex-start'}}>
+                    <span style={{fontSize:'1rem',marginTop:2}}>{a.type==='ok'?'✅':a.type==='warn'?'⚠️':'✏️'}</span>
+                    <div>
+                      <div style={{fontSize:'0.82rem'}}>{a.action}</div>
+                      <div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:2}}>by {a.by}  {a.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Admin Rights Management — Super Admin grants/revokes per-admin capabilities */}
+            <div className="card" style={{padding:24,marginTop:24}}>
+              <h3 style={{marginBottom:6,fontSize:'0.95rem'}}>Admin Rights Management</h3>
+              <p style={{fontSize:'0.78rem',color:'var(--muted)',marginBottom:18}}>
+                Grant or revoke specific capabilities for each admin account. Changes take effect immediately.
+              </p>
+              {users.filter(u => u.role === 'admin').length === 0 ? (
+                <p style={{color:'var(--muted)',fontSize:'0.85rem'}}>No admin accounts yet. Add one above.</p>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  {users.filter(u => u.role === 'admin').map(u => {
+                    const perms = getUserPerms(u.email);
+                    const rights = [
+                      { field:'canManageBooks',    label:'Manage Books' },
+                      { field:'canManageOrders',   label:'Manage Orders' },
+                      { field:'canManageUsers',    label:'Manage Users' },
+                      { field:'canViewAnalytics',  label:'View Analytics' },
+                      { field:'canManagePromos',   label:'Promo Codes' },
+                      { field:'canManageSettings', label:'Site Settings' },
+                      { field:'canViewLogs',       label:'View Logs' },
+                    ];
+                    return (
+                      <div key={u.id} style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--dim)',borderRadius:'var(--r-sm)',padding:'14px 16px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                          <div className="adm-user-avatar" style={{width:30,height:30,fontSize:'0.8rem',flexShrink:0}}>{u.name.charAt(0)}</div>
+                          <div>
+                            <strong style={{fontSize:'0.88rem'}}>{u.name}</strong>
+                            <span style={{display:'block',fontSize:'0.72rem',color:'var(--muted)'}}>{u.email}</span>
+                          </div>
+                          {isUserSuspended(u.email) && <span style={{fontSize:'0.7rem',padding:'2px 8px',borderRadius:10,background:'rgba(231,76,60,0.1)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.3)',marginLeft:'auto'}}>SUSPENDED</span>}
+                        </div>
+                        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                          {rights.map(r => (
+                            <button key={r.field} type="button"
+                              className={'adm-toggle' + (perms[r.field] !== false ? ' on' : '')}
+                              style={{fontSize:'0.72rem',padding:'4px 10px'}}
+                              onClick={async () => {
+                                await setPermField(u.email, r.field, perms[r.field] === false ? true : false);
+                                addLog('system', `Admin right "${r.label}" ${perms[r.field]===false?'granted to':'revoked from'} ${u.email}`);
+                                showToast(`${r.label} ${perms[r.field]===false?'granted':'revoked'} for ${u.name}`);
+                              }}>
+                              {r.label}: {perms[r.field] !== false ? 'ON' : 'OFF'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* -- SYSTEM LOGS -- */}
+        {tab === 'logs' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div>
+                <h1>System Logs</h1>
+                <span className="adm-page-sub">Full audit trail of all system events</span>
+              </div>
+              <div style={{display:'flex',gap:10}}>
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  // Export as CSV
+                  const header = 'Time,Type,Event,User,IP,Status';
+                  const rows = systemLogs.map(l =>
+                    `"${l.time}","${l.type}","${l.event}","${l.user}","${l.ip}","${l.status}"`
+                  ).join('\n');
+                  const blob = new Blob([header + '\n' + rows], { type:'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'ellines-haven-logs.csv'; a.click();
+                  URL.revokeObjectURL(url);
+                  showToast('✅ Logs exported as CSV');
+                }}>Export CSV</button>
+                <button className="btn btn-ghost btn-sm" style={{color:'var(--err)',borderColor:'rgba(231,76,60,0.4)'}}
+                  onClick={() => {
+                    if (!window.confirm('Clear all system logs? This cannot be undone.')) return;
+                    setSystemLogs([]);
+                    // Clear from Firestore (the source of truth)
+                    setDoc(doc(db, 'site_data', 'system_logs'), { logs: [], updatedAt: serverTimestamp() }, { merge: false })
+                      .catch(() => {});
+                    try { localStorage.removeItem('eh_system_logs'); } catch {}
+                    showToast('🗑 System logs cleared');
+                  }}>Clear Logs</button>
+              </div>
+            </div>
+
+            {/* Log type filters */}
+            <div className="adm-toolbar card" style={{gap:8,marginBottom:20}}>
+              {['all','auth','order','book','user','system'].map(f => (
+                <button key={f} className={'adm-filter-btn' + (logFilter===f?' on':'')} onClick={() => setLogFilter(f)}>
+                  {f.charAt(0).toUpperCase()+f.slice(1)}
+                </button>
+              ))}
+              <span className="adm-toolbar-count" style={{marginLeft:'auto'}}>
+                {systemLogs.filter(l => logFilter==='all' || l.type===logFilter).length} entries
+              </span>
+            </div>
+
+            {/* Stats */}
+            <div className="adm-stats-grid" style={{gridTemplateColumns:'repeat(5,1fr)',marginBottom:24}}>
+              {[
+                { label:'Auth Events',   value: systemLogs.filter(l=>l.type==='auth').length,   color:'#4a9eff' },
+                { label:'Order Events',  value: systemLogs.filter(l=>l.type==='order').length,  color:'#c9a84c' },
+                { label:'Book Changes',  value: systemLogs.filter(l=>l.type==='book').length,   color:'#7ab648' },
+                { label:'User Events',   value: systemLogs.filter(l=>l.type==='user').length,   color:'#c97fff' },
+                { label:'System Events', value: systemLogs.filter(l=>l.type==='system').length, color:'#e8832a' },
+              ].map(s=>(
+                <div key={s.label} className="adm-stat-card card">
+                  <div className="adm-stat-body"><strong style={{color:s.color}}>{s.value}</strong><span>{s.label}</span></div>
+                </div>
+              ))}
+            </div>
+
+            <div className="card" style={{overflow:'hidden'}}>
+              <table className="adm-table">
+                <thead><tr><th>Time</th><th>Type</th><th>Event</th><th>User</th><th>IP</th><th>Status</th></tr></thead>
+                <tbody>
+                  {systemLogs
+                    .filter(l => logFilter==='all' || l.type===logFilter)
+                    .map((l,i) => (
+                    <tr key={i}>
+                      <td style={{fontSize:'0.75rem',color:'var(--muted)',whiteSpace:'nowrap'}}>{l.time}</td>
+                      <td><span className="adm-badge" style={{
+                        background: l.type==='auth'?'rgba(74,158,255,0.1)':l.type==='order'?'rgba(201,168,76,0.1)':l.type==='book'?'rgba(122,182,72,0.1)':l.type==='user'?'rgba(201,127,255,0.1)':'rgba(232,131,42,0.1)',
+                        color: l.type==='auth'?'#7eb6ff':l.type==='order'?'var(--gold)':l.type==='book'?'#a5d679':l.type==='user'?'#d49fff':'#f0a055',
+                        borderColor: 'transparent'
+                      }}>{l.type}</span></td>
+                      <td style={{fontSize:'0.83rem'}}>{l.event}</td>
+                      <td style={{fontSize:'0.8rem',color:'var(--muted)'}}>{l.user}</td>
+                      <td><code className="adm-code">{l.ip}</code></td>
+                      <td><span className={'adm-status adm-status--' + (l.status==='success'?'completed':l.status==='warning'?'pending':'refunded')}>{l.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* -- NOTIFICATIONS -- */}
+        {tab === 'notifications' && (
+          <NotificationsPanel books={books} showToast={showToast} saveBook={saveBook} addLog={addLog} />
+        )}
+
+        {/* -- MESSAGES -- */}
+        {tab === 'messages' && (
+          <MessagesPanel showToast={showToast} />
+        )}
+
+        {/* -- SITE CONTROLS -- */}
+        {tab === 'sitecontrols' && (
+          <SiteControlsPanel
+            siteControls={siteControls}
+            saveSiteControls={saveSiteControls}
+            showToast={showToast}
+            isSuper={isSuper}
+          />
+        )}
+
+        {/* -- PAGE EDITOR -- */}
+        {tab === 'pageeditor' && (
+          <PageEditorPanel showToast={showToast} />
+        )}
+
+        {/* -- DESIGN STUDIO -- */}
+        {tab === 'design' && (
+          <DesignStudioPanel showToast={showToast} />
+        )}
+
+        {/* -- SECURITY -- */}
+        {tab === 'security' && (
+          <SecurityPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} isSuper={isSuper} />
+        )}
+
+        {/* -- PLUGINS -- */}
+        {tab === 'plugins' && (
+          <PluginsPanel showToast={showToast} isSuper={isSuper} />
+        )}
+
+        {/* -- GOD MODE — superadmin only -- */}
+        {tab === 'godmode' && isSuper && (
+          <GodModePanel showToast={showToast} books={books} saveBook={saveBook} users={users} isSuper={isSuper} />
+        )}
+
+        {/* -- INTEGRATIONS -- */}
+        {tab === 'integrations' && (
+          <IntegrationsPanel showToast={showToast} isSuper={isSuper} />
+        )}
+
+        {/* -- BACKUP & RESTORE -- */}
+        {tab === 'backup' && (
+          <div className="adm-page">
+            <div className="adm-page-head">
+              <div>
+                <h1>Backup &amp; Restore</h1>
+                <span className="adm-page-sub">Export, import, and restore site data</span>
+              </div>
+            </div>
+
+            {/* DANGER ZONE - Super Admin only nuclear reset */}
+            <div className="card" style={{padding:24,marginBottom:24,border:'1px solid rgba(231,76,60,0.4)',background:'rgba(231,76,60,0.04)'}}>
+              <h3 style={{color:'var(--err)',marginBottom:8}}>Danger Zone</h3>
+              <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>
+                These actions permanently wipe data. Use when you need to clear stale/orphaned data from old browser sessions or testing.
+              </p>
+              <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+                <button className="btn btn-sm" style={{background:'rgba(231,76,60,0.15)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.4)'}}
+                  onClick={() => {
+                    if (!window.confirm('Clear ALL orders? This cannot be undone.')) return;
+                    localStorage.removeItem('eh_orders');
+                    setLiveOrders([]);
+                    syncOrders();
+                    setTick(t => t + 1);
+                    showToast('All orders cleared');
+                  }}>
+                  Clear All Orders
+                </button>
+                <button className="btn btn-sm" style={{background:'rgba(231,76,60,0.15)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.4)'}}
+                  onClick={() => {
+                    if (!window.confirm('Clear ALL library data for all users? This cannot be undone.')) return;
+                    Object.keys(localStorage).filter(k => k.startsWith('eh_lib')).forEach(k => localStorage.removeItem(k));
+                    showToast('All library data cleared');
+                  }}>
+                  Clear All Libraries
+                </button>
+                <button className="btn btn-sm" style={{background:'rgba(231,76,60,0.15)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.4)'}}
+                  onClick={() => {
+                    if (!window.confirm('NUCLEAR RESET: Clear ALL site data including orders, libraries, users, settings? This cannot be undone.')) return;
+                    const keep = ['eh_user']; // keep current admin session
+                    const current = localStorage.getItem('eh_user');
+                    localStorage.clear();
+                    if (current) localStorage.setItem('eh_user', current);
+                    setLiveOrders([]);
+                    syncOrders();
+                    setUsers(buildUserList(suspendedList));
+                    setTick(t => t + 1);
+                    showToast('Full reset complete - all data cleared');
+                  }}>
+                  Nuclear Reset (Clear Everything)
+                </button>
+              </div>
+            </div>
+
+            {/* Backup actions */}
+            <div className="adm-stats-grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:28}}>
+              <div className="card" style={{padding:28,textAlign:'center'}}>
+                <div style={{fontSize:'2.5rem',marginBottom:12}}>💾</div>
+                <h3 style={{fontSize:'1rem',marginBottom:8}}>Full Backup</h3>
+                <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>Export all books, orders, users, and settings as a JSON file.</p>
+                <button className="btn btn-primary btn-sm" style={{width:'100%'}} onClick={() => {
+                  const data = {
+                    books: JSON.parse(localStorage.getItem('eh_books')||'[]'),
+                    orders: JSON.parse(localStorage.getItem('eh_orders')||'[]'),
+                    users: JSON.parse(localStorage.getItem('eh_registered_users')||'[]'),
+                    settings: JSON.parse(localStorage.getItem('eh_settings')||'{}'),
+                    pwOverrides: JSON.parse(localStorage.getItem('eh_pw_overrides')||'{}'),
+                    exportedAt: new Date().toISOString(),
+                    version: '1.0',
+                  };
+                  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href=url; a.download='ellines-haven-backup-'+Date.now()+'.json'; a.click();
+                  URL.revokeObjectURL(url);
+                  showToast('Full backup downloaded');
+                }}>Download Backup</button>
+              </div>
+              <div className="card" style={{padding:28,textAlign:'center'}}>
+                <div style={{fontSize:'2.5rem',marginBottom:12}}>📚</div>
+                <h3 style={{fontSize:'1rem',marginBottom:8}}>Books Only</h3>
+                <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>Export only the books catalogue as JSON.</p>
+                <button className="btn btn-outline btn-sm" style={{width:'100%'}} onClick={() => {
+                  const data = JSON.parse(localStorage.getItem('eh_books')||'[]');
+                  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href=url; a.download='ellines-haven-books-'+Date.now()+'.json'; a.click();
+                  URL.revokeObjectURL(url);
+                  showToast('Books exported');
+                }}>Export Books</button>
+              </div>
+              <div className="card" style={{padding:28,textAlign:'center'}}>
+                <div style={{fontSize:'2.5rem',marginBottom:12}}>🛒</div>
+                <h3 style={{fontSize:'1rem',marginBottom:8}}>Orders Export</h3>
+                <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>Export all order records as JSON.</p>
+                <button className="btn btn-outline btn-sm" style={{width:'100%'}} onClick={() => {
+                  const data = JSON.parse(localStorage.getItem('eh_orders')||'[]');
+                  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a'); a.href=url; a.download='ellines-haven-orders-'+Date.now()+'.json'; a.click();
+                  URL.revokeObjectURL(url);
+                  showToast('Orders exported');
+                }}>Export Orders</button>
+              </div>
+            </div>
+
+            {/* Restore */}
+            <div className="adm-dash-grid">
+              <div className="card" style={{padding:28}}>
+                <h3 style={{marginBottom:8,fontSize:'0.95rem'}}>Restore from Backup</h3>
+                <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:20}}>Upload a previously exported JSON backup file. This will overwrite current data.</p>
+                <div className="adm-restore-zone" onClick={() => document.getElementById('restore-input').click()}>
+                  <div style={{fontSize:'2rem',marginBottom:8}}>📂</div>
+                  <p style={{fontSize:'0.85rem',color:'var(--muted)'}}>Click to select backup JSON file</p>
+                  <p style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:4}}>Only .json files from Ellines Haven backups</p>
+                </div>
+                <input id="restore-input" type="file" accept=".json" style={{display:'none'}} onChange={e => {
+                  const file = e.target.files[0]; if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = evt => {
+                    try {
+                      const data = JSON.parse(evt.target.result);
+                      if (data.version && data.exportedAt) {
+                        if (data.books)       localStorage.setItem('eh_books', JSON.stringify(data.books));
+                        if (data.orders)      localStorage.setItem('eh_orders', JSON.stringify(data.orders));
+                        if (data.users)       localStorage.setItem('eh_registered_users', JSON.stringify(data.users));
+                        if (data.settings)    localStorage.setItem('eh_settings', JSON.stringify(data.settings));
+                        if (data.pwOverrides) localStorage.setItem('eh_pw_overrides', JSON.stringify(data.pwOverrides));
+                        showToast('Backup restored successfully  refresh to see changes ?');
+                      } else { showToast('Invalid backup file'); }
+                    } catch { showToast('Could not read backup file'); }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }} />
+              </div>
+              <div className="card" style={{padding:28}}>
+                <h3 style={{marginBottom:8,fontSize:'0.95rem'}}>Storage Overview</h3>
+                <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:20}}>Current data stored in this browser's localStorage.</p>
+                {[
+                  { key:'eh_books',            label:'Books catalogue',    icon:'📚' },
+                  { key:'eh_orders',           label:'Orders',             icon:'🛒' },
+                  { key:'eh_registered_users', label:'Registered users',   icon:'👥' },
+                  { key:'eh_settings',         label:'Site settings',      icon:'⚙️' },
+                  { key:'eh_pay_methods',      label:'Custom pay methods', icon:'💳' },
+                  { key:'eh_pw_overrides',     label:'Password overrides', icon:'🔑' },
+                ].map(item => {
+                  const raw = localStorage.getItem(item.key);
+                  const parsed = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
+                  const count = Array.isArray(parsed) ? parsed.length : (parsed ? Object.keys(parsed).length : 0);
+                  const size = raw ? (raw.length / 1024).toFixed(1) + ' KB' : '0 KB';
+                  return (
+                    <div key={item.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                      <span style={{fontSize:'0.85rem'}}>{item.icon} {item.label}</span>
+                      <div style={{display:'flex',gap:12,alignItems:'center'}}>
+                        <span style={{fontSize:'0.75rem',color:'var(--gold)'}}>{count} records</span>
+                        <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>{size}</span>
+                        <button className="adm-act-btn adm-act-del" style={{fontSize:'0.68rem',padding:'2px 7px'}}
+                          onClick={() => { if(window.confirm('Clear '+item.label+'?')){ localStorage.removeItem(item.key); showToast(item.label+' cleared'); } }}>
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="adm-info-note" style={{marginTop:16}}>
+                  Deploy note: localStorage data lives in this browser only. For production, connect a real database (Firebase, Supabase, MongoDB).
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}

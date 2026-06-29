@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560">
+  <defs>
+    <linearGradient id="bgnn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#020408"/>
+      <stop offset="40%" stop-color="#060c18"/>
+      <stop offset="100%" stop-color="#0a0818"/>
+    </linearGradient>
+    <linearGradient id="ground_nn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#08060f"/>
+      <stop offset="100%" stop-color="#040308"/>
+    </linearGradient>
+    <linearGradient id="ovnn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.2)"/>
+      <stop offset="45%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.92)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Night sky -->
+  <rect width="400" height="560" fill="url(#bgnn)"/>
+
+  <!-- City glow on horizon -->
+  <ellipse cx="200" cy="215" rx="250" ry="40" fill="#ff4020" opacity="0.12"/>
+  <ellipse cx="200" cy="220" rx="200" ry="30" fill="#ff6030" opacity="0.08"/>
+
+  <!-- Stars -->
+  <g fill="white">
+    <circle cx="25"  cy="20" r="0.9" opacity="0.8"/>
+    <circle cx="55"  cy="10" r="1.1" opacity="0.7"/>
+    <circle cx="85"  cy="30" r="0.8" opacity="0.9"/>
+    <circle cx="115" cy="8"  r="1"   opacity="0.6"/>
+    <circle cx="160" cy="18" r="0.9" opacity="0.8"/>
+    <circle cx="200" cy="6"  r="1.1" opacity="0.7"/>
+    <circle cx="240" cy="22" r="0.8" opacity="0.8"/>
+    <circle cx="280" cy="12" r="1"   opacity="0.7"/>
+    <circle cx="320" cy="28" r="0.9" opacity="0.6"/>
+    <circle cx="360" cy="8"  r="1"   opacity="0.8"/>
+    <circle cx="385" cy="35" r="0.8" opacity="0.7"/>
+    <circle cx="40"  cy="50" r="0.7" opacity="0.5"/>
+    <circle cx="140" cy="45" r="0.8" opacity="0.6"/>
+    <circle cx="350" cy="50" r="0.7" opacity="0.5"/>
+  </g>
+
+  <!-- Nairobi skyline silhouette -->
+  <g fill="#060410">
+    <!-- KICC tower (iconic) -->
+    <rect x="180" y="110" width="40" height="110"/>
+    <polygon points="180,110 200,80 220,110" fill="#060410"/>
+    <!-- observation ring -->
+    <rect x="175" y="145" width="50" height="10" rx="3"/>
+    <!-- Small tower left -->
+    <rect x="100" y="150" width="30" height="70"/>
+    <rect x="98"  y="143" width="34" height="10"/>
+    <!-- Tall tower left-far -->
+    <rect x="50"  y="165" width="24" height="55"/>
+    <rect x="48"  y="158" width="28" height="9"/>
+    <!-- Short building left -->
+    <rect x="135" y="170" width="35" height="50"/>
+    <!-- Mid building -->
+    <rect x="235" y="155" width="30" height="65"/>
+    <rect x="233" y="148" width="34" height="9"/>
+    <!-- Right tower -->
+    <rect x="285" y="145" width="28" height="75"/>
+    <rect x="283" y="138" width="32" height="9"/>
+    <!-- Right far building -->
+    <rect x="330" y="170" width="36" height="50"/>
+    <rect x="328" y="164" width="40" height="8"/>
+    <!-- Antenna on KICC -->
+    <rect x="198" y="55" width="4" height="28"/>
+  </g>
+
+  <!-- Windows lit in buildings -->
+  <g fill="#ffd060" opacity="0.7">
+    <!-- KICC windows -->
+    <rect x="187" y="120" width="4" height="5" rx="0.5"/>
+    <rect x="195" y="120" width="4" height="5" rx="0.5"/>
+    <rect x="203" y="120" width="4" height="5" rx="0.5"/>
+    <rect x="211" y="120" width="4" height="5" rx="0.5"/>
+    <rect x="187" y="130" width="4" height="5" rx="0.5"/>
+    <rect x="203" y="130" width="4" height="5" rx="0.5"/>
+    <rect x="211" y="130" width="4" height="5" rx="0.5"/>
+    <!-- Left tower windows -->
+    <rect x="105" y="158" width="4" height="4" rx="0.5"/>
+    <rect x="113" y="158" width="4" height="4" rx="0.5"/>
+    <rect x="121" y="158" width="4" height="4" rx="0.5"/>
+    <rect x="105" y="167" width="4" height="4" rx="0.5"/>
+    <rect x="113" y="167" width="4" height="4" rx="0.5"/>
+    <!-- Right tower windows -->
+    <rect x="289" y="152" width="4" height="4" rx="0.5"/>
+    <rect x="297" y="152" width="4" height="4" rx="0.5"/>
+    <rect x="305" y="152" width="4" height="4" rx="0.5"/>
+    <rect x="289" y="162" width="4" height="4" rx="0.5"/>
+    <rect x="305" y="162" width="4" height="4" rx="0.5"/>
+  </g>
+
+  <!-- Neon sign glow (club) -->
+  <rect x="50" y="240" width="80" height="3" rx="1" fill="#ff3060" opacity="0.6"/>
+  <rect x="270" y="240" width="80" height="3" rx="1" fill="#00e0ff" opacity="0.5"/>
+
+  <!-- Street level -->
+  <rect x="0" y="220" width="400" height="120" fill="url(#ground_nn)"/>
+
+  <!-- Wet street reflection -->
+  <rect x="0" y="285" width="400" height="60" fill="#06050e" opacity="0.6"/>
+
+  <!-- Street lights -->
+  <g>
+    <rect x="38" y="220" width="4" height="65" fill="#12100a"/>
+    <ellipse cx="40" cy="218" rx="12" ry="5" fill="#fff8b0" opacity="0.35"/>
+    <circle cx="40" cy="220" r="3" fill="#fff8b0" opacity="0.8"/>
+    <!-- reflection -->
+    <ellipse cx="40" cy="296" rx="8" ry="14" fill="#fff8b0" opacity="0.1"/>
+
+    <rect x="358" y="220" width="4" height="65" fill="#12100a"/>
+    <ellipse cx="360" cy="218" rx="12" ry="5" fill="#fff8b0" opacity="0.35"/>
+    <circle cx="360" cy="220" r="3" fill="#fff8b0" opacity="0.8"/>
+    <ellipse cx="360" cy="296" rx="8" ry="14" fill="#fff8b0" opacity="0.1"/>
+  </g>
+
+  <!-- Moving tuk-tuk silhouette -->
+  <g fill="#0a0812">
+    <rect x="155" y="255" width="55" height="28" rx="4"/>
+    <circle cx="168" cy="285" r="8"/>
+    <circle cx="197" cy="285" r="8"/>
+    <rect x="148" y="260" width="10" height="15" rx="2"/>
+  </g>
+  <!-- Tuk-tuk headlight -->
+  <ellipse cx="148" cy="267" rx="6" ry="4" fill="#ffd060" opacity="0.6"/>
+
+  <!-- People silhouettes on pavement -->
+  <g fill="#05040c" opacity="0.85">
+    <circle cx="80" cy="255" r="5"/>
+    <rect x="78" y="260" width="5" height="14" rx="2"/>
+    <rect x="76" y="273" width="3" height="9" rx="1"/>
+    <rect x="81" y="273" width="3" height="9" rx="1"/>
+
+    <circle cx="300" cy="258" r="5"/>
+    <rect x="298" y="263" width="5" height="14" rx="2"/>
+    <rect x="296" y="276" width="3" height="9" rx="1"/>
+    <rect x="301" y="276" width="3" height="9" rx="1"/>
+  </g>
+
+  <!-- Overlay -->
+  <rect width="400" height="560" fill="url(#ovnn)"/>
+
+  <!-- Red neon accent line -->
+  <rect x="0" y="373" width="400" height="2" fill="#ff3060" opacity="0.5"/>
+
+  <!-- Title -->
+  <text x="200" y="406" font-family="Georgia, serif" font-size="30" font-weight="bold" fill="#f0e8ff" text-anchor="middle" letter-spacing="1">NAIROBI</text>
+  <text x="200" y="442" font-family="Georgia, serif" font-size="30" font-weight="bold" fill="#f0e8ff" text-anchor="middle" letter-spacing="1">NIGHTS</text>
+
+  <!-- Line -->
+  <line x1="80" y1="453" x2="320" y2="453" stroke="#ff3060" stroke-width="1" opacity="0.7"/>
+  <text x="200" y="468" font-family="Georgia, serif" font-size="11" fill="#ff6090" text-anchor="middle" letter-spacing="2" font-style="italic">Three Tales After Midnight</text>
+
+  <!-- Author -->
+  <text x="200" y="494" font-family="Georgia, serif" font-size="13" fill="#c9a84c" text-anchor="middle" letter-spacing="2" font-style="italic">Elijah Mwangi M</text>
+
+  <!-- Publisher -->
+  <text x="200" y="519" font-family="Arial, sans-serif" font-size="9" fill="#c9a84c" text-anchor="middle" letter-spacing="1.5" opacity="0.7">ELLINES HAVEN</text>
+
+  <!-- Genre -->
+  <rect x="152" y="526" width="96" height="18" rx="9" fill="rgba(255,48,96,0.1)" stroke="#ff3060" stroke-width="0.8" opacity="0.8"/>
+  <text x="200" y="538" font-family="Arial, sans-serif" font-size="8.5" fill="#ff3060" text-anchor="middle" letter-spacing="1.5">URBAN DRAMA</text>
+</svg>

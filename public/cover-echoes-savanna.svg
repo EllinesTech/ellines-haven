@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a0a00"/>
+      <stop offset="40%" stop-color="#7a3a0a"/>
+      <stop offset="70%" stop-color="#c06020"/>
+      <stop offset="100%" stop-color="#e8a040"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a2010"/>
+      <stop offset="100%" stop-color="#1a0e05"/>
+    </linearGradient>
+    <linearGradient id="overlay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="60%" stop-color="rgba(0,0,0,0.1)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.85)"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="400" height="560" fill="url(#sky)"/>
+
+  <!-- Sun -->
+  <circle cx="200" cy="280" r="55" fill="#ffb040" opacity="0.85" filter="url(#glow)"/>
+  <circle cx="200" cy="280" r="45" fill="#ffd060" opacity="0.7"/>
+
+  <!-- Horizon haze -->
+  <ellipse cx="200" cy="300" rx="220" ry="30" fill="#e88820" opacity="0.35"/>
+
+  <!-- Savanna ground -->
+  <rect x="0" y="295" width="400" height="265" fill="url(#ground)"/>
+
+  <!-- Grass silhouettes -->
+  <g fill="#1a0a00" opacity="0.9">
+    <rect x="0" y="305" width="400" height="5" rx="2"/>
+    <!-- Grass tufts -->
+    <rect x="10" y="295" width="3" height="18" rx="1"/>
+    <rect x="14" y="292" width="2" height="15" rx="1"/>
+    <rect x="30" y="298" width="3" height="14" rx="1"/>
+    <rect x="50" y="293" width="3" height="18" rx="1"/>
+    <rect x="55" y="296" width="2" height="12" rx="1"/>
+    <rect x="80" y="297" width="3" height="15" rx="1"/>
+    <rect x="100" y="294" width="2" height="17" rx="1"/>
+    <rect x="130" y="296" width="3" height="16" rx="1"/>
+    <rect x="150" y="293" width="2" height="19" rx="1"/>
+    <rect x="180" y="297" width="3" height="14" rx="1"/>
+    <rect x="210" y="295" width="2" height="17" rx="1"/>
+    <rect x="240" y="298" width="3" height="13" rx="1"/>
+    <rect x="270" y="294" width="3" height="18" rx="1"/>
+    <rect x="300" y="296" width="2" height="16" rx="1"/>
+    <rect x="330" y="293" width="3" height="19" rx="1"/>
+    <rect x="355" y="297" width="2" height="14" rx="1"/>
+    <rect x="375" y="295" width="3" height="17" rx="1"/>
+    <rect x="390" y="298" width="2" height="12" rx="1"/>
+  </g>
+
+  <!-- Acacia tree left -->
+  <g>
+    <rect x="55" y="190" width="8" height="115" fill="#2a1500"/>
+    <rect x="59" y="195" width="5" height="6" fill="#2a1500"/>
+    <rect x="64" y="210" width="30" height="4" fill="#2a1500"/>
+    <ellipse cx="85" cy="195" rx="28" ry="12" fill="#1a0800"/>
+    <ellipse cx="60" cy="210" rx="22" ry="9" fill="#1a0800"/>
+    <ellipse cx="72" cy="200" rx="35" ry="15" fill="#120600" opacity="0.85"/>
+  </g>
+
+  <!-- Acacia tree right -->
+  <g>
+    <rect x="320" y="200" width="7" height="105" fill="#2a1500"/>
+    <rect x="327" y="205" width="4" height="5" fill="#2a1500"/>
+    <ellipse cx="335" cy="200" rx="30" ry="13" fill="#1a0800"/>
+    <ellipse cx="318" cy="210" rx="20" ry="9" fill="#1a0800"/>
+    <ellipse cx="327" cy="203" rx="38" ry="15" fill="#120600" opacity="0.85"/>
+  </g>
+
+  <!-- Giraffe silhouette -->
+  <g fill="#150800" opacity="0.9">
+    <!-- body -->
+    <ellipse cx="230" cy="268" rx="20" ry="14"/>
+    <!-- neck -->
+    <rect x="240" y="220" width="10" height="55" rx="4"/>
+    <!-- head -->
+    <ellipse cx="247" cy="215" rx="9" ry="7"/>
+    <!-- horns -->
+    <rect x="244" y="205" width="2" height="8" rx="1"/>
+    <rect x="249" y="206" width="2" height="7" rx="1"/>
+    <!-- legs -->
+    <rect x="216" y="278" width="5" height="28" rx="2"/>
+    <rect x="224" y="278" width="5" height="30" rx="2"/>
+    <rect x="235" y="278" width="5" height="28" rx="2"/>
+    <rect x="243" y="278" width="5" height="26" rx="2"/>
+    <!-- tail -->
+    <line x1="210" y1="265" x2="204" y2="280" stroke="#150800" stroke-width="2"/>
+  </g>
+
+  <!-- Overlay gradient -->
+  <rect width="400" height="560" fill="url(#overlay)"/>
+
+  <!-- Red/gold band -->
+  <rect x="0" y="370" width="400" height="2" fill="#c9a84c" opacity="0.6"/>
+
+  <!-- Title -->
+  <text x="200" y="420" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#f0e0b0" text-anchor="middle" letter-spacing="1">ECHOES OF THE</text>
+  <text x="200" y="454" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#f0e0b0" text-anchor="middle" letter-spacing="1">SAVANNA</text>
+
+  <!-- Divider line -->
+  <line x1="80" y1="466" x2="320" y2="466" stroke="#c9a84c" stroke-width="1.5" opacity="0.8"/>
+
+  <!-- Author -->
+  <text x="200" y="488" font-family="Georgia, serif" font-size="13" fill="#c9a84c" text-anchor="middle" letter-spacing="2" font-style="italic">Elijah Mwangi M</text>
+
+  <!-- Publisher mark -->
+  <text x="200" y="518" font-family="Georgia, serif" font-size="10" fill="#c9a84c" text-anchor="middle" letter-spacing="1.5" opacity="0.7">ELLINES HAVEN</text>
+
+  <!-- Genre tag -->
+  <rect x="140" y="525" width="120" height="20" rx="10" fill="rgba(201,168,76,0.15)" stroke="#c9a84c" stroke-width="1" opacity="0.8"/>
+  <text x="200" y="538" font-family="Arial, sans-serif" font-size="9" fill="#c9a84c" text-anchor="middle" letter-spacing="1.5">HISTORICAL FICTION</text>
+</svg>

@@ -1,0 +1,333 @@
+/* ── Reader base ── */
+.reader {
+  min-height: 100vh;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── DRM: block text selection in reader ── */
+.reader--drm {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+.reader--drm input,
+.reader--drm button { user-select: auto; }
+
+/* ── Hide everything when printing ── */
+@media print {
+  .reader { display: none !important; }
+  body::after {
+    content: "This content is copy-protected by Ellines Haven. Printing is not permitted.";
+    display: block;
+    font-size: 1.1rem;
+    padding: 60px;
+    text-align: center;
+  }
+}
+
+/* ── Top nav ── */
+.reader__nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.reader__back { color: var(--muted); font-size: .85rem; transition: color .2s; white-space: nowrap; }
+.reader__back:hover { color: var(--gold); }
+.reader__info { display: flex; flex-direction: column; gap: 2px; text-align: center; flex: 1; }
+.reader__info strong { font-size: .92rem; }
+.reader__info span { font-size: .75rem; color: var(--muted); }
+
+.reader__nav-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* PDF / Text mode toggle */
+.reader__mode-toggle {
+  display: flex;
+  border: 1px solid var(--dim);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.reader__mode-btn {
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.reader__mode-btn:first-child { border-right: 1px solid var(--dim); }
+.reader__mode-btn.on { background: rgba(201,168,76,0.12); color: var(--gold); font-weight: 600; }
+.reader__mode-btn:hover:not(.on) { background: rgba(255,255,255,0.05); color: var(--text); }
+
+.reader__font-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--dim);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+.reader__font-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Watermark strip ── */
+.reader__watermark {
+  background: rgba(201,168,76,0.06);
+  border-bottom: 1px solid rgba(201,168,76,0.12);
+  color: var(--muted);
+  font-size: 0.73rem;
+  text-align: center;
+  padding: 7px 20px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.reader__watermark strong { color: var(--gold); }
+
+/* ══════════════════════════════
+   PDF EMBED MODE
+══════════════════════════════ */
+.reader__pdf-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The iframe — fills the remaining viewport height */
+.reader__pdf-frame {
+  flex: 1;
+  width: 100%;
+  height: calc(100vh - 120px);
+  border: none;
+  display: block;
+}
+
+/* Invisible shield sits on top of iframe corners to intercept right-click */
+.reader__pdf-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none; /* let clicks pass to iframe */
+}
+/* On the corners/edges, capture right-click */
+.reader__pdf-shield::before,
+.reader__pdf-shield::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40px;
+  pointer-events: all; /* block right-click on top bar of iframe */
+}
+.reader__pdf-shield::after { top: auto; bottom: 0; }
+
+/* Ghost watermark tiles over the PDF */
+.reader__pdf-wm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: space-around;
+  justify-content: space-around;
+  gap: 20px;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+.reader__pdf-wm span {
+  font-size: 0.7rem;
+  color: rgba(201,168,76,0.06);
+  transform: rotate(-35deg);
+  white-space: nowrap;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* Footer note under PDF */
+.reader__pdf-footer {
+  text-align: center;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.18);
+  padding: 6px 20px;
+  background: var(--bg);
+  border-top: 1px solid var(--dim);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════
+   TEXT / CHAPTER MODE
+══════════════════════════════ */
+.reader__body {
+  max-width: 740px;
+  margin: 0 auto;
+  padding: 44px 28px 80px;
+  width: 100%;
+}
+.reader__page {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 52px 60px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ghost watermark tiles in text page */
+.reader__ghost-wm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: space-around;
+  justify-content: space-around;
+  gap: 40px;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.reader__ghost-wm span {
+  font-size: 0.6rem;
+  color: rgba(201,168,76,0.04);
+  transform: rotate(-35deg);
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+/* Content above watermark */
+.reader__page--drm > *:not(.reader__ghost-wm) { position: relative; z-index: 1; }
+
+.reader__title { font-size: 2rem; text-align: center; margin-bottom: 6px; }
+.reader__by { text-align: center; color: var(--muted); font-style: italic; font-size: 0.88rem; margin-bottom: 0; }
+.reader__divider { height: 1px; background: linear-gradient(90deg,transparent,var(--gold),transparent); opacity: 0.25; margin: 28px 0 32px; }
+
+/* Chapter tabs */
+.reader__ch-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.reader__ch-btn {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  border: 1px solid var(--dim);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.reader__ch-btn:hover { border-color: var(--gold); color: var(--gold); }
+.reader__ch-btn.on { background: rgba(201,168,76,0.1); border-color: var(--gold); color: var(--gold); font-weight: 600; }
+
+.reader__chapter { font-size: 1.25rem; margin: 0 0 1.4em; color: var(--gold); }
+
+.reader__text { color: var(--text); line-height: 1.95; }
+.reader__text p { margin-bottom: 1.4em; text-indent: 1.4em; }
+.reader__text p:first-child { text-indent: 0; }
+
+.reader__inline-mark {
+  text-align: center;
+  font-size: 0.65rem;
+  color: rgba(201,168,76,0.1);
+  margin: 32px 0 8px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.reader__page-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--dim);
+}
+
+.reader__end {
+  text-align: center;
+  margin-top: 44px;
+  padding-top: 28px;
+  border-top: 1px solid var(--dim);
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Error / gate screens ── */
+.reader-error {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 40px;
+}
+.reader-error__icon { font-size: 3.5rem; margin-bottom: 4px; }
+.reader-error h2 { font-size: 1.5rem; }
+.reader-error p { color: var(--muted); max-width: 380px; line-height: 1.6; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .reader__nav { padding: 10px 14px; }
+  .reader__info { display: none; }
+  .reader__page { padding: 28px 16px; }
+  .reader__body { padding: 20px 10px 60px; }
+  .reader__pdf-frame { height: calc(100vh - 100px); }
+  .reader__mode-btn { padding: 5px 8px; font-size: 0.7rem; }
+}
+
+/* ── Zoom controls group ── */
+.reader__zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--dim);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+}
+.reader__zoom-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  min-width: 38px;
+  text-align: center;
+  user-select: none;
+}
+
+/* ── PDF zoom wrapper ── */
+.reader__pdf-zoom-wrap {
+  flex: 1;
+  transition: transform 0.2s ease, width 0.2s ease, margin-left 0.2s ease;
+}
+.reader__pdf-zoom-wrap iframe {
+  width: 100%;
+  height: calc(100vh - 120px);
+  border: none;
+  display: block;
+}

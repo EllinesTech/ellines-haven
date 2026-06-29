@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <clipPath id="round-clip">
+      <rect x="2" y="2" width="44" height="44" rx="10" ry="10"/>
+    </clipPath>
+  </defs>
+  <!-- dark background -->
+  <rect x="2" y="2" width="44" height="44" rx="10" ry="10" fill="#0d0d1a"/>
+  <!-- logo image -->
+  <image href="/logo-icon.png" x="2" y="2" width="44" height="44" clip-path="url(#round-clip)" preserveAspectRatio="xMidYMid meet"/>
+</svg>

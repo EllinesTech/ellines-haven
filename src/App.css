@@ -1,0 +1,108 @@
+/* Global layout only — all component styles are in their own CSS files */
+
+/* ════════════════════════════════════════
+   404 NOT FOUND PAGE
+════════════════════════════════════════ */
+.notfound-page {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 60px 24px;
+  background: linear-gradient(160deg, #060612 0%, #0d0d1f 60%, #06101c 100%);
+}
+
+.notfound-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+}
+.notfound-glow--a {
+  width: 500px; height: 400px;
+  background: radial-gradient(circle, rgba(201,168,76,.1) 0%, transparent 70%);
+  top: -100px; left: 50%;
+  transform: translateX(-50%);
+}
+.notfound-glow--b {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(15,52,96,.4) 0%, transparent 70%);
+  bottom: 0; left: 20%;
+}
+
+.notfound-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+  max-width: 520px;
+  width: 100%;
+}
+
+.notfound-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  opacity: 0.7;
+  filter: drop-shadow(0 4px 20px rgba(201,168,76,0.4));
+  animation: notfound-float 5s ease-in-out infinite;
+}
+@keyframes notfound-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+
+.notfound-number {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(6rem, 16vw, 10rem);
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, rgba(201,168,76,0.9) 0%, rgba(201,168,76,0.3) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.04em;
+  margin: -10px 0;
+  user-select: none;
+}
+
+.notfound-title {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  color: var(--text);
+  margin: 0;
+}
+
+.notfound-sub {
+  color: var(--muted);
+  font-size: .95rem;
+  line-height: 1.75;
+  max-width: 400px;
+  margin: 0;
+}
+
+.notfound-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.notfound-quote {
+  margin-top: 12px;
+  border-top: 1px solid var(--dim);
+  padding-top: 20px;
+  width: 100%;
+}
+.notfound-quote span {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: .88rem;
+  color: rgba(201,168,76,0.45);
+  line-height: 1.6;
+}
