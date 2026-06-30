@@ -1428,8 +1428,16 @@ export default function Admin() {
     const unsub = onSnapshot(doc(db, 'site_data', 'registered_users'), (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
+
+      // Respect the deletedEmails blocklist — never re-add deleted users
+      const deletedEmails = new Set([
+        ...(data.deletedEmails || []),
+        ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+      ].map(e => e.toLowerCase()));
+
       if (data.registered) {
-        localStorage.setItem('eh_registered_users', JSON.stringify(data.registered));
+        const filtered = data.registered.filter(r => !deletedEmails.has(r.email?.toLowerCase()));
+        localStorage.setItem('eh_registered_users', JSON.stringify(filtered));
       }
       if (data.pwOverrides) {
         const local = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
@@ -1438,10 +1446,10 @@ export default function Admin() {
       if (data.roleOverrides) {
         localStorage.setItem('eh_role_overrides', JSON.stringify(data.roleOverrides));
       }
-      // Re-build users list so new registrations appear immediately
+      // Re-build users list — skip deleted emails
       setUsers(prev => {
-        const fresh = buildUserList(JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]'));
-        // Preserve book counts that were already computed from orders
+        const fresh = buildUserList(JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]'))
+          .filter(u => !deletedEmails.has(u.email.toLowerCase()));
         const prevMap = new Map(prev.map(u => [u.email.toLowerCase(), u]));
         return fresh.map(u => {
           const old = prevMap.get(u.email.toLowerCase());
@@ -1540,10 +1548,15 @@ export default function Admin() {
           // (e.g. they registered on a different device — Firestore registered_users listener
           //  will eventually sync them, but orders fire first)
           const suspended = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
+          const deletedEmails = new Set([
+            ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+          ].map(e => e.toLowerCase()));
+
           fsOrders.forEach(o => {
             if (!o.userEmail) return;
             const emailKey = o.userEmail.toLowerCase();
             if (knownEmails.has(emailKey)) return;
+            if (deletedEmails.has(emailKey)) return; // never re-add deleted users
             knownEmails.add(emailKey);
             baseList.push({
               id: 'fs_' + emailKey.replace(/[^a-z0-9]/g, '_'),
@@ -1627,43 +1640,54 @@ export default function Admin() {
     showToast('Order rejected');
   };
 
-  // Delete user  persists across refresh via eh_deleted_users blocklist
-  const handleDeleteUser = (u) => {
+  // Delete user  persists across refresh via eh_deleted_users blocklist + Firestore
+  const handleDeleteUser = async (u) => {
     const emailKey = u.email.toLowerCase();
 
-    // 1. Add to permanent deleted blocklist
+    // 1. Add to permanent deleted blocklist (localStorage)
     const deleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
     if (!deleted.includes(emailKey)) {
       localStorage.setItem('eh_deleted_users', JSON.stringify([...deleted, emailKey]));
     }
-    // 2. Remove from registered users
+    // 2. Remove from registered users (localStorage)
     const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-    localStorage.setItem('eh_registered_users', JSON.stringify(
-      registered.filter(r => r.email.toLowerCase() !== emailKey)
-    ));
-    // 3. Remove ALL their orders
+    const updatedRegistered = registered.filter(r => r.email.toLowerCase() !== emailKey);
+    localStorage.setItem('eh_registered_users', JSON.stringify(updatedRegistered));
+
+    // 3. Sync deletion to Firestore so real-time listener doesn't re-add on refresh
+    try {
+      const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+      const pwOverrides   = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+      // Remove from Firestore registered_users doc
+      await setDoc(doc(db, 'site_data', 'registered_users'), {
+        registered:   updatedRegistered,
+        pwOverrides,
+        roleOverrides,
+        deletedEmails: [...new Set([...deleted, emailKey])],
+        updatedAt: serverTimestamp(),
+      }, { merge: false });
+      // Also delete from users collection if exists
+      await deleteDoc(doc(db, 'users', u.id)).catch(() => {});
+    } catch (e) { console.warn('[deleteUser] Firestore sync failed:', e.message); }
+
+    // 4. Remove ALL their orders
     const allStoredOrders = JSON.parse(localStorage.getItem('eh_orders') || '[]');
     localStorage.setItem('eh_orders', JSON.stringify(
       allStoredOrders.filter(o => o.userId !== u.id && o.userEmail?.toLowerCase() !== emailKey)
     ));
-    // 4. Remove from suspended list
+    // 5. Remove from suspended list
     const suspended = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
     localStorage.setItem('eh_suspended_users', JSON.stringify(suspended.filter(e => e !== emailKey)));
-    // 5. Clear their library data
+    // 6. Clear their library data
     localStorage.removeItem('eh_lib_' + u.id);
     localStorage.removeItem('eh_lib_email_' + emailKey);
-    // 6. If this user is currently logged in on this browser, log them out
+    // 7. If this user is currently logged in on this browser, log them out
     const currentSession = JSON.parse(localStorage.getItem('eh_user') || 'null');
     if (currentSession && currentSession.email?.toLowerCase() === emailKey) {
       localStorage.removeItem('eh_user');
     }
-    // 7. Refresh state immediately
-    setUsers(buildUserList(suspendedList));
-    try {
-      const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
-      setLiveOrders(stored);
-    } catch {}
-    syncOrders();
+    // 8. Refresh state immediately — remove from UI right away
+    setUsers(prev => prev.filter(x => x.email.toLowerCase() !== emailKey));
     setTick(t => t + 1);
     showToast(`User "${u.name}" permanently deleted`);
   };
