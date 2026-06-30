@@ -209,11 +209,12 @@ export default function Login() {
       /* 1. Check Firestore users collection first */
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
-        const storedPw = localStorage.getItem('eh_pw_overrides')
-          ? JSON.parse(localStorage.getItem('eh_pw_overrides'))[emailKey] || fsUser.passwordHash || fsUser.password
-          : fsUser.passwordHash || fsUser.password;
+        const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+        const storedPw = pwOverrides[emailKey] || fsUser.passwordHash || fsUser.password || '';
         if (fsUser.suspended) { setErr('This account has been suspended. Contact support.'); setBusy(false); return; }
-        if (storedPw && storedPw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
+        // Always require a password — never allow empty password login
+        if (!storedPw) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
+        if (storedPw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
         const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: fsUser.role || 'user' };
         setUser(sessionUser);
         await logLogin(fsUser.email);
@@ -306,6 +307,6 @@ async function logLogin(email) {
     const snap = await getDoc(logsDoc);
     const existing = snap.exists() ? (snap.data().logs || []) : [];
     const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
-    await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: false });
+    await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
   } catch {}
 }

@@ -45,6 +45,11 @@ const FALLBACK_CONTENT = {
   '2': [
     { title:'Chapter 1 — The Weight', text:`Pain is not dramatic. That is the first lie they tell you.\n\nIn films, pain arrives with music — low strings, a single piano note, rain against a window. In real life, it arrives in the middle of an ordinary Tuesday. While you are making tea. While you are answering an email.\n\nKamau's Tuesday was a Wednesday, actually. The ninth of August. He had been up since five, the way he always was, because the body remembers its own rhythms even when everything else forgets them.\n\nHe had made the tea. He had opened the curtains. He had sat down at the table with the intention of working.\n\nThen the phone rang.`},
   ],
+  '11': [
+    { title:'Day 1 — The Call', text:`Nineteen days. That is all it took.\n\nKe did not know, on the morning of the first day, that everything was about to change. He was standing at the window of his apartment, watching the early Nairobi traffic crawl below, coffee cup in hand, the same Tuesday routine he had maintained for three years.\n\nThen his phone rang.\n\nHe did not recognise the number. He almost did not answer. Later, he would think about that — how close he came to letting it ring out, to going on with his ordinary Tuesday, to never knowing.\n\nBut he answered.`},
+    { title:'Day 3 — The Decision', text:`By the third day, Ke understood that there was no going back.\n\nThe choice that had been placed before him was not the kind you could unmake. It was the kind that sat in your chest and rearranged things — quietly, permanently, without asking permission.\n\nHe had not slept. He had walked the city instead. Seven hours through streets he had known his whole life, seeing them differently, as if the news had changed the light.\n\nNairobi had never looked so much like itself. Raw and complicated and full of a beauty that only showed up when you were paying the kind of attention that came with loss.`},
+    { title:'Day 7 — The Truth', text:`On the seventh day, the truth arrived in the form of a letter.\n\nNot a message. Not an email. An actual letter, handwritten, slid under his door at some point between midnight and six in the morning.\n\nKe read it three times. The first time for facts. The second time for meaning. The third time because he could not believe what the first two times had told him.\n\nSomeone had known. Someone had always known. And they had chosen, for seven years, to say nothing.\n\nThe question was no longer what had happened. The question was why.`},
+  ],
 };
 
 function getFallbackChapters(book) {
@@ -67,7 +72,7 @@ function getFallbackChapters(book) {
 ───────────────────────────────────────────── */
 export default function Reader() {
   const { id } = useParams();
-  const { books, user, isOwned, library, myPerms } = useApp();
+  const { books, user, isOwned, library, myPerms, libLoaded } = useApp();
   const book = books.find(b => b.id === id);
   const readerRef = useRef(null);
 
@@ -76,19 +81,6 @@ export default function Reader() {
   const [zoom,      setZoom]      = useState(100);
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
-  // Wait for library to load from Firestore before blocking access
-  const [libReady,  setLibReady]  = useState(false);
-
-  useEffect(() => {
-    // Give Firestore listener up to 3 seconds to confirm ownership
-    const t = setTimeout(() => setLibReady(true), 400);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Also mark ready as soon as library has data
-  useEffect(() => {
-    if (library.length >= 0) setLibReady(true);
-  }, [library]);
 
   // Ownership check — uses Firestore-backed library state from AppContext
   const checkOwned = useCallback(() => {
@@ -152,8 +144,8 @@ export default function Reader() {
   );
 
   if (!checkOwned()) {
-    // Still waiting for Firestore library to load
-    if (!libReady) return (
+    // Still waiting for Firestore library snapshot — show loading briefly
+    if (!libLoaded) return (
       <div className="reader-error">
         <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
         <p style={{ color:'var(--muted)' }}>Verifying access…</p>

@@ -43,7 +43,8 @@ function AccountSettings({ user, myPerms }) {
     setPwMsg('');
     const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
     const stored    = overrides[user.email.toLowerCase()];
-    // Simple check via stored overrides
+    // Require current password before allowing change
+    if (stored && pwForm.current !== stored) { setPwMsg('❌ Current password is incorrect'); return; }
     if (pwForm.newPw.length < 4) { setPwMsg('❌ New password must be at least 4 characters'); return; }
     if (pwForm.newPw !== pwForm.confirm) { setPwMsg('❌ Passwords do not match'); return; }
     overrides[user.email.toLowerCase()] = pwForm.newPw;
@@ -144,6 +145,10 @@ function AccountSettings({ user, myPerms }) {
         <h4 style={{ fontSize:'0.88rem', color:'var(--gold)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>Change Password</h4>
         {pwMsg && <div style={{ padding:'8px 12px', borderRadius:'var(--r-sm)', marginBottom:12, fontSize:'0.82rem', background: pwMsg.startsWith('✅') ? 'rgba(46,204,113,0.08)' : 'rgba(231,76,60,0.08)', color: pwMsg.startsWith('✅') ? 'var(--ok)' : '#e74c3c', border: pwMsg.startsWith('✅') ? '1px solid rgba(46,204,113,0.25)' : '1px solid rgba(231,76,60,0.25)' }}>{pwMsg}</div>}
         <form onSubmit={handlePwChange} style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div>
+            <label style={{ fontSize:'0.8rem', color:'var(--muted)', display:'block', marginBottom:4 }}>Current Password</label>
+            <input className="field" type="password" placeholder="Your current password" value={pwForm.current} onChange={e => setPwForm(f=>({...f,current:e.target.value}))} />
+          </div>
           <div>
             <label style={{ fontSize:'0.8rem', color:'var(--muted)', display:'block', marginBottom:4 }}>New Password</label>
             <input className="field" type="password" placeholder="Minimum 4 characters" value={pwForm.newPw} onChange={e => setPwForm(f=>({...f,newPw:e.target.value}))} />

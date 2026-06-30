@@ -95,6 +95,7 @@ export function AppProvider({ children }) {
   const [settings, setSettingsState] = useState(() => load('eh_settings', DEFAULT_SETTINGS));
   const [library,  setLibState]      = useState([]);
   const [orders,   setOrdersState]   = useState([]);
+  const [libLoaded, setLibLoaded]    = useState(false);
 
   // ── Permissions + Suspension — stored in Firestore so they can't be bypassed ─
   const [userPerms,    setUserPermsState]    = useState(() => {
@@ -301,9 +302,12 @@ export function AppProvider({ children }) {
 
   // ── Library from Firestore (real-time) ───────────────────────────────────
   useEffect(() => {
-    if (!user?.email) { setLibState([]); return; }
+    if (!user?.email) { setLibState([]); setLibLoaded(false); return; }
     const ref   = doc(db, 'libraries', libDocId(user.email));
-    const unsub = onSnapshot(ref, snap => { setLibState(snap.exists() ? (snap.data().books || []) : []); });
+    const unsub = onSnapshot(ref, snap => {
+      setLibState(snap.exists() ? (snap.data().books || []) : []);
+      setLibLoaded(true);
+    });
     return () => unsub();
   }, [user?.email]);
 
@@ -353,15 +357,13 @@ export function AppProvider({ children }) {
       method, ref: ref || '', phone: phone || '',
       status: 'Pending', date: new Date().toISOString().slice(0,10), createdAt: Date.now(),
     };
-    try { await setDoc(doc(db,'orders',order.id), { ...order, createdAt: serverTimestamp() }); }
-    catch (e) {
-      console.error('Firestore placeOrder failed:', e);
-      save('eh_orders', [order, ...load('eh_orders', [])]);
-    }
+    // Always write to Firestore — localStorage fallback causes orders to be invisible to buyer
+    await setDoc(doc(db,'orders',order.id), { ...order, createdAt: serverTimestamp() });
     return order;
   };
 
   const unlockBooksForBuyer = async (userEmail, booksToUnlock) => {
+    if (!userEmail) { console.error('unlockBooksForBuyer: no userEmail provided'); return; }
     const ref = doc(db, 'libraries', libDocId(userEmail));
     try {
       const snap     = await getDoc(ref);
@@ -369,12 +371,20 @@ export function AppProvider({ children }) {
       const map      = new Map(existing.map(b => [b.id, b]));
       booksToUnlock.forEach(b => map.set(b.id, { ...b, downloadUnlocked: true }));
       await setDoc(ref, { email: userEmail.toLowerCase(), books: Array.from(map.values()) }, { merge: true });
-    } catch (e) { console.error('unlockBooksForBuyer failed:', e); }
+    } catch (e) { console.error('unlockBooksForBuyer failed:', e); throw e; }
   };
 
   const confirmOrder = async (orderId) => {
-    const order = orders.find(o => o.id === orderId);
+    // Read directly from Firestore — don't rely on possibly-stale `orders` state
+    let order = orders.find(o => o.id === orderId);
+    if (!order) {
+      try {
+        const snap = await getDoc(doc(db, 'orders', orderId));
+        if (snap.exists()) order = { id: snap.id, ...snap.data() };
+      } catch {}
+    }
     if (!order || order.status !== 'Pending') return;
+    if (!order.userEmail) { console.error('confirmOrder: order has no userEmail'); return; }
     const resolved = (order.items || []).map(item => ({ ...(books.find(b => b.id === item.id) || item), downloadUnlocked: true }));
     await unlockBooksForBuyer(order.userEmail, resolved);
     try { await updateDoc(doc(db,'orders',orderId), { status:'Completed', confirmedAt: serverTimestamp() }); }
@@ -420,7 +430,7 @@ export function AppProvider({ children }) {
     <Ctx.Provider value={{
       user, setUser, logout,
       cart, addToCart, removeFromCart, clearCart,
-      library, addToLibrary, isOwned, canDownload,
+      library, addToLibrary, isOwned, canDownload, libLoaded,
       books, saveBook, deleteBook, resetBooks,
       orders, setOrdersState, placeOrder, confirmOrder, rejectOrder,
       syncOrders, manualUnlock, unlockBooksForBuyer,
