@@ -229,9 +229,9 @@ export default function MessagesPanel({ showToast, users = [] }) {
   };
   const newCount = messages.filter(m => m.status==='new'||!m.status).length;
 
-  // Users available to compose to (exclude admins/superadmins)
+  // Users available to compose to (exclude only yourself)
   const regularUsers = users.filter(u =>
-    u.role !== 'superadmin' && u.email?.toLowerCase() !== user?.email?.toLowerCase()
+    u.email?.toLowerCase() !== user?.email?.toLowerCase()
   );
   const filteredUsers = regularUsers.filter(u =>
     !toSearch ||
