@@ -1421,6 +1421,38 @@ export default function Admin() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Real-time: sync newly registered users from Firestore into the users list
+  // (handles users who registered on a different device — AppContext writes to localStorage
+  //  but Admin.jsx only reads buildUserList on mount; this listener re-syncs it)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_data', 'registered_users'), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.registered) {
+        localStorage.setItem('eh_registered_users', JSON.stringify(data.registered));
+      }
+      if (data.pwOverrides) {
+        const local = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+        localStorage.setItem('eh_pw_overrides', JSON.stringify({ ...local, ...data.pwOverrides }));
+      }
+      if (data.roleOverrides) {
+        localStorage.setItem('eh_role_overrides', JSON.stringify(data.roleOverrides));
+      }
+      // Re-build users list so new registrations appear immediately
+      setUsers(prev => {
+        const fresh = buildUserList(JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]'));
+        // Preserve book counts that were already computed from orders
+        const prevMap = new Map(prev.map(u => [u.email.toLowerCase(), u]));
+        return fresh.map(u => {
+          const old = prevMap.get(u.email.toLowerCase());
+          return old ? { ...u, books: old.books || 0 } : u;
+        });
+      });
+    }, () => {});
+    return () => unsub();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Helper to add a real log entry — writes to Firestore immediately
   const addLog = (type, event, status = 'success') => {
     const entry = {
@@ -1490,7 +1522,7 @@ export default function Admin() {
         });
         setOrdersState(fsOrders);
         setLiveOrders(fsOrders);
-        // Rebuild users with live book counts
+        // Rebuild users with live book counts — also surface users who exist only in Firestore orders
         try {
           const bookCounts = {};
           fsOrders.forEach(o => {
@@ -1499,7 +1531,32 @@ export default function Admin() {
               bookCounts[k] = (bookCounts[k] || 0) + (o.items ? o.items.length : 1);
             }
           });
-          setUsers(buildUserList(suspendedList).map(u => ({ ...u, books: bookCounts[u.email.toLowerCase()] || 0 })));
+
+          // Build base list from localStorage
+          const baseList = buildUserList(suspendedList);
+          const knownEmails = new Set(baseList.map(u => u.email.toLowerCase()));
+
+          // Add any users who appear in Firestore orders but aren't in localStorage yet
+          // (e.g. they registered on a different device — Firestore registered_users listener
+          //  will eventually sync them, but orders fire first)
+          const suspended = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
+          fsOrders.forEach(o => {
+            if (!o.userEmail) return;
+            const emailKey = o.userEmail.toLowerCase();
+            if (knownEmails.has(emailKey)) return;
+            knownEmails.add(emailKey);
+            baseList.push({
+              id: 'fs_' + emailKey.replace(/[^a-z0-9]/g, '_'),
+              name: o.userName || o.userEmail.split('@')[0],
+              email: o.userEmail,
+              role: 'user',
+              joined: o.date || '',
+              books: 0,
+              status: suspended.includes(emailKey) ? 'Suspended' : 'Active',
+            });
+          });
+
+          setUsers(baseList.map(u => ({ ...u, books: bookCounts[u.email.toLowerCase()] || u.books || 0 })));
         } catch {}
         setTick(t => t + 1);
       },
