@@ -64,8 +64,25 @@ export default function Register() {
         status: 'active',
       };
 
-      // Save to Firestore `users` collection (NOT localStorage)
+      // Save to Firestore `users` collection (primary store)
       await setDoc(doc(db, 'users', userId), newUser);
+
+      // Also sync to site_data/registered_users so admin panel picks it up in real-time
+      const { getDoc: getDocFn } = await import('firebase/firestore');
+      const regDoc = await getDocFn(doc(db, 'site_data', 'registered_users'));
+      const existing2 = regDoc.exists() ? (regDoc.data().registered || []) : [];
+      const userEntry = { id: userId, name: form.name.trim(), email: emailKey, role: 'user', joined: new Date().toISOString().slice(0, 10) };
+      if (!existing2.find(u => u.email?.toLowerCase() === emailKey)) {
+        await setDoc(doc(db, 'site_data', 'registered_users'), {
+          registered: [...existing2, userEntry],
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+        // Also update localStorage so login works immediately on this device
+        const local = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+        if (!local.find(u => u.email?.toLowerCase() === emailKey)) {
+          localStorage.setItem('eh_registered_users', JSON.stringify([...local, { ...userEntry, password: form.password }]));
+        }
+      }
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       navigate('/');
