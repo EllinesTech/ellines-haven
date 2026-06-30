@@ -29,19 +29,32 @@ async function checkAdminCredentials(email, password) {
     if (snap.exists()) {
       const data = snap.data();
       const admins = data.accounts || [];
-      return admins.find(a => a.email.toLowerCase() === email.toLowerCase() && a.password === password) || null;
+      // Check accounts array first
+      const found = admins.find(a => a.email.toLowerCase() === email.toLowerCase() && a.password === password);
+      if (found) return found;
+      // Also check pwOverrides stored in same doc
+      const pwMap = data.pwOverrides || {};
+      const byEmail = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
+      if (byEmail && pwMap[email.toLowerCase()] === password) return byEmail;
     }
-    // Fallback: if no Firestore doc exists yet, use the bootstrap credentials
-    // THIS ONLY RUNS ONCE to seed Firestore — then remove from here
-    if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() && password === '808024') {
-      // Seed Firestore with admin credentials so they're stored securely
+    // Bootstrap: seed Firestore with super admin credentials on first run
+    if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      const bootstrapEntry = {
+        email: SUPER_ADMIN_EMAIL,
+        role: 'superadmin',
+        name: 'Admin',
+        id: 'admin01',
+        password: password, // store whatever password they successfully use
+      };
       await setDoc(doc(db, 'site_data', 'admin_credentials'), {
-        accounts: [{ email: SUPER_ADMIN_EMAIL, role: 'superadmin', name: 'Admin' }],
+        accounts: [bootstrapEntry],
         updatedAt: serverTimestamp(),
       }, { merge: true });
-      return { email: SUPER_ADMIN_EMAIL, role: 'superadmin', name: 'Admin', id: 'admin01' };
+      return bootstrapEntry;
     }
-  } catch {}
+  } catch (e) {
+    console.warn('[checkAdminCredentials]', e.message);
+  }
   return null;
 }
 
