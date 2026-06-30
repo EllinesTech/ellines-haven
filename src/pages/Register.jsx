@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import './Auth.css';
 
 function EyeIcon({ open }) {
@@ -41,10 +43,7 @@ export default function Register() {
     const emailKey = form.email.trim().toLowerCase();
 
     try {
-      // Check Firestore first
-      const { collection, query, where, getDocs, doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-      const { db } = await import('../firebase');
-
+      // Check if email already exists in Firestore users collection
       const q = query(collection(db, 'users'), where('email', '==', emailKey));
       const existing = await getDocs(q);
       if (!existing.empty) { setErr('An account with this email already exists.'); setBusy(false); return; }
@@ -56,42 +55,44 @@ export default function Register() {
       }
 
       const userId = 'u_' + Date.now();
-      const newUser = {
+      const joined = new Date().toISOString().slice(0, 10);
+
+      // 1. Save to Firestore users collection (for login)
+      await setDoc(doc(db, 'users', userId), {
         id: userId, name: form.name.trim(), email: emailKey,
         passwordHash: form.password, role: 'user',
-        joined: new Date().toISOString().slice(0, 10),
-        createdAt: serverTimestamp(),
-        status: 'active',
-      };
+        joined, createdAt: serverTimestamp(), status: 'active',
+      });
 
-      // Save to Firestore `users` collection (primary store)
-      await setDoc(doc(db, 'users', userId), newUser);
-
-      // Also sync to site_data/registered_users so admin panel picks it up in real-time
-      const { getDoc: getDocFn } = await import('firebase/firestore');
-      const regDoc = await getDocFn(doc(db, 'site_data', 'registered_users'));
-      const existing2 = regDoc.exists() ? (regDoc.data().registered || []) : [];
-      const userEntry = { id: userId, name: form.name.trim(), email: emailKey, role: 'user', joined: new Date().toISOString().slice(0, 10) };
-      if (!existing2.find(u => u.email?.toLowerCase() === emailKey)) {
+      // 2. Sync to site_data/registered_users so admin panel real-time listener picks it up
+      const userEntry = { id: userId, name: form.name.trim(), email: emailKey, role: 'user', joined };
+      const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
+      const currentList = regSnap.exists() ? (regSnap.data().registered || []) : [];
+      if (!currentList.find(u => u.email?.toLowerCase() === emailKey)) {
         await setDoc(doc(db, 'site_data', 'registered_users'), {
-          registered: [...existing2, userEntry],
+          registered: [...currentList, userEntry],
           updatedAt: serverTimestamp(),
         }, { merge: true });
-        // Also update localStorage so login works immediately on this device
-        const local = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-        if (!local.find(u => u.email?.toLowerCase() === emailKey)) {
-          localStorage.setItem('eh_registered_users', JSON.stringify([...local, { ...userEntry, password: form.password }]));
-        }
+      }
+
+      // 3. Update localStorage so login works immediately on this device
+      const local = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+      if (!local.find(u => u.email?.toLowerCase() === emailKey)) {
+        localStorage.setItem('eh_registered_users', JSON.stringify([
+          ...local, { ...userEntry, password: form.password }
+        ]));
       }
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       navigate('/');
-    } catch (e) {
-      // Fallback: save to localStorage if Firestore fails
+    } catch (err) {
+      console.error('[Register]', err);
+      // Fallback: save to localStorage only if Firestore fails
       const legacyUsers = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
       const userId = 'u_' + Date.now();
-      const newUser = { id: userId, name: form.name.trim(), email: emailKey, password: form.password, role: 'user', joined: new Date().toISOString().slice(0, 10) };
-      localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, newUser]));
+      const joined = new Date().toISOString().slice(0, 10);
+      const userEntry = { id: userId, name: form.name.trim(), email: emailKey, password: form.password, role: 'user', joined };
+      localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, userEntry]));
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       navigate('/');
     }
