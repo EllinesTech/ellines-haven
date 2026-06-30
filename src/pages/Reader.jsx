@@ -76,6 +76,19 @@ export default function Reader() {
   const [zoom,      setZoom]      = useState(100);
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
+  // Wait for library to load from Firestore before blocking access
+  const [libReady,  setLibReady]  = useState(false);
+
+  useEffect(() => {
+    // Give Firestore listener up to 3 seconds to confirm ownership
+    const t = setTimeout(() => setLibReady(true), 400);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Also mark ready as soon as library has data
+  useEffect(() => {
+    if (library.length >= 0) setLibReady(true);
+  }, [library]);
 
   // Ownership check — uses Firestore-backed library state from AppContext
   const checkOwned = useCallback(() => {
@@ -138,14 +151,23 @@ export default function Reader() {
     </div>
   );
 
-  if (!checkOwned()) return (
-    <div className="reader-error">
-      <div className="reader-error__icon">🛒</div>
-      <h2>Purchase required</h2>
-      <p>Buy this book to unlock reading and download access.</p>
-      <Link to={`/book/${book.id}`} className="btn btn-primary">Buy — KSh {book.price}</Link>
-    </div>
-  );
+  if (!checkOwned()) {
+    // Still waiting for Firestore library to load
+    if (!libReady) return (
+      <div className="reader-error">
+        <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
+        <p style={{ color:'var(--muted)' }}>Verifying access…</p>
+      </div>
+    );
+    return (
+      <div className="reader-error">
+        <div className="reader-error__icon">🛒</div>
+        <h2>Purchase required</h2>
+        <p>Buy this book to unlock reading and download access.</p>
+        <Link to={`/book/${book.id}`} className="btn btn-primary">Buy — KSh {book.price}</Link>
+      </div>
+    );
+  }
 
   if (user && myPerms && myPerms.canReadOnline === false) return (
     <div className="reader-error">
