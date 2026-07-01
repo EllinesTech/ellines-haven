@@ -183,8 +183,6 @@
   flex-direction: column;
   gap: 18px;
   min-height: 0;
-  /* Push messages to bottom like WhatsApp */
-  justify-content: flex-end;
 }
 .adm-msg-thread-body::-webkit-scrollbar { width: 4px; }
 .adm-msg-thread-body::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 2px; }
