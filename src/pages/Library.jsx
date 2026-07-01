@@ -3,7 +3,28 @@ import { useSearchParams, Link } from 'react-router-dom';
 import BookCard from '../components/BookCard';
 import { useApp } from '../context/AppContext';
 import { GENRES } from '../data/books';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import './Library.css';
+
+const LIB_DEFAULTS = {
+  hero_badge:          'Complete Collection',
+  hero_heading:        'The Library',
+  hero_sub:            'Every novel & short story by Elijah Mwangi M — original fiction drawn from real East African life.',
+  search_placeholder:  'Search by title, genre or author…',
+  empty_heading:       'No books found',
+  empty_sub:           'Try adjusting your filters or search term.',
+};
+
+function useLibContent() {
+  const [c, setC] = useState(LIB_DEFAULTS);
+  useEffect(() => {
+    getDoc(doc(db, 'site_data', 'library_content')).then(snap => {
+      if (snap.exists()) setC(prev => ({ ...prev, ...snap.data() }));
+    }).catch(() => {});
+  }, []);
+  return c;
+}
 
 const STATUS_FILTERS = [
   { value:'',             label:'All',          icon:'📚' },
@@ -35,6 +56,7 @@ const GENRE_ICONS = {
 
 export default function Library() {
   const { books: allBooks, myPerms } = useApp();
+  const lc = useLibContent();
   const [params, setParams] = useSearchParams();
   const [search, setSearch]     = useState('');
   const [sort, setSort]         = useState('newest');
@@ -102,9 +124,9 @@ export default function Library() {
         <div className="lib-hero__glow lib-hero__glow--b" />
         <div className="container lib-hero__inner">
           <div className="lib-hero__copy">
-            <span className="badge badge-gold">Complete Collection</span>
+            <span className="badge badge-gold">{lc.hero_badge}</span>
             <h1>The <span className="gold-text">Library</span></h1>
-            <p>Every novel &amp; short story by <strong>Elijah Mwangi M</strong> — original fiction drawn from real East African life.</p>
+            <p>Every novel &amp; short story by <strong>Elijah Mwangi M</strong> — {lc.hero_sub.replace(/^Every novel.*?— ?/,'')}</p>
           </div>
           {/* Big search bar in hero */}
           <div className="lib-hero__search">
@@ -112,7 +134,7 @@ export default function Library() {
             <input
               ref={searchRef}
               className="lib-hero__search-input"
-              placeholder="Search by title, genre or author…"
+              placeholder={lc.search_placeholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -234,8 +256,8 @@ export default function Library() {
           {books.length === 0 ? (
             <div className="lib-empty">
               <div className="lib-empty__icon">📭</div>
-              <h3>No books found</h3>
-              <p>Try adjusting your filters or search term.</p>
+              <h3>{lc.empty_heading}</h3>
+              <p>{lc.empty_sub}</p>
               <button className="btn btn-outline" onClick={clear}>Clear Filters</button>
             </div>
           ) : (

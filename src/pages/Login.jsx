@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
@@ -198,6 +198,13 @@ export default function Login() {
   const [err,       setErr]       = useState('');
   const [busy,      setBusy]      = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const [lc,        setLc]        = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
+
+  useEffect(() => {
+    getDoc(doc(db, 'site_data', 'login_content')).then(snap => {
+      if (snap.exists()) setLc(prev => ({ ...prev, ...snap.data() }));
+    }).catch(() => {});
+  }, []);
 
   const submit = async e => {
     e.preventDefault();
@@ -264,8 +271,8 @@ export default function Login() {
         <div className="auth-card card">
           <div className="auth-top">
             <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
-            <h2>Welcome Back</h2>
-            <p>Sign in to access your library</p>
+            <h2>{lc.heading}</h2>
+            <p>{lc.sub}</p>
           </div>
           <form onSubmit={submit}>
             {err && <div className="form-error" style={{marginBottom:'16px'}}>{err}</div>}
@@ -291,10 +298,10 @@ export default function Login() {
               </button>
             </div>
             <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={busy}>
-              {busy ? 'Signing in…' : 'Sign In'}
+              {busy ? 'Signing in…' : lc.btn}
             </button>
           </form>
-          <p className="auth-switch">No account? <Link to="/register">Create one</Link></p>
+          <p className="auth-switch">{lc.no_account} <Link to="/register">{lc.create_link}</Link></p>
         </div>
       </div>
     </main>

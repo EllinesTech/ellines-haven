@@ -105,12 +105,14 @@ export default function MessagesPanel({ showToast, users = [] }) {
   // ── Open message / seed thread ────────────────────────────────────────────
   const openMessage = async msg => {
     const threadId = msg.threadId || msg.id;
-    setSelected({ ...msg, threadId, status: msg.status === 'new' ? 'read' : msg.status });
+    const newStatus = msg.status === 'new' || !msg.status ? 'read' : msg.status;
+    // Update local state immediately so badge changes right away
+    setSelected({ ...msg, threadId, status: newStatus });
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: newStatus, threadId } : m));
     setReplyDraft(''); setSendErr('');
     if (msg.status === 'new' || !msg.status) {
       await setDoc(doc(db, 'contact_messages', msg.id),
         { status: 'read', threadId, updatedAt: serverTimestamp() }, { merge: true });
-      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: 'read', threadId } : m));
       if (!msg.threadId) {
         await setDoc(doc(db, 'contact_messages', threadId, 'messages', 'msg_0'), {
           text: msg.message || '', sender: 'user',

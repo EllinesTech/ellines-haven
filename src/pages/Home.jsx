@@ -3,9 +3,50 @@ import { useState, useEffect } from 'react';
 import BookCard, { BookStatusBadge } from '../components/BookCard';
 import { useApp } from '../context/AppContext';
 import { GENRES } from '../data/books';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import './Home.css';
+
+/* ── Firestore-backed site content (editable via Page Editor) ── */
+const HOME_DEFAULTS = {
+  eyebrow:             "Kenya's Premier Literary Platform",
+  hero_sub:            'Original novels and short stories by Elijah Mwangi M — drawn from real lives, real heartbreaks, and the soul of East Africa. Buy once. Read forever.',
+  hero_btn_primary:    'Browse Books →',
+  hero_btn_secondary:  'Our Story',
+  stat_books:          '50+',
+  stat_readers:        '2k+',
+  stat_rating:         '4.8★',
+  coming_soon_heading: 'Coming Soon',
+  coming_soon_sub:     'Upcoming novels & stories — get notified on launch day',
+  new_releases_heading:'New Releases',
+  new_releases_sub:    'The latest from Elijah Mwangi M',
+  featured_heading:    'Featured Novels & Books',
+  featured_sub:        'Original works inspired by true stories',
+  author_badge:        'Author Spotlight',
+  author_name:         'Elijah Mwangi M',
+  author_bio:          'From the golden savannahs of the Maasai Mara to the misty highlands of Mount Kenya — his stories are drawn from the full breath of this country. Every novel is a window into lives lived and dreams chased across East Africa.',
+  author_quote:        '"Stories that stay with you long after the last page."',
+  genres_heading:      'Browse by Genre',
+  genres_sub:          'Find the story that speaks to you',
+  why_heading:         'Why Ellines Haven?',
+  why_sub:             'More than a bookstore — a literary experience',
+  testimonials_heading:'What Readers Say',
+  testimonials_sub:    'Voices from our community',
+  cta_heading:         'Ready to Start Reading?',
+  cta_sub:             "Join thousands of readers discovering Kenya's finest stories.",
+  cta_btn_primary:     'Create Free Account',
+  cta_btn_secondary:   'Browse First',
+};
+
+function useHomeContent() {
+  const [c, setC] = useState(HOME_DEFAULTS);
+  useEffect(() => {
+    getDoc(doc(db, 'site_data', 'home_content')).then(snap => {
+      if (snap.exists()) setC(prev => ({ ...prev, ...snap.data() }));
+    }).catch(() => {});
+  }, []);
+  return c;
+}
 
 /* ── Notify Me button — writes to Firestore so admin sees it ── */
 function NotifyBtn({ book, e }) {
@@ -106,6 +147,7 @@ function BookStack({ books }) {
 
 export default function Home() {
   const { books } = useApp();
+  const c = useHomeContent();
   // Only show active books on the front page
   const activeBooks = books.filter(b => b.active !== false);
   const featured    = activeBooks.filter(b => b.featured);
@@ -124,10 +166,17 @@ export default function Home() {
   useEffect(() => {
     const t = setInterval(() => {
       setFade(false);
-      setTimeout(() => { setTagIdx(i => (i + 1) % TAGLINES.length); setFade(true); }, 350);
+      setTimeout(() => { setTagIdx(i => (i + 1) % 4); setFade(true); }, 350);
     }, 3600);
     return () => clearInterval(t);
   }, []);
+
+  const taglines = [
+    c.hero_tagline_1 || 'Where Stories Find Their Home',
+    c.hero_tagline_2 || 'From the Heart of Kenya',
+    c.hero_tagline_3 || 'Real Lives. Real Drama. Real Stories.',
+    c.hero_tagline_4 || 'Original Fiction by Elijah Mwangi M',
+  ];
 
   return (
     <main>
@@ -143,31 +192,27 @@ export default function Home() {
         <div className="container hero__inner">
           {/* LEFT — copy */}
           <div className="hero__copy">
-            <span className="badge badge-gold hero__eyebrow">Kenya's Premier Literary Platform</span>
+            <span className="badge badge-gold hero__eyebrow">{c.eyebrow}</span>
 
             <h1 className="hero__h1">
               <span className={`hero__tagline${fade ? ' hero__tagline--in' : ' hero__tagline--out'}`}>
-                {TAGLINES[tagIdx]}
+                {taglines[tagIdx]}
               </span>
             </h1>
 
-            <p className="hero__sub">
-              Original novels and short stories by <strong>Elijah Mwangi M</strong> —
-              drawn from real lives, real heartbreaks, and the soul of East Africa.
-              Buy once. Read forever.
-            </p>
+            <p className="hero__sub">{c.hero_sub}</p>
 
             <div className="hero__btns">
-              <Link to="/library" className="btn btn-primary">Browse Books →</Link>
-              <Link to="/about"   className="btn btn-outline">Our Story</Link>
+              <Link to="/library" className="btn btn-primary">{c.hero_btn_primary}</Link>
+              <Link to="/about"   className="btn btn-outline">{c.hero_btn_secondary}</Link>
             </div>
 
             <div className="hero__stats">
-              <div><strong>50+</strong><span>Books</span></div>
+              <div><strong>{c.stat_books}</strong><span>Books</span></div>
               <div className="hero__stat-bar" />
-              <div><strong>2k+</strong><span>Readers</span></div>
+              <div><strong>{c.stat_readers}</strong><span>Readers</span></div>
               <div className="hero__stat-bar" />
-              <div><strong>4.8★</strong><span>Rating</span></div>
+              <div><strong>{c.stat_rating}</strong><span>Rating</span></div>
             </div>
           </div>
 
@@ -224,7 +269,7 @@ export default function Home() {
             <div className="sec-head">
               <div>
                 <h2>Coming <span className="gold-text">Soon</span></h2>
-                <p>Upcoming novels &amp; stories — get notified on launch day</p>
+                <p>{c.coming_soon_sub}</p>
               </div>
               <Link to="/library?status=coming-soon" className="btn btn-outline btn-sm">See All →</Link>
             </div>
@@ -279,7 +324,7 @@ export default function Home() {
             <div className="sec-head">
               <div>
                 <h2>New <span className="gold-text">Releases</span></h2>
-                <p>The latest from Elijah Mwangi M</p>
+                <p>{c.new_releases_sub}</p>
               </div>
               <Link to="/library" className="btn btn-outline btn-sm">All Books →</Link>
             </div>
@@ -320,7 +365,7 @@ export default function Home() {
           <div className="sec-head">
             <div>
               <h2>Featured <span className="gold-text">Novels & Books</span></h2>
-              <p>Original works inspired by true stories</p>
+              <p>{c.featured_sub}</p>
             </div>
             <Link to="/library" className="btn btn-outline btn-sm">View All →</Link>
           </div>
@@ -340,19 +385,15 @@ export default function Home() {
         </div>
         <div className="container promo-banner__content">
           <div className="promo-banner__copy">
-            <span className="badge badge-gold">Author Spotlight</span>
-            <h2>Elijah Mwangi M</h2>
-            <p>
-              From the golden savannahs of the Maasai Mara to the misty highlands of
-              Mount Kenya — his stories are drawn from the full breath of this country.
-              Every novel is a window into lives lived and dreams chased across East Africa.
-            </p>
+            <span className="badge badge-gold">{c.author_badge}</span>
+            <h2>{c.author_name}</h2>
+            <p>{c.author_bio}</p>
             <div className="promo-banner__btns">
               <Link to="/founder" className="btn btn-primary">Meet the Author</Link>
               <Link to="/library" className="btn btn-ghost">Explore All Books</Link>
             </div>
             <div className="promo-banner__quotes">
-              <blockquote>"Stories that stay with you long after the last page."</blockquote>
+              <blockquote>{c.author_quote}</blockquote>
             </div>
           </div>
           <BookStack books={featured} />
@@ -365,7 +406,7 @@ export default function Home() {
       <section className="section genres-sec">
         <div className="container">
           <h2 className="text-c">Browse by <span className="gold-text">Genre</span></h2>
-          <p className="text-c muted" style={{ marginBottom:'36px' }}>Find the story that speaks to you</p>
+          <p className="text-c muted" style={{ marginBottom:'36px' }}>{c.genres_sub}</p>
           <div className="genres-row">
             {GENRES.map(g => (
               <Link key={g} to={`/library?genre=${g}`} className="genre-pill">{g}</Link>
@@ -380,7 +421,7 @@ export default function Home() {
       <section className="section why-sec">
         <div className="container">
           <h2 className="text-c">Why <span className="gold-text">Ellines Haven</span>?</h2>
-          <p className="text-c muted" style={{ marginBottom:'48px' }}>More than a bookstore — a literary experience</p>
+          <p className="text-c muted" style={{ marginBottom:'48px' }}>{c.why_sub}</p>
           <div className="why-grid">
             {[
               { icon:'✍️', title:'Authentic Stories',  desc:'Every book draws from real events, real people, and the streets of Kenya.'        },
@@ -406,7 +447,7 @@ export default function Home() {
       <section className="section testimonials-sec">
         <div className="container">
           <h2 className="text-c">What <span className="gold-text">Readers Say</span></h2>
-          <p className="text-c muted" style={{ marginBottom:'44px' }}>Voices from our community</p>
+          <p className="text-c muted" style={{ marginBottom:'44px' }}>{c.testimonials_sub}</p>
           <div className="testimonials-grid">
             {[
               { name:'Amina K.', loc:'Nairobi', stars:5, text:'"Chasing Ghosts and Supercars had me hooked from the first chapter. Finally, stories that feel like home."' },
@@ -435,11 +476,11 @@ export default function Home() {
           <div className="cta-box">
             <div className="cta-box__glow" />
             <img src="/logo-icon.png" alt="" className="cta-box__logo" />
-            <h2>Ready to Start Reading?</h2>
-            <p>Join thousands of readers discovering Kenya's finest stories.</p>
+            <h2>{c.cta_heading}</h2>
+            <p>{c.cta_sub}</p>
             <div className="cta-box__btns">
-              <Link to="/register" className="btn btn-primary">Create Free Account</Link>
-              <Link to="/library"  className="btn btn-ghost">Browse First</Link>
+              <Link to="/register" className="btn btn-primary">{c.cta_btn_primary}</Link>
+              <Link to="/library"  className="btn btn-ghost">{c.cta_btn_secondary}</Link>
             </div>
           </div>
         </div>

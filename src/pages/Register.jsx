@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -18,6 +18,13 @@ export default function Register() {
   const [show, setShow] = useState({ password:false, confirm:false });
   const [err,  setErr]  = useState('');
   const [busy, setBusy] = useState(false);
+  const [rc,   setRc]   = useState({ heading:'Create Account', sub:'Join our community of readers', btn:'Create Account', already_have:'Already have an account?', sign_in_link:'Sign in', closed_heading:'Registrations Closed', closed_sub:'New account creation is currently disabled. Please check back later.' });
+
+  useEffect(() => {
+    getDoc(doc(db, 'site_data', 'register_content')).then(snap => {
+      if (snap.exists()) setRc(prev => ({ ...prev, ...snap.data() }));
+    }).catch(() => {});
+  }, []);
 
   if (siteControls?.disableRegistration) {
     return (
