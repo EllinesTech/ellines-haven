@@ -33,7 +33,7 @@ export default function Register() {
           <div className="auth-card card" style={{ textAlign:'center' }}>
             <div style={{ fontSize:'3rem', marginBottom:16 }}>🚫</div>
             <h2>Registrations Closed</h2>
-            <p style={{ color:'var(--muted)', marginTop:8, marginBottom:20 }}>New account creation is currently disabled. Please check back later.</p>
+            <p style={{ color:'var(--muted)', marginTop:8, marginBottom:20 }}>{rc.closed_sub}</p>
             <Link to="/login" className="btn btn-primary" style={{ width:'100%' }}>Sign In Instead</Link>
           </div>
         </div>
@@ -115,8 +115,8 @@ export default function Register() {
         <div className="auth-card card">
           <div className="auth-top">
             <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
-            <h2>Create Account</h2>
-            <p>Join our community of readers</p>
+            <h2>{rc.heading}</h2>
+            <p>{rc.sub}</p>
           </div>
           <form onSubmit={submit}>
             {err && <div className="form-error" style={{ marginBottom:'16px' }}>{err}</div>}
@@ -170,10 +170,10 @@ export default function Register() {
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width:'100%', marginTop:'6px' }} disabled={busy}>
-              {busy ? 'Creating Account…' : 'Create Account'}
+              {busy ? 'Creating Account…' : rc.btn}
             </button>
           </form>
-          <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
+          <p className="auth-switch">{rc.already_have} <Link to="/login">{rc.sign_in_link}</Link></p>
         </div>
       </div>
     </main>
