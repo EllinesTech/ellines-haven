@@ -111,8 +111,28 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
         const ov = JSON.parse(localStorage.getItem('eh_pw_overrides')||'{}');
         ov[selectedUser.email.toLowerCase()] = newPw;
         localStorage.setItem('eh_pw_overrides', JSON.stringify(ov));
+        // Also sync to Firestore registered_users
+        const regSnap = await getDoc(doc(db,'site_data','registered_users')).catch(()=>null);
+        if (regSnap?.exists()) {
+          const reg = regSnap.data().registered || [];
+          const rov = regSnap.data().pwOverrides || {};
+          rov[selectedUser.email.toLowerCase()] = newPw;
+          await setDoc(doc(db,'site_data','registered_users'),{registered:reg, pwOverrides:rov, updatedAt:serverTimestamp()},{merge:true});
+        }
       }
       if (newRole !== selectedUser.role) {
+        // Persist role to Firestore (not just localStorage)
+        const regSnap = await getDoc(doc(db,'site_data','registered_users')).catch(()=>null);
+        if (regSnap?.exists()) {
+          const reg = (regSnap.data().registered||[]).map(r =>
+            r.email?.toLowerCase() === selectedUser.email.toLowerCase() ? {...r, role:newRole} : r
+          );
+          const roleOv = regSnap.data().roleOverrides || {};
+          roleOv[selectedUser.email.toLowerCase()] = newRole;
+          await setDoc(doc(db,'site_data','registered_users'),{registered:reg, roleOverrides:roleOv, updatedAt:serverTimestamp()},{merge:true});
+        }
+        // Also update Firestore users collection
+        try { await setDoc(doc(db,'users',selectedUser.id||selectedUser.email.replace(/[^a-z0-9]/g,'_')),{role:newRole},{merge:true}); } catch {}
         const ro = JSON.parse(localStorage.getItem('eh_role_overrides')||'{}');
         ro[selectedUser.email.toLowerCase()] = newRole;
         localStorage.setItem('eh_role_overrides', JSON.stringify(ro));
@@ -364,21 +384,56 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
             <h3 style={{fontSize:'0.92rem',marginBottom:4,color:'var(--gold)'}}>⚡ Site Controls</h3>
             {[
               {l:'🔴 Lock Site (Maintenance)',action:async()=>{await setDoc(doc(db,'site_data','site_controls'),{maintenanceMode:true,updatedAt:serverTimestamp()},{merge:true});showToast?.('Site locked');}},
+              {l:'🔓 Unlock Site',action:async()=>{await setDoc(doc(db,'site_data','site_controls'),{maintenanceMode:false,updatedAt:serverTimestamp()},{merge:true});showToast?.('Site unlocked');}},
               {l:'🔄 Force Refresh All Users',action:async()=>{await setDoc(doc(db,'site_data','force_refresh'),{ts:serverTimestamp()});showToast?.('Refresh signal sent');}},
-              {l:'🔁 Reset All Permissions',action:()=>showToast?.('Permissions reset')},
+              {l:'🔁 Reset All Permissions',action:async()=>{
+                await setDoc(doc(db,'site_data','user_permissions'),{perms:{},updatedAt:serverTimestamp()},{merge:false});
+                localStorage.removeItem('eh_user_perms');
+                showToast?.('✅ All permissions reset to defaults');
+              }},
+              {l:'🔓 Enable Purchases for All',action:async()=>{
+                const snap = await getDoc(doc(db,'site_data','user_permissions')).catch(()=>null);
+                const existing = snap?.exists() ? (snap.data().perms||{}) : {};
+                const updated = {};
+                allUsers.forEach(u => { updated[u.email.toLowerCase()] = {...(existing[u.email.toLowerCase()]||{}), canPurchase:true }; });
+                await setDoc(doc(db,'site_data','user_permissions'),{perms:updated,updatedAt:serverTimestamp()},{merge:true});
+                showToast?.('✅ Purchases enabled for all users');
+              }},
             ].map(a=>(
               <button key={a.l} className="btn btn-ghost btn-sm" onClick={()=>setConfirmGate({label:a.l+'?',action:a.action})} style={{textAlign:'left'}}>{a.l}</button>
             ))}
           </div>
           <div className="card" style={{padding:20,gridColumn:'1/-1'}}>
-            <h3 style={{fontSize:'0.92rem',marginBottom:12,color:'var(--gold)'}}>📚 Bulk Unlock Book</h3>
+            <h3 style={{fontSize:'0.92rem',marginBottom:12,color:'var(--gold)'}}>📚 Bulk Unlock Book for All Users</h3>
+            <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>This will unlock the selected book for every registered user — use for free releases or promotions.</p>
             <div style={{display:'flex',gap:10,alignItems:'center'}}>
               <select className="field" value={selectedBook} onChange={e=>setSelectedBook(e.target.value)} style={{flex:1}}>
                 <option value="">Select book to unlock for ALL users…</option>
                 {(books||[]).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
               </select>
               <button className="btn btn-primary btn-sm" disabled={!selectedBook}
-                onClick={()=>setConfirmGate({label:'Unlock "'+((books||[]).find(b=>b.id===selectedBook)?.title||'this book')+'" for ALL users?',action:async()=>{showToast?.('Bulk unlock queued — use manual unlock per user for now');}})}> Unlock for All</button>
+                onClick={()=>setConfirmGate({
+                  label:'Unlock "'+((books||[]).find(b=>b.id===selectedBook)?.title||'this book')+'" for ALL '+allUsers.length+' users?',
+                  action:async()=>{
+                    const book = (books||[]).find(b=>b.id===selectedBook);
+                    if (!book) return;
+                    let count = 0;
+                    for (const u of allUsers) {
+                      try {
+                        const libId = u.email.toLowerCase().replace(/[^a-z0-9]/g,'_');
+                        const snap = await getDoc(doc(db,'libraries',libId));
+                        const existing = snap.exists() ? (snap.data().books||[]) : [];
+                        if (!existing.find(b=>b.id===book.id)) {
+                          await setDoc(doc(db,'libraries',libId),{email:u.email.toLowerCase(),books:[...existing,{...book,downloadUnlocked:true}]},{merge:true});
+                          count++;
+                        }
+                      } catch {}
+                    }
+                    showToast?.(`✅ Unlocked for ${count} users`);
+                  }
+                })}>
+                🔓 Unlock for All
+              </button>
             </div>
           </div>
         </div>

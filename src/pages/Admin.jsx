@@ -14,6 +14,7 @@ import IntegrationsPanel from './admin-panels/IntegrationsPanel';
 import MessagesPanel     from './admin-panels/MessagesPanel';
 import ReportsPanel      from './admin-panels/ReportsPanel';
 import ReviewsPanel      from './admin-panels/ReviewsPanel';
+import EmailPanel        from './admin-panels/EmailPanel';
 import './Admin.css';
 
 const EMPTY_BOOK = {
@@ -1725,6 +1726,7 @@ export default function Admin() {
     { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
     { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
     { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
+    { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
     /* ── Power tools — visible to both admin & superadmin ── */
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
@@ -3234,6 +3236,11 @@ export default function Admin() {
         {/* -- MESSAGES -- */}
         {tab === 'messages' && (
           <MessagesPanel showToast={showToast} users={users} />
+        )}
+
+        {/* -- EMAIL CONFIG -- */}
+        {tab === 'email' && (
+          <EmailPanel showToast={showToast} isSuper={isSuper} />
         )}
 
         {/* -- SITE CONTROLS -- */}
