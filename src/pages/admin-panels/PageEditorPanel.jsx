@@ -23,6 +23,9 @@ export default function PageEditorPanel({ showToast }) {
   const [saving,     setSaving]     = useState(false);
   const [sideOpen,   setSideOpen]   = useState(true);
   const [iframeKey,  setIframeKey]  = useState(0);
+  const [iframeErr,  setIframeErr]  = useState(false);
+  const [editArrIdx, setEditArrIdx] = useState(null); // { key, idx }
+  const [editArrVal, setEditArrVal] = useState('');
   const iframeRef = useRef(null);
 
   const current = pageData[activePage.key] || {};
@@ -78,7 +81,7 @@ export default function PageEditorPanel({ showToast }) {
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1, marginLeft: 8 }}>
           {PAGES.map(p => (
             <button key={p.key}
-              onClick={() => { setActivePage(p); setEditKey(null); }}
+              onClick={() => { setActivePage(p); setEditKey(null); setIframeErr(false); }}
               style={{
                 padding: '5px 12px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, fontFamily: 'inherit',
                 background: activePage.key === p.key ? 'var(--gold)' : 'rgba(255,255,255,0.07)',
@@ -112,15 +115,30 @@ export default function PageEditorPanel({ showToast }) {
       {/* ── Main area: iframe + sidebar ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Live page iframe */}
-        <div style={{ flex: 1, position: 'relative', background: '#000', overflow: 'hidden' }}>
-          <iframe
-            key={iframeKey}
-            ref={iframeRef}
-            src={origin + activePage.path}
-            title={activePage.label + ' preview'}
-            style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          />
+        <div style={{ flex: 1, position: 'relative', background: '#111', overflow: 'hidden' }}>
+          {iframeErr ? (
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:14, padding:24, textAlign:'center' }}>
+              <div style={{ fontSize:'2.5rem' }}>🔗</div>
+              <p style={{ color:'var(--muted)', fontSize:'0.88rem', lineHeight:1.6, maxWidth:340 }}>
+                The live preview can't load in an iframe on this browser or environment.<br />
+                Open the page directly to see it.
+              </p>
+              <a href={origin + activePage.path} target="_blank" rel="noopener noreferrer"
+                style={{ background:'var(--gold)', color:'#000', borderRadius:7, padding:'8px 20px', fontWeight:700, fontSize:'0.85rem', textDecoration:'none' }}>
+                ↗ Open {activePage.label} in New Tab
+              </a>
+            </div>
+          ) : (
+            <iframe
+              key={iframeKey}
+              ref={iframeRef}
+              src={origin + activePage.path}
+              title={activePage.label + ' preview'}
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              onError={() => setIframeErr(true)}
+            />
+          )}
           {/* overlay label */}
           <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'rgba(0,0,0,0.7)', color: 'var(--gold)', fontSize: '0.72rem', fontWeight: 700, padding: '4px 10px', borderRadius: 6, pointerEvents: 'none', letterSpacing: 1 }}>
             LIVE PREVIEW — {activePage.label.toUpperCase()}
@@ -185,14 +203,46 @@ export default function PageEditorPanel({ showToast }) {
                     <div style={{ padding: '8px 10px' }}>
                       {isArr ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {v.map((item, idx) => (
-                            <div key={idx} style={{ fontSize: '0.78rem', color: 'var(--muted)', padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 4, border: '1px solid var(--border)', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                              <span style={{ color: 'var(--gold)', minWidth: 16, fontSize: '0.7rem', marginTop: 1 }}>{idx + 1}.</span>
-                              <span style={{ flex: 1, wordBreak: 'break-word' }}>{typeof item === 'string' ? item : JSON.stringify(item)}</span>
-                            </div>
-                          ))}
-                          <button onClick={() => { const arr = [...v, '']; setPageData(prev => ({ ...prev, [activePage.key]: { ...(prev[activePage.key] || {}), [k]: arr } })); }}
-                            style={{ alignSelf: 'flex-start', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', color: 'var(--gold)', borderRadius: 4, padding: '3px 9px', cursor: 'pointer', fontSize: '0.72rem', fontFamily: 'inherit' }}>+ Add item</button>
+                          {v.map((item, idx) => {
+                            const isEditingItem = editArrIdx?.key === k && editArrIdx?.idx === idx;
+                            return (
+                              <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 4, border: `1px solid ${isEditingItem ? 'rgba(201,168,76,0.5)' : 'var(--border)'}`, overflow: 'hidden' }}>
+                                {isEditingItem ? (
+                                  <div style={{ padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                    <textarea value={editArrVal} onChange={e => setEditArrVal(e.target.value)}
+                                      rows={2} autoFocus
+                                      style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: 4, color: 'var(--text)', padding: '5px 8px', fontSize: '0.8rem', resize: 'vertical', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                                    <div style={{ display: 'flex', gap: 5 }}>
+                                      <button onClick={() => {
+                                        const arr = [...v]; arr[idx] = editArrVal;
+                                        setPageData(prev => ({ ...prev, [activePage.key]: { ...(prev[activePage.key] || {}), [k]: arr } }));
+                                        setEditArrIdx(null);
+                                      }} style={{ background: 'var(--gold)', border: 'none', color: '#000', borderRadius: 4, padding: '3px 10px', cursor: 'pointer', fontWeight: 700, fontSize: '0.72rem', fontFamily: 'inherit' }}>✓ Save</button>
+                                      <button onClick={() => setEditArrIdx(null)}
+                                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: 4, padding: '3px 8px', cursor: 'pointer', fontSize: '0.72rem', fontFamily: 'inherit' }}>Cancel</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', padding: '5px 8px' }}>
+                                    <span style={{ color: 'var(--gold)', minWidth: 16, fontSize: '0.7rem', marginTop: 2, flexShrink: 0 }}>{idx + 1}.</span>
+                                    <span style={{ flex: 1, fontSize: '0.78rem', color: 'var(--text)', wordBreak: 'break-word', lineHeight: 1.5 }}>{typeof item === 'string' ? item : JSON.stringify(item)}</span>
+                                    <button onClick={() => { setEditArrIdx({ key: k, idx }); setEditArrVal(typeof item === 'string' ? item : JSON.stringify(item)); }}
+                                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.7rem', padding: '1px 4px', flexShrink: 0, fontFamily: 'inherit' }}>✏️</button>
+                                    <button onClick={() => {
+                                      const arr = v.filter((_, i) => i !== idx);
+                                      setPageData(prev => ({ ...prev, [activePage.key]: { ...(prev[activePage.key] || {}), [k]: arr } }));
+                                    }} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: '0.7rem', padding: '1px 4px', flexShrink: 0, fontFamily: 'inherit' }}>✕</button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <button onClick={() => {
+                            const arr = [...v, ''];
+                            setPageData(prev => ({ ...prev, [activePage.key]: { ...(prev[activePage.key] || {}), [k]: arr } }));
+                            setEditArrIdx({ key: k, idx: arr.length - 1 });
+                            setEditArrVal('');
+                          }} style={{ alignSelf: 'flex-start', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)', color: 'var(--gold)', borderRadius: 4, padding: '3px 9px', cursor: 'pointer', fontSize: '0.72rem', fontFamily: 'inherit' }}>+ Add item</button>
                         </div>
                       ) : isEditing ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
