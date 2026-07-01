@@ -1,20 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
-import PageEditorPanel   from './admin-panels/PageEditorPanel';
-import DesignStudioPanel from './admin-panels/DesignStudioPanel';
-import SecurityPanel     from './admin-panels/SecurityPanel';
-import PluginsPanel      from './admin-panels/PluginsPanel';
-import GodModePanel      from './admin-panels/GodModePanel';
-import IntegrationsPanel from './admin-panels/IntegrationsPanel';
-import MessagesPanel     from './admin-panels/MessagesPanel';
-import ReportsPanel      from './admin-panels/ReportsPanel';
-import ReviewsPanel      from './admin-panels/ReviewsPanel';
-import EmailPanel        from './admin-panels/EmailPanel';
+const PageEditorPanel   = lazy(() => import('./admin-panels/PageEditorPanel'));
+const DesignStudioPanel = lazy(() => import('./admin-panels/DesignStudioPanel'));
+const SecurityPanel     = lazy(() => import('./admin-panels/SecurityPanel'));
+const PluginsPanel      = lazy(() => import('./admin-panels/PluginsPanel'));
+const GodModePanel      = lazy(() => import('./admin-panels/GodModePanel'));
+const IntegrationsPanel = lazy(() => import('./admin-panels/IntegrationsPanel'));
+const MessagesPanel     = lazy(() => import('./admin-panels/MessagesPanel'));
+const ReportsPanel      = lazy(() => import('./admin-panels/ReportsPanel'));
+const ReviewsPanel      = lazy(() => import('./admin-panels/ReviewsPanel'));
+const EmailPanel        = lazy(() => import('./admin-panels/EmailPanel'));
+
+const PanelLoader = () => (
+  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
+    <div style={{ width:32, height:32, border:'3px solid rgba(201,168,76,0.2)', borderTop:'3px solid var(--gold)', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
+    <span style={{ color:'var(--muted)', fontSize:'0.82rem' }}>Loading panel…</span>
+  </div>
+);
 import './Admin.css';
 
 const EMPTY_BOOK = {
@@ -1471,6 +1478,7 @@ export default function Admin() {
   const [orderFilter, setOrderFilter] = useState('all');
   const [reviews, setReviews] = useState(MOCK_REVIEWS_INIT);
   const [promos,  setPromos]  = useState(PROMO_INIT);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // ── Load reviews + promos from Firestore (persist across refresh) ──────────
   useEffect(() => {
@@ -1847,7 +1855,6 @@ export default function Admin() {
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
     /* ── Power tools — visible to both admin & superadmin ── */
-    /* ── Power tools — visible to both admin & superadmin ── */
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
     { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
     { k:'security',      label:'Security',          icon:'🔒', group:'power' },
@@ -1861,11 +1868,20 @@ export default function Admin() {
   ];
 
   return (
-    <div className="adm">
+    <div className={`adm${sidebarCollapsed ? ' adm--collapsed' : ''}`}>
+      {/* ── Sidebar collapse toggle ── */}
+      <button
+        className="adm-sidebar-toggle"
+        onClick={() => setSidebarCollapsed(c => !c)}
+        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {sidebarCollapsed ? '→' : '←'}
+      </button>
+
       <aside className="adm-sidebar">
         <div className="adm-sidebar-logo">
           <img src="/logo-nobg3.png" alt="Ellines Haven" className="adm-sidebar-logo-img" />
-          <div>
+          <div className="adm-sidebar-logo-text">
             <span className="adm-sidebar-brand">Ellines Haven</span>
             <em>{isSuper ? 'Super Admin Panel' : 'Admin Panel'}</em>
             {isSuper && <span className="adm-super-tag">SUPER ADMIN</span>}
@@ -2579,7 +2595,9 @@ export default function Admin() {
         )}
         {/* REVIEWS */}
         {tab === 'reviews' && (
-          <ReviewsPanel books={books} showToast={showToast} isSuper={isSuper} />
+          <Suspense fallback={<PanelLoader />}>
+            <ReviewsPanel books={books} showToast={showToast} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* PROMO CODES */}
@@ -2655,10 +2673,14 @@ export default function Admin() {
         )}
         {/* ANALYTICS / REPORTS */}
         {tab === 'analytics' && (
-          <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+          <Suspense fallback={<PanelLoader />}>
+            <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+          </Suspense>
         )}
         {tab === 'reports' && (
-          <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+          <Suspense fallback={<PanelLoader />}>
+            <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+          </Suspense>
         )}
 
         {/* SETTINGS */}
@@ -2944,7 +2966,12 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.filter(u => u.role !== 'superadmin').map(u => {
+                  {users.length === 0 ? (
+                    <tr><td colSpan={11} style={{textAlign:'center',padding:'32px 0',color:'var(--muted)',fontSize:'0.85rem'}}>No users found</td></tr>
+                  ) : users.filter(u => u.role !== 'superadmin' && u.role !== 'admin').length === 0 ? (
+                    <tr><td colSpan={11} style={{textAlign:'center',padding:'32px 0',color:'var(--muted)',fontSize:'0.85rem'}}>No regular users yet. Admin accounts are managed in Admin Control.</td></tr>
+                  ) : null}
+                  {users.filter(u => u.role !== 'superadmin' && u.role !== 'admin').map(u => {
                     const p = getPerms(u.email);
                     const isSuspended = isUserSuspended(u.email);
                     const PermToggle = ({ field }) => (
@@ -2966,14 +2993,14 @@ export default function Admin() {
                             <div className="adm-user-avatar" style={{flexShrink:0,width:28,height:28,fontSize:'0.75rem'}}>
                               {u.name.charAt(0)}
                             </div>
-                            <div>
-                              <strong style={{fontSize:'0.85rem'}}>{u.name}</strong>
-                              <span style={{display:'block',fontSize:'0.72rem',color:'var(--muted)'}}>{u.email}</span>
+                            <div style={{minWidth:0}}>
+                              <strong style={{fontSize:'0.85rem',display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.name}</strong>
+                              <span style={{display:'block',fontSize:'0.72rem',color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.email}</span>
                             </div>
                           </div>
                         </td>
                         <td>
-                          <span className={'adm-role adm-role--' + (u.role === 'admin' ? 'admin' : 'user')}>{u.role}</span>
+                          <span className="adm-role adm-role--user">{u.role || 'user'}</span>
                         </td>
                         <PermToggle field="canBrowse"           />
                         <PermToggle field="canPurchase"         />
@@ -2984,19 +3011,15 @@ export default function Admin() {
                         <PermToggle field="canViewBookDetails"  />
                         <PermToggle field="canPlaceOrders"      />
                         <td style={{textAlign:'center'}}>
-                          {u.id !== user.id && u.role !== 'admin' ? (
-                            <button
-                              className={'adm-perm-btn' + (isSuspended ? ' off' : ' on')}
-                              onClick={async () => {
-                                await setSuspended(u.email, !isSuspended);
-                                setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: !isSuspended ? 'Suspended' : 'Active' } : x));
-                                showToast(u.name + (!isSuspended ? ' suspended — logged out instantly' : ' reactivated ✅'));
-                              }}>
-                              {isSuspended ? 'Suspended' : 'Active'}
-                            </button>
-                          ) : (
-                            <span style={{fontSize:'0.75rem',color:'var(--muted)'}}>Protected</span>
-                          )}
+                          <button
+                            className={'adm-perm-btn' + (isSuspended ? ' off' : ' on')}
+                            onClick={async () => {
+                              await setSuspended(u.email, !isSuspended);
+                              setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: !isSuspended ? 'Suspended' : 'Active' } : x));
+                              showToast(u.name + (!isSuspended ? ' suspended — logged out instantly' : ' reactivated ✅'));
+                            }}>
+                            {isSuspended ? 'Suspended' : 'Active'}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -3028,7 +3051,7 @@ export default function Admin() {
                         saveUserPerms(updated); showToast('Reviews disabled site-wide');
                       }},
                       { label:'Reset all user permissions to default', action: () => {
-                        localStorage.removeItem('eh_user_perms'); saveUserPerms({}); showToast('Permissions reset ?');
+                        localStorage.removeItem('eh_user_perms'); saveUserPerms({}); showToast('✅ Permissions reset to defaults');
                       }},
                     ].map(action => (
                       <button key={action.label} className="btn btn-ghost btn-sm" style={{textAlign:'left',justifyContent:'flex-start'}} onClick={action.action}>
@@ -3359,12 +3382,16 @@ export default function Admin() {
 
         {/* -- MESSAGES -- */}
         {tab === 'messages' && (
-          <MessagesPanel showToast={showToast} users={users} />
+          <Suspense fallback={<PanelLoader />}>
+            <MessagesPanel showToast={showToast} users={users} />
+          </Suspense>
         )}
 
         {/* -- EMAIL CONFIG -- */}
         {tab === 'email' && (
-          <EmailPanel showToast={showToast} isSuper={isSuper} />
+          <Suspense fallback={<PanelLoader />}>
+            <EmailPanel showToast={showToast} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- SITE CONTROLS -- */}
@@ -3379,32 +3406,44 @@ export default function Admin() {
 
         {/* -- PAGE EDITOR -- */}
         {tab === 'pageeditor' && (
-          <PageEditorPanel showToast={showToast} />
+          <Suspense fallback={<PanelLoader />}>
+            <PageEditorPanel showToast={showToast} />
+          </Suspense>
         )}
 
         {/* -- DESIGN STUDIO -- */}
         {tab === 'design' && (
-          <DesignStudioPanel showToast={showToast} />
+          <Suspense fallback={<PanelLoader />}>
+            <DesignStudioPanel showToast={showToast} />
+          </Suspense>
         )}
 
         {/* -- SECURITY -- */}
         {tab === 'security' && (
-          <SecurityPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} isSuper={isSuper} />
+          <Suspense fallback={<PanelLoader />}>
+            <SecurityPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- PLUGINS -- */}
         {tab === 'plugins' && (
-          <PluginsPanel showToast={showToast} isSuper={isSuper} />
+          <Suspense fallback={<PanelLoader />}>
+            <PluginsPanel showToast={showToast} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- GOD MODE — superadmin only -- */}
         {tab === 'godmode' && isSuper && (
-          <GodModePanel showToast={showToast} books={books} saveBook={saveBook} users={users} isSuper={isSuper} />
+          <Suspense fallback={<PanelLoader />}>
+            <GodModePanel showToast={showToast} books={books} saveBook={saveBook} users={users} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- INTEGRATIONS -- */}
         {tab === 'integrations' && (
-          <IntegrationsPanel showToast={showToast} isSuper={isSuper} />
+          <Suspense fallback={<PanelLoader />}>
+            <IntegrationsPanel showToast={showToast} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- BACKUP & RESTORE -- */}

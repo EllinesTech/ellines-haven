@@ -780,11 +780,19 @@
 .adm-status--success { background: rgba(46,204,113,0.12); color: var(--ok); border: 1px solid rgba(46,204,113,0.25); }
 .adm-status--warning { background: rgba(201,168,76,0.12); color: var(--gold); border: 1px solid rgba(201,168,76,0.25); }
 
-/* ── Permissions table — compact to fit without horizontal scroll ── */
-.adm-perms-table { table-layout: fixed; width: 100%; }
-.adm-perms-table th, .adm-perms-table td { white-space: nowrap; padding: 8px 6px; font-size: 0.78rem; }
+/* ── Permissions table ── */
+.adm-perms-table { table-layout: auto; width: 100%; border-collapse: collapse; }
+.adm-perms-table th,
+.adm-perms-table td { white-space: nowrap; padding: 10px 8px; font-size: 0.78rem; vertical-align: middle; }
 .adm-perms-table th { font-size: 0.68rem; letter-spacing: 0.5px; }
-.adm-perms-table td:first-child { white-space: normal; min-width: 120px; }
+/* User column: allow wrapping, fixed min so name never bleeds into Role column */
+.adm-perms-table td:first-child,
+.adm-perms-table th:first-child { white-space: normal; min-width: 180px; max-width: 220px; }
+/* Role column — fixed narrow width */
+.adm-perms-table td:nth-child(2),
+.adm-perms-table th:nth-child(2) { min-width: 70px; }
+/* Toggle columns — keep uniform */
+.adm-perms-table td:not(:first-child):not(:nth-child(2)) { min-width: 60px; text-align: center; }
 
 .adm-perm-btn {
   display: inline-flex;

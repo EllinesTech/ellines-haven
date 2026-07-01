@@ -2,10 +2,12 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { EditModeProvider } from './context/EditModeContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WelcomePrompt from './components/WelcomePrompt';
 import EllineaAI from './components/EllineaAI';
+import EditToolbar from './components/EditToolbar';
 import './App.css';
 
 const Home        = lazy(() => import('./pages/Home'));
@@ -179,6 +181,7 @@ export default function App() {
   return (
     <AppProvider>
       <LanguageProvider>
+        <EditModeProvider>
         <BrowserRouter>
           <ScrollToTop />
           <SiteControls />
@@ -186,6 +189,7 @@ export default function App() {
           <WhatsAppFloat />
           <WelcomePrompt />
           <EllineaAI />
+          <EditToolbar />
           <MaintenanceGate>
           <SuspensionGate>
             <Suspense fallback={<div style={{ minHeight: '60vh' }} />}>
@@ -219,6 +223,7 @@ export default function App() {
           </SuspensionGate>
           </MaintenanceGate>
         </BrowserRouter>
+        </EditModeProvider>
       </LanguageProvider>
     </AppProvider>
   );

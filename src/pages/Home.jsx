@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import BookCard, { BookStatusBadge } from '../components/BookCard';
 import { useApp } from '../context/AppContext';
+import { useEditMode } from '../context/EditModeContext';
+import EditableField from '../components/EditableField';
 import { GENRES } from '../data/books';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -40,11 +42,24 @@ const HOME_DEFAULTS = {
 
 function useHomeContent() {
   const [c, setC] = useState(HOME_DEFAULTS);
+  const editCtx = useEditMode();
+
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'home_content')).then(snap => {
-      if (snap.exists()) setC(prev => ({ ...prev, ...snap.data() }));
+      const fsData = snap.exists() ? snap.data() : {};
+      const merged = { ...HOME_DEFAULTS, ...fsData };
+      setC(merged);
+      // If edit mode is active for this page, seed the context with current values
+      if (editCtx?.editMode && editCtx?.pageKey === 'home_content') {
+        // Already seeded by enterEdit — don't overwrite
+      }
     }).catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line
+
+  // When in edit mode, live-merge the edit context values on top
+  if (editCtx?.editMode && editCtx?.pageKey === 'home_content') {
+    return { ...c, ...editCtx.pageData };
+  }
   return c;
 }
 
@@ -147,7 +162,19 @@ function BookStack({ books }) {
 
 export default function Home() {
   const { books } = useApp();
+  const editCtx = useEditMode();
   const c = useHomeContent();
+
+  // When edit toolbar triggers edit mode for this page, seed with current values
+  useEffect(() => {
+    if (editCtx?.editMode && editCtx?.pageKey === 'home_content' && Object.keys(editCtx.pageData).length === 0) {
+      // Seed with current content so existing values show up in editor
+      getDoc(doc(db, 'site_data', 'home_content')).then(snap => {
+        const fsData = snap.exists() ? snap.data() : {};
+        editCtx.enterEdit('home_content', { ...HOME_DEFAULTS, ...fsData });
+      }).catch(() => editCtx.enterEdit('home_content', { ...HOME_DEFAULTS }));
+    }
+  }, [editCtx?.editMode, editCtx?.pageKey]); // eslint-disable-line
   // Only show active books on the front page
   const activeBooks = books.filter(b => b.active !== false);
   const featured    = activeBooks.filter(b => b.featured);
@@ -192,7 +219,9 @@ export default function Home() {
         <div className="container hero__inner">
           {/* LEFT — copy */}
           <div className="hero__copy">
-            <span className="badge badge-gold hero__eyebrow">{c.eyebrow}</span>
+            <span className="badge badge-gold hero__eyebrow">
+              <EditableField field="eyebrow">{c.eyebrow}</EditableField>
+            </span>
 
             <h1 className="hero__h1">
               <span className={`hero__tagline${fade ? ' hero__tagline--in' : ' hero__tagline--out'}`}>
@@ -200,19 +229,25 @@ export default function Home() {
               </span>
             </h1>
 
-            <p className="hero__sub">{c.hero_sub}</p>
+            <p className="hero__sub">
+              <EditableField field="hero_sub" multiline>{c.hero_sub}</EditableField>
+            </p>
 
             <div className="hero__btns">
-              <Link to="/library" className="btn btn-primary">{c.hero_btn_primary}</Link>
-              <Link to="/about"   className="btn btn-outline">{c.hero_btn_secondary}</Link>
+              <Link to="/library" className="btn btn-primary">
+                <EditableField field="hero_btn_primary">{c.hero_btn_primary}</EditableField>
+              </Link>
+              <Link to="/about" className="btn btn-outline">
+                <EditableField field="hero_btn_secondary">{c.hero_btn_secondary}</EditableField>
+              </Link>
             </div>
 
             <div className="hero__stats">
-              <div><strong>{c.stat_books}</strong><span>Books</span></div>
+              <div><strong><EditableField field="stat_books">{c.stat_books}</EditableField></strong><span>Books</span></div>
               <div className="hero__stat-bar" />
-              <div><strong>{c.stat_readers}</strong><span>Readers</span></div>
+              <div><strong><EditableField field="stat_readers">{c.stat_readers}</EditableField></strong><span>Readers</span></div>
               <div className="hero__stat-bar" />
-              <div><strong>{c.stat_rating}</strong><span>Rating</span></div>
+              <div><strong><EditableField field="stat_rating">{c.stat_rating}</EditableField></strong><span>Rating</span></div>
             </div>
           </div>
 
@@ -364,8 +399,8 @@ export default function Home() {
         <div className="container">
           <div className="sec-head">
             <div>
-              <h2>Featured <span className="gold-text">Novels & Books</span></h2>
-              <p>{c.featured_sub}</p>
+              <h2><EditableField field="featured_heading">{c.featured_heading}</EditableField></h2>
+              <p><EditableField field="featured_sub">{c.featured_sub}</EditableField></p>
             </div>
             <Link to="/library" className="btn btn-outline btn-sm">View All →</Link>
           </div>
@@ -386,8 +421,8 @@ export default function Home() {
         <div className="container promo-banner__content">
           <div className="promo-banner__copy">
             <span className="badge badge-gold">{c.author_badge}</span>
-            <h2>{c.author_name}</h2>
-            <p>{c.author_bio}</p>
+            <h2><EditableField field="author_name">{c.author_name}</EditableField></h2>
+            <p><EditableField field="author_bio" multiline>{c.author_bio}</EditableField></p>
             <div className="promo-banner__btns">
               <Link to="/founder" className="btn btn-primary">Meet the Author</Link>
               <Link to="/library" className="btn btn-ghost">Explore All Books</Link>
@@ -476,11 +511,15 @@ export default function Home() {
           <div className="cta-box">
             <div className="cta-box__glow" />
             <img src="/logo-icon.png" alt="" className="cta-box__logo" />
-            <h2>{c.cta_heading}</h2>
-            <p>{c.cta_sub}</p>
+            <h2><EditableField field="cta_heading">{c.cta_heading}</EditableField></h2>
+            <p><EditableField field="cta_sub" multiline>{c.cta_sub}</EditableField></p>
             <div className="cta-box__btns">
-              <Link to="/register" className="btn btn-primary">{c.cta_btn_primary}</Link>
-              <Link to="/library"  className="btn btn-ghost">{c.cta_btn_secondary}</Link>
+              <Link to="/register" className="btn btn-primary">
+                <EditableField field="cta_btn_primary">{c.cta_btn_primary}</EditableField>
+              </Link>
+              <Link to="/library" className="btn btn-ghost">
+                <EditableField field="cta_btn_secondary">{c.cta_btn_secondary}</EditableField>
+              </Link>
             </div>
           </div>
         </div>

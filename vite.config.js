@@ -5,21 +5,28 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    strictPort: true,   // fail hard if 5173 is taken — never silently drift to 5174/5175
+    strictPort: true,
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
     chunkSizeWarningLimit: 600,
+    minify: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Firebase — split into auth and the heavier firestore/app chunks
+          // Firebase — split auth away from the heavy SDK
           if (id.includes('firebase/auth') || id.includes('@firebase/auth')) {
             return 'vendor-firebase-auth';
           }
+          if (id.includes('firebase/firestore') || id.includes('@firebase/firestore')) {
+            return 'vendor-firebase-firestore';
+          }
+          if (id.includes('firebase/storage') || id.includes('@firebase/storage')) {
+            return 'vendor-firebase-storage';
+          }
           if (id.includes('firebase') || id.includes('@firebase')) {
-            return 'vendor-firebase';
+            return 'vendor-firebase-core';
           }
           // React ecosystem
           if (id.includes('react-dom') || id.includes('react-router')) {
