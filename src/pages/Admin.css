@@ -126,6 +126,49 @@
   position: relative;
 }
 
+/* ── Messages panel — fills the admin main viewport ── */
+.adm-messages-shell {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 160px);
+  overflow: hidden;
+}
+.adm-messages-grid {
+  display: grid;
+  gap: 14px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+.adm-messages-grid--split { grid-template-columns: 320px 1fr; }
+.adm-messages-grid--full  { grid-template-columns: 1fr; }
+
+.adm-msg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.adm-msg-thread {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  min-height: 0;
+}
+.adm-msg-thread-body {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
 /* ── Page header ── */
 .adm-page { max-width: 1200px; }
 .adm-page-head {
