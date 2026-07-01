@@ -210,7 +210,13 @@ export function AppProvider({ children }) {
 
   // ── Setters ──────────────────────────────────────────────────────────────────
   const setCart     = v => { setCartState(v);     save('eh_cart', v); };
-  const setSettings = v => { setSettingsState(v); save('eh_settings', v); };
+  const setSettings = v => {
+    setSettingsState(v);
+    save('eh_settings', v);
+    // Also persist to Firestore so settings survive across devices and deployments
+    setDoc(doc(db, 'site_data', 'site_settings'), { ...v, updatedAt: serverTimestamp() }, { merge: true })
+      .catch(e => console.warn('[Settings] Firestore write failed:', e.message));
+  };
 
   const setBooks = (vOrFn) => {
     // Support both direct value and functional updater (like React setState)
@@ -252,6 +258,17 @@ export function AppProvider({ children }) {
   };
 
   const updateSettings = patch => setSettings(prev => ({ ...prev, ...patch }));
+
+  // ── Load settings from Firestore on mount (wins over localStorage) ─────────
+  useEffect(() => {
+    getDoc(doc(db, 'site_data', 'site_settings')).then(snap => {
+      if (!snap.exists()) return;
+      const fsSettings = snap.data();
+      delete fsSettings.updatedAt;
+      setSettingsState(prev => ({ ...prev, ...fsSettings }));
+      save('eh_settings', { ...load('eh_settings', DEFAULT_SETTINGS), ...fsSettings });
+    }).catch(() => {});
+  }, []); // eslint-disable-line
 
   // ── Load books from Firestore on mount ────────────────────────────────────
   useEffect(() => {

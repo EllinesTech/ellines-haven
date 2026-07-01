@@ -1086,11 +1086,73 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
 }
 
 // ── NotificationsPanel ───────────────────────────────────────────────────────
+const REVERT_REASONS = [
+  'Sent by mistake',
+  'Book not yet available',
+  'Wrong user notified',
+  'Notification sent to wrong book',
+  'User requested re-notification',
+  'Technical error',
+  'Other',
+];
+
+function RevertModal({ notif, bookTitle, onConfirm, onClose }) {
+  const [reason, setReason] = useState('');
+  const [custom, setCustom] = useState('');
+  const [busy, setBusy]     = useState(false);
+
+  const handleConfirm = async () => {
+    const finalReason = reason === 'Other' ? custom.trim() : reason;
+    if (!finalReason) { return; }
+    setBusy(true);
+    await onConfirm(notif, finalReason);
+    setBusy(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:'var(--surface,#1a1a2e)', border:'1px solid var(--dim)', borderRadius:'var(--r)', padding:24, width:'100%', maxWidth:420 }}>
+        <h3 style={{ margin:'0 0 4px', fontSize:'1rem' }}>Revert Notification</h3>
+        <p style={{ margin:'0 0 16px', fontSize:'0.8rem', color:'var(--muted)' }}>
+          Revert <strong>{notif.name || notif.email}</strong> for "{bookTitle}" back to <em>pending</em>.
+        </p>
+        <p style={{ margin:'0 0 8px', fontSize:'0.82rem', fontWeight:600 }}>Reason for reverting:</p>
+        <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:12 }}>
+          {REVERT_REASONS.map(r => (
+            <label key={r} style={{ display:'flex', alignItems:'center', gap:8, fontSize:'0.82rem', cursor:'pointer' }}>
+              <input type="radio" name="revert-reason" value={r} checked={reason===r} onChange={() => setReason(r)} />
+              {r}
+            </label>
+          ))}
+        </div>
+        {reason === 'Other' && (
+          <textarea
+            placeholder="Describe the reason…"
+            value={custom}
+            onChange={e => setCustom(e.target.value)}
+            rows={2}
+            style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid var(--dim)', borderRadius:'var(--r-sm)', color:'inherit', padding:'8px 10px', fontSize:'0.82rem', resize:'vertical', boxSizing:'border-box', marginBottom:12 }}
+          />
+        )}
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="btn btn-danger btn-sm" onClick={handleConfirm} disabled={busy || !reason || (reason==='Other' && !custom.trim())}>
+            {busy ? '⏳ Reverting…' : '↩ Revert'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificationsPanel({ books, showToast, saveBook, addLog }) {
-  const [notifs, setNotifs]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState({});
-  const [fetchErr, setFetchErr] = useState('');
+  const [notifs, setNotifs]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [sending, setSending]     = useState({});
+  const [fetchErr, setFetchErr]   = useState('');
+  const [revertTarget, setRevertTarget] = useState(null); // { notif, bookTitle }
 
   useEffect(() => {
     setFetchErr('');
@@ -1150,6 +1212,26 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
       showToast('❌ Error: ' + e.message);
     }
     setSending(s => ({ ...s, [bookId]: false }));
+  };
+
+  const revertNotification = async (notif, reason) => {
+    try {
+      await setDoc(doc(db, 'contact_messages', notif.id), {
+        notified: false,
+        notifiedAt: null,
+        status: 'pending',
+        revertedAt: serverTimestamp(),
+        revertReason: reason,
+      }, { merge: true });
+      // Best-effort revert in notifications collection too
+      const notifKey = `notify_${notif.bookId}_${(notif.email||'').replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
+      setDoc(doc(db, 'notifications', notifKey), { notified: false, notifiedAt: null, revertedAt: serverTimestamp(), revertReason: reason }, { merge: true }).catch(() => {});
+      setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, notified: false, status: 'pending' } : n));
+      addLog('system', `Notification reverted for "${notif.name || notif.email}" on "${notif.bookTitle || 'book'}" — Reason: ${reason}`);
+      showToast(`↩ Reverted notification for ${notif.name || notif.email}`);
+    } catch (e) {
+      showToast('❌ Revert failed: ' + e.message);
+    }
   };
 
   return (
@@ -1220,6 +1302,15 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
                       <span style={{ fontSize:'0.7rem', padding:'2px 8px', borderRadius:10, background: n.notified?'rgba(46,204,113,0.1)':'rgba(201,168,76,0.1)', color: n.notified?'var(--ok)':'var(--gold)', border: n.notified?'1px solid rgba(46,204,113,0.3)':'1px solid rgba(201,168,76,0.3)' }}>
                         {n.notified ? '✓ Notified' : '⏳ Pending'}
                       </span>
+                      {/* Revert button — only shown when already notified */}
+                      {n.notified && (
+                        <button
+                          onClick={() => setRevertTarget({ notif: n, bookTitle: group.title })}
+                          title="Revert notification status back to pending"
+                          style={{ fontSize:'0.7rem', padding:'3px 8px', borderRadius:'var(--r-sm)', background:'rgba(231,76,60,0.08)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)', cursor:'pointer', flexShrink:0 }}>
+                          ↩ Revert
+                        </button>
+                      )}
                       {/* Quick WhatsApp link per user */}
                       <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + (n.name||'there') + ', "' + group.title + '" is now available! 📖 https://ellines-haven.vercel.app/book/' + bookId)}`}
                         target="_blank" rel="noopener noreferrer"
@@ -1233,6 +1324,16 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
             );
           })}
         </div>
+      )}
+
+      {/* Revert modal */}
+      {revertTarget && (
+        <RevertModal
+          notif={revertTarget.notif}
+          bookTitle={revertTarget.bookTitle}
+          onConfirm={revertNotification}
+          onClose={() => setRevertTarget(null)}
+        />
       )}
     </div>
   );
@@ -1641,6 +1742,23 @@ export default function Admin() {
     showToast('Order rejected');
   };
 
+  // Archive an order — moves it to Firestore archives collection
+  const handleArchiveOrder = async (orderId) => {
+    try {
+      const order = allOrders.find(o => o.id === orderId);
+      if (!order) return;
+      await setDoc(doc(db, 'archives', orderId), {
+        ...order,
+        type: 'order',
+        archivedAt: serverTimestamp(),
+        archivedBy: user?.email,
+      });
+      await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
+      setLiveOrders(prev => prev.filter(o => o.id !== orderId));
+      showToast('📦 Order archived');
+    } catch (e) { showToast('❌ Archive failed: ' + e.message); }
+  };
+
   // Delete user  persists across refresh via eh_deleted_users blocklist + Firestore
   const handleDeleteUser = async (u) => {
     const emailKey = u.email.toLowerCase();
@@ -1728,6 +1846,7 @@ export default function Admin() {
     { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
+    /* ── Power tools — visible to both admin & superadmin ── */
     /* ── Power tools — visible to both admin & superadmin ── */
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
     { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
@@ -2266,6 +2385,11 @@ export default function Admin() {
                               </button>
                             </>
                           )}
+                          <button className="adm-act-btn" style={{ fontSize:'0.68rem', opacity:0.6 }}
+                            onClick={() => handleArchiveOrder(o.id)}
+                            title="Archive this order">
+                            📦
+                          </button>
                         </td>
                       </tr>
                     );
