@@ -2582,26 +2582,43 @@ export default function Admin() {
                     <button className="btn btn-primary btn-sm" onClick={async () => {
                       if (!newPw.trim()) return;
                       const email = resetPwUser.email.toLowerCase();
-                      // 1. Save to localStorage overrides (legacy / same-device login)
+                      const pw = newPw.trim();
+
+                      // 1. Save to localStorage overrides (same-device fallback)
                       const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-                      overrides[email] = newPw;
+                      overrides[email] = pw;
                       localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
-                      // 2. Write directly to Firestore users/{id} — this is what Login checks first
+
+                      // 2. Find the REAL Firestore user doc by email query — never guess by ID
                       try {
-                        const userId = resetPwUser.id || email.replace(/[^a-z0-9]/g,'_');
-                        await setDoc(doc(db, 'users', userId), {
-                          passwordHash: newPw, updatedAt: serverTimestamp(),
-                        }, { merge: true });
-                      } catch {}
-                      // 3. Sync pwOverrides into registered_users with merge:true (never overwrite all users)
+                        const q = query(collection(db, 'users'), where('email', '==', email));
+                        const snap = await getDocs(q);
+                        if (!snap.empty) {
+                          await setDoc(doc(db, 'users', snap.docs[0].id), {
+                            passwordHash: pw, updatedAt: serverTimestamp(),
+                          }, { merge: true });
+                        } else {
+                          // Not in /users yet — create it so login can find them
+                          const uid = (resetPwUser.id && resetPwUser.id !== 'admin01')
+                            ? resetPwUser.id : ('u_' + Date.now());
+                          await setDoc(doc(db, 'users', uid), {
+                            id: uid, name: resetPwUser.name || '', email,
+                            role: resetPwUser.role || 'user',
+                            passwordHash: pw, createdAt: serverTimestamp(), status: 'active',
+                          });
+                        }
+                      } catch (e) { console.warn('[PW reset]', e.message); }
+
+                      // 3. Sync pwOverrides into registered_users so all devices pick it up
                       try {
                         await setDoc(doc(db, 'site_data', 'registered_users'), {
                           pwOverrides: overrides, updatedAt: serverTimestamp(),
                         }, { merge: true });
                       } catch {}
-                      setUsers(prev => prev.map(u => u.id === resetPwUser.id ? { ...u, password: newPw } : u));
+
+                      setUsers(prev => prev.map(u => u.id === resetPwUser.id ? { ...u, password: pw } : u));
                       addLog('user', 'Password reset for ' + email);
-                      showToast('✅ Password updated for ' + resetPwUser.name + ' — new password: ' + newPw);
+                      showToast('✅ Password updated for ' + resetPwUser.name);
                       setResetPwUser(null); setNewPw('');
                     }}>Set Password</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => { setResetPwUser(null); setNewPw(''); }}>Cancel</button>
