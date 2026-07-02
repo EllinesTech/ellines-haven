@@ -2,6 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import BookCard from '../components/BookCard';
 import { useApp } from '../context/AppContext';
+import { useEditMode } from '../context/EditModeContext';
+import EditableField from '../components/EditableField';
 import { GENRES } from '../data/books';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -56,7 +58,11 @@ const GENRE_ICONS = {
 
 export default function Library() {
   const { books: allBooks, myPerms } = useApp();
+  const editCtx = useEditMode();
   const lc = useLibContent();
+  // Merge edit context on top when editing
+  const cv = (editCtx?.editMode && editCtx?.pageKey === 'library_content')
+    ? { ...lc, ...editCtx.pageData } : lc;
   const [params, setParams] = useSearchParams();
   const [search, setSearch]     = useState('');
   const [sort, setSort]         = useState('newest');
@@ -124,9 +130,11 @@ export default function Library() {
         <div className="lib-hero__glow lib-hero__glow--b" />
         <div className="container lib-hero__inner">
           <div className="lib-hero__copy">
-            <span className="badge badge-gold">{lc.hero_badge}</span>
+            <span className="badge badge-gold">
+              <EditableField field="hero_badge">{cv.hero_badge}</EditableField>
+            </span>
             <h1>The <span className="gold-text">Library</span></h1>
-            <p>Every novel &amp; short story by <strong>Elijah Mwangi M</strong> — {lc.hero_sub.replace(/^Every novel.*?— ?/,'')}</p>
+            <p>Every novel &amp; short story by <strong>Elijah Mwangi M</strong> — <EditableField field="hero_sub" multiline>{cv.hero_sub.replace(/^Every novel.*?— ?/,'')}</EditableField></p>
           </div>
           {/* Big search bar in hero */}
           <div className="lib-hero__search">
@@ -134,7 +142,7 @@ export default function Library() {
             <input
               ref={searchRef}
               className="lib-hero__search-input"
-              placeholder={lc.search_placeholder}
+              placeholder={cv.search_placeholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -256,8 +264,8 @@ export default function Library() {
           {books.length === 0 ? (
             <div className="lib-empty">
               <div className="lib-empty__icon">📭</div>
-              <h3>{lc.empty_heading}</h3>
-              <p>{lc.empty_sub}</p>
+              <h3><EditableField field="empty_heading">{cv.empty_heading}</EditableField></h3>
+              <p><EditableField field="empty_sub">{cv.empty_sub}</EditableField></p>
               <button className="btn btn-outline" onClick={clear}>Clear Filters</button>
             </div>
           ) : (

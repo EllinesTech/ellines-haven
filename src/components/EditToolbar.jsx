@@ -1,6 +1,8 @@
 import { useEditMode } from '../context/EditModeContext';
 import { useApp } from '../context/AppContext';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 /* Map routes to Firestore doc keys */
 const ROUTE_TO_KEY = {
@@ -29,119 +31,119 @@ export default function EditToolbar() {
   const { user } = useApp();
   const ctx = useEditMode();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   if (!isAdmin) return null;
-
-  // Don't show on admin panel itself
-  if (pathname.startsWith('/admin')) return null;
+  if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return null;
 
   const pageKey = ROUTE_TO_KEY[pathname];
-  const { editMode, dirty, saving, toast, enterEdit, exitEdit, saveAll, pageData } = ctx;
+  const { editMode, dirty, saving, toast, enterEdit, exitEdit, saveAll } = ctx;
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!pageKey) return;
-    enterEdit(pageKey, {}); // pages load their own data from Firestore
-  };
-
-  const handleSave = async () => {
-    await saveAll();
+    // Load current Firestore values so the editor starts with real content
+    let fsData = {};
+    try {
+      const snap = await getDoc(doc(db, 'site_data', pageKey));
+      if (snap.exists()) fsData = snap.data();
+    } catch { /* use empty — page defaults will fill in */ }
+    enterEdit(pageKey, fsData);
   };
 
   const handleExit = () => {
-    if (dirty && !window.confirm('You have unsaved changes. Exit anyway?')) return;
+    if (dirty && !window.confirm('You have unsaved changes. Exit edit mode?')) return;
     exitEdit();
+  };
+
+  const toolbarStyle = {
+    position: 'fixed', bottom: 88, left: '50%', transform: 'translateX(-50%)',
+    zIndex: 9990, display: 'flex', alignItems: 'center', gap: 6,
+    background: editMode ? 'rgba(8,8,18,0.98)' : 'rgba(8,8,18,0.9)',
+    border: `1px solid ${editMode ? 'rgba(201,168,76,0.55)' : 'rgba(255,255,255,0.1)'}`,
+    borderRadius: 50, padding: '6px 12px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+    backdropFilter: 'blur(14px)',
+    transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
+    maxWidth: 'calc(100vw - 32px)',
   };
 
   return (
     <>
-      {/* Toast */}
+      {/* Toast notification */}
       {toast && (
         <div style={{
           position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
-          background: toast.startsWith('✅') ? 'rgba(46,204,113,0.95)' : 'rgba(231,76,60,0.95)',
+          background: toast.startsWith('✅') ? '#1a7a3a' : '#8b1a1a',
           color: '#fff', padding: '10px 24px', borderRadius: 8,
           fontWeight: 600, fontSize: '0.88rem', zIndex: 99999,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.4)', pointerEvents: 'none',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)', pointerEvents: 'none',
+          letterSpacing: 0.2,
         }}>
           {toast}
         </div>
       )}
 
-      {/* Toolbar */}
-      <div style={{
-        position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-        zIndex: 9990, display: 'flex', alignItems: 'center', gap: 8,
-        background: editMode ? 'rgba(10,10,20,0.97)' : 'rgba(10,10,20,0.92)',
-        border: editMode ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 50, padding: '7px 14px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(12px)',
-        transition: 'all 0.2s',
-        whiteSpace: 'nowrap',
-      }}>
+      {/* Edit mode banner at top */}
+      {editMode && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9989,
+          background: 'rgba(201,168,76,0.12)', borderBottom: '2px solid rgba(201,168,76,0.5)',
+          padding: '7px 16px', textAlign: 'center', pointerEvents: 'none',
+          fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold, #c9a84c)',
+          backdropFilter: 'blur(6px)', letterSpacing: 0.5,
+        }}>
+          ✏️ EDIT MODE — Click any highlighted text to edit · Save when done
+        </div>
+      )}
+
+      {/* Floating toolbar */}
+      <div style={toolbarStyle}>
         {!editMode ? (
           <>
             {pageKey ? (
-              <button onClick={handleEdit} style={btnStyle('var(--gold, #c9a84c)', '#000')}>
+              <button onClick={handleEdit} style={btn('var(--gold,#c9a84c)', '#000')}>
                 ✏️ Edit {ROUTE_LABELS[pathname] || 'Page'}
               </button>
             ) : (
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem', padding: '0 8px' }}>
-                No editable content on this page
+              <span style={{ color:'rgba(255,255,255,0.35)', fontSize:'0.75rem', padding:'0 6px' }}>
+                No editable content here
               </span>
             )}
-            <a href="/admin" style={btnStyle('rgba(255,255,255,0.08)', 'rgba(255,255,255,0.7)', true)}>
+            <a href="/admin" style={btn('rgba(255,255,255,0.07)', 'rgba(255,255,255,0.6)')}>
               ⚙️ Admin
             </a>
           </>
         ) : (
           <>
-            <span style={{ color: 'rgba(201,168,76,0.8)', fontSize: '0.74rem', fontWeight: 600, paddingLeft: 4 }}>
-              ✏️ EDITING — click any highlighted text
+            <span style={{ color:'rgba(201,168,76,0.85)', fontSize:'0.72rem', fontWeight:700, paddingLeft:4 }}>
+              ✏️ {ROUTE_LABELS[pathname]}
             </span>
             {dirty && (
-              <span style={{ background: 'rgba(231,76,60,0.2)', color: '#e74c3c', fontSize: '0.7rem', padding: '2px 8px', borderRadius: 10, border: '1px solid rgba(231,76,60,0.3)' }}>
+              <span style={{ background:'rgba(231,76,60,0.18)', color:'#e06c5a', fontSize:'0.68rem', padding:'2px 8px', borderRadius:10, border:'1px solid rgba(231,76,60,0.3)', flexShrink:0 }}>
                 Unsaved
               </span>
             )}
-            <button onClick={handleSave} disabled={saving || !dirty}
-              style={btnStyle(dirty ? 'var(--gold, #c9a84c)' : 'rgba(255,255,255,0.1)', dirty ? '#000' : 'rgba(255,255,255,0.3)')}>
+            <button onClick={saveAll} disabled={saving || !dirty}
+              style={btn(dirty ? 'var(--gold,#c9a84c)' : 'rgba(255,255,255,0.08)', dirty ? '#000' : 'rgba(255,255,255,0.25)')}>
               {saving ? '⏳ Saving…' : '💾 Save & Publish'}
             </button>
-            <button onClick={handleExit} style={btnStyle('rgba(231,76,60,0.15)', '#e74c3c')}>
-              ✕ Exit Edit
+            <button onClick={handleExit} style={btn('rgba(231,76,60,0.12)', '#e06c5a')}>
+              ✕ Exit
             </button>
           </>
         )}
       </div>
-
-      {/* Edit mode dim overlay hint */}
-      {editMode && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          background: 'rgba(201,168,76,0.04)',
-          borderBottom: '3px solid rgba(201,168,76,0.4)',
-          zIndex: 9989, pointerEvents: 'none',
-          padding: '6px 16px', textAlign: 'center',
-          fontSize: '0.75rem', fontWeight: 600,
-          color: 'var(--gold, #c9a84c)',
-          backdropFilter: 'blur(4px)',
-        }}>
-          EDIT MODE — Click any dashed text to edit it. Save when done.
-        </div>
-      )}
     </>
   );
 }
 
-function btnStyle(bg, color, isLink = false) {
+function btn(bg, color) {
   return {
     background: bg, color, border: 'none', borderRadius: 50,
-    padding: '6px 16px', cursor: 'pointer', fontWeight: 600,
-    fontSize: '0.78rem', fontFamily: 'inherit', textDecoration: 'none',
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-    transition: 'opacity 0.15s', opacity: 1,
+    padding: '6px 15px', cursor: 'pointer', fontWeight: 600,
+    fontSize: '0.77rem', fontFamily: 'inherit', textDecoration: 'none',
+    display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+    transition: 'opacity 0.15s',
   };
 }

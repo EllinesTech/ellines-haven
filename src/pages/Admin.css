@@ -6,6 +6,30 @@
   background: var(--bg);
 }
 
+/* ── Sidebar collapse toggle ── */
+.adm-sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  left: 208px;
+  transform: translateY(-50%);
+  z-index: 200;
+  width: 20px;
+  height: 40px;
+  border-radius: 0 8px 8px 0;
+  background: var(--gold);
+  color: #000;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.25s;
+  box-shadow: 3px 0 10px rgba(0,0,0,0.3);
+}
+.adm--collapsed .adm-sidebar-toggle { left: 48px; }
+
 /* ── Sidebar ── */
 .adm-sidebar {
   width: 220px;
@@ -18,7 +42,20 @@
   top: 0; bottom: 0; left: 0;
   z-index: 100;
   overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.25s;
 }
+.adm--collapsed .adm-sidebar { width: 60px; }
+.adm--collapsed .adm-sidebar-logo-text,
+.adm--collapsed .adm-super-tag,
+.adm--collapsed .adm-nav-section,
+.adm--collapsed .adm-nav-divider,
+.adm--collapsed .adm-admin-info > div { display: none; }
+.adm--collapsed .adm-nav-btn { padding: 12px 0; justify-content: center; gap: 0; }
+.adm--collapsed .adm-nav-icon-emoji { font-size: 1.3rem; width: auto; }
+.adm--collapsed .adm-sidebar-logo { padding: 14px; justify-content: center; }
+.adm--collapsed .adm-sidebar-logo-img { width: 32px; height: 32px; }
+.adm--collapsed .adm-sidebar-footer { padding: 12px 8px; align-items: center; }
 
 .adm-sidebar-logo {
   display: flex;
@@ -33,6 +70,7 @@
   flex-shrink: 0;
   filter: drop-shadow(0 2px 6px rgba(201,168,76,0.3));
 }
+.adm-sidebar-logo-text { display: flex; flex-direction: column; }
 .adm-sidebar-brand {
   font-family: 'Playfair Display', serif;
   font-size: 1rem;
@@ -71,6 +109,8 @@
   cursor: pointer;
   transition: all 0.2s;
   width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
 }
 .adm-nav-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
 .adm-nav-btn.active {
@@ -89,11 +129,7 @@
   flex-direction: column;
   gap: 12px;
 }
-.adm-admin-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+.adm-admin-info { display: flex; align-items: center; gap: 10px; }
 .adm-admin-avatar {
   width: 34px; height: 34px;
   border-radius: 50%;
@@ -108,84 +144,136 @@
 }
 .adm-admin-info strong { display: block; font-size: 0.85rem; color: var(--text); }
 .adm-admin-info span  { font-size: 0.72rem; color: var(--muted); }
-.adm-back-btn {
-  font-size: 0.82rem;
-  color: var(--muted);
-  transition: color 0.2s;
-  padding: 6px 2px;
-}
+.adm-back-btn { font-size: 0.82rem; color: var(--muted); transition: color 0.2s; padding: 6px 2px; }
 .adm-back-btn:hover { color: var(--gold); }
 
-/* ── Main area ── */
+/* ── Main content area ── */
 .adm-main {
   margin-left: 220px;
   flex: 1;
   height: 100vh;
-  overflow-y: auto;
-  padding: 28px 32px;
-  position: relative;
-}
-
-/* ── Messages panel — WhatsApp-style full viewport ── */
-.adm-messages-shell {
   display: flex;
   flex-direction: column;
-  position: fixed;
-  top: 0;
-  left: 220px;
-  right: 0;
-  bottom: 0;
   overflow: hidden;
-  background: var(--bg);
-  padding: 20px 28px 0;
-  z-index: 1;
+  transition: margin-left 0.25s;
 }
-.adm-messages-grid {
-  display: grid;
-  gap: 16px;
+.adm--collapsed .adm-main { margin-left: 60px; }
+
+/* Scrollable area for normal pages */
+.adm-main-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+}
+
+/* Messages tab — no padding, full height chat */
+.adm-main-messages {
   flex: 1;
   overflow: hidden;
-  min-height: 0;
-  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
 }
-.adm-messages-grid--split { grid-template-columns: 340px 1fr; }
+
+/* ─────────────────────────────────────────────────────────
+   Messages Panel — WhatsApp layout
+   Shell is split: left list | right thread
+───────────────────────────────────────────────────────── */
+.adm-messages-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.adm-messages-topbar {
+  padding: 14px 24px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+}
+.adm-messages-filters {
+  padding: 8px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: rgba(0,0,0,0.1);
+}
+.adm-messages-grid {
+  flex: 1;
+  display: grid;
+  overflow: hidden;
+  min-height: 0;
+}
+.adm-messages-grid--split { grid-template-columns: 300px 1fr; }
 .adm-messages-grid--full  { grid-template-columns: 1fr; }
 
+/* Conversation list */
 .adm-msg-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   overflow-y: auto;
-  padding-right: 4px;
-  padding-bottom: 8px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
 }
-.adm-msg-list::-webkit-scrollbar { width: 4px; }
-.adm-msg-list::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 2px; }
+.adm-msg-list::-webkit-scrollbar { width: 3px; }
+.adm-msg-list::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); }
 
-/* WhatsApp-style thread — fills all remaining height */
+/* Thread pane */
 .adm-msg-thread {
   display: flex;
   flex-direction: column;
-  background: var(--card);
-  border: 1px solid rgba(201,168,76,0.2);
-  border-radius: 12px;
   overflow: hidden;
   min-height: 0;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-/* This is the key: messages area takes ALL leftover space */
+.adm-msg-thread-topbar {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adm-msg-thread-actions {
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: rgba(0,0,0,0.08);
+}
+
+/* THE CHAT AREA — fills everything between topbar and reply box */
 .adm-msg-thread-body {
   flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  min-height: 0;
+  gap: 16px;
 }
 .adm-msg-thread-body::-webkit-scrollbar { width: 4px; }
 .adm-msg-thread-body::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 2px; }
+
+/* Reply box — pinned to bottom */
+.adm-msg-thread-reply {
+  flex-shrink: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
 
 /* ── Page header ── */
 .adm-page { max-width: 1200px; }

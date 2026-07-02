@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useEditMode } from '../context/EditModeContext';
+import EditableField from '../components/EditableField';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import './Auth.css';
@@ -199,12 +201,16 @@ export default function Login() {
   const [busy,      setBusy]      = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [lc,        setLc]        = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
+  const editCtx = useEditMode();
 
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'login_content')).then(snap => {
       if (snap.exists()) setLc(prev => ({ ...prev, ...snap.data() }));
     }).catch(() => {});
   }, []);
+
+  const cv = (editCtx?.editMode && editCtx?.pageKey === 'login_content')
+    ? { ...lc, ...editCtx.pageData } : lc;
 
   const submit = async e => {
     e.preventDefault();

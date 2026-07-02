@@ -244,8 +244,6 @@ export default function MessagesPanel({ showToast, users = [] }) {
 
   return (
     <div className="adm-messages-shell">
-
-      {/* ── Compose modal ── */}
       {composeOpen && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
           <div className="card" style={{ width:'100%', maxWidth:560, padding:28, display:'flex', flexDirection:'column', gap:16, boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }}>
@@ -296,10 +294,10 @@ export default function MessagesPanel({ showToast, users = [] }) {
       )}
 
       {/* ── Page header ── */}
-      <div className="adm-page-head" style={{ flexShrink:0, marginBottom:12 }}>
+      <div className="adm-messages-topbar">
         <div>
-          <h1>Messages &amp; Notifications</h1>
-          <span className="adm-page-sub">{messages.length} total · {newCount > 0 ? <strong style={{ color:'#e8832a' }}>{newCount} new</strong> : 'all read'}</span>
+          <h1 style={{ fontSize:'1.5rem', margin:0, marginBottom:3 }}>Messages &amp; Notifications</h1>
+          <span style={{ fontSize:'0.85rem', color:'var(--muted)' }}>{messages.length} total · {newCount > 0 ? <strong style={{ color:'#e8832a' }}>{newCount} new</strong> : 'all read'}</span>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <button className="btn btn-primary" onClick={() => { setComposeOpen(true); setCompErr(''); setToSearch(''); setToEmail(''); setCompSubject(''); setCompBody(''); }}>
@@ -309,25 +307,21 @@ export default function MessagesPanel({ showToast, users = [] }) {
         </div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display:'flex', gap:6, marginBottom:8, flexShrink:0 }}>
+      {/* ── Tabs + Filters ── */}
+      <div className="adm-messages-filters">
         {[['messages','💬 Messages',regular.length],['notifications','🔔 Notifications',notifs.length]].map(([k,label,count]) => (
           <button key={k} className={'adm-filter-btn'+(tab===k?' active':'')} onClick={() => setTab(k)}>
-            {label} <span style={{ marginLeft:4, background:'rgba(255,255,255,0.12)', borderRadius:10, padding:'1px 6px', fontSize:'0.72rem' }}>{count}</span>
+            {label} <span style={{ marginLeft:4, background:'rgba(255,255,255,0.12)', borderRadius:10, padding:'1px 6px', fontSize:'0.7rem' }}>{count}</span>
           </button>
         ))}
-      </div>
-
-      {/* ── Status filters ── */}
-      <div style={{ display:'flex', gap:5, marginBottom:10, flexWrap:'wrap', flexShrink:0 }}>
+        <span style={{ width:1, background:'rgba(255,255,255,0.1)', margin:'0 6px' }}/>
         {['all','new','read','replied','spam'].map(f => (
           <button key={f} className={'adm-filter-btn'+(filter===f?' active':'')} onClick={() => setFilter(f)}
-            style={{ textTransform:'capitalize', fontSize:'0.8rem' }}>
-            {f}{counts[f] > 0 && <span style={{ marginLeft:5, background:'rgba(255,255,255,0.12)', borderRadius:10, padding:'1px 5px', fontSize:'0.68rem' }}>{counts[f]}</span>}
+            style={{ textTransform:'capitalize', fontSize:'0.78rem' }}>
+            {f}{counts[f]>0&&<span style={{ marginLeft:4, background:'rgba(255,255,255,0.1)', borderRadius:10, padding:'0 5px', fontSize:'0.66rem' }}>{counts[f]}</span>}
           </button>
         ))}
       </div>
-
       {/* ── Main grid: list + thread ── */}
       <div className={`adm-messages-grid ${selected ? 'adm-messages-grid--split' : 'adm-messages-grid--full'}`}>
 
@@ -382,12 +376,12 @@ export default function MessagesPanel({ showToast, users = [] }) {
           <div className="adm-msg-thread">
 
             {/* Header */}
-            <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexShrink:0, background:'rgba(255,255,255,0.01)' }}>
+            <div className="adm-msg-thread-topbar">
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                <div style={{ fontWeight:700, fontSize:'1.05rem', marginBottom:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {selected.subject||'No subject'}
                 </div>
-                <div style={{ fontSize:'0.84rem', color:'var(--muted)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                <div style={{ fontSize:'0.82rem', color:'var(--muted)', display:'flex', alignItems:'center', gap:6 }}>
                   {selected.fromAdmin
                     ? <><span>To:</span><strong style={{ color:'var(--text)' }}>{selected.name}</strong><span style={{ color:'#4a9eff' }}>{selected.email}</span></>
                     : <><span>From:</span><strong style={{ color:'var(--text)' }}>{selected.name}</strong>
@@ -396,14 +390,14 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   }
                 </div>
               </div>
-              <div style={{ display:'flex', gap:6, flexShrink:0, marginLeft:12 }}>
-                <button className="adm-act-btn adm-act-del" onClick={() => deleteMsg(selected.id)} title="Delete">🗑</button>
+              <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                <button className="adm-act-btn adm-act-del" onClick={() => deleteMsg(selected.id)}>🗑</button>
                 <button className="adm-close-btn" onClick={() => setSelected(null)}>✕</button>
               </div>
             </div>
 
             {/* Action bar */}
-            <div style={{ padding:'8px 16px', borderBottom:'1px solid rgba(255,255,255,0.04)', display:'flex', gap:6, alignItems:'center', flexShrink:0, background:'rgba(0,0,0,0.1)' }}>
+            <div className="adm-msg-thread-actions">
               {['new','read','replied','spam'].map(s => (
                 <button key={s} className={'adm-filter-btn'+(selected.status===s?' active':'')}
                   style={{ fontSize:'0.74rem', padding:'4px 10px', textTransform:'capitalize' }}
@@ -418,15 +412,15 @@ export default function MessagesPanel({ showToast, users = [] }) {
               )}
             </div>
 
-            {/* Messages area — the key fix: explicit flex:1 with min-height:0 */}
+            {/* THE CHAT BODY — fills all remaining space */}
             <div className="adm-msg-thread-body">
               {/* Show original message if no thread yet */}
               {thread.length === 0 && selected.message && (
-                <div style={{ display:'flex', gap:10, alignItems:'flex-end', alignSelf:'flex-start', maxWidth:'80%' }}>
-                  <div style={{ width:34, height:34, borderRadius:'50%', background:'rgba(74,158,255,0.15)', color:'#4a9eff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', flexShrink:0, alignSelf:'flex-end' }}>👤</div>
+                <div style={{ display:'flex', gap:10, alignSelf:'flex-start', maxWidth:'80%' }}>
+                  <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(74,158,255,0.15)', color:'#4a9eff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', flexShrink:0, alignSelf:'flex-end' }}>👤</div>
                   <div>
-                    <div style={{ fontSize:'0.72rem', color:'var(--muted)', marginBottom:5 }}>{selected.name} · {fmtDate(selected.createdAt)}</div>
-                    <div style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--border)', borderRadius:'4px 16px 16px 16px', padding:'14px 18px', fontSize:'1rem', lineHeight:1.75, whiteSpace:'pre-wrap', wordBreak:'break-word', color:'var(--text)' }}>
+                    <div style={{ fontSize:'0.74rem', color:'var(--muted)', marginBottom:6 }}>{selected.name} · {fmtDate(selected.createdAt)}</div>
+                    <div style={{ background:'rgba(74,158,255,0.09)', border:'1px solid rgba(74,158,255,0.2)', borderRadius:'4px 16px 16px 16px', padding:'14px 18px', fontSize:'1rem', lineHeight:1.75, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
                       {selected.message}
                     </div>
                   </div>
@@ -436,21 +430,20 @@ export default function MessagesPanel({ showToast, users = [] }) {
               {thread.map(t => {
                 const isAdmin = t.sender === 'admin';
                 return (
-                  <div key={t.id} style={{ display:'flex', gap:10, alignItems:'flex-end', alignSelf:isAdmin?'flex-end':'flex-start', maxWidth:'80%', flexDirection:isAdmin?'row-reverse':'row' }}>
-                    <div style={{ width:34, height:34, borderRadius:'50%', background:isAdmin?'rgba(201,168,76,0.15)':'rgba(74,158,255,0.15)', color:isAdmin?'var(--gold)':'#4a9eff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:isAdmin?'0.88rem':'1.1rem', fontWeight:700, flexShrink:0, alignSelf:'flex-end' }}>
+                  <div key={t.id} style={{ display:'flex', gap:10, alignSelf:isAdmin?'flex-end':'flex-start', maxWidth:'80%', flexDirection:isAdmin?'row-reverse':'row' }}>
+                    <div style={{ width:36, height:36, borderRadius:'50%', background:isAdmin?'rgba(201,168,76,0.18)':'rgba(74,158,255,0.15)', color:isAdmin?'var(--gold)':'#4a9eff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:isAdmin?'0.9rem':'1.1rem', fontWeight:700, flexShrink:0, alignSelf:'flex-end' }}>
                       {isAdmin ? (t.senderName||'A')[0].toUpperCase() : '👤'}
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:isAdmin?'flex-end':'flex-start' }}>
-                      <div style={{ fontSize:'0.72rem', color:'var(--muted)', padding:'0 4px' }}>
-                        {isAdmin ? '🛡️ You (Admin)' : t.senderName} · {fmtDate(t.createdAt)}
+                      <div style={{ fontSize:'0.73rem', color:'var(--muted)', padding:'0 4px' }}>
+                        {isAdmin ? '🛡️ Admin' : t.senderName} · {fmtDate(t.createdAt)}
                       </div>
                       <div style={{
                         background: isAdmin ? 'rgba(201,168,76,0.14)' : 'rgba(74,158,255,0.09)',
                         border: isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
                         borderRadius: isAdmin ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
                         padding:'14px 18px', fontSize:'1rem', lineHeight:1.75,
-                        whiteSpace:'pre-wrap', wordBreak:'break-word', color:'var(--text)',
-                        maxWidth:'100%',
+                        whiteSpace:'pre-wrap', wordBreak:'break-word',
                       }}>
                         {t.text}
                       </div>
@@ -462,22 +455,17 @@ export default function MessagesPanel({ showToast, users = [] }) {
             </div>
 
             {/* Reply box */}
-            <div style={{ padding:'16px 18px', borderTop:'1px solid var(--border)', flexShrink:0, background:'rgba(0,0,0,0.15)' }}>
-              {sendErr && (
-                <div style={{ fontSize:'0.84rem', color:'#e74c3c', background:'rgba(231,76,60,0.08)', padding:'8px 14px', borderRadius:'var(--r-sm)', border:'1px solid rgba(231,76,60,0.25)', marginBottom:10 }}>
-                  ⚠️ {sendErr}
-                </div>
-              )}
+            <div className="adm-msg-thread-reply">
+              {sendErr && <div style={{ fontSize:'0.84rem', color:'#e74c3c', background:'rgba(231,76,60,0.08)', padding:'8px 14px', borderRadius:'var(--r-sm)', border:'1px solid rgba(231,76,60,0.25)', marginBottom:10 }}>⚠️ {sendErr}</div>}
               <textarea className="field" rows={3} value={replyDraft}
                 onChange={e => setReplyDraft(e.target.value)}
                 onKeyDown={e => { if (e.key==='Enter' && (e.ctrlKey||e.metaKey)) sendReply(); }}
                 placeholder="Type your reply… (Ctrl+Enter to send)"
-                style={{ resize:'none', width:'100%', marginBottom:10, fontSize:'0.97rem', lineHeight:1.65, background:'rgba(255,255,255,0.03)' }} />
+                style={{ resize:'none', width:'100%', marginBottom:10, fontSize:'0.97rem', lineHeight:1.6 }} />
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center' }}>
                 <span style={{ fontSize:'0.72rem', color:'var(--muted)', marginRight:'auto' }}>Ctrl+Enter to send</span>
                 <button className="btn btn-ghost btn-sm" onClick={() => setReplyDraft('')}>Clear</button>
-                <button className="btn btn-primary" onClick={sendReply} disabled={sending || !replyDraft.trim()}
-                  style={{ minWidth:120 }}>
+                <button className="btn btn-primary" onClick={sendReply} disabled={sending || !replyDraft.trim()} style={{ minWidth:120 }}>
                   {sending ? '⏳ Sending…' : '↩ Send Reply'}
                 </button>
               </div>
@@ -488,3 +476,4 @@ export default function MessagesPanel({ showToast, users = [] }) {
     </div>
   );
 }
+

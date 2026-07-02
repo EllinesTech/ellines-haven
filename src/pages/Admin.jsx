@@ -1954,7 +1954,16 @@ export default function Admin() {
         {editing !== null && <BookForm initial={editing} onSave={handleSaveBook} onCancel={() => setEditing(null)} />}
         {deleting && <Confirm msg="Delete this book? This cannot be undone." onYes={() => handleDeleteBook(deleting)} onNo={() => setDeleting(null)} />}
 
-        {/* Add User / Admin modal */}
+        {/* Messages tab — full height, no padding */}
+        {tab === 'messages' && (
+          <div className="adm-main-messages">
+            <MessagesPanel showToast={showToast} users={users} />
+          </div>
+        )}
+
+        {/* All other tabs — scrollable with padding */}
+        {tab !== 'messages' && (
+          <div className="adm-main-scroll">
         {addUserModal && (
           <div className="adm-overlay">
             <div className="adm-confirm card" style={{ maxWidth:440, textAlign:'left' }}>
@@ -3381,11 +3390,7 @@ export default function Admin() {
         )}
 
         {/* -- MESSAGES -- */}
-        {tab === 'messages' && (
-          <Suspense fallback={<PanelLoader />}>
-            <MessagesPanel showToast={showToast} users={users} />
-          </Suspense>
-        )}
+        {/* handled above in adm-main-messages wrapper */}
 
         {/* -- EMAIL CONFIG -- */}
         {tab === 'email' && (
@@ -3615,6 +3620,9 @@ export default function Admin() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
           </div>
         )}
 
