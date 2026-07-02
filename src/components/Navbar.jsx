@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from './LanguageSwitcher';
+import UserNotificationsBell from './UserNotifications';
 import './Navbar.css';
 
 const isAdmin = (role) => role === 'admin' || role === 'superadmin';
@@ -56,8 +57,10 @@ export default function Navbar() {
           </Link>
 
           {user ? (
-            <div className="nav__user">
-              <button className="nav__avatar-btn" onClick={() => setDropdown(d => !d)}>
+            <>
+              <UserNotificationsBell user={user} />
+              <div className="nav__user">
+                <button className="nav__avatar-btn" onClick={() => setDropdown(d => !d)}>
                 <div className={`nav__avatar${user.role === 'superadmin' ? ' nav__avatar--super' : ''}`}>
                   {user.name.charAt(0).toUpperCase()}
                 </div>
@@ -81,6 +84,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <div className="nav__auth">
               <Link to="/login" className="btn btn-ghost btn-sm">Sign In</Link>

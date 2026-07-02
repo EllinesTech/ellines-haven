@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import UserMessages from '../components/UserMessages';
+import { UserNotificationsPanel } from '../components/UserNotifications';
 import './UserProfile.css';
 
 const WA = '254748255466';
@@ -126,6 +127,9 @@ export default function UserProfile() {
   /* Pending deletion state */
   const [pendingDel, setPendingDel] = useState(null); // { scheduledAt, daysLeft }
 
+  /* Unread notification count */
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
   const showToast = (msg, type='ok') => { setToast(msg); setToastType(type); setTimeout(()=>setToast(''),3500); };
 
   useEffect(() => { if (!user) navigate('/login'); }, [user, navigate]);
@@ -145,6 +149,20 @@ export default function UserProfile() {
         else setPendingDel(null);
       }
     }).catch(()=>{});
+  }, [user?.email]);
+
+  /* Live unread notification count */
+  useEffect(() => {
+    if (!user?.email) return;
+    const q = query(
+      collection(db, 'user_notifications'),
+      where('userEmail', '==', user.email.toLowerCase()),
+      where('read', '==', false)
+    );
+    const unsub = onSnapshot(q, snap => {
+      setUnreadNotifs(snap.size);
+    }, () => {});
+    return () => unsub();
   }, [user?.email]);
 
   if (!user) return null;
@@ -239,6 +257,7 @@ export default function UserProfile() {
     ['account','👤','Profile'],
     ['library','📚','My Books'],
     ['activity','🛒','Orders'],
+    ['notifications','🔔', unreadNotifs > 0 ? `Notifications (${unreadNotifs})` : 'Notifications'],
     ['messages','💬','Messages'],
     ['password','🔑','Security'],
     ['prefs','⚙️','Settings'],
@@ -545,6 +564,13 @@ export default function UserProfile() {
                   <span className="up-toggle-dot" style={{left:22}} />
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ── NOTIFICATIONS TAB ── */}
+          {tab === 'notifications' && (
+            <div className="up-panel">
+              <UserNotificationsPanel user={user} />
             </div>
           )}
 

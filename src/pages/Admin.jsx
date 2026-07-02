@@ -1201,20 +1201,78 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
   const sendNotification = async (bookId) => {
     setSending(s => ({ ...s, [bookId]: true }));
     const group = byBook[bookId];
+    const pendingItems = group.items.filter(n => !n.notified);
+    const book = books?.find(b => b.id === bookId);
+    const bookUrl = `https://ellines-haven.pages.dev/book/${bookId}`;
 
     try {
-      // Mark all as notified in contact_messages
+      // 1. Mark all as notified in contact_messages
       await Promise.all(group.items.map(n =>
         setDoc(doc(db, 'contact_messages', n.id), { notified: true, notifiedAt: serverTimestamp(), status: 'notified' }, { merge: true })
       ));
-      // Also mark in notifications collection (best-effort — may fail due to rules)
+
+      // 2. Best-effort mark in legacy notifications collection
       await Promise.all(group.items.map(n => {
         const notifKey = `notify_${bookId}_${(n.email||'').replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
         return setDoc(doc(db, 'notifications', notifKey), { notified: true, notifiedAt: serverTimestamp() }, { merge: true }).catch(() => {});
       }));
+
+      // 3. Write in-app dashboard notification for each pending user
+      await Promise.all(pendingItems.map(n => {
+        const emailSlug = (n.email||'').replace(/[^a-z0-9]/gi,'_').toLowerCase();
+        const inAppKey  = `inapp_${bookId}_${emailSlug}`;
+        const msgText   = `"${group.title}" is now available! Tap to read it on Ellines Haven.`;
+        return Promise.all([
+          // In-app bell notification
+          setDoc(doc(db, 'user_notifications', inAppKey), {
+            userEmail:   (n.email||'').toLowerCase(),
+            userId:      n.userId || '',
+            type:        'book_ready',
+            title:       `📖 ${group.title} is now available!`,
+            message:     msgText,
+            bookId:      bookId,
+            bookTitle:   group.title,
+            bookUrl:     bookUrl,
+            read:        false,
+            createdAt:   serverTimestamp(),
+            sentByAdmin: true,
+          }, { merge: true }),
+          // Direct message in their Messages inbox
+          setDoc(doc(db, 'contact_messages', `dm_ready_${inAppKey}`), {
+            name:       n.name || n.email,
+            email:      (n.email||'').toLowerCase(),
+            userId:     n.userId || '',
+            subject:    `📖 "${group.title}" is now available!`,
+            message:    `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '…\n\n' : ''}Head over to your library or click the link below to start reading:\n${bookUrl}\n\nHappy reading! 📚\n— Ellines Haven Team`,
+            type:       'direct',
+            status:     'replied',
+            threadId:   `dm_ready_${inAppKey}`,
+            createdAt:  serverTimestamp(),
+            lastMsg:    `"${group.title}" is now available! Click to read.`,
+            lastMsgAt:  serverTimestamp(),
+            lastSender: 'admin',
+            userRead:   false,
+            fromAdmin:  true,
+            adminEmail: 'ellines.haven@gmail.com',
+            adminName:  'Ellines Haven',
+            bookId:     bookId,
+            bookTitle:  group.title,
+          }).then(() =>
+            // Seed the thread subcollection so the user sees the message body
+            setDoc(doc(db, 'contact_messages', `dm_ready_${inAppKey}`, 'messages', 'msg_0'), {
+              text:        `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '…\n\n' : ''}Head over to your library or click the link below:\n${bookUrl}\n\nHappy reading! 📚\n— Ellines Haven Team`,
+              sender:      'admin',
+              senderName:  'Ellines Haven',
+              senderEmail: 'ellines.haven@gmail.com',
+              createdAt:   serverTimestamp(),
+            })
+          ),
+        ]);
+      }));
+
       setNotifs(prev => prev.map(n => n.bookId === bookId ? { ...n, notified: true, status: 'notified' } : n));
-      addLog('system', `Notifications sent for "${group.title}" to ${group.items.length} user(s)`);
-      showToast(`✅ Notified ${group.items.length} user(s) for "${group.title}"`);
+      addLog('system', `Notifications sent for "${group.title}" to ${pendingItems.length} user(s) — email + in-app`);
+      showToast(`✅ Notified ${pendingItems.length} user(s) for "${group.title}" — inbox + bell notification sent`);
     } catch (e) {
       showToast('❌ Error: ' + e.message);
     }

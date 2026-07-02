@@ -11,6 +11,7 @@ service cloud.firestore {
     match /users/{d}                           { allow read, write: if true; }
     match /reviews/{d}                         { allow read, write: if true; }
     match /notifications/{d}                   { allow read, write: if true; }
+    match /user_notifications/{d}              { allow read, write: if true; }
     match /admin_logs/{d}                      { allow read, write: if true; }
     match /admin_notifications/{d}             { allow read, write: if true; }
     match /contact_messages/{docId}            { allow read, write: if true; }
