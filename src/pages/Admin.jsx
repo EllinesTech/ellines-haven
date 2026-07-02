@@ -1891,12 +1891,12 @@ export default function Admin() {
           {/* ── Manage section ── */}
           <div className="adm-nav-section adm-nav-section-admin">
             <span className="adm-nav-section-dot adm-nav-section-dot--admin" />
-            Manage
+            <span className="adm-nav-label">Manage</span>
           </div>
           {navItems.filter(n => n.group === 'admin').map(({ k, label, icon }) => (
-            <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>
+            <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} onClick={() => setTab(k)} title={label}>
               <span className="adm-nav-icon-emoji">{icon}</span>
-              {label}
+              <span className="adm-nav-label">{label}</span>
             </button>
           ))}
 
@@ -1904,12 +1904,12 @@ export default function Admin() {
           <div className="adm-nav-divider" />
           <div className="adm-nav-section adm-nav-section-power">
             <span className="adm-nav-section-dot adm-nav-section-dot--power" />
-            Power Tools
+            <span className="adm-nav-label">Power Tools</span>
           </div>
           {navItems.filter(n => n.group === 'power').map(({ k, label, icon }) => (
-            <button key={k} className={'adm-nav-btn adm-nav-btn--power' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>
+            <button key={k} className={'adm-nav-btn adm-nav-btn--power' + (tab === k ? ' active' : '')} onClick={() => setTab(k)} title={label}>
               <span className="adm-nav-icon-emoji">{icon}</span>
-              {label}
+              <span className="adm-nav-label">{label}</span>
             </button>
           ))}
 
@@ -1919,12 +1919,12 @@ export default function Admin() {
               <div className="adm-nav-divider" />
               <div className="adm-nav-section adm-nav-section-super">
                 <span className="adm-nav-section-dot adm-nav-section-dot--super" />
-                Super Admin
+                <span className="adm-nav-label">Super Admin</span>
               </div>
               {navItems.filter(n => n.group === 'super').map(({ k, label, icon }) => (
-                <button key={k} className={'adm-nav-btn adm-nav-btn--super' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>
+                <button key={k} className={'adm-nav-btn adm-nav-btn--super' + (tab === k ? ' active' : '')} onClick={() => setTab(k)} title={label}>
                   <span className="adm-nav-icon-emoji">{icon}</span>
-                  {label}
+                  <span className="adm-nav-label">{label}</span>
                 </button>
               ))}
             </>
