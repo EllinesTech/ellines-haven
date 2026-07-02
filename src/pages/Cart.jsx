@@ -165,7 +165,10 @@ export default function Cart() {
       clearCart();
       setStep('stk_waiting');
     } catch (err) {
-      setStkError(err.message || 'Could not send payment request. Try again.');
+      // Extract the real error message from Firebase Functions error
+      const msg = err?.details || err?.message || err?.code || JSON.stringify(err);
+      setStkError(msg || 'Could not send payment request. Try again.');
+      console.error('[Cart] stkPush error:', err);
     } finally {
       setBusy(false);
     }

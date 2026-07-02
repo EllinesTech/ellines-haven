@@ -11,7 +11,7 @@
  *   MPESA_ENV               — "sandbox" | "production"  (default: production)
  */
 
-const { onRequest, onCall } = require("firebase-functions/v2/https");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const axios = require("axios");
@@ -65,7 +65,7 @@ exports.stkPush = onCall(
     const { phone, amount, orderId, userEmail, bookIds } = request.data;
 
     if (!phone || !amount || !orderId || !userEmail) {
-      throw new Error("Missing required fields: phone, amount, orderId, userEmail");
+      throw new HttpsError("invalid-argument", "Missing required fields: phone, amount, orderId, userEmail");
     }
 
     const env           = MPESA_ENV.value() || "production";
@@ -132,10 +132,9 @@ exports.stkPush = onCall(
       return { success: true, checkoutRequestId: CheckoutRequestID };
     } catch (err) {
       const darjaError = err.response?.data;
+      const msg = darjaError?.errorMessage || darjaError?.ResponseDescription || err.message || "STK push failed";
       console.error("[stkPush] error:", JSON.stringify(darjaError || err.message));
-      throw new Error(
-        darjaError?.errorMessage || darjaError?.ResponseDescription || err.message || "STK push failed"
-      );
+      throw new HttpsError("internal", msg);
     }
   }
 );
