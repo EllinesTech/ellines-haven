@@ -277,8 +277,8 @@ export default function Login() {
         <div className="auth-card card">
           <div className="auth-top">
             <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
-            <h2>{lc.heading}</h2>
-            <p>{lc.sub}</p>
+            <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
+            <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
           <form onSubmit={submit}>
             {err && <div className="form-error" style={{marginBottom:'16px'}}>{err}</div>}
@@ -304,10 +304,13 @@ export default function Login() {
               </button>
             </div>
             <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={busy}>
-              {busy ? 'Signing in…' : lc.btn}
+              {busy ? 'Signing in…' : cv.btn}
             </button>
           </form>
-          <p className="auth-switch">{lc.no_account} <Link to="/register">{lc.create_link}</Link></p>
+          <p className="auth-switch">
+            <EditableField field="no_account">{cv.no_account}</EditableField>{' '}
+            <Link to="/register"><EditableField field="create_link">{cv.create_link}</EditableField></Link>
+          </p>
         </div>
       </div>
     </main>

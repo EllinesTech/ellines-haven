@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useEditMode } from '../context/EditModeContext';
+import EditableField from '../components/EditableField';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import './Auth.css';
@@ -19,12 +21,16 @@ export default function Register() {
   const [err,  setErr]  = useState('');
   const [busy, setBusy] = useState(false);
   const [rc,   setRc]   = useState({ heading:'Create Account', sub:'Join our community of readers', btn:'Create Account', already_have:'Already have an account?', sign_in_link:'Sign in', closed_heading:'Registrations Closed', closed_sub:'New account creation is currently disabled. Please check back later.' });
+  const editCtx = useEditMode();
 
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'register_content')).then(snap => {
       if (snap.exists()) setRc(prev => ({ ...prev, ...snap.data() }));
     }).catch(() => {});
   }, []);
+
+  const cv = (editCtx?.editMode && editCtx?.pageKey === 'register_content')
+    ? { ...rc, ...editCtx.pageData } : rc;
 
   if (siteControls?.disableRegistration) {
     return (
@@ -33,7 +39,9 @@ export default function Register() {
           <div className="auth-card card" style={{ textAlign:'center' }}>
             <div style={{ fontSize:'3rem', marginBottom:16 }}>🚫</div>
             <h2>Registrations Closed</h2>
-            <p style={{ color:'var(--muted)', marginTop:8, marginBottom:20 }}>{rc.closed_sub}</p>
+            <p style={{ color:'var(--muted)', marginTop:8, marginBottom:20 }}>
+              <EditableField field="closed_sub">{cv.closed_sub}</EditableField>
+            </p>
             <Link to="/login" className="btn btn-primary" style={{ width:'100%' }}>Sign In Instead</Link>
           </div>
         </div>
@@ -115,8 +123,8 @@ export default function Register() {
         <div className="auth-card card">
           <div className="auth-top">
             <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
-            <h2>{rc.heading}</h2>
-            <p>{rc.sub}</p>
+            <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
+            <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
           <form onSubmit={submit}>
             {err && <div className="form-error" style={{ marginBottom:'16px' }}>{err}</div>}
@@ -170,10 +178,13 @@ export default function Register() {
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width:'100%', marginTop:'6px' }} disabled={busy}>
-              {busy ? 'Creating Account…' : rc.btn}
+              {busy ? 'Creating Account…' : cv.btn}
             </button>
           </form>
-          <p className="auth-switch">{rc.already_have} <Link to="/login">{rc.sign_in_link}</Link></p>
+          <p className="auth-switch">
+            <EditableField field="already_have">{cv.already_have}</EditableField>{' '}
+            <Link to="/login"><EditableField field="sign_in_link">{cv.sign_in_link}</EditableField></Link>
+          </p>
         </div>
       </div>
     </main>

@@ -4,6 +4,7 @@ import BookCard, { BookStatusBadge } from '../components/BookCard';
 import { useApp } from '../context/AppContext';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
+import EditableImage from '../components/EditableImage';
 import { GENRES } from '../data/books';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -15,6 +16,8 @@ const HOME_DEFAULTS = {
   hero_sub:            'Original novels and short stories by Elijah Mwangi M — drawn from real lives, real heartbreaks, and the soul of East Africa. Buy once. Read forever.',
   hero_btn_primary:    'Browse Books →',
   hero_btn_secondary:  'Our Story',
+  hero_poster:         '/poster4.png',
+  author_bg_image:     '/cover-the-last-chapter.png',
   stat_books:          '50+',
   stat_readers:        '2k+',
   stat_rating:         '4.8★',
@@ -254,7 +257,13 @@ export default function Home() {
           {/* RIGHT — poster + floating badge */}
           <div className="hero__visual">
             <div className="hero__poster-frame">
-              <img src="/poster4.png" alt="Ellines Haven" className="hero__poster" />
+              <EditableImage
+                field="hero_poster"
+                src={c.hero_poster || '/poster4.png'}
+                alt="Ellines Haven"
+                className="hero__poster"
+                storageFolder="site-images"
+              />
               <div className="hero__poster-shine" />
             </div>
             {spotlight && (
@@ -415,7 +424,13 @@ export default function Home() {
       ══════════════════════════════════════ */}
       <section className="promo-banner">
         <div className="promo-banner__bg">
-          <img src="/cover-the-last-chapter.png" alt="" aria-hidden="true" className="promo-banner__bg-img" />
+          <EditableImage
+            field="author_bg_image"
+            src={c.author_bg_image || '/cover-the-last-chapter.png'}
+            alt=""
+            className="promo-banner__bg-img"
+            storageFolder="site-images"
+          />
           <div className="promo-banner__bg-mask" />
         </div>
         <div className="container promo-banner__content">

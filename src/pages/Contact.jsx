@@ -144,15 +144,17 @@ export default function Contact() {
             {sent
               ? <div className="contact-sent">
                   <div style={{ fontSize:'3rem', marginBottom:16 }}>✅</div>
-                  <h3>{cv.sent_heading}</h3>
-                  <p>{cv.sent_sub}</p>
+                  <h3><EditableField field="sent_heading">{cv.sent_heading}</EditableField></h3>
+                  <p><EditableField field="sent_sub" multiline>{cv.sent_sub}</EditableField></p>
                   <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginTop:8 }}>
                     If WhatsApp didn't open, message us directly at <a href={WA_LINK} target="_blank" rel="noopener noreferrer" style={{ color:'#25D366' }}>0748 255 466</a>
                   </p>
                   <button className="btn btn-outline" style={{ marginTop:20 }} onClick={() => { setSent(false); setForm({ name:'', email:'', subject:'', message:'' }); }}>Send Another</button>
                 </div>
               : <form onSubmit={submit}>
-                  <h3 style={{ marginBottom:22 }}>{cv.form_heading}</h3>
+                  <h3 style={{ marginBottom:22 }}>
+                    <EditableField field="form_heading">{cv.form_heading}</EditableField>
+                  </h3>
                   {[
                     { k:'name',    label:'Your Name',  type:'text',  ph:'Amina Njeri' },
                     { k:'email',   label:'Email',       type:'email', ph:'your@email.com' },

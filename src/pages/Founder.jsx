@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import EditableImage from '../components/EditableImage';
 import './Founder.css';
 
 /* ── Firestore key ── */
@@ -40,6 +41,7 @@ function EditableText({ value, onSave, tag: Tag = 'p', className, style, multili
 
 /* ── Default content ── */
 const DEFAULT = {
+  founderPhoto: '/mwangi.png',
   heroTitle: 'Elijah Mwangi M',
   heroSub: 'Visionary founder of the Ellines Group — spanning technology, literature, and craftsmanship across Kenya. Software engineer, AI developer, and published author.',
   roles: [
@@ -184,11 +186,22 @@ export default function Founder() {
         <div className="founder-hero-content">
           <div className="founder-photo-wrap">
             <div className="founder-photo-ring">
-              <img
-                src={HERO_PHOTOS[activePhoto].src}
-                alt={HERO_PHOTOS[activePhoto].alt}
-                className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
-              />
+              {isSA ? (
+                <EditableImage
+                  field="founderPhoto"
+                  src={content.founderPhoto || HERO_PHOTOS[activePhoto].src}
+                  alt={HERO_PHOTOS[activePhoto].alt}
+                  className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
+                  storageFolder="site-images"
+                  onUpload={url => patch('founderPhoto', url)}
+                />
+              ) : (
+                <img
+                  src={content.founderPhoto || HERO_PHOTOS[activePhoto].src}
+                  alt={HERO_PHOTOS[activePhoto].alt}
+                  className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
+                />
+              )}
               <span className="founder-badge-float">{HERO_PHOTOS[activePhoto].caption}</span>
             </div>
             {/* Dot indicators */}

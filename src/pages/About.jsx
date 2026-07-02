@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import EditableImage from '../components/EditableImage';
 import './About.css';
 
 /* ── Firestore key ── */
 const ABOUT_DOC = () => doc(db, 'site_data', 'about_content');
 
 const DEFAULT_CONTENT = {
+  founderPhoto: '/mwangi.png',
   heroTagline: 'A home for original African literature — built in Kenya, for the world.',
 
   /* Story */
@@ -446,7 +448,18 @@ export default function About() {
         <div className="container">
           <div className="about-founder-strip">
             <div className="about-founder-photo-wrap">
-              <img src="/mwangi.png" alt="Elijah Mwangi M — Founder" className="about-founder-photo" />
+              {isSA ? (
+                <EditableImage
+                  field="founderPhoto"
+                  src={content.founderPhoto || '/mwangi.png'}
+                  alt="Elijah Mwangi M — Founder"
+                  className="about-founder-photo"
+                  storageFolder="site-images"
+                  onUpload={url => patch('founderPhoto', url)}
+                />
+              ) : (
+                <img src={content.founderPhoto || '/mwangi.png'} alt="Elijah Mwangi M — Founder" className="about-founder-photo" />
+              )}
             </div>
             <div className="about-founder-text">
               <span className="about-founder-label">✦ The Founder</span>
