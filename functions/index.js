@@ -58,6 +58,8 @@ exports.stkPush = onCall(
   {
     secrets: [CONSUMER_KEY, CONSUMER_SECRET, SHORTCODE, PASSKEY, CALLBACK_URL, MPESA_ENV],
     region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
   },
   async (request) => {
     const { phone, amount, orderId, userEmail, bookIds } = request.data;
@@ -69,14 +71,14 @@ exports.stkPush = onCall(
     const env           = MPESA_ENV.value() || "production";
     const consumerKey   = CONSUMER_KEY.value();
     const consumerSecret= CONSUMER_SECRET.value();
-    const shortcode     = SHORTCODE.value();
+    const shortcode     = SHORTCODE.value(); // 174379 sandbox / real till for production
     const passkey       = PASSKEY.value();
     const callbackUrl   = CALLBACK_URL.value();
 
-    const base =
-      env === "sandbox"
-        ? "https://sandbox.safaricom.co.ke"
-        : "https://api.safaricom.co.ke";
+    const isSandbox = env === "sandbox";
+    const base = isSandbox
+      ? "https://sandbox.safaricom.co.ke"
+      : "https://api.safaricom.co.ke";
 
     const timestamp = new Date()
       .toISOString()
@@ -88,6 +90,8 @@ exports.stkPush = onCall(
 
     try {
       const token = await getAccessToken(consumerKey, consumerSecret, env);
+
+      console.log("[stkPush] sending:", { shortcode, formattedPhone, amount: Math.ceil(amount), env, callbackUrl });
 
       const stkRes = await axios.post(
         `${base}/mpesa/stkpush/v1/processrequest`,
@@ -101,8 +105,8 @@ exports.stkPush = onCall(
           PartyB: shortcode,
           PhoneNumber: formattedPhone,
           CallBackURL: callbackUrl,
-          AccountReference: orderId,
-          TransactionDesc: `Ellines Haven — ${orderId}`,
+          AccountReference: "EllinesBks",
+          TransactionDesc: "Ellines Haven Books",
         },
         {
           headers: {
@@ -127,9 +131,10 @@ exports.stkPush = onCall(
 
       return { success: true, checkoutRequestId: CheckoutRequestID };
     } catch (err) {
-      console.error("[stkPush] error:", err.response?.data || err.message);
+      const darjaError = err.response?.data;
+      console.error("[stkPush] error:", JSON.stringify(darjaError || err.message));
       throw new Error(
-        err.response?.data?.errorMessage || err.message || "STK push failed"
+        darjaError?.errorMessage || darjaError?.ResponseDescription || err.message || "STK push failed"
       );
     }
   }
@@ -261,6 +266,8 @@ exports.queryPaymentStatus = onCall(
   {
     secrets: [CONSUMER_KEY, CONSUMER_SECRET, SHORTCODE, PASSKEY, MPESA_ENV],
     region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
   },
   async (request) => {
     const { checkoutRequestId } = request.data;
