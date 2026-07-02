@@ -256,7 +256,7 @@ export default function MyLibrary() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ borderBottom:'1px solid var(--dim)', background:'var(--surface)', position:'sticky', top:0, zIndex:10 }}>
+      <div style={{ borderBottom:'1px solid var(--dim)', background:'var(--surface)', position:'sticky', top:80, zIndex:10 }}>
         <div className="container" style={{ display:'flex', gap:0 }}>
           {[
             { k:'library',  label:'📚 My Books' },

@@ -222,12 +222,16 @@ export default function Login() {
       /* 1. Check Firestore users collection first */
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
-        const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-        const storedPw = pwOverrides[emailKey] || fsUser.passwordHash || fsUser.password || '';
         if (fsUser.suspended) { setErr('This account has been suspended. Contact support.'); setBusy(false); return; }
-        // Always require a password — never allow empty password login
-        if (!storedPw) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
-        if (storedPw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
+        // Firestore passwordHash is the authoritative password (set by admin reset or registration)
+        // localStorage pwOverrides is a same-device fallback kept for legacy compatibility
+        const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+        const localOverride = pwOverrides[emailKey];
+        // Accept: local override (if it matches what admin set on this device) OR Firestore hash
+        const fsHash = fsUser.passwordHash || fsUser.password || '';
+        const passwordOk = (localOverride && localOverride === form.password) || (fsHash && fsHash === form.password);
+        if (!fsHash && !localOverride) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
+        if (!passwordOk) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
         const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: fsUser.role || 'user' };
         setUser(sessionUser);
         await logLogin(fsUser.email);

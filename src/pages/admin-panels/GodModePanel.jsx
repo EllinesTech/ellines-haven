@@ -111,14 +111,15 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
         const ov = JSON.parse(localStorage.getItem('eh_pw_overrides')||'{}');
         ov[selectedUser.email.toLowerCase()] = newPw;
         localStorage.setItem('eh_pw_overrides', JSON.stringify(ov));
-        // Also sync to Firestore registered_users
-        const regSnap = await getDoc(doc(db,'site_data','registered_users')).catch(()=>null);
-        if (regSnap?.exists()) {
-          const reg = regSnap.data().registered || [];
-          const rov = regSnap.data().pwOverrides || {};
-          rov[selectedUser.email.toLowerCase()] = newPw;
-          await setDoc(doc(db,'site_data','registered_users'),{registered:reg, pwOverrides:rov, updatedAt:serverTimestamp()},{merge:true});
-        }
+        // Write directly to Firestore users/{id} — this is what Login checks first on any device
+        try {
+          const userId = selectedUser.id || selectedUser.email.toLowerCase().replace(/[^a-z0-9]/g,'_');
+          await setDoc(doc(db,'users',userId), { passwordHash: newPw, updatedAt: serverTimestamp() }, { merge: true });
+        } catch {}
+        // Also sync pwOverrides into registered_users with merge:true (never wipe the whole doc)
+        try {
+          await setDoc(doc(db,'site_data','registered_users'), { pwOverrides: ov, updatedAt: serverTimestamp() }, { merge: true });
+        } catch {}
       }
       if (newRole !== selectedUser.role) {
         // Persist role to Firestore (not just localStorage)

@@ -1841,17 +1841,22 @@ export default function Admin() {
 
     // 3. Sync deletion to Firestore so real-time listener doesn't re-add on refresh
     try {
-      const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
-      const pwOverrides   = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-      // Remove from Firestore registered_users doc
+      const deleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
+      // Use merge:true — only update the deletedEmails blocklist, never wipe other users
       await setDoc(doc(db, 'site_data', 'registered_users'), {
-        registered:   updatedRegistered,
-        pwOverrides,
-        roleOverrides,
         deletedEmails: [...new Set([...deleted, emailKey])],
         updatedAt: serverTimestamp(),
-      }, { merge: false });
-      // Also delete from users collection if exists
+      }, { merge: true });
+      // Remove from the registered array in Firestore too (fetch first, then update)
+      const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
+      if (regSnap.exists()) {
+        const fsRegistered = (regSnap.data().registered || []).filter(r => r.email?.toLowerCase() !== emailKey);
+        await setDoc(doc(db, 'site_data', 'registered_users'), {
+          registered: fsRegistered,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+      // Also delete from users collection
       await deleteDoc(doc(db, 'users', u.id)).catch(() => {});
     } catch (e) { console.warn('[deleteUser] Firestore sync failed:', e.message); }
 
@@ -2054,7 +2059,7 @@ export default function Admin() {
                 )}
               </div>
               <div className="adm-confirm-btns" style={{ marginTop:20 }}>
-                <button className="btn btn-primary btn-sm" onClick={() => {
+                <button className="btn btn-primary btn-sm" onClick={async () => {
                   const { name, email, password, role } = addUserForm;
                   if (!name.trim() || !email.trim() || !password.trim()) { showToast('❌ All fields are required'); return; }
                   if (password.length < 4) { showToast('❌ Password must be at least 4 characters'); return; }
@@ -2062,28 +2067,50 @@ export default function Admin() {
                   // Check for duplicates
                   const existing = users.find(u => u.email.toLowerCase() === emailKey);
                   if (existing) { showToast('❌ An account with that email already exists'); return; }
-                  // Save password override
+
+                  const newUser = { id: (addUserModal==='admin'?'adm_':'usr_') + Date.now(), name: name.trim(), email: emailKey, role: addUserModal==='admin' ? role : 'user', joined: new Date().toISOString().slice(0,10) };
+
+                  // 1. Write directly to Firestore users/{id} with passwordHash — works on all devices
+                  try {
+                    await setDoc(doc(db, 'users', newUser.id), {
+                      id: newUser.id, name: newUser.name, email: emailKey,
+                      passwordHash: password.trim(), role: newUser.role,
+                      joined: newUser.joined, createdAt: serverTimestamp(), status: 'active',
+                    });
+                  } catch (e) { console.warn('[AddUser] users write failed:', e.message); }
+
+                  // 2. Append to registered_users with merge:true — never wipe existing users
+                  try {
+                    const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
+                    const currentList = regSnap.exists() ? (regSnap.data().registered || []) : [];
+                    const overrides = { ...(regSnap.exists() ? regSnap.data().pwOverrides || {} : {}),
+                      [emailKey]: password.trim() };
+                    const roleOverrides = { ...(regSnap.exists() ? regSnap.data().roleOverrides || {} : {}) };
+                    if (addUserModal === 'admin') roleOverrides[emailKey] = role;
+                    if (!currentList.find(r => r.email?.toLowerCase() === emailKey)) {
+                      await setDoc(doc(db, 'site_data', 'registered_users'), {
+                        registered: [...currentList, newUser],
+                        pwOverrides: overrides,
+                        roleOverrides,
+                        updatedAt: serverTimestamp(),
+                      }, { merge: true });
+                    }
+                  } catch (e) { console.warn('[Users] Firestore sync failed:', e.message); }
+
+                  // 3. Update localStorage
                   const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
                   overrides[emailKey] = password.trim();
                   localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
-                  // Save role override if admin
-                  const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+                  const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+                  if (!registered.find(r => r.email?.toLowerCase() === emailKey)) {
+                    localStorage.setItem('eh_registered_users', JSON.stringify([...registered, newUser]));
+                  }
                   if (addUserModal === 'admin') {
+                    const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
                     roleOverrides[emailKey] = role;
                     localStorage.setItem('eh_role_overrides', JSON.stringify(roleOverrides));
                   }
-                  // Add to registered users list (localStorage)
-                  const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-                  const newUser = { id: (addUserModal==='admin'?'adm_':'usr_') + Date.now(), name: name.trim(), email: emailKey, role: addUserModal==='admin' ? role : 'user', joined: new Date().toISOString().slice(0,10) };
-                  if (!registered.find(r => r.email.toLowerCase() === emailKey)) registered.push(newUser);
-                  localStorage.setItem('eh_registered_users', JSON.stringify(registered));
-                  // ── Sync to Firestore so other devices can log in ──
-                  setDoc(doc(db, 'site_data', 'registered_users'), {
-                    registered,
-                    pwOverrides: overrides,
-                    roleOverrides,
-                    updatedAt: serverTimestamp(),
-                  }, { merge: false }).catch(e => console.warn('[Users] Firestore sync failed:', e.message));
+
                   // Update local UI state
                   setUsers(prev => [...prev, { ...newUser, books:0, status:'Active' }]);
                   addLog('user', (addUserModal==='admin'?'Admin':'User') + ' account created: ' + emailKey);
@@ -2552,19 +2579,26 @@ export default function Admin() {
                     <input className="field" type="text" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Enter new password" autoFocus />
                   </div>
                   <div className="adm-confirm-btns" style={{ marginTop:16 }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => {
+                    <button className="btn btn-primary btn-sm" onClick={async () => {
                       if (!newPw.trim()) return;
                       const email = resetPwUser.email.toLowerCase();
+                      // 1. Save to localStorage overrides (legacy / same-device login)
                       const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
                       overrides[email] = newPw;
                       localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
-                      // Sync to Firestore so password works on all devices
-                      const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-                      const roleOverrides = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
-                      setDoc(doc(db, 'site_data', 'registered_users'), {
-                        registered, pwOverrides: overrides, roleOverrides,
-                        updatedAt: serverTimestamp(),
-                      }, { merge: false }).catch(() => {});
+                      // 2. Write directly to Firestore users/{id} — this is what Login checks first
+                      try {
+                        const userId = resetPwUser.id || email.replace(/[^a-z0-9]/g,'_');
+                        await setDoc(doc(db, 'users', userId), {
+                          passwordHash: newPw, updatedAt: serverTimestamp(),
+                        }, { merge: true });
+                      } catch {}
+                      // 3. Sync pwOverrides into registered_users with merge:true (never overwrite all users)
+                      try {
+                        await setDoc(doc(db, 'site_data', 'registered_users'), {
+                          pwOverrides: overrides, updatedAt: serverTimestamp(),
+                        }, { merge: true });
+                      } catch {}
                       setUsers(prev => prev.map(u => u.id === resetPwUser.id ? { ...u, password: newPw } : u));
                       addLog('user', 'Password reset for ' + email);
                       showToast('✅ Password updated for ' + resetPwUser.name + ' — new password: ' + newPw);
