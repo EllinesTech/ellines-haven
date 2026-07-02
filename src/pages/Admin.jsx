@@ -1524,6 +1524,202 @@ function ManualUnlockForm({ books, showToast, onUnlock }) {
     </form>
   );
 }
+
+/* ── ArchivesPanel ────────────────────────────────────────────────────────── */
+function ArchivesPanel({ db, showToast, onRestore }) {
+  const [items, setItems]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const { collection: col, query: q, orderBy, onSnapshot: snap } = require !== undefined
+      ? { collection: null } : {};
+    // Use module-level firebase imports
+    import('firebase/firestore').then(() => {}).catch(() => {});
+    const unsubPromise = (async () => {
+      const { collection, query, orderBy, onSnapshot } = await import('firebase/firestore');
+      const qr = query(collection(db, 'archives'), orderBy('archivedAt', 'desc'));
+      return onSnapshot(qr, s => {
+        setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      }, () => setLoading(false));
+    })();
+    return () => unsubPromise.then(u => u && u());
+  }, []); // eslint-disable-line
+
+  const restore = async (item) => {
+    try {
+      const { doc, setDoc, deleteDoc, serverTimestamp } = await import('firebase/firestore');
+      const { id, archivedAt, archivedBy, ...orderData } = item;
+      await setDoc(doc(db, 'orders', id), { ...orderData, restoredAt: serverTimestamp() });
+      await deleteDoc(doc(db, 'archives', id));
+      setItems(prev => prev.filter(i => i.id !== id));
+      onRestore && onRestore({ id, ...orderData });
+      showToast('✅ Order restored to active orders');
+    } catch (e) { showToast('❌ Restore failed: ' + e.message); }
+  };
+
+  const permanentDelete = async (id) => {
+    if (!window.confirm('Permanently delete this archived order? This cannot be undone.')) return;
+    try {
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, 'archives', id));
+      setItems(prev => prev.filter(i => i.id !== id));
+      showToast('🗑️ Permanently deleted');
+    } catch (e) { showToast('❌ ' + e.message); }
+  };
+
+  return (
+    <div className="adm-page">
+      <div className="adm-page-head">
+        <div>
+          <h1>Archives</h1>
+          <span className="adm-page-sub">Orders removed from the active list — safely stored here. Restore or permanently delete.</span>
+        </div>
+      </div>
+      {loading ? (
+        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading archives…</div>
+      ) : items.length === 0 ? (
+        <div className="adm-empty">
+          <div style={{ fontSize:'3rem', marginBottom:12 }}>📦</div>
+          <p>No archived orders yet. Archive orders from the Orders tab to store them here.</p>
+        </div>
+      ) : (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <table className="adm-table">
+            <thead>
+              <tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Status</th><th>Archived</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {items.map(item => (
+                <tr key={item.id}>
+                  <td><code style={{ fontSize:'0.72rem', color:'var(--gold)' }}>{item.id}</code></td>
+                  <td>
+                    <strong style={{ display:'block', fontSize:'0.85rem' }}>{item.userName || item.userEmail}</strong>
+                    <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.userEmail}</span>
+                  </td>
+                  <td style={{ fontSize:'0.78rem' }}>{(item.items||[]).map(b => b.title).join(', ') || '—'}</td>
+                  <td><strong>KSh {item.total?.toLocaleString() || '—'}</strong></td>
+                  <td><span className={`adm-status adm-status--${(item.status||'').toLowerCase()}`}>{item.status}</span></td>
+                  <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
+                    {item.archivedBy && <span style={{ display:'block' }}>by {item.archivedBy}</span>}
+                    {item.archivedAt?.toDate?.()?.toLocaleDateString?.() || '—'}
+                  </td>
+                  <td className="adm-actions">
+                    <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
+                    <button className="adm-act-btn adm-act-del" onClick={() => permanentDelete(item.id)}>🗑️ Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── TrashPanel ───────────────────────────────────────────────────────────── */
+function TrashPanel({ db, showToast, onRestore }) {
+  const [items, setItems]   = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { collection, query, orderBy, onSnapshot } = await import('firebase/firestore');
+      const qr = query(collection(db, 'trash'), orderBy('trashedAt', 'desc'));
+      const unsub = onSnapshot(qr, s => {
+        setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      }, () => setLoading(false));
+      return unsub;
+    })();
+  }, []); // eslint-disable-line
+
+  const restore = async (item) => {
+    try {
+      const { doc, setDoc, deleteDoc, serverTimestamp } = await import('firebase/firestore');
+      const { id, trashedAt, trashedBy, ...orderData } = item;
+      await setDoc(doc(db, 'orders', id), { ...orderData, restoredAt: serverTimestamp() });
+      await deleteDoc(doc(db, 'trash', id));
+      setItems(prev => prev.filter(i => i.id !== id));
+      onRestore && onRestore({ id, ...orderData });
+      showToast('✅ Order restored to active orders');
+    } catch (e) { showToast('❌ Restore failed: ' + e.message); }
+  };
+
+  const permanentDelete = async (id) => {
+    if (!window.confirm('Permanently delete this order? This cannot be undone.')) return;
+    try {
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, 'trash', id));
+      setItems(prev => prev.filter(i => i.id !== id));
+      showToast('🗑️ Permanently deleted');
+    } catch (e) { showToast('❌ ' + e.message); }
+  };
+
+  const emptyTrash = async () => {
+    if (!window.confirm(`Permanently delete all ${items.length} trashed orders? This cannot be undone.`)) return;
+    try {
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      await Promise.all(items.map(i => deleteDoc(doc(db, 'trash', i.id))));
+      setItems([]);
+      showToast('🗑️ Trash emptied');
+    } catch (e) { showToast('❌ ' + e.message); }
+  };
+
+  return (
+    <div className="adm-page">
+      <div className="adm-page-head">
+        <div>
+          <h1>Trash</h1>
+          <span className="adm-page-sub">Deleted orders — restore them or permanently remove them.</span>
+        </div>
+        {items.length > 0 && (
+          <button className="btn btn-danger btn-sm" onClick={emptyTrash}>🗑️ Empty Trash ({items.length})</button>
+        )}
+      </div>
+      {loading ? (
+        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading trash…</div>
+      ) : items.length === 0 ? (
+        <div className="adm-empty">
+          <div style={{ fontSize:'3rem', marginBottom:12 }}>🗑️</div>
+          <p>Trash is empty. Deleted orders will appear here.</p>
+        </div>
+      ) : (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <table className="adm-table">
+            <thead>
+              <tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Status</th><th>Deleted</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {items.map(item => (
+                <tr key={item.id} style={{ opacity: 0.8 }}>
+                  <td><code style={{ fontSize:'0.72rem', color:'#e74c3c' }}>{item.id}</code></td>
+                  <td>
+                    <strong style={{ display:'block', fontSize:'0.85rem' }}>{item.userName || item.userEmail}</strong>
+                    <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.userEmail}</span>
+                  </td>
+                  <td style={{ fontSize:'0.78rem' }}>{(item.items||[]).map(b => b.title).join(', ') || '—'}</td>
+                  <td><strong>KSh {item.total?.toLocaleString() || '—'}</strong></td>
+                  <td><span className={`adm-status adm-status--${(item.status||'').toLowerCase()}`}>{item.status}</span></td>
+                  <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
+                    {item.trashedBy && <span style={{ display:'block' }}>by {item.trashedBy}</span>}
+                    {item.trashedAt?.toDate?.()?.toLocaleDateString?.() || '—'}
+                  </td>
+                  <td className="adm-actions">
+                    <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
+                    <button className="adm-act-btn adm-act-del" onClick={() => permanentDelete(item.id)}>✕ Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Admin() {
   const { user, books, saveBook, deleteBook, resetBooks, orders, setOrdersState, confirmOrder, rejectOrder, settings, updateSettings, syncOrders, manualUnlock, unlockBooksForBuyer, userPerms, getUserPerms, setPermField, saveUserPerms, suspendedList, isUserSuspended, setSuspended, siteControls, saveSiteControls } = useApp();
   const location = useLocation();
@@ -1825,6 +2021,24 @@ export default function Admin() {
     } catch (e) { showToast('❌ Archive failed: ' + e.message); }
   };
 
+  // Delete order — moves to trash (soft delete)
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm('Move this order to Trash? It can be restored later.')) return;
+    try {
+      const order = allOrders.find(o => o.id === orderId);
+      if (!order) return;
+      await setDoc(doc(db, 'trash', orderId), {
+        ...order,
+        type: 'order',
+        trashedAt: serverTimestamp(),
+        trashedBy: user?.email,
+      });
+      await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
+      setLiveOrders(prev => prev.filter(o => o.id !== orderId));
+      showToast('🗑️ Order moved to Trash');
+    } catch (e) { showToast('❌ Delete failed: ' + e.message); }
+  };
+
   // Delete user  persists across refresh via eh_deleted_users blocklist + Firestore
   const handleDeleteUser = async (u) => {
     const emailKey = u.email.toLowerCase();
@@ -1904,6 +2118,8 @@ export default function Admin() {
     { k:'covers',        label:'Novel Covers',      icon:'🖼️', group:'admin' },
     { k:'photos',        label:'Site Photos',       icon:'📷', group:'admin' },
     { k:'orders',        label:'Orders' + (pendingCount > 0 ? ` (${pendingCount})` : ''), icon:'🛒', group:'admin' },
+    { k:'archives',      label:'Archives',          icon:'📦', group:'admin' },
+    { k:'trash',         label:'Trash',             icon:'🗑️', group:'admin' },
     { k:'users',         label:'Users',             icon:'👥', group:'admin' },
     { k:'userbooks',     label:'User Libraries',    icon:'📖', group:'admin' },
     { k:'permissions',   label:'Permissions',       icon:'🔐', group:'admin' },
@@ -2488,17 +2704,22 @@ export default function Admin() {
                           {isPending && (
                             <>
                               <button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>
-                                Confirm
+                                ✅ Confirm
                               </button>
                               <button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>
-                                Reject
+                                ✕ Reject
                               </button>
                             </>
                           )}
-                          <button className="adm-act-btn" style={{ fontSize:'0.68rem', opacity:0.6 }}
+                          <button className="adm-act-btn adm-act-archive"
                             onClick={() => handleArchiveOrder(o.id)}
-                            title="Archive this order">
-                            📦
+                            title="Archive this order — removes from active list, stored in Archives">
+                            📦 Archive
+                          </button>
+                          <button className="adm-act-btn adm-act-del"
+                            onClick={() => handleDeleteOrder(o.id)}
+                            title="Move to Trash — can be restored">
+                            🗑️ Delete
                           </button>
                         </td>
                       </tr>
@@ -2556,6 +2777,20 @@ export default function Admin() {
             </div>
 
           </div>
+        )}
+
+        {/* ARCHIVES */}
+        {tab === 'archives' && (
+          <ArchivesPanel db={db} showToast={showToast} onRestore={(order) => {
+            setLiveOrders(prev => [order, ...prev]);
+          }} />
+        )}
+
+        {/* TRASH */}
+        {tab === 'trash' && (
+          <TrashPanel db={db} showToast={showToast} onRestore={(order) => {
+            setLiveOrders(prev => [order, ...prev]);
+          }} />
         )}
 
         {/* USERS */}

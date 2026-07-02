@@ -735,6 +735,20 @@
 }
 .adm-act-confirm:hover { background: rgba(46,204,113,0.18); border-color: var(--ok); }
 
+.adm-act-archive {
+  font-size: 0.72rem; font-family: inherit;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(201,168,76,0.35);
+  background: rgba(201,168,76,0.08);
+  color: var(--gold);
+  cursor: pointer;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.adm-act-archive:hover { background: rgba(201,168,76,0.18); border-color: var(--gold); }
+
 /* Status rejected */
 .adm-status--rejected { background: rgba(231,76,60,0.1); color: var(--err); border: 1px solid rgba(231,76,60,0.25); }
 

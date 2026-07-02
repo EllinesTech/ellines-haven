@@ -3,6 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /orders/{d}                                { allow read, write: if true; }
     match /archives/{d}                              { allow read, write: if true; }
+    match /trash/{d}                                 { allow read, write: if true; }
     match /libraries/{d}                             { allow read, write: if true; }
     match /site_data/{d}                             { allow read, write: if true; }
     match /book_chapters/{d}                         { allow read, write: if true; }
