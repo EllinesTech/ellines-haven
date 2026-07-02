@@ -4,7 +4,7 @@ import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc,
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
-const WA = '254748255466';
+const WA_ADMIN = '254748255466';
 const fmtDate = ts => {
   if (!ts) return '—';
   try {
@@ -12,6 +12,95 @@ const fmtDate = ts => {
     return d.toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
   } catch { return '—'; }
 };
+
+/* ── Order notification banner shown at top of Messages panel ── */
+function OrderNotificationBanner({ orders, onDismiss }) {
+  const unread = orders.filter(o => o.status === 'unread');
+  const [notifPerm, setNotifPerm] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'denied'
+  );
+
+  const requestPerm = async () => {
+    if (!('Notification' in window)) return;
+    const perm = await Notification.requestPermission();
+    setNotifPerm(perm);
+  };
+
+  if (!unread.length && notifPerm === 'granted') return null;
+
+  return (
+    <div style={{
+      background:'rgba(232,131,42,0.12)', border:'2px solid rgba(232,131,42,0.5)',
+      borderRadius:'var(--r)', padding:'14px 18px', marginBottom:16,
+      display:'flex', flexDirection:'column', gap:10,
+    }}>
+      {/* Permission prompt if not granted */}
+      {notifPerm !== 'granted' && (
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom: unread.length ? 10 : 0, borderBottom: unread.length ? '1px solid rgba(232,131,42,0.25)' : 'none' }}>
+          <span style={{ fontSize:'0.82rem', color:'var(--muted)' }}>
+            🔔 Enable browser notifications to get alerted for new orders — even when this tab isn't active
+          </span>
+          <button onClick={requestPerm}
+            style={{ flexShrink:0, marginLeft:12, padding:'5px 12px', background:'var(--gold)', color:'#000', border:'none', borderRadius:20, cursor:'pointer', fontSize:'0.78rem', fontWeight:700, fontFamily:'inherit' }}>
+            Enable
+          </button>
+        </div>
+      )}
+
+      {unread.length > 0 && (
+        <>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <strong style={{ color:'#e8832a', fontSize:'0.95rem' }}>🛒 {unread.length} New Order{unread.length > 1 ? 's' : ''}!</strong>
+            <button onClick={onDismiss} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.8rem' }}>
+              Mark all read
+            </button>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {unread.slice(0, 3).map(o => (
+              <div key={o.orderId || o.id} style={{
+                background:'rgba(0,0,0,0.2)', borderRadius:'var(--r-sm)', padding:'10px 14px',
+                display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap',
+              }}>
+                <div>
+                  <div style={{ fontSize:'0.88rem', fontWeight:700, color:'var(--text)' }}>
+                    {o.userName || 'Unknown'} <span style={{ color:'var(--muted)', fontWeight:400 }}>({o.userEmail || 'no email'})</span>
+                  </div>
+                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', marginTop:2 }}>
+                    {(o.items || []).map(i => i.title).join(', ')} · <strong style={{ color:'#e8832a' }}>KSh {o.total}</strong> · {o.method}
+                  </div>
+                  <div style={{ fontSize:'0.7rem', color:'var(--muted)', marginTop:2 }}>{fmtDate(o.createdAt)}</div>
+                </div>
+                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                  {o.waLink && (
+                    <a href={o.waLink} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        padding:'6px 14px', background:'rgba(37,211,102,0.15)', color:'#25D366',
+                        border:'1px solid rgba(37,211,102,0.4)', borderRadius:20,
+                        textDecoration:'none', fontSize:'0.8rem', fontWeight:600,
+                        display:'flex', alignItems:'center', gap:5,
+                      }}>
+                      💬 WhatsApp
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setDoc(doc(db, 'admin_notifications', o.orderId || o.id), { status:'read' }, { merge:true }).catch(() => {})}
+                    style={{ padding:'6px 12px', background:'rgba(255,255,255,0.07)', color:'var(--muted)', border:'1px solid var(--border)', borderRadius:20, cursor:'pointer', fontSize:'0.78rem', fontFamily:'inherit' }}>
+                    ✓ Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+            {unread.length > 3 && (
+              <div style={{ fontSize:'0.78rem', color:'var(--muted)', textAlign:'center' }}>
+                +{unread.length - 3} more orders — check the Orders tab
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 const SC = {
   new:          { bg:'rgba(232,131,42,0.12)', color:'#e8832a',    border:'rgba(232,131,42,0.3)'   },
   read:         { bg:'rgba(74,158,255,0.1)',  color:'#4a9eff',    border:'rgba(74,158,255,0.25)'  },
@@ -55,6 +144,54 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const [composing,   setComposing]   = useState(false);
   const [compErr,     setCompErr]     = useState('');
 
+  // ── Order notifications from admin_notifications ─────────────────────────
+  const [orderNotifs, setOrderNotifs] = useState([]);
+  const prevOrderIds = useRef(new Set());
+  const orderMounted = useRef(false);
+
+  // Request browser notification permission once
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'admin_notifications'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(n => n.type === 'new_order');
+
+      // Find genuinely new unread orders (not seen before)
+      if (orderMounted.current) {
+        notifs.forEach(n => {
+          if (n.status === 'unread' && !prevOrderIds.current.has(n.orderId || n.id)) {
+            // Browser notification (works even if tab is in background)
+            if ('Notification' in window && Notification.permission === 'granted') {
+              const itemList = (n.items || []).map(i => i.title).join(', ');
+              new Notification('🛒 New Order — Ellines Haven', {
+                body: `${n.userName || 'A customer'} ordered: ${itemList} · KSh ${n.total}`,
+                icon: '/logo-icon.png',
+                tag: n.orderId || n.id,
+              });
+            }
+            playAdminNotifSound();
+          }
+        });
+      }
+      prevOrderIds.current = new Set(notifs.map(n => n.orderId || n.id));
+      orderMounted.current = true;
+      setOrderNotifs(notifs);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  const dismissAllOrders = async () => {
+    const unread = orderNotifs.filter(o => o.status === 'unread');
+    await Promise.all(unread.map(o =>
+      setDoc(doc(db, 'admin_notifications', o.orderId || o.id), { status:'read' }, { merge:true }).catch(() => {})
+    ));
+  };
   const threadRef  = useRef(null);
   const prevIds    = useRef(new Set());
   const mounted    = useRef(false);
@@ -297,7 +434,12 @@ export default function MessagesPanel({ showToast, users = [] }) {
       <div className="adm-messages-topbar">
         <div>
           <h1 style={{ fontSize:'1.5rem', margin:0, marginBottom:3 }}>Messages &amp; Notifications</h1>
-          <span style={{ fontSize:'0.85rem', color:'var(--muted)' }}>{messages.length} total · {newCount > 0 ? <strong style={{ color:'#e8832a' }}>{newCount} new</strong> : 'all read'}</span>
+          <span style={{ fontSize:'0.85rem', color:'var(--muted)' }}>
+            {messages.length} total · {newCount > 0 ? <strong style={{ color:'#e8832a' }}>{newCount} new</strong> : 'all read'}
+            {orderNotifs.filter(o => o.status === 'unread').length > 0 && (
+              <> · <strong style={{ color:'#e8832a' }}>🛒 {orderNotifs.filter(o => o.status === 'unread').length} order{orderNotifs.filter(o => o.status === 'unread').length > 1 ? 's' : ''}</strong></>
+            )}
+          </span>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
           <button className="btn btn-primary" onClick={() => { setComposeOpen(true); setCompErr(''); setToSearch(''); setToEmail(''); setCompSubject(''); setCompBody(''); }}>
@@ -306,6 +448,9 @@ export default function MessagesPanel({ showToast, users = [] }) {
           <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:180 }} />
         </div>
       </div>
+
+      {/* ── Order notifications banner ── */}
+      <OrderNotificationBanner orders={orderNotifs} onDismiss={dismissAllOrders} />
 
       {/* ── Tabs + Filters ── */}
       <div className="adm-messages-filters">
@@ -404,7 +549,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   onClick={() => markStatus(selected.id, s)}>{s}</button>
               ))}
               {selected.email && (
-                <a href={`https://wa.me/${WA}?text=${encodeURIComponent('Hi '+selected.name+', ')}`}
+                <a href={`https://wa.me/${WA_ADMIN}?text=${encodeURIComponent('Hi '+selected.name+', ')}`}
                   target="_blank" rel="noopener noreferrer"
                   style={{ marginLeft:'auto', fontSize:'0.78rem', padding:'5px 12px', background:'rgba(37,211,102,0.12)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', borderRadius:20, textDecoration:'none', display:'flex', alignItems:'center', gap:5 }}>
                   💬 WhatsApp

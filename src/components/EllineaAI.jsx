@@ -48,6 +48,16 @@ function offlineReply(msg, ctx) {
     return `I'm **Ellinea** — the AI assistant for Ellines Haven! 🌟\n\nI can help you:\n• 📚 Find and recommend books\n• 💳 Explain payment methods (M-Pesa, Airtel, Card)\n• 📖 Access your library\n• 🔑 Manage your account\n• ✍️ Learn about author Elijah Mwangi M\n• 🏢 Understand Ellines Haven\n\nJust ask me anything!`;
   }
 
+  // Order status / tracking
+  if (/order|payment.*status|did.*pay|confirm.*payment|my.*order|track.*order|order.*confirm/.test(m)) {
+    return `To check your order status:\n\n1. Go to __/profile__ → **Orders** tab\n2. Or check __/my-library__ — if your book appears there, the order was confirmed ✅\n\nIf you paid but your book isn't showing, please contact us:\n• 💬 **WhatsApp:** 0748 255 466 _(fastest — we respond within the hour)_\n• 📧 **Email:** ellines.haven@gmail.com\n\nAlways include your M-Pesa confirmation message when contacting us. 📱`;
+  }
+
+  // M-Pesa instructions
+  if (/how.*pay|mpesa.*how|pay.*mpesa|steps.*pay|send.*money|lipa.*namba|m-pesa.*number|paybill|till number/.test(m)) {
+    return `Here's how to pay with **M-Pesa**:\n\n1. Add the book to your cart at __/library__\n2. Proceed to checkout\n3. You'll get an STK Push directly to your phone\n4. Enter your M-Pesa PIN to confirm\n5. Your book unlocks **instantly** after payment ✅\n\nM-Pesa number: **0748 255 466** · Registered to: **Ellines Haven**\n\nNeed help? WhatsApp us: 0748 255 466 💬`;
+  }
+
   // Books — list or search
   if (/book|novel|read|story|fiction|title|what.*have|browse|catalogue|collection/.test(m)) {
     const available = books.filter(b => b.active !== false && b.status !== 'draft');
@@ -56,84 +66,135 @@ function offlineReply(msg, ctx) {
     return `We have ${available.length} original African stories! Here are some highlights:\n\n${list}\n\nBrowse the full library at __/library__ — filter by genre, price, or search by title. 📚`;
   }
 
-  // Specific book search
-  if (/marriage|pain|nairobi|savanna|mombasa|sunsets|ghost|acacia|chapter|thunder/.test(m)) {
-    const found = books.filter(b => b.title?.toLowerCase().includes(m.split(' ').find(w => w.length > 4) || '') || b.genre?.toLowerCase().includes(m));
+  // Specific book search by title keywords
+  const bookKeywords = ['marriage','pain','nairobi','savanna','mombasa','sunsets','ghost','acacia','chapter','thunder','19 days','nineteen days','chasing'];
+  if (bookKeywords.some(k => m.includes(k))) {
+    const word = bookKeywords.find(k => m.includes(k)) || '';
+    const found = books.filter(b =>
+      b.title?.toLowerCase().includes(word) ||
+      b.genre?.toLowerCase().includes(word) ||
+      b.description?.toLowerCase().includes(word)
+    );
     if (found.length) {
       return `I found: **${found[0].title}** — ${found[0].genre} · KSh ${found[0].price}\n\n${found[0].excerpt || found[0].description || ''}\n\nView it at __/book/${found[0].id}__ 📚`;
     }
   }
 
-  // Payment
-  if (/pay|mpesa|m-pesa|airtel|card|visa|price|cost|ksh|buy|purchase|how much|checkout|checkout/.test(m)) {
-    return `We accept:\n• 📱 **M-Pesa** (STK push to your phone)\n• 🔴 **Airtel Money**\n• 💳 **Visa / Mastercard**\n\nAfter payment clears, your book unlocks **instantly** — no waiting! Books start from **KSh 120**. Go to your cart at __/cart__ to complete a purchase. 💳`;
+  // Payment / price
+  if (/pay|mpesa|m-pesa|airtel|card|visa|price|cost|ksh|buy|purchase|how much|checkout/.test(m)) {
+    return `We accept:\n• 📱 **M-Pesa** (STK push — fastest, most popular)\n• 🔴 **Airtel Money**\n• 💳 **Visa / Mastercard**\n\nAfter payment clears, your book unlocks **instantly**. Books start from **KSh 120**.\n\nGo to your cart at __/cart__ to complete a purchase. 💳`;
   }
 
-  // Library / access
-  if (/library|my book|download|read online|access|unlock|own|purchased|bought/.test(m)) {
+  // Library / access / download
+  if (/library|my book|download|read online|access|unlock|own|purchased|bought|pdf/.test(m)) {
     return `Your purchased books live in **My Library** at __/my-library__. You can:\n• 📱 Read online directly in the browser\n• ⬇️ Download the PDF for offline reading\n\nYour library is yours **forever** — no subscriptions, no expiry dates. Once you buy, you keep it. 📖`;
   }
 
-  // Author / founder
-  if (/author|elijah|mwangi|founder|wrote|writer|who wrote|created by/.test(m)) {
-    return `All books on Ellines Haven are written by **Elijah Mwangi M** — a Kenyan software engineer, AI developer, and published author.\n\nEvery story is drawn from real life across East Africa. He also founded **Ellines Tech** and **Ellines Rattan Furniture**.\n\n👤 Read his full story at __/founder__`;
+  // Author / founder info
+  if (/author|elijah|mwangi|founder|wrote|writer|who wrote|created by|biography|bio/.test(m)) {
+    return `All books on Ellines Haven are written by **Elijah Mwangi M** — a Kenyan software engineer, AI developer, entrepreneur, and published author.\n\nHe founded:\n• ✍️ **Ellines Haven** — digital literary platform\n• 💻 **Ellines Tech** — technology services\n• 🪑 **Ellines Rattan Furniture** — handcrafted furniture\n\nEvery story draws from real life across East Africa.\n\n👤 Read his full story at __/founder__`;
   }
 
-  // About platform
-  if (/about|who|what is|ellines|platform|company|haven/.test(m)) {
-    return `**Ellines Haven** is Kenya's premier digital literary platform — a sanctuary for original African stories. 🌍\n\n• Founded by Elijah Mwangi M\n• Part of the Ellines Group\n• All stories are authentic, honest, and Kenyan\n• Pay with M-Pesa, buy online, read instantly\n\nLearn more at __/about__`;
+  // About platform / company
+  if (/about|who.*ellines|what is ellines|platform|company|haven|ellines group/.test(m)) {
+    return `**Ellines Haven** is Kenya's premier digital literary platform — a sanctuary for original African stories. 🌍\n\n• Founded by Elijah Mwangi M\n• Part of the **Ellines Group** (Tech, Furniture, Haven)\n• Authentic, honest, Kenya-rooted stories\n• Pay with M-Pesa, buy online, read instantly\n• No subscriptions — buy once, own forever\n\nLearn more at __/about__`;
   }
 
-  // Contact / support
-  if (/contact|help|support|problem|issue|reach|whatsapp|phone|email/.test(m)) {
-    return `Need help? Here's how to reach us:\n\n• 💬 **WhatsApp:** 0748 255 466 _(fastest — we reply within the hour)_\n• 📧 **Email:** ellines.haven@gmail.com\n• 📞 **Phone:** 0748 255 466 or 0728 807 213\n• 📍 **Location:** Nairobi, Kenya\n\nOr visit our __/contact__ page. 🤝`;
+  // Contact / support / help
+  if (/contact|help|support|problem|issue|reach|whatsapp|phone|email|customer|service/.test(m)) {
+    return `Need help? Here's how to reach us:\n\n• 💬 **WhatsApp:** 0748 255 466 _(fastest — we reply within the hour)_\n• 📧 **Email:** ellines.haven@gmail.com\n• 📞 **Phone:** 0748 255 466 · 0728 807 213\n• 📍 **Location:** Nairobi, Kenya\n• 🕐 **Hours:** Mon–Sat, 8am–8pm EAT\n\nOr visit our __/contact__ page. 🤝`;
   }
 
   // Account / login / register
-  if (/account|login|sign in|sign up|register|password|forgot|create.*account/.test(m)) {
-    if (/forgot|reset|change.*password/.test(m)) {
-      return `To reset your password, go to __/login__ and click **"Forgot password?"**. You'll receive a 6-digit code to create a new password. 🔑`;
+  if (/account|login|sign in|sign up|register|password|forgot|create.*account|new account/.test(m)) {
+    if (/forgot|reset|change.*password|lost.*password/.test(m)) {
+      return `To reset your password:\n\n1. Go to __/login__\n2. Click **"Forgot password?"**\n3. Enter your email — you'll receive a 6-digit code\n4. Enter the code and set a new password ✅\n\nStill stuck? WhatsApp us at 0748 255 466 and we'll reset it for you manually. 🔑`;
     }
     if (/register|sign up|create/.test(m)) {
-      return `Creating an account is **free**! Visit __/register__ to get started. With an account you can:\n• 📚 Save your purchased books\n• 🛒 Track your orders\n• ⬇️ Download books you've bought\n\nIt takes under a minute. 😊`;
+      return `Creating an account is **free** and takes under a minute!\n\nVisit __/register__ to get started. With an account you can:\n• 📚 Save your purchased books forever\n• 🛒 Track your orders\n• ⬇️ Download books you've bought\n• 💬 Message the team directly\n\nAlready have one? Sign in at __/login__ 😊`;
     }
-    return `To sign in, visit __/login__. New here? Create a free account at __/register__.\n\nForgot your password? Click "Forgot password?" on the sign-in page. 🔑`;
+    if (/delete.*account|close.*account|remove.*account/.test(m)) {
+      return `To delete your account, go to __/profile__ → **Account Settings** → Request Deletion.\n\nThere's a 30-day grace period before the account is permanently removed — you can restore it any time during that window.\n\nNeed help? WhatsApp 0748 255 466. 🔑`;
+    }
+    return `To sign in, visit __/login__. New here? Create a free account at __/register__.\n\nForgot your password? Click **"Forgot password?"** on the sign-in page. 🔑`;
   }
 
-  // Admin
-  if (/admin|dashboard|manage|panel/.test(m)) {
+  // Admin access
+  if (/admin|dashboard|manage|panel|god mode/.test(m)) {
     if (user?.role === 'superadmin' || user?.role === 'admin') {
-      return `Welcome, **${name}**! As ${user.role === 'superadmin' ? '⚡ Super Admin' : '🛡️ Admin'} you have full access to the dashboard.\n\nHead to __/admin__ to manage books, orders, users, design, integrations, and more. 🚀`;
+      return `Welcome, **${name}**! As ${user.role === 'superadmin' ? '⚡ Super Admin' : '🛡️ Admin'} you have full access to the dashboard.\n\nHead to __/admin__ to manage books, orders, users, design, integrations, messages, and more. 🚀`;
     }
-    return `The admin panel is for authorised staff only. If you need admin access, contact support at ellines.haven@gmail.com. 🔒`;
+    return `The admin panel is for authorised staff only. If you need admin access, contact us at ellines.haven@gmail.com. 🔒`;
   }
 
   // Genre / recommendation
-  if (/recommend|suggest|what should|best|popular|drama|romance|mystery|history|thriller/.test(m)) {
-    const genreMap = { drama: 'Drama', romance: 'Romance', mystery: 'Mystery', history: 'Historical', historical: 'Historical' };
+  if (/recommend|suggest|what should|best|popular|drama|romance|mystery|history|thriller|fiction|good book/.test(m)) {
+    const genreMap = { drama:'Drama', romance:'Romance', mystery:'Mystery', history:'Historical', historical:'Historical', thriller:'Thriller', fiction:'Fiction' };
     const matchedGenre = Object.keys(genreMap).find(k => m.includes(k));
-    const genreBooks = matchedGenre ? books.filter(b => b.genre?.toLowerCase().includes(genreMap[matchedGenre].toLowerCase())).slice(0, 3) : books.filter(b => b.featured).slice(0, 3);
-    const list = genreBooks.map(b => `• **${b.title}** · KSh ${b.price}`).join('\n');
-    return `Here are my picks for you${matchedGenre ? ` (${genreMap[matchedGenre]})` : ''}:\n\n${list || 'Browse our full collection at __/library__.'}\n\nFilter by genre at __/library__ to find exactly what you're looking for! 🌟`;
+    const genreBooks = matchedGenre
+      ? books.filter(b => b.genre?.toLowerCase().includes(genreMap[matchedGenre].toLowerCase())).slice(0, 3)
+      : books.filter(b => b.featured).slice(0, 3);
+    if (genreBooks.length) {
+      const list = genreBooks.map(b => `• **${b.title}** · KSh ${b.price}`).join('\n');
+      return `Here are my picks for you${matchedGenre ? ` (${genreMap[matchedGenre]})` : ''}:\n\n${list}\n\nFilter by genre at __/library__ to find exactly what you're looking for! 🌟`;
+    }
+    return `Browse our full collection at __/library__ — you can filter by genre, price range, and more. We have ${books.filter(b=>b.active!==false).length} titles available. 📚`;
   }
 
-  // Price / affordability
-  if (/cheap|affordable|expensive|discount|promo|offer|free/.test(m)) {
-    return `Books on Ellines Haven start from just **KSh 120**. We keep prices fair and local — because great literature should be accessible to everyone.\n\nCheck the library for current prices: __/library__ 💰`;
+  // Pricing / affordability
+  if (/cheap|affordable|expensive|discount|promo|offer|free|price range|how much.*books/.test(m)) {
+    const prices = books.filter(b=>b.price>0).map(b=>b.price).sort((a,b)=>a-b);
+    const min = prices[0] || 120, max = prices[prices.length-1] || 500;
+    return `Books on Ellines Haven range from **KSh ${min}** to **KSh ${max}**. We keep prices fair and local — great literature should be accessible to everyone.\n\nBrowse current prices at __/library__ 💰`;
   }
 
-  // Swahili
-  if (/asante|sawa|karibu|ndiyo|hapana|pole|wewe|mimi|vitabu/.test(m)) {
-    return `Karibu sana! 😊 Naweza kukusaidia na chochote kuhusu Ellines Haven — vitabu, malipo, akaunti, au maswali mengine. Niambie unachohitaji!`;
+  // Reading / how to read
+  if (/how.*read|can i read|read online|read on phone|mobile|device|tablet|kindle/.test(m)) {
+    return `You can read your books:\n• 📱 **On any device** — phone, tablet, laptop, desktop\n• 🌐 **Online in your browser** — just go to __/my-library__\n• ⬇️ **Download PDF** — read offline anywhere, anytime\n\nNo special app needed — just your browser. Works on Android, iPhone, and everything else. 📖`;
+  }
+
+  // Refund / return policy
+  if (/refund|return|money back|cancel.*order|cancel.*payment/.test(m)) {
+    return `Because books are digital products that are instantly accessible after payment, we generally don't offer refunds once a book has been unlocked.\n\nHowever, if there was a payment error or you were charged but didn't receive your book, please contact us immediately:\n• 💬 **WhatsApp:** 0748 255 466\n• 📧 **Email:** ellines.haven@gmail.com\n\nWe always do our best to make things right. 🤝`;
+  }
+
+  // Delivery / shipping (since it's digital)
+  if (/deliver|ship|physical|print|hard copy|paperback/.test(m)) {
+    return `Ellines Haven is a **digital-only platform** — all books are delivered instantly online after payment. There's no physical shipping.\n\nOnce you pay, your book is available immediately in __/my-library__ for reading or PDF download. ⚡`;
+  }
+
+  // Languages
+  if (/language|english|swahili|kiswahili|translate|translation/.test(m)) {
+    return `Currently, all books on Ellines Haven are written in **English**. The stories are set in East Africa with authentic Kenyan voices, culture, and context.\n\nWe're exploring Swahili editions in the future — stay tuned! 📚\n\nKwa maswali kwa Kiswahili: unaweza kuwasiliana nasi kupitia WhatsApp: 0748 255 466`;
+  }
+
+  // Swahili responses
+  if (/asante|sawa|karibu|ndiyo|hapana|pole|wewe|mimi|vitabu|ninahitaji|tafadhali|samahani/.test(m)) {
+    return `Karibu sana! 😊 Naweza kukusaidia na:\n• 📚 Vitabu vilivyopo\n• 💳 Jinsi ya kulipa (M-Pesa, Airtel)\n• 📖 Kufikia maktaba yako\n• 🔑 Akaunti yako\n\nNiambie unachohitaji! Pia unaweza kuwasiliana nasi kwa WhatsApp: **0748 255 466**`;
   }
 
   // Thank you
-  if (/thank|thanks|thx|asante/.test(m)) {
-    return `You're welcome, ${name}! 😊 Happy reading — if you need anything else, I'm right here. ✦`;
+  if (/thank|thanks|thx|asante|great.*help|helpful/.test(m)) {
+    return `You're welcome, ${name}! 😊 Happy reading — if you ever need anything else, I'm right here. ✦`;
   }
 
-  // Fallback
-  return `I'm **Ellinea**, your Ellines Haven assistant. I didn't quite catch that, but I can help with:\n\n• 📚 Finding or recommending books\n• 💳 Payment methods (M-Pesa, Airtel, Card)\n• 📖 Accessing your library\n• 🔑 Account and password help\n• ✍️ Info about author Elijah Mwangi M\n\nWhat would you like to know? 😊`;
+  // Privacy / data
+  if (/privacy|data|personal.*info|what.*you.*store|gdpr|my.*data/.test(m)) {
+    return `Ellines Haven takes your privacy seriously. We collect:\n• Your name and email (for your account)\n• Purchase records (so you can access your books)\n• Messages you send us\n\nWe don't sell your data to third parties. Read our full policy at __/privacy__. 🔒`;
+  }
+
+  // Terms / conditions
+  if (/terms|conditions|policy|rules|legal|agreement/.test(m)) {
+    return `You can find our full terms and conditions at __/terms__ and our privacy policy at __/privacy__.\n\nThe main points:\n• Purchased books are for personal use only\n• No sharing or redistribution of downloaded books\n• We reserve the right to suspend accounts that violate our terms\n\nQuestions? Email ellines.haven@gmail.com 📄`;
+  }
+
+  // Technical issues / errors
+  if (/error|bug|not working|broken|problem|issue|crash|loading|slow|can't access|stuck/.test(m)) {
+    return `Sorry to hear you're having trouble! Here's what to try:\n\n1. **Refresh** the page (Ctrl+R / Cmd+R)\n2. **Clear your browser cache** and try again\n3. **Try a different browser** (Chrome works best)\n4. Check your **internet connection**\n\nIf the problem persists, contact us right away:\n• 💬 **WhatsApp:** 0748 255 466 _(fastest response)_\n• 📧 **Email:** ellines.haven@gmail.com\n\nDescribe the issue and which page it's on. 🔧`;
+  }
+
+  // Fallback with richer suggestions
+  return `I'm **Ellinea**, your Ellines Haven assistant. I didn't quite catch that, but I can help with:\n\n• 📚 **Books** — find, search, browse by genre\n• 💳 **Payments** — M-Pesa, Airtel, Card instructions\n• 📖 **Your library** — access, download, read online\n• 🔑 **Account** — login, register, password reset\n• ✍️ **Author** — about Elijah Mwangi M\n• 📞 **Contact** — WhatsApp 0748 255 466\n\nWhat would you like to know? 😊`;
 }
 
 /* ── OpenAI API call (if key configured) ── */
@@ -198,7 +259,29 @@ export default function EllineaAI() {
     try {
       if (aiConfig?.apiKey) {
         // Build system prompt with site context
-        const systemPrompt = `You are ${AI_NAME}, a friendly and knowledgeable assistant for Ellines Haven — Kenya's premier digital literary platform. You help readers discover books, handle payments, manage their accounts, and learn about the platform and its founder Elijah Mwangi M. The user is currently on: ${ctx.page}. Keep responses concise, warm, and helpful. Use simple markdown for formatting. Always refer to books, payment methods (M-Pesa, Airtel Money, Visa/MC), and the author Elijah Mwangi M where relevant.`;
+        const bookList = (ctx.books || []).filter(b => b.active !== false && b.status !== 'draft')
+          .map(b => `"${b.title}" (${b.genre}, KSh ${b.price})`).join(', ');
+        const systemPrompt = `You are ${AI_NAME}, a warm, knowledgeable, and helpful AI assistant for Ellines Haven — Kenya's premier digital literary platform founded by Elijah Mwangi M. You help readers discover books, handle M-Pesa/Airtel/card payments, manage accounts, and learn about the platform.
+
+Current page: ${ctx.page}
+Available books: ${bookList || 'Check /library for full catalogue'}
+User: ${ctx.user ? ctx.user.name + ' (' + (ctx.user.role || 'user') + ')' : 'Guest'}
+
+Key facts:
+- Payment: M-Pesa STK push to 0748255466, Airtel Money, Visa/Mastercard. Books unlock instantly after payment.
+- Books range KSh 120–500. No subscriptions — buy once, own forever.
+- Support: WhatsApp 0748 255 466 (fastest), Email ellines.haven@gmail.com, Mon–Sat 8am–8pm EAT
+- My Library at /my-library for purchased books (read online or download PDF)
+- Register free at /register, sign in at /login, forgot password via "Forgot password?" link
+- Author: Elijah Mwangi M — Kenyan software engineer, AI developer, author
+
+Rules:
+- Keep responses concise, warm, and practical. Max 150 words unless a complex question needs more.
+- Use simple markdown for formatting (**bold**, bullet points with •).
+- Use __/route__ for internal links (e.g., __/library__, __/login__).
+- If you don't know something specific about Ellines Haven, say so and direct to WhatsApp support.
+- Never make up book titles or prices — only mention books from the list above.
+- Be conversational and friendly, like a knowledgeable friend — not a corporate bot.`;
         const history = msgs.slice(-8).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.text }));
         reply = await callOpenAI([{ role: 'system', content: systemPrompt }, ...history, { role: 'user', content: msg }], aiConfig.apiKey, aiConfig.model);
       } else {

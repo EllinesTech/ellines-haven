@@ -376,6 +376,31 @@ export function AppProvider({ children }) {
     };
     // Always write to Firestore — localStorage fallback causes orders to be invisible to buyer
     await setDoc(doc(db,'orders',order.id), { ...order, createdAt: serverTimestamp() });
+
+    // ── Notify admin: write to admin_notifications so the panel lights up ──
+    try {
+      const itemList = order.items.map(i => i.title).join(', ');
+      const waText = encodeURIComponent(
+        `🛒 NEW ORDER from ${order.userName} (${order.userEmail || 'guest'})\n` +
+        `Books: ${itemList}\n` +
+        `Total: KSh ${order.total}\n` +
+        `Method: ${method}\n` +
+        `Order ID: ${order.id}`
+      );
+      await setDoc(doc(db, 'admin_notifications', order.id), {
+        type: 'new_order',
+        orderId: order.id,
+        userName: order.userName,
+        userEmail: order.userEmail,
+        items: order.items,
+        total: order.total,
+        method,
+        status: 'unread',
+        waLink: `https://wa.me/254748255466?text=${waText}`,
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) { console.warn('[placeOrder] admin notification failed:', e.message); }
+
     return order;
   };
 

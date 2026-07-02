@@ -3,6 +3,24 @@ import { doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, serverT
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
+/* ── Merge two user lists, deduped by email, Firestore wins for conflicts ── */
+function mergeUserLists(propUsers, fsUsers) {
+  const map = new Map();
+  // Local/prop users go in first (lower priority)
+  (propUsers || []).forEach(u => {
+    if (u.email) map.set(u.email.toLowerCase(), u);
+  });
+  // Firestore users override — they are authoritative
+  (fsUsers || []).forEach(u => {
+    if (u.email) {
+      const key = u.email.toLowerCase();
+      const existing = map.get(key) || {};
+      map.set(key, { ...existing, ...u });
+    }
+  });
+  return Array.from(map.values());
+}
+
 const TABS = ['overview','users','deletions','mass','database','emergency'];
 const TAB_LABELS = { overview:'Overview', users:'User Control', deletions:'Pending Deletions', mass:'Mass Actions', database:'Database', emergency:'Emergency' };
 const COLLS = ['site_data','orders','libraries','contact_messages','user_profiles','reviews','admin_notifications'];
@@ -53,10 +71,28 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
   const [selectedBook, setSelectedBook] = useState('');
   const [transferEmail, setTransferEmail] = useState('');
 
-  const allUsers = [
-    ...(propUsers || []),
-    ...JSON.parse(localStorage.getItem('eh_registered_users')||'[]')
-  ].filter((u,i,a)=>a.findIndex(x=>x.email?.toLowerCase()===u.email?.toLowerCase())===i);
+  // ── Live Firestore users ─────────────────────────────────────────────────
+  const [fsUsers, setFsUsers] = useState([]);
+  const [fsUsersLoading, setFsUsersLoading] = useState(true);
+
+  useEffect(() => {
+    setFsUsersLoading(true);
+    const unsub = onSnapshot(collection(db, 'users'), (snap) => {
+      const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setFsUsers(fetched);
+      setFsUsersLoading(false);
+    }, () => setFsUsersLoading(false));
+    return () => unsub();
+  }, []);
+
+  // Merge Firestore users + prop users + localStorage — deduplicated, Firestore wins
+  const allUsers = mergeUserLists(
+    [
+      ...(propUsers || []),
+      ...JSON.parse(localStorage.getItem('eh_registered_users') || '[]'),
+    ],
+    fsUsers
+  ).filter((u, i, a) => a.findIndex(x => x.email?.toLowerCase() === u.email?.toLowerCase()) === i);
 
   const filtered = allUsers.filter(u =>
     !userSearch || u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase())
@@ -72,6 +108,10 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
       return ()=>unsub();
     } catch {}
   },[]);
+
+  useEffect(()=>{
+    setAdminStats(s=>({...s, users:allUsers.length, suspended:allUsers.filter(u=>isUserSuspended?.(u.email)).length}));
+  },[allUsers.length]); // eslint-disable-line
 
   useEffect(()=>{
     // Load pending deletions from user_profiles
@@ -260,6 +300,11 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
           <div>
             <input className="field" value={userSearch} onChange={e=>setUserSearch(e.target.value)} placeholder="Search users by name or email…" style={{marginBottom:12,width:'100%'}} />
             <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:'65vh',overflowY:'auto'}}>
+              {fsUsersLoading && (
+                <div style={{textAlign:'center',padding:'12px 0',fontSize:'0.78rem',color:'var(--muted)'}}>
+                  ⏳ Loading users from Firestore…
+                </div>
+              )}
               {filtered.map((u,i)=>(
                 <div key={i} onClick={()=>selectUser(u)}
                   style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:selectedUser?.email===u.email?'rgba(201,168,76,0.1)':'var(--card)',border:selectedUser?.email===u.email?'1px solid rgba(201,168,76,0.4)':'1px solid var(--border)',borderRadius:'var(--r-sm)',cursor:'pointer',transition:'all 0.15s'}}>
