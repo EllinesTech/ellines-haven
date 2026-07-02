@@ -17,6 +17,8 @@ service cloud.firestore {
     match /admin_notifications/{d}                   { allow read, write: if true; }
     match /contact_messages/{docId}                  { allow read, write: if true; }
     match /contact_messages/{docId}/messages/{msgId} { allow read, write: if true; }
-    match /{document=**}                             { allow read, write: if false; }
+    // Allow all other collections (books_catalogue, covers, etc.)
+    match /{collection}/{document}                   { allow read, write: if true; }
+    match /{collection}/{document}/{sub}/{subDoc}     { allow read, write: if true; }
   }
 }

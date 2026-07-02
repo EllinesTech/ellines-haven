@@ -1526,90 +1526,138 @@ function ManualUnlockForm({ books, showToast, onUnlock }) {
 }
 
 /* ── ArchivesPanel ────────────────────────────────────────────────────────── */
+/* ── TrashPanel / ArchivesPanel — handles ALL content types ─────────────── */
+const TYPE_LABELS = {
+  order:   { icon:'🛒', label:'Order',   color:'var(--gold)' },
+  book:    { icon:'📚', label:'Book',    color:'#4a9eff'     },
+  user:    { icon:'👤', label:'User',    color:'#a855f7'     },
+  message: { icon:'💬', label:'Message', color:'#25D366'     },
+  review:  { icon:'⭐', label:'Review',  color:'#e8832a'     },
+};
+
+function ItemSummary({ item }) {
+  const type = item.type || 'order';
+  if (type === 'order') return (
+    <td style={{ fontSize:'0.78rem' }}>
+      <div><strong>{item.userName || item.userEmail || '—'}</strong></div>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.userEmail}</div>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{(item.items||[]).map(b=>b.title).join(', ')}</div>
+      {item.total && <div style={{ color:'var(--gold)', fontWeight:700 }}>KSh {item.total.toLocaleString()}</div>}
+    </td>
+  );
+  if (type === 'book') return (
+    <td style={{ fontSize:'0.78rem' }}>
+      <strong>{item.title || '—'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.genre} · {item.author}</div>
+    </td>
+  );
+  if (type === 'user') return (
+    <td style={{ fontSize:'0.78rem' }}>
+      <strong>{item.name || '—'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.email}</div>
+    </td>
+  );
+  if (type === 'message') return (
+    <td style={{ fontSize:'0.78rem' }}>
+      <strong>{item.name || item.email || '—'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{(item.message||'').slice(0,60)}{(item.message||'').length>60?'…':''}</div>
+    </td>
+  );
+  if (type === 'review') return (
+    <td style={{ fontSize:'0.78rem' }}>
+      <strong>{item.user || '—'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.book} · {'★'.repeat(item.rating||0)}</div>
+    </td>
+  );
+  return <td style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{item.id}</td>;
+}
+
 function ArchivesPanel({ db, showToast, onRestore }) {
-  const [items, setItems]   = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [items,      setItems]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [typeFilter, setTypeFilter] = useState('all');
 
   useEffect(() => {
-    const { collection: col, query: q, orderBy, onSnapshot: snap } = require !== undefined
-      ? { collection: null } : {};
-    // Use module-level firebase imports
-    import('firebase/firestore').then(() => {}).catch(() => {});
-    const unsubPromise = (async () => {
-      const { collection, query, orderBy, onSnapshot } = await import('firebase/firestore');
-      const qr = query(collection(db, 'archives'), orderBy('archivedAt', 'desc'));
-      return onSnapshot(qr, s => {
-        setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      }, () => setLoading(false));
-    })();
-    return () => unsubPromise.then(u => u && u());
+    const qr = query(collection(db, 'archives'), orderBy('archivedAt', 'desc'));
+    const unsub = onSnapshot(qr, s => {
+      setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => unsub();
   }, []); // eslint-disable-line
 
   const restore = async (item) => {
     try {
-      const { doc, setDoc, deleteDoc, serverTimestamp } = await import('firebase/firestore');
-      const { id, archivedAt, archivedBy, ...orderData } = item;
-      await setDoc(doc(db, 'orders', id), { ...orderData, restoredAt: serverTimestamp() });
+      const { id, archivedAt, archivedBy, type, ...data } = item;
+      const target = type==='user' ? 'users' : type==='message' ? 'contact_messages' : type==='review' ? 'reviews' : 'orders';
+      await setDoc(doc(db, target, id), { ...data, type, restoredAt: serverTimestamp() });
       await deleteDoc(doc(db, 'archives', id));
       setItems(prev => prev.filter(i => i.id !== id));
-      onRestore && onRestore({ id, ...orderData });
-      showToast('✅ Order restored to active orders');
+      onRestore?.({ id, ...data });
+      showToast('✅ Restored');
     } catch (e) { showToast('❌ Restore failed: ' + e.message); }
   };
 
-  const permanentDelete = async (id) => {
-    if (!window.confirm('Permanently delete this archived order? This cannot be undone.')) return;
+  const permDelete = async (id) => {
+    if (!window.confirm('Permanently delete? This cannot be undone.')) return;
     try {
-      const { doc, deleteDoc } = await import('firebase/firestore');
       await deleteDoc(doc(db, 'archives', id));
       setItems(prev => prev.filter(i => i.id !== id));
       showToast('🗑️ Permanently deleted');
     } catch (e) { showToast('❌ ' + e.message); }
   };
 
+  const types = ['all', ...new Set(items.map(i => i.type||'order'))];
+  const filtered = typeFilter==='all' ? items : items.filter(i => (i.type||'order')===typeFilter);
+
   return (
     <div className="adm-page">
       <div className="adm-page-head">
-        <div>
-          <h1>Archives</h1>
-          <span className="adm-page-sub">Orders removed from the active list — safely stored here. Restore or permanently delete.</span>
-        </div>
+        <div><h1>Archives</h1><span className="adm-page-sub">{items.length} archived item{items.length!==1?'s':''} — orders, books, messages, users &amp; reviews</span></div>
       </div>
+      {types.length > 1 && (
+        <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
+          {types.map(t => {
+            const tm = TYPE_LABELS[t];
+            return (
+              <button key={t} onClick={() => setTypeFilter(t)}
+                style={{ padding:'4px 14px', borderRadius:20, border:'1px solid', fontSize:'0.78rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                  background: typeFilter===t ? 'rgba(201,168,76,0.15)' : 'transparent',
+                  color: typeFilter===t ? 'var(--gold)' : 'var(--muted)',
+                  borderColor: typeFilter===t ? 'rgba(201,168,76,0.5)' : 'var(--dim)' }}>
+                {t==='all' ? 'All' : (tm?.icon+' '+tm?.label+'s')}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {loading ? (
         <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading archives…</div>
-      ) : items.length === 0 ? (
-        <div className="adm-empty">
-          <div style={{ fontSize:'3rem', marginBottom:12 }}>📦</div>
-          <p>No archived orders yet. Archive orders from the Orders tab to store them here.</p>
+      ) : filtered.length === 0 ? (
+        <div className="adm-empty"><div style={{ fontSize:'3rem', marginBottom:12 }}>📦</div>
+          <p>{typeFilter==='all' ? 'No archived items yet.' : `No archived ${typeFilter}s.`}</p>
         </div>
       ) : (
         <div className="card" style={{ overflow:'hidden' }}>
           <table className="adm-table">
-            <thead>
-              <tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Status</th><th>Archived</th><th>Actions</th></tr>
-            </thead>
+            <thead><tr><th>Type</th><th>ID</th><th>Summary</th><th>Archived By</th><th>Date</th><th>Actions</th></tr></thead>
             <tbody>
-              {items.map(item => (
-                <tr key={item.id}>
-                  <td><code style={{ fontSize:'0.72rem', color:'var(--gold)' }}>{item.id}</code></td>
-                  <td>
-                    <strong style={{ display:'block', fontSize:'0.85rem' }}>{item.userName || item.userEmail}</strong>
-                    <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.userEmail}</span>
-                  </td>
-                  <td style={{ fontSize:'0.78rem' }}>{(item.items||[]).map(b => b.title).join(', ') || '—'}</td>
-                  <td><strong>KSh {item.total?.toLocaleString() || '—'}</strong></td>
-                  <td><span className={`adm-status adm-status--${(item.status||'').toLowerCase()}`}>{item.status}</span></td>
-                  <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
-                    {item.archivedBy && <span style={{ display:'block' }}>by {item.archivedBy}</span>}
-                    {item.archivedAt?.toDate?.()?.toLocaleDateString?.() || '—'}
-                  </td>
-                  <td className="adm-actions">
-                    <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
-                    <button className="adm-act-btn adm-act-del" onClick={() => permanentDelete(item.id)}>🗑️ Delete</button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map(item => {
+                const tm = TYPE_LABELS[item.type||'order'] || TYPE_LABELS.order;
+                return (
+                  <tr key={item.id}>
+                    <td><span style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--dim)', borderRadius:6, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700, color:tm.color, whiteSpace:'nowrap' }}>{tm.icon} {tm.label}</span></td>
+                    <td><code style={{ fontSize:'0.68rem', color:'var(--gold)' }}>{String(item.id).slice(0,16)}</code></td>
+                    <ItemSummary item={item} />
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.archivedBy||'—'}</td>
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.archivedAt?.toDate?.()?.toLocaleDateString?.()||'—'}</td>
+                    <td className="adm-actions">
+                      <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
+                      <button className="adm-act-btn adm-act-del"     onClick={() => permDelete(item.id)}>✕ Delete Forever</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1620,37 +1668,34 @@ function ArchivesPanel({ db, showToast, onRestore }) {
 
 /* ── TrashPanel ───────────────────────────────────────────────────────────── */
 function TrashPanel({ db, showToast, onRestore }) {
-  const [items, setItems]   = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [items,      setItems]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [typeFilter, setTypeFilter] = useState('all');
 
   useEffect(() => {
-    (async () => {
-      const { collection, query, orderBy, onSnapshot } = await import('firebase/firestore');
-      const qr = query(collection(db, 'trash'), orderBy('trashedAt', 'desc'));
-      const unsub = onSnapshot(qr, s => {
-        setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      }, () => setLoading(false));
-      return unsub;
-    })();
+    const qr = query(collection(db, 'trash'), orderBy('trashedAt', 'desc'));
+    const unsub = onSnapshot(qr, s => {
+      setItems(s.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => unsub();
   }, []); // eslint-disable-line
 
   const restore = async (item) => {
     try {
-      const { doc, setDoc, deleteDoc, serverTimestamp } = await import('firebase/firestore');
-      const { id, trashedAt, trashedBy, ...orderData } = item;
-      await setDoc(doc(db, 'orders', id), { ...orderData, restoredAt: serverTimestamp() });
+      const { id, trashedAt, trashedBy, type, ...data } = item;
+      const target = type==='user' ? 'users' : type==='message' ? 'contact_messages' : type==='review' ? 'reviews' : 'orders';
+      await setDoc(doc(db, target, id), { ...data, type, restoredAt: serverTimestamp() });
       await deleteDoc(doc(db, 'trash', id));
       setItems(prev => prev.filter(i => i.id !== id));
-      onRestore && onRestore({ id, ...orderData });
-      showToast('✅ Order restored to active orders');
+      onRestore?.({ id, ...data });
+      showToast('✅ Restored');
     } catch (e) { showToast('❌ Restore failed: ' + e.message); }
   };
 
-  const permanentDelete = async (id) => {
-    if (!window.confirm('Permanently delete this order? This cannot be undone.')) return;
+  const permDelete = async (id) => {
+    if (!window.confirm('Permanently delete this item? This cannot be undone.')) return;
     try {
-      const { doc, deleteDoc } = await import('firebase/firestore');
       await deleteDoc(doc(db, 'trash', id));
       setItems(prev => prev.filter(i => i.id !== id));
       showToast('🗑️ Permanently deleted');
@@ -1658,60 +1703,70 @@ function TrashPanel({ db, showToast, onRestore }) {
   };
 
   const emptyTrash = async () => {
-    if (!window.confirm(`Permanently delete all ${items.length} trashed orders? This cannot be undone.`)) return;
+    if (!window.confirm(`Permanently delete all ${items.length} items in trash? Cannot be undone.`)) return;
     try {
-      const { doc, deleteDoc } = await import('firebase/firestore');
       await Promise.all(items.map(i => deleteDoc(doc(db, 'trash', i.id))));
       setItems([]);
       showToast('🗑️ Trash emptied');
     } catch (e) { showToast('❌ ' + e.message); }
   };
 
+  const types = ['all', ...new Set(items.map(i => i.type||'order'))];
+  const filtered = typeFilter==='all' ? items : items.filter(i => (i.type||'order')===typeFilter);
+
   return (
     <div className="adm-page">
       <div className="adm-page-head">
-        <div>
-          <h1>Trash</h1>
-          <span className="adm-page-sub">Deleted orders — restore them or permanently remove them.</span>
-        </div>
+        <div><h1>Trash</h1><span className="adm-page-sub">{items.length} item{items.length!==1?'s':''} in trash</span></div>
         {items.length > 0 && (
-          <button className="btn btn-danger btn-sm" onClick={emptyTrash}>🗑️ Empty Trash ({items.length})</button>
+          <button onClick={emptyTrash} style={{ background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'7px 16px', cursor:'pointer', fontWeight:600, fontSize:'0.82rem', fontFamily:'inherit' }}>
+            🗑️ Empty Trash ({items.length})
+          </button>
         )}
       </div>
+      {types.length > 1 && (
+        <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
+          {types.map(t => {
+            const tm = TYPE_LABELS[t];
+            return (
+              <button key={t} onClick={() => setTypeFilter(t)}
+                style={{ padding:'4px 14px', borderRadius:20, border:'1px solid', fontSize:'0.78rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                  background: typeFilter===t ? 'rgba(231,76,60,0.12)' : 'transparent',
+                  color: typeFilter===t ? '#e74c3c' : 'var(--muted)',
+                  borderColor: typeFilter===t ? 'rgba(231,76,60,0.4)' : 'var(--dim)' }}>
+                {t==='all' ? 'All' : (tm?.icon+' '+tm?.label+'s')}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {loading ? (
         <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading trash…</div>
-      ) : items.length === 0 ? (
-        <div className="adm-empty">
-          <div style={{ fontSize:'3rem', marginBottom:12 }}>🗑️</div>
-          <p>Trash is empty. Deleted orders will appear here.</p>
+      ) : filtered.length === 0 ? (
+        <div className="adm-empty"><div style={{ fontSize:'3rem', marginBottom:12 }}>🗑️</div>
+          <p>Trash is empty. Deleted items from Orders, Books, Users, Messages and Reviews appear here.</p>
         </div>
       ) : (
         <div className="card" style={{ overflow:'hidden' }}>
           <table className="adm-table">
-            <thead>
-              <tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Status</th><th>Deleted</th><th>Actions</th></tr>
-            </thead>
+            <thead><tr><th>Type</th><th>ID</th><th>Summary</th><th>Deleted By</th><th>Date</th><th>Actions</th></tr></thead>
             <tbody>
-              {items.map(item => (
-                <tr key={item.id} style={{ opacity: 0.8 }}>
-                  <td><code style={{ fontSize:'0.72rem', color:'#e74c3c' }}>{item.id}</code></td>
-                  <td>
-                    <strong style={{ display:'block', fontSize:'0.85rem' }}>{item.userName || item.userEmail}</strong>
-                    <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.userEmail}</span>
-                  </td>
-                  <td style={{ fontSize:'0.78rem' }}>{(item.items||[]).map(b => b.title).join(', ') || '—'}</td>
-                  <td><strong>KSh {item.total?.toLocaleString() || '—'}</strong></td>
-                  <td><span className={`adm-status adm-status--${(item.status||'').toLowerCase()}`}>{item.status}</span></td>
-                  <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
-                    {item.trashedBy && <span style={{ display:'block' }}>by {item.trashedBy}</span>}
-                    {item.trashedAt?.toDate?.()?.toLocaleDateString?.() || '—'}
-                  </td>
-                  <td className="adm-actions">
-                    <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
-                    <button className="adm-act-btn adm-act-del" onClick={() => permanentDelete(item.id)}>✕ Delete</button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map(item => {
+                const tm = TYPE_LABELS[item.type||'order'] || TYPE_LABELS.order;
+                return (
+                  <tr key={item.id} style={{ opacity:0.85 }}>
+                    <td><span style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.25)', borderRadius:6, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700, color:'#e06c5a', whiteSpace:'nowrap' }}>{tm.icon} {tm.label}</span></td>
+                    <td><code style={{ fontSize:'0.68rem', color:'#e06c5a' }}>{String(item.id).slice(0,16)}</code></td>
+                    <ItemSummary item={item} />
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.trashedBy||'—'}</td>
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.trashedAt?.toDate?.()?.toLocaleDateString?.()||'—'}</td>
+                    <td className="adm-actions">
+                      <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
+                      <button className="adm-act-btn adm-act-del"     onClick={() => permDelete(item.id)}>✕ Delete Forever</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
