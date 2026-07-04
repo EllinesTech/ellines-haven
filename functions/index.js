@@ -93,21 +93,24 @@ exports.stkPush = onCall(
 
       console.log("[stkPush] sending:", { shortcode, formattedPhone, amount: Math.ceil(amount), env, callbackUrl });
 
+      const reqBody = {
+        BusinessShortCode: shortcode,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: Math.ceil(amount),
+        PartyA: formattedPhone,
+        PartyB: shortcode,
+        PhoneNumber: formattedPhone,
+        CallBackURL: callbackUrl,
+        AccountReference: "EllinesBks",
+        TransactionDesc: "Ellines Haven Books",
+      };
+      console.log("[stkPush] request body:", JSON.stringify(reqBody));
+
       const stkRes = await axios.post(
         `${base}/mpesa/stkpush/v1/processrequest`,
-        {
-          BusinessShortCode: shortcode,
-          Password: password,
-          Timestamp: timestamp,
-          TransactionType: "CustomerPayBillOnline",
-          Amount: Math.ceil(amount),
-          PartyA: formattedPhone,
-          PartyB: shortcode,
-          PhoneNumber: formattedPhone,
-          CallBackURL: callbackUrl,
-          AccountReference: "EllinesBks",
-          TransactionDesc: "Ellines Haven Books",
-        },
+        reqBody,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -132,8 +135,9 @@ exports.stkPush = onCall(
       return { success: true, checkoutRequestId: CheckoutRequestID };
     } catch (err) {
       const darjaError = err.response?.data;
-      const msg = darjaError?.errorMessage || darjaError?.ResponseDescription || err.message || "STK push failed";
-      console.error("[stkPush] error:", JSON.stringify(darjaError || err.message));
+      const darjaStatus = err.response?.status;
+      const msg = darjaError?.errorMessage || darjaError?.ResponseDescription || darjaError?.error_description || err.message || "STK push failed";
+      console.error("[stkPush] Daraja error:", darjaStatus, JSON.stringify(darjaError));
       throw new HttpsError("internal", msg);
     }
   }
