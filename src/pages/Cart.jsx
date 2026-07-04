@@ -181,7 +181,8 @@ export default function Cart() {
   const [busy,             setBusy]            = useState(false);
   const [stkError,         setStkError]        = useState('');
   const [placedOrder,      setPlacedOrder]     = useState(null);
-  const [cancelledNotice,  setCancelledNotice] = useState(''); // non-empty string = show notice
+  const [cancelledNotice,  setCancelledNotice] = useState('');
+  const [refundAcked,      setRefundAcked]     = useState(false); // no-refund acknowledgement
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
@@ -564,7 +565,16 @@ export default function Cart() {
   );
 
   // ── Payment screen ───────────────────────────────────────────────────────
-  if (step === 'pay') return (
+  if (step === 'pay') {
+    // Which methods are active — driven by admin settings, default includes the 4 core ones
+    const activeMethods = settings.payMethods || ['paystack','mpesa','airtel','card'];
+    const show = {
+      paystack: activeMethods.includes('paystack'),
+      paypal:   activeMethods.includes('paypal') && (settings.paypalEnabled || settings.paypalClientId),
+      airtel:   activeMethods.includes('airtel'),
+      wa:       activeMethods.includes('wa'),
+    };
+    return (
     <main className="cart-page">
       <div className="page-header"><div className="container"><h1><EditableField field="checkout_heading">Checkout</EditableField></h1></div></div>
       <div className="container">
@@ -572,12 +582,23 @@ export default function Cart() {
           <div className="pay-form card">
             <h3>Choose Payment Method</h3>
             <div className="pay-methods">
-              <button className={'pay-btn' + (method === 'paystack' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paystack'); setStkError(''); }}>💳 Pay Online</button>
-              {(settings.paypalEnabled || settings.paypalClientId) && (
+              {show.paystack && (
+                <button className={'pay-btn' + (method === 'paystack' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paystack'); setStkError(''); }}>💳 Pay Online</button>
+              )}
+              {show.paypal && (
                 <button className={'pay-btn' + (method === 'paypal' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paypal'); setStkError(''); }}>🅿 PayPal</button>
               )}
-              <button className={'pay-btn' + (method === 'airtel'   ? ' pay-btn--on' : '')} onClick={() => { setMethod('airtel');   setStkError(''); }}>Airtel Money</button>
-              <button className={'pay-btn' + (method === 'wa'       ? ' pay-btn--on' : '')} onClick={() => { setMethod('wa');       setStkError(''); }}>WhatsApp</button>
+              {show.airtel && (
+                <button className={'pay-btn' + (method === 'airtel' ? ' pay-btn--on' : '')} onClick={() => { setMethod('airtel'); setStkError(''); }}>Airtel Money</button>
+              )}
+              {show.wa && (
+                <button className={'pay-btn' + (method === 'wa' ? ' pay-btn--on' : '')} onClick={() => { setMethod('wa'); setStkError(''); }}>WhatsApp</button>
+              )}
+              {!show.paystack && !show.paypal && !show.airtel && !show.wa && (
+                <div style={{ color:'var(--muted)', fontSize:'0.88rem', padding:'20px 0', textAlign:'center' }}>
+                  No payment methods are currently active. Please contact us via WhatsApp.
+                </div>
+              )}
             </div>
 
             {/* ── Paystack: M-Pesa / Card / Bank ── */}
@@ -635,7 +656,19 @@ export default function Cart() {
                   <span>Total</span>
                   <strong>KSh {(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}</strong>
                 </div>
-                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy}>
+                {/* ── No-refund acknowledgement ── */}
+                <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
+                  <input
+                    type="checkbox"
+                    checked={refundAcked}
+                    onChange={e => setRefundAcked(e.target.checked)}
+                    style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }}
+                  />
+                  <span style={{ color:'var(--muted)' }}>
+                    I understand that <strong style={{ color:'var(--text)' }}>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Read refund policy →</Link>
+                  </span>
+                </label>
+                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy || !refundAcked}>
                   {busy ? 'Opening payment…' : `⚡ Pay KSh ${(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}`}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
@@ -658,7 +691,14 @@ export default function Cart() {
                   {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
                 </div>
                 <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
-                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px', background:'#0070f0', borderColor:'#0070f0' }} disabled={busy}>
+                {/* ── No-refund acknowledgement ── */}
+                <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
+                  <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }} />
+                  <span style={{ color:'var(--muted)' }}>
+                    I understand that <strong style={{ color:'var(--text)' }}>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Read refund policy →</Link>
+                  </span>
+                </label>
+                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px', background:'#0070f0', borderColor:'#0070f0' }} disabled={busy || !refundAcked}>
                   {busy ? 'Connecting to PayPal…' : `🅿 Pay with PayPal`}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
@@ -676,7 +716,12 @@ export default function Cart() {
                   <div className="form-group" style={{ marginTop:12 }}><label>Transaction Reference *</label><input className="field" placeholder="Airtel transaction code" value={ref} onChange={e => setRef(e.target.value.toUpperCase())} required style={{ textTransform:'uppercase', letterSpacing:2, fontWeight:600 }} /></div>
                 </div>
                 <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
-                <button type="submit" className="btn btn-primary" style={{ width:'100%' }} disabled={busy}>{busy ? 'Submitting…' : 'Submit Payment'}</button>
+                {/* ── No-refund acknowledgement ── */}
+                <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
+                  <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }} />
+                  <span style={{ color:'var(--muted)' }}>I understand that <strong style={{ color:'var(--text)' }}>all digital purchases are final and non-refundable</strong>. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Refund policy →</Link></span>
+                </label>
+                <button type="submit" className="btn btn-primary" style={{ width:'100%' }} disabled={busy || !refundAcked}>{busy ? 'Submitting…' : 'Submit Payment'}</button>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
             )}
@@ -719,6 +764,7 @@ export default function Cart() {
       </div>
     </main>
   );
+  } // end if (step === 'pay')
 
   // ── Cart screen ──────────────────────────────────────────────────────────
   return (
@@ -810,6 +856,9 @@ export default function Cart() {
                   <strong>KSh {total.toLocaleString()}</strong>
                 </div>
                 <p className="cart-sum__unlock-note">⚡ Books unlock instantly after payment</p>
+                <div style={{ padding:'10px 12px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.18)', borderRadius:'var(--r-sm)', fontSize:'0.76rem', color:'var(--muted)', lineHeight:1.6, marginBottom:12 }}>
+                  🚫 <strong style={{ color:'var(--text)' }}>No refunds</strong> — digital books are delivered instantly and cannot be returned once unlocked. <Link to="/terms#refund" style={{ color:'var(--gold)' }}>Policy →</Link>
+                </div>
                 <button className="btn btn-primary cart-sum__cta" onClick={checkout}>
                   Proceed to Checkout
                 </button>

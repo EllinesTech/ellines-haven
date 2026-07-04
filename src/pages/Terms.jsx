@@ -62,14 +62,32 @@ export default function Terms() {
             </ul>
           </section>
 
-          <section className="legal-section">
+          <section className="legal-section" id="refund">
             <h2>5. Refund Policy</h2>
-            <p>Because our products are digital and delivered instantly upon payment verification, we do not offer refunds after access has been granted, except in the following circumstances:</p>
+            <div style={{ background:'rgba(231,76,60,0.06)', border:'1px solid rgba(231,76,60,0.25)', borderLeft:'4px solid #e74c3c', borderRadius:6, padding:'14px 18px', marginBottom:16 }}>
+              <strong>All digital book purchases on Ellines Haven are strictly non-refundable.</strong>
+            </div>
+            <p>
+              When you purchase a book, it is <strong>unlocked and delivered to your personal library immediately</strong> upon payment confirmation. Because digital content is delivered instantly and cannot be "returned" — unlike a physical product — we do not offer refunds once access has been granted.
+            </p>
+            <p>By completing a purchase, you explicitly acknowledge and agree that:</p>
             <ul>
-              <li>A technical fault on our platform prevents you from accessing content you paid for.</li>
-              <li>You were charged incorrectly or charged twice for the same order.</li>
+              <li>You have had the opportunity to read the book description, excerpt, and details before purchasing.</li>
+              <li>Digital content is non-returnable once unlocked and accessible in your library.</li>
+              <li>No refund will be issued on the basis of disliking the content, changing your mind, or having already read the book.</li>
+              <li>This no-refund policy applies to all payment methods including M-Pesa, card, and PayPal.</li>
             </ul>
-            <p>To request a refund under the above circumstances, contact us within 7 days of purchase via WhatsApp at 0748 255 466 with your order reference and transaction code.</p>
+            <p>
+              <strong>Exceptions — we will investigate and remedy the following:</strong>
+            </p>
+            <ul>
+              <li>You were charged but the book was <strong>not unlocked</strong> in your library due to a technical fault on our platform.</li>
+              <li>You were charged <strong>more than once</strong> for the same order.</li>
+              <li>You were charged an <strong>incorrect amount</strong> that does not match the displayed price at checkout.</li>
+            </ul>
+            <p>
+              To raise a dispute under the above exceptions, contact us <strong>within 7 days of purchase</strong> via WhatsApp at <a href="https://wa.me/254748255466">0748 255 466</a> with your order reference number and M-Pesa or transaction code. We will review and respond within 24 hours.
+            </p>
           </section>
 
           <section className="legal-section">
