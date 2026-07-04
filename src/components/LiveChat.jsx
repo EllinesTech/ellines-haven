@@ -258,11 +258,11 @@ export default function LiveChat() {
         title="Chat with us"
         style={{
           position:    'fixed',
-          bottom:      90,      // sits above the WhatsApp button
-          right:       24,
+          bottom:      80,       // stack: WhatsApp(20px) + 50px height + 10px gap
+          right:       20,
           zIndex:      7900,
-          width:       52,
-          height:      52,
+          width:       50,
+          height:      50,
           borderRadius:'50%',
           background:  'linear-gradient(135deg,#6c63ff,#4a9eff)',
           border:      'none',
@@ -298,15 +298,15 @@ export default function LiveChat() {
 
       {/* ── Chat window ── */}
       {open && (
-        <div style={{
+        <div className="lc-window" style={{
           position:     'fixed',
-          bottom:       152,
-          right:        24,
+          bottom:       140,
+          right:        80,
           zIndex:       7900,
           width:        340,
-          maxWidth:     'calc(100vw - 32px)',
+          maxWidth:     'calc(100vw - 24px)',
           height:       480,
-          maxHeight:    'calc(100vh - 180px)',
+          maxHeight:    'calc(100vh - 200px)',
           background:   'var(--surface, #12122a)',
           border:       '1px solid rgba(106,99,255,0.35)',
           borderRadius: 16,
@@ -320,6 +320,28 @@ export default function LiveChat() {
             @keyframes lc-appear {
               from { opacity:0; transform:translateY(12px) scale(0.97); }
               to   { opacity:1; transform:none; }
+            }
+            @media (max-width: 480px) {
+              .lc-window {
+                right: 0 !important;
+                left: 0 !important;
+                bottom: 0 !important;
+                width: 100vw !important;
+                max-width: 100vw !important;
+                height: 80vh !important;
+                max-height: 80vh !important;
+                border-radius: 20px 20px 0 0 !important;
+                border-bottom: none !important;
+              }
+            }
+            @media (min-width: 481px) and (max-width: 768px) {
+              .lc-window {
+                right: 12px !important;
+                left: auto !important;
+                bottom: 140px !important;
+                width: calc(100vw - 24px) !important;
+                max-width: calc(100vw - 24px) !important;
+              }
             }
           `}</style>
 
