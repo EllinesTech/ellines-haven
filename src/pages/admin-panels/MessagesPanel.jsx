@@ -749,6 +749,47 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
 
           {/* ── Session list (left column) ── */}
           <div className="adm-msg-list">
+
+            {/* Sessions header with online toggle */}
+            {chatSessions.length > 0 && (
+              <div style={{
+                padding:'10px 14px',
+                display:'flex',
+                justifyContent:'space-between',
+                alignItems:'center',
+                gap:8,
+                borderBottom:'1px solid var(--border)',
+                background:'rgba(0,0,0,0.1)',
+                flexShrink:0,
+              }}>
+                <span style={{ fontSize:'0.76rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.5 }}>
+                  Sessions ({chatSessions.length})
+                </span>
+                <button
+                  onClick={toggleAgentOnline}
+                  style={{
+                    padding:'4px 10px',
+                    borderRadius:16,
+                    border:'1px solid var(--border)',
+                    background:agentOnline ? 'rgba(46,204,113,0.12)' : 'rgba(100,116,139,0.1)',
+                    color:agentOnline ? '#2ecc71' : 'var(--muted)',
+                    fontWeight:700,
+                    fontSize:'0.7rem',
+                    fontFamily:'inherit',
+                    display:'flex',
+                    alignItems:'center',
+                    gap:5,
+                    cursor:'pointer',
+                    transition:'all 0.15s',
+                  }}
+                >
+                  <span style={{ width:6, height:6, borderRadius:'50%', background: agentOnline ? '#2ecc71' : '#64748b', display:'inline-block' }} />
+                  {agentOnline ? 'Online' : 'Go Online'}
+                </button>
+              </div>
+            )}
+
+            {/* Sessions list */}
             {chatSessions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>💬</div>
