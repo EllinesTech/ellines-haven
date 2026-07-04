@@ -366,12 +366,21 @@ exports.paystackWebhook = onRequest(
         return;
       }
 
-      // Find the order by Paystack reference
-      const ordersSnap = await db
+      // Find the order — try paystackRef first (new code), then order id directly (old code fallback)
+      let ordersSnap = await db
         .collection("orders")
         .where("paystackRef", "==", reference)
         .limit(1)
         .get();
+
+      // Fallback: old code stored ref = orderId, so the order doc ID IS the reference
+      if (ordersSnap.empty) {
+        const directDoc = await db.collection("orders").doc(reference).get();
+        if (directDoc.exists) {
+          ordersSnap = { empty: false, docs: [directDoc] };
+          console.log("[paystackWebhook] found order by direct doc ID:", reference);
+        }
+      }
 
       if (ordersSnap.empty) {
         console.warn("[paystackWebhook] no order found for ref:", reference);
@@ -466,10 +475,15 @@ exports.verifyPaystackPayment = onCall(
 
       // ── Step 3: Unlock books and mark order Completed ─────────────────────
       if (orderId && userEmail) {
-        const orderSnap = await db.collection("orders").doc(orderId).get();
+        // Support both new format (orderId != reference) and old format (orderId == reference)
+        let orderSnap = await db.collection("orders").doc(orderId).get();
+        // If not found by orderId, try by reference directly (old code fallback)
+        if (!orderSnap.exists) {
+          orderSnap = await db.collection("orders").doc(reference).get();
+        }
         if (orderSnap.exists && orderSnap.data().status !== "Completed") {
           const order = orderSnap.data();
-          await db.collection("orders").doc(orderId).update({
+          await db.collection("orders").doc(orderSnap.id).update({
             status:          "Completed",
             paystackRef:     reference,
             paystackChannel: data.channel,
@@ -478,7 +492,7 @@ exports.verifyPaystackPayment = onCall(
             paymentMethod:   "paystack",
           });
           await unlockBooksForUser(userEmail, order.items || []);
-          console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderId);
+          console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderSnap.id);
         }
       }
 
