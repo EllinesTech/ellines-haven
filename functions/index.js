@@ -1,18 +1,15 @@
 /**
  * Ellines Haven — Firebase Cloud Functions
- * Handles M-Pesa STK Push and payment callback for automatic book unlocking.
+ * Handles M-Pesa STK Push (Daraja), Paystack webhook, and automatic book unlocking.
  *
- * Environment variables (set via `firebase functions:secrets` or .env):
- *   MPESA_CONSUMER_KEY      — Daraja API consumer key
- *   MPESA_CONSUMER_SECRET   — Daraja API consumer secret
- *   MPESA_SHORTCODE         — Business shortcode (till or paybill)
- *   MPESA_PASSKEY           — Lipa Na M-Pesa online passkey
- *   MPESA_CALLBACK_URL      — Public URL of this function's /mpesaCallback endpoint
- *   MPESA_ENV               — "sandbox" | "production"  (default: production)
+ * Secrets:
+ *   MPESA_*           — Daraja API credentials (kept for future production use)
+ *   PAYSTACK_SECRET   — Paystack secret key (sk_test_... or sk_live_...)
  */
 
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
+const crypto = require("crypto");
 const admin = require("firebase-admin");
 const axios = require("axios");
 
@@ -26,6 +23,7 @@ const SHORTCODE       = defineSecret("MPESA_SHORTCODE");
 const PASSKEY         = defineSecret("MPESA_PASSKEY");
 const CALLBACK_URL    = defineSecret("MPESA_CALLBACK_URL");
 const MPESA_ENV       = defineSecret("MPESA_ENV");
+const PAYSTACK_SECRET = defineSecret("PAYSTACK_SECRET");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const libDocId = (email) =>
@@ -308,6 +306,147 @@ exports.queryPaymentStatus = onCall(
       return { success: true, data: res.data };
     } catch (err) {
       return { success: false, error: err.response?.data || err.message };
+    }
+  }
+);
+
+// ── Paystack Webhook ──────────────────────────────────────────────────────────
+// Paystack POSTs here after every payment event.
+// We verify the signature, then unlock books on charge.success.
+exports.paystackWebhook = onRequest(
+  { secrets: [PAYSTACK_SECRET], region: "us-central1" },
+  async (req, res) => {
+    // Always respond 200 immediately so Paystack doesn't retry
+    res.status(200).send("OK");
+
+    try {
+      const secret = PAYSTACK_SECRET.value();
+      const hash = crypto
+        .createHmac("sha512", secret)
+        .update(JSON.stringify(req.body))
+        .digest("hex");
+
+      if (hash !== req.headers["x-paystack-signature"]) {
+        console.warn("[paystackWebhook] invalid signature — ignoring");
+        return;
+      }
+
+      const event = req.body;
+      console.log("[paystackWebhook] event:", event.event, "ref:", event.data?.reference);
+
+      if (event.event !== "charge.success") return;
+
+      const data      = event.data;
+      const reference = data.reference;
+      const email     = data.customer?.email?.toLowerCase();
+      const paidKobo  = data.amount; // Paystack amounts are in kobo (KES cents × 100)
+
+      if (!reference || !email) {
+        console.warn("[paystackWebhook] missing reference or email");
+        return;
+      }
+
+      // Find the order by Paystack reference
+      const ordersSnap = await db
+        .collection("orders")
+        .where("paystackRef", "==", reference)
+        .limit(1)
+        .get();
+
+      if (ordersSnap.empty) {
+        console.warn("[paystackWebhook] no order found for ref:", reference);
+        return;
+      }
+
+      const orderDoc = ordersSnap.docs[0];
+      const order    = orderDoc.data();
+      const orderId  = orderDoc.id;
+
+      if (order.status === "Completed") {
+        console.log("[paystackWebhook] already completed:", orderId);
+        return;
+      }
+
+      // Mark order completed
+      await db.collection("orders").doc(orderId).update({
+        status:           "Completed",
+        paystackRef:      reference,
+        paystackChannel:  data.channel,
+        paidAmount:       paidKobo / 100,
+        confirmedAt:      admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:        admin.firestore.FieldValue.serverTimestamp(),
+        paymentMethod:    "paystack",
+      });
+
+      // Unlock books
+      await unlockBooksForUser(order.userEmail || email, order.items || []);
+      console.log("[paystackWebhook] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+
+      // Notify admin
+      await db.collection("admin_notifications").doc(orderId + "_ps").set({
+        type:        "order_confirmed_auto",
+        orderId,
+        userName:    order.userName,
+        userEmail:   order.userEmail,
+        total:       paidKobo / 100,
+        paystackRef: reference,
+        channel:     data.channel,
+        status:      "unread",
+        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+
+    } catch (err) {
+      console.error("[paystackWebhook] error:", err.message);
+    }
+  }
+);
+
+// ── Verify Paystack payment (callable — double-check from frontend) ────────────
+exports.verifyPaystackPayment = onCall(
+  {
+    secrets: [PAYSTACK_SECRET],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { reference, orderId, userEmail } = request.data;
+    if (!reference) throw new HttpsError("invalid-argument", "reference required");
+
+    const secret = PAYSTACK_SECRET.value();
+
+    try {
+      const res = await axios.get(
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+        { headers: { Authorization: `Bearer ${secret}` } }
+      );
+
+      const data = res.data?.data;
+      if (!data || data.status !== "success") {
+        throw new HttpsError("failed-precondition", "Payment not successful");
+      }
+
+      // Unlock books if not already done (webhook may have already handled it)
+      if (orderId && userEmail) {
+        const orderSnap = await db.collection("orders").doc(orderId).get();
+        if (orderSnap.exists && orderSnap.data().status !== "Completed") {
+          const order = orderSnap.data();
+          await db.collection("orders").doc(orderId).update({
+            status:          "Completed",
+            paystackRef:     reference,
+            paystackChannel: data.channel,
+            paidAmount:      data.amount / 100,
+            confirmedAt:     admin.firestore.FieldValue.serverTimestamp(),
+            paymentMethod:   "paystack",
+          });
+          await unlockBooksForUser(userEmail, order.items || []);
+        }
+      }
+
+      return { success: true, channel: data.channel, amount: data.amount / 100 };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      throw new HttpsError("internal", msg);
     }
   }
 );

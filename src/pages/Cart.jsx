@@ -2,8 +2,22 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { db, callStkPush } from '../firebase';
+import { db, callVerifyPaystack } from '../firebase';
 import './Cart.css';
+
+// Paystack public key — test key, safe to expose in frontend
+const PAYSTACK_PUBLIC_KEY = 'pk_test_d48ed3967ced2938fbd4f1e20b9394b52c979928';
+
+// Load Paystack inline script once
+function loadPaystack() {
+  return new Promise((resolve) => {
+    if (window.PaystackPop) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://js.paystack.co/v1/inline.js';
+    s.onload = resolve;
+    document.head.appendChild(s);
+  });
+}
 
 // ── STK Push polling screen ────────────────────────────────────────────────────
 function StkWaiting({ order, onSuccess, onFailed, onCancel }) {
@@ -109,7 +123,7 @@ export default function Cart() {
   const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls } = useApp();
   // steps: cart | pay | stk_waiting | pending | done
   const [step,        setStep]        = useState('cart');
-  const [method,      setMethod]      = useState('mpesa');
+  const [method,      setMethod]      = useState('paystack');
   const [phone,       setPhone]       = useState('');
   const [ref,         setRef]         = useState('');
   const [busy,        setBusy]        = useState(false);
@@ -142,33 +156,55 @@ export default function Cart() {
 
   const checkout = () => { if (!user) navigate('/login'); else setStep('pay'); };
 
-  // ── M-Pesa STK Push flow ─────────────────────────────────────────────────
-  const submitStkPush = async e => {
+  // ── Paystack payment flow ────────────────────────────────────────────────────
+  const submitPaystack = async e => {
     e.preventDefault();
     setStkError('');
     setBusy(true);
     try {
-      // 1. Create the order in Firestore (status: Pending)
-      const order = await placeOrder([...cart], 'mpesa_stk', '', phone);
+      const order = await placeOrder([...cart], 'paystack', '', '');
       setPlacedOrder(order);
+      await loadPaystack();
 
-      // 2. Trigger STK push via Cloud Function
-      await callStkPush({
-        phone,
-        amount: total,
-        orderId: order.id,
-        userEmail: user.email,
-        bookIds: cart.map(b => b.id),
+      await new Promise((resolve) => {
+        const handler = window.PaystackPop.setup({
+          key:      PAYSTACK_PUBLIC_KEY,
+          email:    user.email,
+          amount:   total * 100,
+          currency: 'KES',
+          ref:      order.id,
+          metadata: {
+            orderId:   order.id,
+            userEmail: user.email,
+            userName:  user.name,
+            books:     cart.map(b => b.title).join(', '),
+          },
+          callback: async (response) => {
+            setStep('verifying');
+            try {
+              await callVerifyPaystack({
+                reference: response.reference,
+                orderId:   order.id,
+                userEmail: user.email,
+              });
+              clearCart();
+              setStep('done');
+            } catch (err) {
+              setStkError(err.message || 'Verification failed. Contact support with ref: ' + response.reference);
+              setStep('pay');
+            }
+            resolve();
+          },
+          onClose: () => {
+            setStkError('Payment was cancelled.');
+            resolve();
+          },
+        });
+        handler.openIframe();
       });
-
-      // 3. Move to waiting screen — real-time listener handles the rest
-      clearCart();
-      setStep('stk_waiting');
     } catch (err) {
-      // Extract the real error message from Firebase Functions error
-      const msg = err?.details || err?.message || err?.code || JSON.stringify(err);
-      setStkError(msg || 'Could not send payment request. Try again.');
-      console.error('[Cart] stkPush error:', err);
+      const msg = err?.details || err?.message || 'Payment failed. Try again.';
+      setStkError(msg);
     } finally {
       setBusy(false);
     }
@@ -186,21 +222,32 @@ export default function Cart() {
     setStep('pending');
   };
 
-  // ── STK Waiting screen ───────────────────────────────────────────────────
+  // ── STK Waiting screen (legacy) ──────────────────────────────────────────
   if (step === 'stk_waiting') return (
     <main className="cart-page">
       <div className="container" style={{ maxWidth:520, margin:'60px auto' }}>
         <StkWaiting
           order={placedOrder}
           onSuccess={() => navigate('/my-library')}
-          onFailed={() => { setStep('pay'); setMethod('mpesa'); }}
+          onFailed={() => { setStep('pay'); setMethod('paystack'); }}
           onCancel={() => navigate('/my-library')}
         />
       </div>
     </main>
   );
 
-  // ── Done screen (after auto-confirm) ────────────────────────────────────
+  // ── Verifying screen ──────────────────────────────────────────────────────
+  if (step === 'verifying') return (
+    <main className="cart-page">
+      <div className="container" style={{ maxWidth:480, margin:'80px auto', textAlign:'center' }}>
+        <div style={{ fontSize:'3rem', marginBottom:16 }}>🔄</div>
+        <h2>Verifying Payment…</h2>
+        <p style={{ color:'var(--muted)' }}>Just a moment while we confirm your payment.</p>
+      </div>
+    </main>
+  );
+
+  // ── Done screen ───────────────────────────────────────────────────────────
   if (step === 'done') return (
     <main className="cart-page">
       <div className="container">
@@ -260,67 +307,39 @@ export default function Cart() {
           <div className="pay-form card">
             <h3>Choose Payment Method</h3>
             <div className="pay-methods">
-              {methods.map(v => (
-                <button key={v} className={'pay-btn' + (method === v ? ' pay-btn--on' : '')} onClick={() => { setMethod(v); setStkError(''); }}>
-                  {methodLabels[v] || v}
-                </button>
-              ))}
+              <button className={'pay-btn' + (method === 'paystack' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paystack'); setStkError(''); }}>💳 Pay Online</button>
+              <button className={'pay-btn' + (method === 'airtel'   ? ' pay-btn--on' : '')} onClick={() => { setMethod('airtel');   setStkError(''); }}>Airtel Money</button>
+              <button className={'pay-btn' + (method === 'wa'       ? ' pay-btn--on' : '')} onClick={() => { setMethod('wa');       setStkError(''); }}>WhatsApp</button>
             </div>
 
-            {/* ── M-Pesa: STK Push (automatic) ── */}
-            {method === 'mpesa' && (
-              <form onSubmit={submitStkPush}>
+            {/* ── Paystack: M-Pesa / Card / Bank ── */}
+            {method === 'paystack' && (
+              <form onSubmit={submitPaystack}>
                 <div className="pay-mpesa-box">
-                  <div style={{
-                    background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)',
-                    borderLeft:'3px solid var(--ok)', borderRadius:'var(--r-sm)',
-                    padding:'10px 14px', marginBottom:16, fontSize:'0.83rem',
-                  }}>
-                    ⚡ <strong style={{ color:'var(--ok)' }}>Instant payment</strong> — you'll get an M-Pesa prompt on your phone. Enter your PIN and books unlock automatically.
+                  <div style={{ background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderLeft:'3px solid var(--ok)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
+                    ⚡ <strong style={{ color:'var(--ok)' }}>Instant unlock</strong> — pay with M-Pesa, Visa, Mastercard, or bank. Books unlock automatically once payment confirms.
                   </div>
                   <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
-                  <div className="pay-detail-row"><span>Business</span><strong>{settings.mpesaName || 'Ellines Haven'}</strong></div>
-                  <div className="form-group" style={{ marginTop:16 }}>
-                    <label>Your M-Pesa Phone Number *</label>
-                    <input className="field" placeholder="07XX XXX XXX" value={phone}
-                      onChange={e => setPhone(e.target.value)} required />
-                    <small>The prompt will be sent to this number</small>
-                  </div>
-                  {stkError && (
-                    <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>
-                      ⚠ {stkError}
-                    </div>
-                  )}
+                  <div className="pay-detail-row"><span>Accepted</span><strong>M-Pesa · Visa · Mastercard · Bank</strong></div>
+                  {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
                 </div>
                 <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
-                <button type="submit" className="btn btn-primary" style={{ width:'100%' }} disabled={busy}>
-                  {busy ? 'Sending prompt…' : '📱 Pay Now with M-Pesa'}
+                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy}>
+                  {busy ? 'Opening payment…' : `⚡ Pay KSh ${total.toLocaleString()}`}
                 </button>
-                <div className="pay-wa-divider"><span>or</span></div>
-                <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi! I\'d like to order:\n' + cart.map(b => `• ${b.title} — KSh ${b.price}`).join('\n') + `\n\nTotal: KSh ${total}`)}`}
-                  target="_blank" rel="noopener noreferrer" className="btn btn-wa" style={{ width:'100%' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                  Order via WhatsApp instead
-                </a>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
             )}
 
-            {/* ── Airtel Money (manual reference) ── */}
+            {/* ── Airtel Money (manual) ── */}
             {method === 'airtel' && (
               <form onSubmit={submitManual}>
                 <div className="pay-mpesa-box">
                   <p className="pay-instruction">Send via <strong>Airtel Money</strong></p>
                   <div className="pay-detail-row"><span>Send to</span><strong className="pay-highlight">{settings.airtelNum || 'Contact us for Airtel number'}</strong></div>
                   <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
-                  <div className="form-group" style={{ marginTop:16 }}>
-                    <label>Your Airtel Number</label>
-                    <input className="field" placeholder="073X XXX XXX" value={phone} onChange={e => setPhone(e.target.value)} required />
-                  </div>
-                  <div className="form-group" style={{ marginTop:12 }}>
-                    <label>Transaction Reference *</label>
-                    <input className="field" placeholder="Airtel transaction code" value={ref} onChange={e => setRef(e.target.value.toUpperCase())} required style={{ textTransform:'uppercase', letterSpacing:2, fontWeight:600 }} />
-                  </div>
+                  <div className="form-group" style={{ marginTop:16 }}><label>Your Airtel Number</label><input className="field" placeholder="073X XXX XXX" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
+                  <div className="form-group" style={{ marginTop:12 }}><label>Transaction Reference *</label><input className="field" placeholder="Airtel transaction code" value={ref} onChange={e => setRef(e.target.value.toUpperCase())} required style={{ textTransform:'uppercase', letterSpacing:2, fontWeight:600 }} /></div>
                 </div>
                 <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
                 <button type="submit" className="btn btn-primary" style={{ width:'100%' }} disabled={busy}>{busy ? 'Submitting…' : 'Submit Payment'}</button>
@@ -328,16 +347,17 @@ export default function Cart() {
               </form>
             )}
 
-            {/* ── Card (not yet live) ── */}
-            {method === 'card' && (
+            {/* ── WhatsApp ── */}
+            {method === 'wa' && (
               <div className="pay-mpesa-box">
-                <div className="adm-info-note" style={{ marginBottom:16 }}>Card payments require backend integration. Please use M-Pesa or contact us.</div>
-                <div className="form-group" style={{ marginBottom:14 }}><label>Card Number</label><input className="field" placeholder="1234 5678 9012 3456" disabled /></div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-                  <div className="form-group"><label>Expiry</label><input className="field" placeholder="MM/YY" disabled /></div>
-                  <div className="form-group"><label>CVV</label><input className="field" placeholder="123" disabled /></div>
-                </div>
-                <button className="btn btn-primary" style={{ width:'100%', marginTop:16 }} disabled>Card payments coming soon</button>
+                <p className="pay-instruction">Order directly via <strong>WhatsApp</strong></p>
+                <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
+                <p style={{ color:'var(--muted)', fontSize:'0.83rem', marginTop:12 }}>We'll confirm your payment and unlock your books manually — usually within minutes.</p>
+                <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi! I\'d like to order:\n' + cart.map(b => `• ${b.title} — KSh ${b.price}`).join('\n') + `\n\nTotal: KSh ${total}`)}`}
+                  target="_blank" rel="noopener noreferrer" className="btn btn-wa" style={{ width:'100%', marginTop:16 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  Order via WhatsApp
+                </a>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
               </div>
             )}
@@ -353,9 +373,9 @@ export default function Cart() {
             ))}
             <div className="pay-total"><span>{cart.length} item{cart.length !== 1 ? 's' : ''}</span><strong>KSh {total.toLocaleString()}</strong></div>
             <div className="pay-trust">
-              {method === 'mpesa'
-                ? <><span>⚡ Books unlock instantly after M-Pesa payment</span><span>No waiting — fully automatic</span></>
-                : <><span>Books unlock after payment is verified</span><span>Usually within minutes during business hours</span></>
+              {method === 'paystack'
+                ? <><span>⚡ Books unlock instantly after payment</span><span>M-Pesa · Card · Bank supported</span></>
+                : <><span>Books unlock after payment is verified</span><span>Usually within minutes</span></>
               }
             </div>
           </div>

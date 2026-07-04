@@ -21,5 +21,6 @@ export const functions = getFunctions(app, 'us-central1');
 // Callable cloud functions
 export const callStkPush          = (data) => httpsCallable(functions, 'stkPush')(data);
 export const callQueryPayStatus   = (data) => httpsCallable(functions, 'queryPaymentStatus')(data);
+export const callVerifyPaystack   = (data) => httpsCallable(functions, 'verifyPaystackPayment')(data);
 
 export default app;
