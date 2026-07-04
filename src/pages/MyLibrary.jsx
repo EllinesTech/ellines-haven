@@ -544,8 +544,8 @@ export default function MyLibrary() {
           <div className="mylib-alert">
             <span className="mylib-alert-icon">⏳</span>
             <div>
-              <strong>Payment verification in progress</strong>
-              <p>You have {myPending.length} order{myPending.length !== 1 ? 's' : ''} awaiting confirmation. Books unlock automatically once payment is verified.</p>
+              <strong>Processing payment…</strong>
+              <p>You have {myPending.length} order{myPending.length !== 1 ? 's' : ''} still processing. Your books will appear here automatically once confirmed.</p>
             </div>
             <button onClick={() => setActiveTab('orders')} className="btn btn-outline btn-sm" style={{ flexShrink:0 }}>
               View Orders
@@ -732,11 +732,11 @@ export default function MyLibrary() {
                         </div>
                         {o.status === 'Pending' && (
                           <div className="mylib-order-pending-row">
-                            <p>⏳ Waiting for payment verification. We'll unlock your books as soon as we confirm your payment.</p>
-                            <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please verify my payment. Ref: ' + (o.ref||'N/A'))}`}
+                            <p>⏳ This order is processing. Your books will unlock automatically — usually within seconds. If it takes longer, contact support.</p>
+                            <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please check my payment. Ref: ' + (o.ref||'N/A'))}`}
                               target="_blank" rel="noopener noreferrer"
                               className="btn btn-sm" style={{ background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', flexShrink:0, whiteSpace:'nowrap' }}>
-                              💬 Follow Up on WhatsApp
+                              💬 Contact Support
                             </a>
                           </div>
                         )}

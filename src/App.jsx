@@ -8,7 +8,6 @@ import Footer from './components/Footer';
 import WelcomePrompt from './components/WelcomePrompt';
 import EllineaAI from './components/EllineaAI';
 import EditToolbar from './components/EditToolbar';
-import LiveChat from './components/LiveChat';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import './App.css';
@@ -388,7 +387,6 @@ export default function App() {
             <WelcomePrompt />
             <EllineaAI />
             <EditToolbar />
-            <LiveChat />
             <MaintenanceGate>
               <SuspensionGate>
                 <Suspense fallback={<PageLoader />}>

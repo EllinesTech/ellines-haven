@@ -171,7 +171,7 @@ async function notifyAdminPaymentIssue(order, reason, paystackRef) {
 
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
-  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls } = useApp();
+  const { cart, removeFromCart, clearCart, user, placeOrder, confirmOrder, settings, myPerms, siteControls } = useApp();
   // steps: cart | pay | stk_waiting | pending | done | verifying | paypal_modal
   const [step,             setStep]            = useState('cart');
   const [method,           setMethod]          = useState('paystack');
@@ -416,16 +416,24 @@ export default function Cart() {
     }
   };
 
-  // ── Manual reference flow (Airtel / fallback) ────────────────────────────
+  // ── Manual reference flow (Airtel / fallback) — auto-confirms immediately ──
   const submitManual = async e => {
     e.preventDefault();
     setBusy(true);
-    await new Promise(r => setTimeout(r, 400));
-    const order = await placeOrder([...cart], method, ref, phone);
-    setPlacedOrder(order);
-    clearCart();
-    setBusy(false);
-    setStep('pending');
+    try {
+      const order = await placeOrder([...cart], method, ref, phone);
+      setPlacedOrder(order);
+
+      // Auto-confirm: unlock books immediately — no manual admin step needed
+      await confirmOrder(order.id);
+
+      clearCart();
+      setStep('done');
+    } catch (err) {
+      setStkError('Something went wrong. Please try again or contact support.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   // ── PayPal payment flow ────────────────────────────────────────────────────

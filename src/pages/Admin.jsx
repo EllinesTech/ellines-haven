@@ -2650,6 +2650,7 @@ export default function Admin() {
     { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
     { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
     { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
+    { k:'livechat',      label:'Live Chat',          icon:'⚡', group:'admin' },
     { k:'sms',           label:'SMS Broadcast',      icon:'📱', group:'admin' },
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
@@ -2822,7 +2823,14 @@ export default function Admin() {
         {/* Messages tab — full height, no padding */}
         {tab === 'messages' && (
           <div className="adm-main-messages">
-            <MessagesPanel showToast={showToast} users={users} />
+            <MessagesPanel showToast={showToast} users={users} defaultTab="messages" />
+          </div>
+        )}
+
+        {/* Live Chat tab — full height, no padding */}
+        {tab === 'livechat' && (
+          <div className="adm-main-messages">
+            <MessagesPanel showToast={showToast} users={users} defaultTab="livechat" />
           </div>
         )}
 
@@ -3293,6 +3301,16 @@ export default function Admin() {
                 </button>
               )}
             </div>
+            {selectedIds.size > 0 && (
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:8,background:"rgba(201,168,76,0.08)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:"var(--r)",flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,color:"var(--gold)",fontSize:"0.88rem"}}>{selectedIds.size} book{selectedIds.size!==1?"s":""} selected</span>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" book(s)?")){selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)deleteBook(id)});clearSelected();showToast("Deleted "+selectedIds.size+" books")}}}>🗑️ Delete</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:false})});clearSelected();showToast("Deactivated")}}>📴 Deactivate</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:true})});clearSelected();showToast("Activated")}}>✅ Activate</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,featured:true})});clearSelected();showToast("Featured")}}>⭐ Feature</button>
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>✕ Clear</button>
+              </div>
+            )}
             <div className="card" style={{ overflow:'hidden' }}>
               <table className="adm-table adm-books-table">
                 <thead>
@@ -3301,9 +3319,11 @@ export default function Admin() {
                 <tbody>
                   {filtered.map(b => {
                     const statusMeta = BOOK_STATUSES.find(s => s.value === (b.status || 'complete')) || BOOK_STATUSES[0];
+                    const isChecked = selectedIds.has(b.id);
                     return (
-                    <tr key={b.id} style={b.active===false?{opacity:0.45}:{}}>
-                      <td>
+                      <tr key={b.id} style={{ background: isChecked ? 'rgba(201,168,76,0.07)' : undefined }}>
+                        <td><input type="checkbox" checked={isChecked} onChange={() => toggleSelect(b.id)} style={{ cursor:'pointer', accentColor:'var(--gold)' }} /></td>
+                        <td>
                         {b.coverType === 'photo' && b.cover
                           ? <img src={b.cover} alt="" className="adm-book-thumb" />
                           : <div className="adm-book-thumb-styled" style={{ background:b.coverColor || '#1a1a3a' }}>
@@ -3531,14 +3551,34 @@ export default function Admin() {
               </div>
             )}
 
+            {selectedIds.size > 0 && (
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:8,background:"rgba(201,168,76,0.08)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:"var(--r)",flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,color:"var(--gold)",fontSize:"0.88rem"}}>{selectedIds.size} user{selectedIds.size!==1?"s":""} selected</span>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)setSuspended?.(u.email,true)});clearSelected();showToast("Suspended "+selectedIds.size+" users")}}>🚫 Suspend</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)setSuspended?.(u.email,false)});clearSelected();showToast("Reinstated users")}}>✓ Reinstate</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" user(s)? Cannot be undone.")){selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)handleDeleteUser(u)});clearSelected()}}}>🗑️ Delete</button>
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>✕ Clear</button>
+              </div>
+            )}
             <div className="card" style={{ overflow:'hidden' }}>
               <table className="adm-table">
                 <thead>
-                  <tr><th>Avatar</th><th>Name</th><th>Email</th><th>Role</th><th>Books</th><th>Joined</th><th>Status</th><th>Actions</th></tr>
+                  <tr>
+                    <th style={{width:34}}><input type="checkbox" onChange={e=>e.target.checked?selectAll(users.map(u=>u.id)):clearSelected()} checked={users.length>0&&users.every(u=>selectedIds.has(u.id))} style={{cursor:"pointer",accentColor:"var(--gold)"}} /></th>
+                    <th>Avatar</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Books</th>
+                    <th>Joined</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
-                    <tr key={u.id}>
+                    <tr key={u.id} style={selectedIds.has(u.id)?{background:"rgba(201,168,76,0.05)"}:{}}>
+                      <td><input type="checkbox" checked={selectedIds.has(u.id)} onChange={()=>toggleSelect(u.id)} style={{cursor:"pointer",accentColor:"var(--gold)"}} /></td>
                       <td>
                         <div className="adm-user-avatar" style={u.role === 'superadmin' ? { background:'linear-gradient(135deg,#c9a84c,#e8c96d)', color:'#000' } : {}}>
                           {u.name.charAt(0)}

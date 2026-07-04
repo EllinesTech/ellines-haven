@@ -5,7 +5,7 @@
 /* ── FAB button ── */
 .ellinea-fab {
   position: fixed;
-  bottom: 140px; /* stack: WhatsApp(20) + 50 + 10gap + LiveChat(80) + 50 + 10gap = 140 */
+  bottom: 80px; /* stack above WhatsApp: 20 + 50 + 10 */
   right: 20px;
   z-index: 8500;
   width: 50px;
@@ -58,11 +58,11 @@
 /* ── Chat window ── */
 .ellinea-window {
   position: fixed;
-  bottom: 200px; /* above the FAB stack */
-  right: 80px;   /* offset left so it doesn't overlap FABs */
+  bottom: 140px;
+  right: 80px;
   z-index: 8600;
   width: 360px;
-  max-height: 560px;
+  max-height: 580px;
   display: flex;
   flex-direction: column;
   background: #0f0f22;
@@ -72,6 +72,86 @@
   overflow: hidden;
   animation: ellinea-in 0.22s cubic-bezier(.34,1.56,.64,1);
 }
+
+/* ── Tab bar ── */
+.ellinea-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.ellinea-tab {
+  flex: 1;
+  padding: 10px 8px;
+  background: none;
+  border: none;
+  color: rgba(240,236,226,0.45);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-bottom: 2px solid transparent;
+  position: relative;
+}
+.ellinea-tab:hover { color: rgba(240,236,226,0.8); background: rgba(255,255,255,0.04); }
+.ellinea-tab--active {
+  color: var(--gold, #c9a84c);
+  border-bottom-color: var(--gold, #c9a84c);
+  background: rgba(201,168,76,0.06);
+}
+.ellinea-tab--live.ellinea-tab--active {
+  color: #4a9eff;
+  border-bottom-color: #4a9eff;
+  background: rgba(74,158,255,0.06);
+}
+.ellinea-tab-badge {
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: #e74c3c;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+.ellinea-agent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+}
+.ellinea-agent-dot--on { background: #2ecc71; }
+
+/* ── Live-chat header (gradient) ── */
+.ellinea-lc-header {
+  background: linear-gradient(135deg,#6c63ff,#4a9eff);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+/* ── Live-chat messages area ── */
+.ellinea-lc-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 0;
+}
+.ellinea-lc-messages::-webkit-scrollbar { width: 3px; }
+.ellinea-lc-messages::-webkit-scrollbar-thumb { background: rgba(74,158,255,0.3); border-radius: 2px; }
 @keyframes ellinea-in {
   from { opacity: 0; transform: scale(0.88) translateY(16px); }
   to   { opacity: 1; transform: scale(1)    translateY(0); }
@@ -292,18 +372,18 @@
     border-radius: 20px 20px 0 0;
     border-bottom: none;
   }
-  .ellinea-fab { bottom: 144px; right: 16px; width: 48px; height: 48px; }
+  .ellinea-fab { bottom: 80px; right: 16px; width: 48px; height: 48px; }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {
   .ellinea-window {
     right: 12px;
-    bottom: 144px;
+    bottom: 140px;
     width: calc(100vw - 24px);
     max-height: 70vh;
     border-radius: 16px;
   }
-  .ellinea-fab { bottom: 144px; right: 16px; width: 50px; height: 50px; }
+  .ellinea-fab { bottom: 80px; right: 16px; width: 50px; height: 50px; }
 }
 
 /* ── Links in chat bubbles ── */

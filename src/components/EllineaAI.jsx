@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc, getDoc, setDoc, addDoc, onSnapshot,
+  collection, query, orderBy, serverTimestamp,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 import './EllineaAI.css';
 
@@ -363,18 +366,52 @@ async function callOpenAI(messages, apiKey, model = 'gpt-4o-mini') {
   return data.choices?.[0]?.message?.content || '';
 }
 
+/* ── Live-chat helpers ── */
+const fmtLcTime = ts => {
+  if (!ts) return '';
+  try {
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+};
+function playPing() {
+  try {
+    const ctx2 = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx2.createOscillator(), g = ctx2.createGain();
+    o.connect(g); g.connect(ctx2.destination);
+    o.type = 'sine'; o.frequency.value = 880;
+    g.gain.setValueAtTime(0.15, ctx2.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx2.currentTime + 0.4);
+    o.start(ctx2.currentTime); o.stop(ctx2.currentTime + 0.4);
+  } catch {}
+}
+
 export default function EllineaAI() {
   const { user, books } = useApp();
   const location = useLocation();
+
+  // ── AI tab state ──────────────────────────────────────────────────────────
   const [open,     setOpen]     = useState(false);
+  const [tab,      setTab]      = useState('ai'); // 'ai' | 'live'
   const [msgs,     setMsgs]     = useState([
-    { role: 'assistant', text: `Hi! I'm **${AI_NAME}**, your Ellines Haven assistant. Ask me anything about books, payments, your account, or the platform! 📚` }
+    { role: 'assistant', text: `Hi! I'm **${AI_NAME}**, your Ellines Haven assistant. Ask me anything about books, payments, your account, or the platform! 📚\n\nWant to talk to a human? Click the **💬 Live Agent** tab above.` }
   ]);
   const [input,    setInput]    = useState('');
   const [typing,   setTyping]   = useState(false);
   const [aiConfig, setAiConfig] = useState(null);
   const [unread,   setUnread]   = useState(0);
-  const bottomRef = useRef(null);
+  const bottomRef  = useRef(null);
+
+  // ── Live-chat tab state ───────────────────────────────────────────────────
+  const [chatId,        setChatId]        = useState(null);
+  const [chatMessages,  setChatMessages]  = useState([]);
+  const [chatDraft,     setChatDraft]     = useState('');
+  const [chatSending,   setChatSending]   = useState(false);
+  const [agentOnline,   setAgentOnline]   = useState(false);
+  const [liveUnread,    setLiveUnread]    = useState(0);
+  const chatBottomRef   = useRef(null);
+  const prevLcCount     = useRef(0);
+  const chatInputRef    = useRef(null);
 
   // Load OpenAI config from Firestore
   useEffect(() => {
@@ -386,15 +423,79 @@ export default function EllineaAI() {
     }).catch(() => {});
   }, []);
 
-  // Auto-scroll
+  // Auto-scroll AI tab
   useEffect(() => {
-    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [msgs, open]);
+    if (open && tab === 'ai') bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs, open, tab]);
 
-  // Track unread when closed
+  // ── Live-chat: restore session ───────────────────────────────────────────
   useEffect(() => {
-    if (!open) setUnread(u => u + 0); // reset on open
-  }, [open]);
+    const stored = localStorage.getItem('eh_live_chat_id');
+    if (stored) setChatId(stored);
+  }, []);
+
+  // ── Live-chat: listen for external open event (from AI or nav) ───────────
+  useEffect(() => {
+    const handler = () => { setOpen(true); setTab('live'); setLiveUnread(0); };
+    window.addEventListener('ellines-open-livechat', handler);
+    return () => window.removeEventListener('ellines-open-livechat', handler);
+  }, []);
+
+  // ── Live-chat: agent online status ───────────────────────────────────────
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_data', 'agent_status'), snap => {
+      setAgentOnline(snap.exists() ? !!snap.data()?.online : false);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  // ── Live-chat: messages listener ─────────────────────────────────────────
+  useEffect(() => {
+    if (!chatId) return;
+    const q = query(collection(db, 'contact_messages', chatId, 'messages'), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      const lcMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const newAdminMsgs = lcMsgs.filter(m => m.sender === 'admin').length;
+      if (!(open && tab === 'live') && newAdminMsgs > prevLcCount.current) {
+        const added = newAdminMsgs - prevLcCount.current;
+        setLiveUnread(u => u + added);
+        if (lcMsgs.length > prevLcCount.current) playPing();
+      }
+      prevLcCount.current = newAdminMsgs;
+      setChatMessages(lcMsgs);
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+    }, () => {});
+    return () => unsub();
+  }, [chatId, open, tab]);
+
+  // ── Live-chat: clear unread when tab is active ────────────────────────────
+  useEffect(() => {
+    if (open && tab === 'live') setLiveUnread(0);
+  }, [open, tab]);
+
+  // ── Live-chat: auto-start session when switching to live tab ─────────────
+  useEffect(() => {
+    if (!open || tab !== 'live') return;
+    const stored = localStorage.getItem('eh_live_chat_id');
+    if (stored || chatId) return;
+    (async () => {
+      const email = user?.email || 'guest@unknown.com';
+      const name  = user?.name  || 'Guest';
+      const newId = 'chat_' + email.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now();
+      await setDoc(doc(db, 'contact_messages', newId), {
+        name, email: email.toLowerCase(), userId: user?.id || '',
+        subject: 'Live Chat', message: '', type: 'live_chat', status: 'new',
+        threadId: newId, createdAt: serverTimestamp(), lastMsg: '',
+        lastMsgAt: serverTimestamp(), lastSender: 'user', userRead: true, agentOnline: false,
+      });
+      setChatId(newId);
+      localStorage.setItem('eh_live_chat_id', newId);
+      await addDoc(collection(db, 'contact_messages', newId, 'messages'), {
+        text: `👋 Hi ${name}! You're now connected. An agent will be with you shortly.`,
+        sender: 'system', senderName: 'Ellines Haven', createdAt: serverTimestamp(),
+      });
+    })();
+  }, [open, tab]); // eslint-disable-line
 
   const ctx = {
     page: SITE_CONTEXT[location.pathname] || location.pathname,
@@ -449,16 +550,13 @@ Rules:
 
     setTyping(false);
 
-    // Special signal: open live chat widget
+    // Special signal: switch to live-agent tab
     if (reply === '__OPEN_LIVE_CHAT__') {
       setMsgs(prev => [...prev, {
         role: 'assistant',
-        text: `Sure! Connecting you to a live agent now. 💬\n\nOur team is available **Mon–Sat, 8am–8pm EAT**. Type your message and we'll reply as soon as possible.`,
+        text: `Sure! Switching you to the **💬 Live Agent** tab now.\n\nOur team is available **Mon–Sat, 8am–8pm EAT**. Type your message and we'll reply as soon as possible.`,
       }]);
-      setTimeout(() => {
-        setOpen(false);
-        window.dispatchEvent(new CustomEvent('ellines-open-livechat'));
-      }, 1200);
+      setTimeout(() => setTab('live'), 900);
       return;
     }
 
@@ -466,7 +564,48 @@ Rules:
     if (!open) setUnread(u => u + 1);
   };
 
-  const clearChat = () => setMsgs([{ role: 'assistant', text: `Hi again! I'm **${AI_NAME}**, ready to help. What can I do for you? 😊` }]);
+  const clearChat = () => setMsgs([{ role: 'assistant', text: `Hi again! I'm **${AI_NAME}**, ready to help. What can I do for you? 😊\n\nWant a human? Click the **💬 Live Agent** tab.` }]);
+
+  // ── Live-chat send ────────────────────────────────────────────────────────
+  const sendChat = async () => {
+    if (!chatDraft.trim() || chatSending) return;
+    setChatSending(true);
+    let id = chatId;
+    if (!id) {
+      const email = user?.email || 'guest@unknown.com';
+      const name  = user?.name  || 'Guest';
+      id = 'chat_' + email.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now();
+      await setDoc(doc(db, 'contact_messages', id), {
+        name, email: email.toLowerCase(), userId: user?.id || '',
+        subject: 'Live Chat', message: chatDraft.trim().slice(0, 100), type: 'live_chat',
+        status: 'new', threadId: id, createdAt: serverTimestamp(),
+        lastMsg: chatDraft.trim().slice(0, 80), lastMsgAt: serverTimestamp(),
+        lastSender: 'user', userRead: true,
+      });
+      setChatId(id);
+      localStorage.setItem('eh_live_chat_id', id);
+    }
+    await addDoc(collection(db, 'contact_messages', id, 'messages'), {
+      text: chatDraft.trim(), sender: 'user',
+      senderName: user?.name || 'Guest', senderEmail: (user?.email || '').toLowerCase(),
+      createdAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'contact_messages', id), {
+      lastMsg: chatDraft.trim().slice(0, 80), lastMsgAt: serverTimestamp(),
+      lastSender: 'user', userRead: true, status: 'new',
+    }, { merge: true });
+    setChatDraft('');
+    setChatSending(false);
+    chatInputRef.current?.focus();
+  };
+
+  const resetLiveChat = () => {
+    localStorage.removeItem('eh_live_chat_id');
+    setChatId(null);
+    setChatMessages([]);
+    setChatDraft('');
+    prevLcCount.current = 0;
+  };
 
   const renderText = (text) => {
     // Convert **bold**, __/route__ internal links, plain URLs, and newlines
@@ -495,83 +634,152 @@ Rules:
   // Don't show on admin page
   if (location.pathname === '/admin') return null;
 
+  const totalUnread = unread + liveUnread;
+
   return (
     <>
-      {/* ── Floating toggle button ── */}
-      <button className="ellinea-fab" onClick={() => { setOpen(o => !o); setUnread(0); }} aria-label="EllineaAI">
+      {/* ── Single FAB ── */}
+      <button
+        className="ellinea-fab"
+        onClick={() => { setOpen(o => !o); setUnread(0); if (tab === 'live') setLiveUnread(0); }}
+        aria-label="Ellinea AI & Live Chat"
+      >
         {open ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
         ) : (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         )}
-        {!open && unread > 0 && <span className="ellinea-fab-badge">{unread}</span>}
+        {!open && totalUnread > 0 && <span className="ellinea-fab-badge">{totalUnread > 9 ? '9+' : totalUnread}</span>}
         {!open && <span className="ellinea-fab-label">{AI_NAME}</span>}
       </button>
 
       {/* ── Chat window ── */}
       {open && (
         <div className="ellinea-window">
-          {/* Header */}
-          <div className="ellinea-header">
-            <div className="ellinea-avatar">✦</div>
-            <div>
-              <div className="ellinea-name">{AI_NAME}</div>
-              <div className="ellinea-status">
-                <span className="ellinea-dot" />
-                {aiConfig?.apiKey ? 'GPT-powered · Online' : 'Always available'}
-              </div>
-            </div>
-            <div className="ellinea-header-actions">
-              <button onClick={clearChat} title="Clear chat">🗑️</button>
-              <button onClick={() => setOpen(false)} title="Close">✕</button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="ellinea-messages" onClick={handleBubbleClick}>
-            {msgs.map((m, i) => (
-              <div key={i} className={`ellinea-msg ellinea-msg--${m.role}`}>
-                {m.role === 'assistant' && <div className="ellinea-msg-avatar">✦</div>}
-                <div className="ellinea-msg-bubble" dangerouslySetInnerHTML={{ __html: renderText(m.text) }} />
-              </div>
-            ))}
-            {typing && (
-              <div className="ellinea-msg ellinea-msg--assistant">
-                <div className="ellinea-msg-avatar">✦</div>
-                <div className="ellinea-typing"><span/><span/><span/></div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Quick replies */}
-          {msgs.length <= 2 && (
-            <div className="ellinea-quickreplies">
-              {QUICK_REPLIES.map((q, i) => (
-                <button key={i} className="ellinea-qr" onClick={() => send(q.value)}>{q.label}</button>
-              ))}
-            </div>
-          )}
-
-          {/* Input */}
-          <div className="ellinea-input-row">
-            <input
-              className="ellinea-input"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-              placeholder="Ask me anything…"
-              disabled={typing}
-            />
-            <button className="ellinea-send" onClick={() => send()} disabled={typing || !input.trim()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          {/* Tab bar */}
+          <div className="ellinea-tabs">
+            <button
+              className={'ellinea-tab' + (tab === 'ai' ? ' ellinea-tab--active' : '')}
+              onClick={() => { setTab('ai'); setUnread(0); }}
+            >
+              ✦ {AI_NAME}
+              {unread > 0 && tab !== 'ai' && <span className="ellinea-tab-badge">{unread}</span>}
+            </button>
+            <button
+              className={'ellinea-tab' + (tab === 'live' ? ' ellinea-tab--active ellinea-tab--live' : '')}
+              onClick={() => { setTab('live'); setLiveUnread(0); }}
+            >
+              💬 Live Agent
+              {liveUnread > 0 && tab !== 'live' && <span className="ellinea-tab-badge">{liveUnread}</span>}
+              <span className={'ellinea-agent-dot' + (agentOnline ? ' ellinea-agent-dot--on' : '')} title={agentOnline ? 'Agent online' : 'Leave a message'} />
             </button>
           </div>
 
-          <div className="ellinea-footer">
-            Powered by <strong>Ellinea</strong> · Ellines Haven AI
-            {!aiConfig?.apiKey && <span style={{color:'rgba(255,255,255,0.35)'}}> · Connect OpenAI for GPT</span>}
-          </div>
+          {/* ── AI TAB ── */}
+          {tab === 'ai' && (
+            <>
+              <div className="ellinea-header">
+                <div className="ellinea-avatar">✦</div>
+                <div>
+                  <div className="ellinea-name">{AI_NAME}</div>
+                  <div className="ellinea-status">
+                    <span className="ellinea-dot" />
+                    {aiConfig?.apiKey ? 'GPT-powered · Online' : 'Always available'}
+                  </div>
+                </div>
+                <div className="ellinea-header-actions">
+                  <button onClick={clearChat} title="Clear chat">🗑️</button>
+                  <button onClick={() => setOpen(false)} title="Close">✕</button>
+                </div>
+              </div>
+              <div className="ellinea-messages" onClick={handleBubbleClick}>
+                {msgs.map((m, i) => (
+                  <div key={i} className={`ellinea-msg ellinea-msg--${m.role}`}>
+                    {m.role === 'assistant' && <div className="ellinea-msg-avatar">✦</div>}
+                    <div className="ellinea-msg-bubble" dangerouslySetInnerHTML={{ __html: renderText(m.text) }} />
+                  </div>
+                ))}
+                {typing && (
+                  <div className="ellinea-msg ellinea-msg--assistant">
+                    <div className="ellinea-msg-avatar">✦</div>
+                    <div className="ellinea-typing"><span/><span/><span/></div>
+                  </div>
+                )}
+                <div ref={bottomRef} />
+              </div>
+              {msgs.length <= 2 && (
+                <div className="ellinea-quickreplies">
+                  {QUICK_REPLIES.map((q, i) => (
+                    <button key={i} className="ellinea-qr" onClick={() => send(q.value)}>{q.label}</button>
+                  ))}
+                </div>
+              )}
+              <div className="ellinea-input-row">
+                <input
+                  className="ellinea-input"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+                  placeholder="Ask me anything…"
+                  disabled={typing}
+                />
+                <button className="ellinea-send" onClick={() => send()} disabled={typing || !input.trim()}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+              <div className="ellinea-footer">
+                Powered by <strong>Ellinea</strong> · Ellines Haven AI
+              </div>
+            </>
+          )}
+
+          {/* ── LIVE AGENT TAB ── */}
+          {tab === 'live' && (
+            <>
+              <div className="ellinea-lc-header">
+                <div style={{ width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1rem', flexShrink:0 }}>💬</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:700, color:'#fff', fontSize:'0.9rem' }}>Ellines Haven Support</div>
+                  <div style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.75)', display:'flex', alignItems:'center', gap:5 }}>
+                    <span style={{ width:6, height:6, borderRadius:'50%', background: agentOnline ? '#2ecc71' : 'rgba(255,255,255,0.35)', flexShrink:0, display:'inline-block' }}/>
+                    {agentOnline ? 'Agent online' : 'Leave a message — reply within 24 hrs'}
+                  </div>
+                </div>
+                <button onClick={resetLiveChat} title="New chat" style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:6, padding:'3px 8px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit' }}>New</button>
+                <button onClick={() => setOpen(false)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:'1.1rem', padding:'0 2px', lineHeight:1 }}>✕</button>
+              </div>
+              <div className="ellinea-lc-messages">
+                {chatMessages.length === 0 && (
+                  <div style={{ textAlign:'center', padding:'24px 12px', color:'rgba(255,255,255,0.45)', fontSize:'0.8rem' }}>
+                    <div style={{ fontSize:'1.8rem', marginBottom:8 }}>👋</div>
+                    <p style={{ marginBottom:6 }}>Hi{user?.name ? ` ${user.name.split(' ')[0]}` : ''}! How can we help you today?</p>
+                    <p style={{ fontSize:'0.7rem' }}>Type a message below — an agent will reply shortly.</p>
+                  </div>
+                )}
+                {chatMessages.map(msg => {
+                  const isUser   = msg.sender === 'user';
+                  const isSystem = msg.sender === 'system';
+                  if (isSystem) return (
+                    <div key={msg.id} style={{ textAlign:'center', fontSize:'0.7rem', color:'rgba(255,255,255,0.4)', padding:'3px 8px', background:'rgba(255,255,255,0.04)', borderRadius:20, margin:'0 auto', maxWidth:'80%' }}>{msg.text}</div>
+                  );
+                  return (
+                    <div key={msg.id} style={{ display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth:'80%', padding:'8px 12px', borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: isUser ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)', color:'#fff', fontSize:'0.85rem', lineHeight:1.5, wordBreak:'break-word', whiteSpace:'pre-wrap' }}>{msg.text}</div>
+                      <span style={{ fontSize:'0.63rem', color:'rgba(255,255,255,0.35)', marginTop:2, paddingInline:4 }}>{isUser ? 'You' : '🛡️ Agent'} · {fmtLcTime(msg.createdAt)}</span>
+                    </div>
+                  );
+                })}
+                <div ref={chatBottomRef} />
+              </div>
+              <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', padding:'8px 10px', display:'flex', gap:7, flexShrink:0, background:'rgba(0,0,0,0.15)' }}>
+                <textarea ref={chatInputRef} rows={1} value={chatDraft} onChange={e => setChatDraft(e.target.value)} onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();} }} placeholder="Type a message…" style={{ flex:1, resize:'none', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', padding:'7px 11px', fontSize:'0.85rem', fontFamily:'inherit', outline:'none', maxHeight:70, overflowY:'auto' }} />
+                <button onClick={sendChat} disabled={chatSending||!chatDraft.trim()} style={{ flexShrink:0, width:36, height:36, borderRadius:'50%', background:chatDraft.trim()?'linear-gradient(135deg,#6c63ff,#4a9eff)':'rgba(255,255,255,0.08)', border:'none', color:'#fff', cursor:chatDraft.trim()?'pointer':'default', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.2s', alignSelf:'flex-end' }} aria-label="Send">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+              </div>
+              <div style={{ textAlign:'center', fontSize:'0.6rem', color:'rgba(255,255,255,0.25)', padding:'4px 8px 6px', flexShrink:0, background:'rgba(0,0,0,0.1)' }}>Ellines Haven · Mon–Sat 8am–8pm EAT</div>
+            </>
+          )}
         </div>
       )}
     </>

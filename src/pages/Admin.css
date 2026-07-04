@@ -180,7 +180,7 @@
 .adm-main-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 32px;
+  padding: 20px 24px;
 }
 
 /* Messages tab — no padding, full height chat */
@@ -189,6 +189,16 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Page content max-width cap so nothing bloats on wide screens ── */
+.adm-page {
+  max-width: 1100px;
+  width: 100%;
+}
+.adm-main-scroll > * {
+  max-width: 1100px;
+  width: 100%;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -293,42 +303,43 @@
 
 
 /* ── Page header ── */
-.adm-page { max-width: 1200px; }
 .adm-page-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 28px;
-  gap: 16px;
+  margin-bottom: 20px;
+  gap: 12px;
   flex-wrap: wrap;
 }
-.adm-page-head h1 { font-size: 1.8rem; margin-bottom: 4px; }
-.adm-page-sub { color: var(--muted); font-size: 0.88rem; }
+.adm-page-head h1 { font-size: 1.5rem; margin-bottom: 3px; }
+.adm-page-sub { color: var(--muted); font-size: 0.85rem; }
 
 /* ── Stats grid ── */
 .adm-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
+.adm-stats-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.adm-stats-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .adm-stat-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px 22px;
+  gap: 14px;
+  padding: 16px 18px;
 }
 .adm-stat-icon {
-  width: 48px; height: 48px;
+  width: 40px; height: 40px;
   border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   flex-shrink: 0;
 }
-.adm-stat-body strong { display: block; font-size: 1.6rem; font-family: 'Playfair Display', serif; line-height: 1.1; }
-.adm-stat-body span   { font-size: 0.78rem; color: var(--muted); }
+.adm-stat-body strong { display: block; font-size: 1.35rem; font-family: 'Playfair Display', serif; line-height: 1.1; }
+.adm-stat-body span   { font-size: 0.75rem; color: var(--muted); }
 
 /* ── Dashboard grid ── */
 .adm-dash-grid {

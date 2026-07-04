@@ -208,8 +208,8 @@ export default function AdminNotificationsBell({ user }) {
       {/* Dropdown panel */}
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 10px)', right: 0,
-          width: 400, maxHeight: 560,
+          position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+          width: 320, maxHeight: 420,
           background: '#13131f',
           border: '1px solid rgba(201,168,76,0.3)',
           borderRadius: 'var(--r)',
@@ -305,8 +305,8 @@ export default function AdminNotificationsBell({ user }) {
                       key={n.id}
                       onClick={() => isUnread && handleMarkRead(n.id)}
                       style={{
-                        display: 'flex', gap: 10, alignItems: 'flex-start',
-                        padding: '12px 14px',
+                        display: 'flex', gap: 8, alignItems: 'flex-start',
+                        padding: '9px 12px',
                         background: isUnread ? 'rgba(201,168,76,0.05)' : 'transparent',
                         borderBottom: '1px solid rgba(255,255,255,0.04)',
                         borderLeft: isUnread ? '3px solid var(--gold)' : '3px solid transparent',
@@ -317,11 +317,11 @@ export default function AdminNotificationsBell({ user }) {
                       onMouseLeave={e => { e.currentTarget.style.background = isUnread ? 'rgba(201,168,76,0.05)' : 'transparent'; }}
                     >
                       <div style={{
-                        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
                         background: isUnread ? 'rgba(201,168,76,0.15)' : 'rgba(148,144,160,0.1)',
                         color: isUnread ? 'var(--gold)' : 'var(--muted)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.9rem',
+                        fontSize: '0.78rem',
                       }}>
                         {n.icon || '🔔'}
                       </div>
@@ -334,7 +334,7 @@ export default function AdminNotificationsBell({ user }) {
                           marginBottom: 2,
                         }}>
                           <strong style={{ 
-                            fontSize: '0.82rem', 
+                            fontSize: '0.78rem', 
                             fontWeight: isUnread ? 700 : 500,
                             color: isUnread ? 'var(--gold)' : 'var(--text)',
                             lineHeight: 1.3,
@@ -353,10 +353,10 @@ export default function AdminNotificationsBell({ user }) {
                           )}
                         </div>
                         <div style={{ 
-                          fontSize: '0.75rem', 
+                          fontSize: '0.7rem', 
                           color: 'var(--muted)', 
-                          lineHeight: 1.4,
-                          marginBottom: 4,
+                          lineHeight: 1.35,
+                          marginBottom: 3,
                         }}>
                           {n.message}
                         </div>

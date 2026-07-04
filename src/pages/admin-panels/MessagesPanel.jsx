@@ -123,7 +123,7 @@ function playAdminNotifSound() {
   } catch {}
 }
 
-export default function MessagesPanel({ showToast, users = [] }) {
+export default function MessagesPanel({ showToast, users = [], defaultTab = 'messages' }) {
   const { user } = useApp();
   const [messages,    setMessages]    = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -134,7 +134,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const [sending,     setSending]     = useState(false);
   const [sendErr,     setSendErr]     = useState('');
   const [search,      setSearch]      = useState('');
-  const [tab,         setTab]         = useState('messages');
+  const [tab,         setTab]         = useState(defaultTab === 'livechat' ? 'livechat' : 'messages');
   // Compose-to-user modal
   const [composeOpen, setComposeOpen] = useState(false);
   const [toEmail,     setToEmail]     = useState('');
