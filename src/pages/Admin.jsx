@@ -2258,6 +2258,9 @@ export default function Admin() {
   const [resetPwUser, setResetPwUser] = useState(null);
   const [newPw, setNewPw]       = useState('');
   const [newPayMethod, setNewPayMethod] = useState({ name:'', type:'mobile', number:'', enabled:true });
+  // For the nav bar badge counts on messages and live chat
+  const [messages, setMessages] = useState([]);
+  const [chatSessions, setChatSessions] = useState([]);
   // Add user/admin modal
   const [addUserModal, setAddUserModal] = useState(null); // 'user' | 'admin'
   const [addUserForm, setAddUserForm]   = useState({ name:'', email:'', password:'', role:'user' });
@@ -2322,6 +2325,30 @@ export default function Admin() {
     }, () => {});
     return () => unsub();
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Live chat sessions listener — for nav bar badge count
+  useEffect(() => {
+    const q = query(
+      collection(db, 'contact_messages'),
+      where('type', '==', 'live_chat'),
+      orderBy('lastMsgAt', 'desc')
+    );
+    const unsub = onSnapshot(q, snap => {
+      const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setChatSessions(sessions);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  // Messages listener — for nav bar badge count
+  useEffect(() => {
+    const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMessages(msgs);
+    }, () => {});
+    return () => unsub();
   }, []);
 
   // Helper to add a real log entry — writes to Firestore immediately
