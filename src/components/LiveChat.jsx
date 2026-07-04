@@ -1,0 +1,420 @@
+/**
+ * LiveChat — floating chat widget for site users.
+ * Creates a real-time conversation in Firestore under:
+ *   contact_messages/{chatId}               (header doc, type: 'live_chat')
+ *   contact_messages/{chatId}/messages/{id} (individual messages)
+ *
+ * Admins see these sessions in MessagesPanel under the "Live Chat" tab.
+ */
+
+import { useState, useEffect, useRef } from 'react';
+import {
+  collection, doc, setDoc, addDoc, onSnapshot,
+  serverTimestamp, query, orderBy,
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import { useApp } from '../context/AppContext';
+
+/* ─── helpers ─── */
+const fmtTime = ts => {
+  if (!ts) return '';
+  try {
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+};
+
+/* ─── tiny sound for new admin message ─── */
+function playPing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine'; o.frequency.value = 880;
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+export default function LiveChat() {
+  const { user } = useApp();
+
+  const [open,      setOpen]      = useState(false);
+  const [chatId,    setChatId]    = useState(null);
+  const [messages,  setMessages]  = useState([]);
+  const [draft,     setDraft]     = useState('');
+  const [sending,   setSending]   = useState(false);
+  const [agentOnline, setAgentOnline] = useState(false);
+  const [unread,    setUnread]    = useState(0);
+
+  const bottomRef    = useRef(null);
+  const prevMsgCount = useRef(0);
+  const inputRef     = useRef(null);
+
+  /* ── restore existing chat session from localStorage ── */
+  useEffect(() => {
+    const stored = localStorage.getItem('eh_live_chat_id');
+    if (stored) setChatId(stored);
+  }, []);
+
+  /* ── listen for agent online status ── */
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_data', 'agent_status'), snap => {
+      setAgentOnline(snap.exists() ? !!snap.data()?.online : false);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  /* ── messages listener ── */
+  useEffect(() => {
+    if (!chatId) return;
+    const q = query(
+      collection(db, 'contact_messages', chatId, 'messages'),
+      orderBy('createdAt', 'asc')
+    );
+    const unsub = onSnapshot(q, snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // play sound + count unread admin messages when chat is closed
+      const newAdminMsgs = msgs.filter(m => m.sender === 'admin').length;
+      if (!open && newAdminMsgs > prevMsgCount.current) {
+        const added = newAdminMsgs - prevMsgCount.current;
+        setUnread(u => u + added);
+        if (msgs.length > prevMsgCount.current) playPing();
+      }
+      prevMsgCount.current = newAdminMsgs;
+      setMessages(msgs);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+    }, () => {});
+    return () => unsub();
+  }, [chatId, open]);
+
+  /* ── clear unread when opened ── */
+  useEffect(() => {
+    if (open) setUnread(0);
+  }, [open]);
+
+  /* ── auto-scroll on new message when open ── */
+  useEffect(() => {
+    if (open) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+  }, [messages, open]);
+
+  /* ── start or resume conversation ── */
+  const startChat = async () => {
+    if (chatId) return; // already exists
+
+    const email  = user?.email || 'guest@unknown.com';
+    const name   = user?.name  || 'Guest';
+    const newId  = 'chat_' + email.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now();
+
+    await setDoc(doc(db, 'contact_messages', newId), {
+      name,
+      email:      email.toLowerCase(),
+      userId:     user?.id || '',
+      subject:    'Live Chat',
+      message:    '',
+      type:       'live_chat',
+      status:     'new',
+      threadId:   newId,
+      createdAt:  serverTimestamp(),
+      lastMsg:    '',
+      lastMsgAt:  serverTimestamp(),
+      lastSender: 'user',
+      userRead:   true,
+      agentOnline: false,
+    });
+
+    setChatId(newId);
+    localStorage.setItem('eh_live_chat_id', newId);
+
+    // send system greeting
+    await addDoc(collection(db, 'contact_messages', newId, 'messages'), {
+      text:       `👋 Hi ${name}! You're now connected. An agent will be with you shortly.`,
+      sender:     'system',
+      senderName: 'Ellines Haven',
+      createdAt:  serverTimestamp(),
+    });
+  };
+
+  /* ── send a message ── */
+  const send = async () => {
+    if (!draft.trim() || sending) return;
+    setSending(true);
+
+    let id = chatId;
+    if (!id) {
+      // create session on first message
+      const email = user?.email || 'guest@unknown.com';
+      const name  = user?.name  || 'Guest';
+      id = 'chat_' + email.replace(/[^a-z0-9]/gi, '_') + '_' + Date.now();
+      await setDoc(doc(db, 'contact_messages', id), {
+        name,
+        email:     email.toLowerCase(),
+        userId:    user?.id || '',
+        subject:   'Live Chat',
+        message:   draft.trim().slice(0, 100),
+        type:      'live_chat',
+        status:    'new',
+        threadId:  id,
+        createdAt: serverTimestamp(),
+        lastMsg:   draft.trim().slice(0, 80),
+        lastMsgAt: serverTimestamp(),
+        lastSender:'user',
+        userRead:  true,
+      });
+      setChatId(id);
+      localStorage.setItem('eh_live_chat_id', id);
+    }
+
+    await addDoc(collection(db, 'contact_messages', id, 'messages'), {
+      text:        draft.trim(),
+      sender:      'user',
+      senderName:  user?.name || 'Guest',
+      senderEmail: (user?.email || '').toLowerCase(),
+      createdAt:   serverTimestamp(),
+    });
+
+    await setDoc(doc(db, 'contact_messages', id), {
+      lastMsg:    draft.trim().slice(0, 80),
+      lastMsgAt:  serverTimestamp(),
+      lastSender: 'user',
+      userRead:   true,
+      status:     'new',
+    }, { merge: true });
+
+    setDraft('');
+    setSending(false);
+    inputRef.current?.focus();
+  };
+
+  const handleKey = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  };
+
+  /* ── reset chat (start new session) ── */
+  const resetChat = () => {
+    localStorage.removeItem('eh_live_chat_id');
+    setChatId(null);
+    setMessages([]);
+    setDraft('');
+    prevMsgCount.current = 0;
+  };
+
+  /* ─── render ─── */
+  return (
+    <>
+      {/* ── FAB toggle button ── */}
+      <button
+        onClick={() => { setOpen(v => !v); if (!chatId && !open) startChat(); }}
+        aria-label="Live Chat"
+        title="Chat with us"
+        style={{
+          position:    'fixed',
+          bottom:      90,      // sits above the WhatsApp button
+          right:       24,
+          zIndex:      7900,
+          width:       52,
+          height:      52,
+          borderRadius:'50%',
+          background:  'linear-gradient(135deg,#6c63ff,#4a9eff)',
+          border:      'none',
+          color:       '#fff',
+          cursor:      'pointer',
+          display:     'flex',
+          alignItems:  'center',
+          justifyContent:'center',
+          boxShadow:   '0 4px 20px rgba(106,99,255,0.5)',
+          transition:  'transform 0.2s, box-shadow 0.2s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform='scale(1.1)'; e.currentTarget.style.boxShadow='0 6px 28px rgba(106,99,255,0.65)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform='scale(1)';   e.currentTarget.style.boxShadow='0 4px 20px rgba(106,99,255,0.5)'; }}
+      >
+        {open ? (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        ) : (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        )}
+        {/* unread badge */}
+        {!open && unread > 0 && (
+          <span style={{
+            position:'absolute', top:-4, right:-4,
+            background:'#e74c3c', color:'#fff',
+            borderRadius:'50%', width:20, height:20,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'0.7rem', fontWeight:700, border:'2px solid var(--bg,#0d0d1a)',
+          }}>{unread > 9 ? '9+' : unread}</span>
+        )}
+      </button>
+
+      {/* ── Chat window ── */}
+      {open && (
+        <div style={{
+          position:     'fixed',
+          bottom:       152,
+          right:        24,
+          zIndex:       7900,
+          width:        340,
+          maxWidth:     'calc(100vw - 32px)',
+          height:       480,
+          maxHeight:    'calc(100vh - 180px)',
+          background:   'var(--surface, #12122a)',
+          border:       '1px solid rgba(106,99,255,0.35)',
+          borderRadius: 16,
+          boxShadow:    '0 16px 48px rgba(0,0,0,0.6)',
+          display:      'flex',
+          flexDirection:'column',
+          overflow:     'hidden',
+          animation:    'lc-appear 0.2s ease',
+        }}>
+          <style>{`
+            @keyframes lc-appear {
+              from { opacity:0; transform:translateY(12px) scale(0.97); }
+              to   { opacity:1; transform:none; }
+            }
+          `}</style>
+
+          {/* header */}
+          <div style={{
+            background:  'linear-gradient(135deg,#6c63ff,#4a9eff)',
+            padding:     '14px 16px',
+            display:     'flex',
+            alignItems:  'center',
+            gap:         10,
+            flexShrink:  0,
+          }}>
+            <div style={{
+              width:36, height:36, borderRadius:'50%',
+              background:'rgba(255,255,255,0.2)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:'1.1rem', flexShrink:0,
+            }}>💬</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700, color:'#fff', fontSize:'0.95rem', lineHeight:1.2 }}>Ellines Haven Support</div>
+              <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.8)', display:'flex', alignItems:'center', gap:5 }}>
+                <span style={{ width:7, height:7, borderRadius:'50%', background: agentOnline ? '#2ecc71' : 'rgba(255,255,255,0.4)', flexShrink:0, display:'inline-block' }}/>
+                {agentOnline ? 'Agent online' : 'Leave a message — we reply within 24 hrs'}
+              </div>
+            </div>
+            <button
+              onClick={resetChat}
+              title="Start new chat"
+              style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:6, padding:'4px 8px', cursor:'pointer', fontSize:'0.7rem', fontFamily:'inherit' }}>
+              New
+            </button>
+          </div>
+
+          {/* messages area */}
+          <div style={{
+            flex:      1,
+            overflowY: 'auto',
+            padding:   '14px 12px',
+            display:   'flex',
+            flexDirection: 'column',
+            gap:       10,
+          }}>
+            {messages.length === 0 && (
+              <div style={{ textAlign:'center', padding:'30px 0', color:'var(--muted,#7a7a9a)', fontSize:'0.82rem' }}>
+                <div style={{ fontSize:'2rem', marginBottom:8 }}>👋</div>
+                <p>Hi{user?.name ? ` ${user.name}` : ''}! How can we help you today?</p>
+                <p style={{ fontSize:'0.72rem', marginTop:6 }}>Type a message below to get started.</p>
+              </div>
+            )}
+            {messages.map(msg => {
+              const isUser   = msg.sender === 'user';
+              const isSystem = msg.sender === 'system';
+              if (isSystem) return (
+                <div key={msg.id} style={{ textAlign:'center', fontSize:'0.72rem', color:'var(--muted,#7a7a9a)', padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:20 }}>
+                  {msg.text}
+                </div>
+              );
+              return (
+                <div key={msg.id} style={{ display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth:    '80%',
+                    padding:     '9px 13px',
+                    borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                    background:   isUser ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)',
+                    color:        '#fff',
+                    fontSize:     '0.88rem',
+                    lineHeight:   1.55,
+                    wordBreak:    'break-word',
+                    whiteSpace:   'pre-wrap',
+                  }}>{msg.text}</div>
+                  <span style={{ fontSize:'0.65rem', color:'var(--muted,#7a7a9a)', marginTop:3, paddingInline:4 }}>
+                    {isUser ? 'You' : '🛡️ Agent'} · {fmtTime(msg.createdAt)}
+                  </span>
+                </div>
+              );
+            })}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* input bar */}
+          <div style={{
+            borderTop:  '1px solid rgba(255,255,255,0.08)',
+            padding:    '10px 10px',
+            display:    'flex',
+            gap:        8,
+            flexShrink: 0,
+            background: 'rgba(0,0,0,0.2)',
+          }}>
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Type a message…"
+              style={{
+                flex:        1,
+                resize:      'none',
+                background:  'rgba(255,255,255,0.07)',
+                border:      '1px solid rgba(255,255,255,0.1)',
+                borderRadius:10,
+                color:       '#fff',
+                padding:     '8px 12px',
+                fontSize:    '0.88rem',
+                lineHeight:  1.5,
+                fontFamily:  'inherit',
+                outline:     'none',
+                maxHeight:   80,
+                overflowY:   'auto',
+              }}
+            />
+            <button
+              onClick={send}
+              disabled={sending || !draft.trim()}
+              style={{
+                flexShrink:  0,
+                width:       38,
+                height:      38,
+                borderRadius:'50%',
+                background:  draft.trim() ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)',
+                border:      'none',
+                color:       '#fff',
+                cursor:      draft.trim() ? 'pointer' : 'default',
+                display:     'flex',
+                alignItems:  'center',
+                justifyContent: 'center',
+                transition:  'background 0.2s',
+                alignSelf:   'flex-end',
+              }}
+              aria-label="Send message"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* footer note */}
+          <div style={{ textAlign:'center', fontSize:'0.62rem', color:'var(--muted,#7a7a9a)', padding:'5px 8px 7px', flexShrink:0, background:'rgba(0,0,0,0.15)' }}>
+            Powered by Ellines Haven · Mon–Sat 8am–8pm EAT
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

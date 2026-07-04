@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+﻿import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
@@ -2224,6 +2224,13 @@ export default function Admin() {
   const [reviews, setReviews] = useState(MOCK_REVIEWS_INIT);
   const [promos,  setPromos]  = useState(PROMO_INIT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // ── Multi-select state (shared, keyed by tab) ─────────────────────────────
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const toggleSelect  = id => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
+  const selectAll     = ids => setSelectedIds(new Set(ids));
+  const clearSelected = () => setSelectedIds(new Set());
+  // Reset selection when tab changes
+  useEffect(() => { clearSelected(); }, [tab]); // eslint-disable-line
 
   // ── Load reviews + promos from Firestore (persist across refresh) ──────────
   useEffect(() => {
@@ -2643,6 +2650,7 @@ export default function Admin() {
     { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
     { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
     { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
+    { k:'sms',           label:'SMS Broadcast',      icon:'📱', group:'admin' },
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
     /* ── Power tools — visible to both admin & superadmin ── */
@@ -2818,8 +2826,17 @@ export default function Admin() {
           </div>
         )}
 
+        {/* SMS Broadcast tab — full height, no padding */}
+        {tab === 'sms' && (
+          <div className="adm-main-messages">
+            <Suspense fallback={<PanelLoader />}>
+              <SMSPanel showToast={showToast} users={users} />
+            </Suspense>
+          </div>
+        )}
+
         {/* All other tabs — scrollable with padding */}
-        {tab !== 'messages' && (
+        {tab !== 'messages' && tab !== 'sms' && (
           <div className="adm-main-scroll">
         {addUserModal && (
           <div className="adm-overlay">
@@ -3279,7 +3296,7 @@ export default function Admin() {
             <div className="card" style={{ overflow:'hidden' }}>
               <table className="adm-table adm-books-table">
                 <thead>
-                  <tr><th>Cover</th><th>Title</th><th>Genre</th><th>Type</th><th>Price</th><th>Status</th><th>Active</th><th>Featured</th><th>New</th><th>Actions</th></tr>
+                  <tr><th style={{width:34}}><input type="checkbox" onChange={e=>e.target.checked?selectAll(filtered.map(b=>b.id)):clearSelected()} checked={filtered.length>0&&filtered.every(b=>selectedIds.has(b.id))} style={{cursor:"pointer",accentColor:"var(--gold)"}} /></th><th>Cover</th><th>Title</th><th>Genre</th><th>Type</th><th>Price</th><th>Status</th><th>Active</th><th>Featured</th><th>New</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {filtered.map(b => {
@@ -3801,119 +3818,253 @@ export default function Admin() {
         {tab === 'payments' && (
           <div className="adm-page">
             <div className="adm-page-head">
-              <div><h1>Payment Methods</h1><span className="adm-page-sub">Configure checkout payment options  changes apply instantly</span></div>
+              <div>
+                <h1>Payment Methods</h1>
+                <span className="adm-page-sub">Activate or deactivate each method — changes show on checkout immediately</span>
+              </div>
             </div>
-            <div className="adm-settings-grid">
 
-              {/* M-Pesa */}
-              <div className="card adm-settings-card">
-                <h3>📱 M-Pesa</h3>
-                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Customers pay via M-Pesa Send Money or Lipa Na M-Pesa Till.</p>
-                <div className="adm-field-group">
-                  <label>Send Money Number</label>
-                  <input className="field" value={sForm.mpesaPhone || ''} onChange={e => setSetting('mpesaPhone', e.target.value)} placeholder="0748255466" />
-                </div>
-                <div className="adm-field-group">
-                  <label>Lipa Na M-Pesa Till Number</label>
-                  <input className="field" value={sForm.mpesaTill || ''} onChange={e => setSetting('mpesaTill', e.target.value)} placeholder="Leave blank to use phone number" />
-                  <small style={{ color:'var(--muted)', fontSize:'0.75rem' }}>If set, till number takes priority over phone at checkout</small>
-                </div>
-                <div className="adm-field-group">
-                  <label>Business / Account Name</label>
-                  <input className="field" value={sForm.mpesaName || ''} onChange={e => setSetting('mpesaName', e.target.value)} placeholder="Ellines Haven" />
-                </div>
-                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('M-Pesa settings')}>Save M-Pesa</button>
-              </div>
-
-              {/* Airtel Money */}
-              <div className="card adm-settings-card">
-                <h3>📶 Airtel Money</h3>
-                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Customers pay via Airtel Money.</p>
-                <div className="adm-field-group">
-                  <label>Airtel Money Number</label>
-                  <input className="field" value={sForm.airtelNum || ''} onChange={e => setSetting('airtelNum', e.target.value)} placeholder="073X XXX XXX" />
-                </div>
-                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Airtel settings')}>Save Airtel</button>
-              </div>
-
-              {/* Card Payments */}
-              <div className="card adm-settings-card">
-                <h3>💳 Card & International Payments</h3>
-                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Stripe for card payments. Paystack is already live.</p>
-                <div className="adm-field-group">
-                  <label className="adm-check" style={{ marginBottom:12 }}>
-                    <input type="checkbox" checked={!!sForm.stripeEnabled} onChange={e => setSetting('stripeEnabled', e.target.checked)} /> Enable Stripe card payments
-                  </label>
-                </div>
-                <div className="adm-field-group">
-                  <label>Stripe Secret Key</label>
-                  <input className="field" type="password" value={sForm.stripeKey || ''} onChange={e => setSetting('stripeKey', e.target.value)} placeholder="sk_live_..." />
-                </div>
-                <div className="adm-field-group">
-                  <label>Currency</label>
-                  <select className="field" value={sForm.currency || 'KES'} onChange={e => setSetting('currency', e.target.value)}>
-                    <option value="KES">KES  Kenyan Shilling</option>
-                    <option value="USD">USD  US Dollar</option>
-                    <option value="EUR">EUR  Euro</option>
-                  </select>
-                </div>
-                <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Card settings')}>Save Card Settings</button>
-              </div>
-
-              {/* PayPal Settings */}
-              <div className="card adm-settings-card">
-                <h3>🅿 PayPal</h3>
-                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>
-                  Accept PayPal, credit &amp; debit cards internationally. Charges in USD — KES equivalent shown to customer.
-                  Set <code style={{ color:'var(--gold)', fontSize:'0.78rem' }}>PAYPAL_CLIENT_ID</code>,{' '}
-                  <code style={{ color:'var(--gold)', fontSize:'0.78rem' }}>PAYPAL_CLIENT_SECRET</code>, and{' '}
-                  <code style={{ color:'var(--gold)', fontSize:'0.78rem' }}>PAYPAL_MODE</code> as Firebase secrets.
-                </p>
-                <div className="adm-field-group">
-                  <label>PayPal Client ID <span style={{ color:'var(--muted)', fontSize:'0.72rem' }}>(public — used to load PayPal SDK)</span></label>
-                  <input className="field" value={sForm.paypalClientId || ''} onChange={e => setSetting('paypalClientId', e.target.value)} placeholder="AXxxx… (live or sandbox)" />
-                </div>
-                <div className="adm-field-group">
-                  <label className="adm-check">
-                    <input type="checkbox" checked={!!sForm.paypalEnabled} onChange={e => setSetting('paypalEnabled', e.target.checked)} /> Show PayPal at checkout
-                  </label>
-                </div>
-                <div className="adm-info-note" style={{ marginTop:10, fontSize:'0.76rem' }}>
-                  💡 See <strong>functions/MPESA_SETUP.md → Part 3</strong> for full PayPal setup instructions including Firebase secrets.
-                </div>
-                <button className="btn btn-primary btn-sm" style={{ marginTop:10 }} onClick={() => saveSettings('PayPal settings')}>Save PayPal Settings</button>
-              </div>
-
-              {/* Active methods toggle */}
-              <div className="card adm-settings-card">
-                <h3>✅ Active at Checkout</h3>
-                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Toggle which payment methods customers can see at checkout.</p>
-                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                  {[
-                    { key:'mpesa',    label:'M-Pesa (STK Push)', icon:'📱' },
-                    { key:'paystack', label:'Paystack (M-Pesa · Card · Bank)', icon:'🟢' },
-                    { key:'paypal',   label:'PayPal (International)', icon:'🅿' },
-                    { key:'airtel',   label:'Airtel Money', icon:'📶' },
-                    { key:'card',   label:'Card (Stripe)', icon:'💳' },
-                  ].map(m => {
-                    const active = (sForm.payMethods || ['mpesa','paystack','airtel','card']).includes(m.key);
+            {/* ── Quick status overview ── */}
+            {(() => {
+              const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+              const allMethods = [
+                { key:'paystack', icon:'🟢', label:'Paystack' },
+                { key:'mpesa',    icon:'📱', label:'M-Pesa STK' },
+                { key:'paypal',   icon:'🅿', label:'PayPal' },
+                { key:'airtel',   icon:'📶', label:'Airtel' },
+                { key:'card',     icon:'💳', label:'Stripe' },
+                { key:'wa',       icon:'💬', label:'WhatsApp' },
+              ];
+              return (
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20, padding:'12px 16px', background:'var(--surface)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
+                  <span style={{ fontSize:'0.75rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1, alignSelf:'center', marginRight:4 }}>At Checkout:</span>
+                  {allMethods.map(m => {
+                    const on = activeMethods.includes(m.key);
                     return (
-                      <label key={m.key} className="adm-check" style={{ fontSize:'0.9rem' }}>
-                        <input type="checkbox" checked={active}
-                          onChange={e => {
-                            const cur = sForm.payMethods || ['mpesa','paystack','airtel','card'];
-                            setSetting('payMethods', e.target.checked ? [...cur, m.key] : cur.filter(x => x !== m.key));
-                          }}
-                        /> {m.icon} {m.label}
-                      </label>
+                      <button key={m.key}
+                        onClick={() => {
+                          const cur = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                          const next = on ? cur.filter(x => x !== m.key) : [...cur, m.key];
+                          setSetting('payMethods', next);
+                          updateSettings({ ...sForm, payMethods: next });
+                          showToast(on ? `${m.label} deactivated` : `${m.label} activated`);
+                        }}
+                        style={{
+                          padding:'5px 12px', borderRadius:20, border:'none', cursor:'pointer',
+                          background: on ? 'rgba(46,204,113,0.15)' : 'rgba(100,116,139,0.12)',
+                          color: on ? '#2ecc71' : 'var(--muted)',
+                          fontWeight:700, fontSize:'0.78rem', fontFamily:'inherit',
+                          display:'flex', alignItems:'center', gap:5,
+                          transition:'all 0.15s',
+                        }}>
+                        <span style={{ width:7, height:7, borderRadius:'50%', background: on ? '#2ecc71' : '#64748b', flexShrink:0, display:'inline-block' }} />
+                        {m.icon} {m.label}
+                      </button>
                     );
                   })}
                 </div>
-                <div className="adm-info-note" style={{ marginTop:16 }}>
-                  Paystack &amp; PayPal unlock books <strong>automatically</strong>. Airtel Money requires manual verification in the Orders tab.
-                </div>
-                <button className="btn btn-primary btn-sm" style={{ marginTop:14 }} onClick={() => saveSettings('Payment methods')}>Save Active Methods</button>
-              </div>
+              );
+            })()}
+
+            <div className="adm-settings-grid">
+
+              {/* M-Pesa */}
+              {(() => {
+                const key = 'mpesa';
+                const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                const isActive = activeMethods.includes(key);
+                const toggle = () => {
+                  const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
+                  setSetting('payMethods', next);
+                  updateSettings({ ...sForm, payMethods: next });
+                  showToast(isActive ? '📱 M-Pesa hidden from checkout' : '📱 M-Pesa shown at checkout');
+                };
+                return (
+                  <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <h3 style={{ margin:0 }}>📱 M-Pesa STK Push</h3>
+                      <button onClick={toggle} style={{
+                        padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
+                        background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
+                        color: isActive ? '#2ecc71' : '#e74c3c',
+                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                    </div>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Automatic STK push — customer enters PIN on their phone.</p>
+                    <div className="adm-field-group">
+                      <label>Send Money Number</label>
+                      <input className="field" value={sForm.mpesaPhone || ''} onChange={e => setSetting('mpesaPhone', e.target.value)} placeholder="0748255466" />
+                    </div>
+                    <div className="adm-field-group">
+                      <label>Lipa Na M-Pesa Till</label>
+                      <input className="field" value={sForm.mpesaTill || ''} onChange={e => setSetting('mpesaTill', e.target.value)} placeholder="Leave blank to use phone" />
+                    </div>
+                    <div className="adm-field-group">
+                      <label>Business Name</label>
+                      <input className="field" value={sForm.mpesaName || ''} onChange={e => setSetting('mpesaName', e.target.value)} placeholder="Ellines Haven" />
+                    </div>
+                    <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('M-Pesa settings')}>Save M-Pesa</button>
+                  </div>
+                );
+              })()}
+
+              {/* Paystack */}
+              {(() => {
+                const key = 'paystack';
+                const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                const isActive = activeMethods.includes(key);
+                const toggle = () => {
+                  const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
+                  setSetting('payMethods', next);
+                  updateSettings({ ...sForm, payMethods: next });
+                  showToast(isActive ? '🟢 Paystack hidden from checkout' : '🟢 Paystack shown at checkout');
+                };
+                return (
+                  <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <h3 style={{ margin:0 }}>🟢 Paystack</h3>
+                      <button onClick={toggle} style={{
+                        padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
+                        background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
+                        color: isActive ? '#2ecc71' : '#e74c3c',
+                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                    </div>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:8 }}>Accepts M-Pesa, local cards, and bank transfers. Books unlock <strong>automatically</strong>.</p>
+                    <div className="adm-info-note" style={{ fontSize:'0.75rem' }}>Public key is hardcoded in Cart.jsx. Update it there if needed.</div>
+                  </div>
+                );
+              })()}
+
+              {/* Airtel Money */}
+              {(() => {
+                const key = 'airtel';
+                const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                const isActive = activeMethods.includes(key);
+                const toggle = () => {
+                  const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
+                  setSetting('payMethods', next);
+                  updateSettings({ ...sForm, payMethods: next });
+                  showToast(isActive ? '📶 Airtel hidden from checkout' : '📶 Airtel shown at checkout');
+                };
+                return (
+                  <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <h3 style={{ margin:0 }}>📶 Airtel Money</h3>
+                      <button onClick={toggle} style={{
+                        padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
+                        background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
+                        color: isActive ? '#2ecc71' : '#e74c3c',
+                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                    </div>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Manual verification required — admin confirms in Orders tab.</p>
+                    <div className="adm-field-group">
+                      <label>Airtel Money Number</label>
+                      <input className="field" value={sForm.airtelNum || ''} onChange={e => setSetting('airtelNum', e.target.value)} placeholder="073X XXX XXX" />
+                    </div>
+                    <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Airtel settings')}>Save Airtel</button>
+                  </div>
+                );
+              })()}
+
+              {/* WhatsApp */}
+              {(() => {
+                const key = 'wa';
+                const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                const isActive = activeMethods.includes(key);
+                const toggle = () => {
+                  const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
+                  setSetting('payMethods', next);
+                  updateSettings({ ...sForm, payMethods: next });
+                  showToast(isActive ? '💬 WhatsApp hidden from checkout' : '💬 WhatsApp shown at checkout');
+                };
+                return (
+                  <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <h3 style={{ margin:0 }}>💬 WhatsApp Pay</h3>
+                      <button onClick={toggle} style={{
+                        padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
+                        background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
+                        color: isActive ? '#2ecc71' : '#e74c3c',
+                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                    </div>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Customer sends payment then confirms via WhatsApp. Manual unlock required.</p>
+                  </div>
+                );
+              })()}
+
+              {/* PayPal */}
+              {(() => {
+                const key = 'paypal';
+                const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                const isActive = activeMethods.includes(key);
+                const toggle = () => {
+                  const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
+                  setSetting('payMethods', next);
+                  setSetting('paypalEnabled', !isActive);
+                  updateSettings({ ...sForm, payMethods: next, paypalEnabled: !isActive });
+                  showToast(isActive ? '🅿 PayPal hidden from checkout' : '🅿 PayPal shown at checkout');
+                };
+                return (
+                  <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <h3 style={{ margin:0 }}>🅿 PayPal</h3>
+                      <button onClick={toggle} style={{
+                        padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
+                        background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
+                        color: isActive ? '#2ecc71' : '#e74c3c',
+                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                    </div>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>International payments — USD. Books unlock automatically.</p>
+                    <div className="adm-field-group">
+                      <label>PayPal Client ID</label>
+                      <input className="field" value={sForm.paypalClientId || ''} onChange={e => setSetting('paypalClientId', e.target.value)} placeholder="AXxxx…" />
+                    </div>
+                    <div className="adm-info-note" style={{ marginTop:8, fontSize:'0.75rem' }}>
+                      Set <code>PAYPAL_CLIENT_ID</code>, <code>PAYPAL_CLIENT_SECRET</code>, <code>PAYPAL_MODE</code> as Firebase secrets.
+                    </div>
+                    <button className="btn btn-primary btn-sm" style={{ marginTop:10 }} onClick={() => saveSettings('PayPal settings')}>Save PayPal</button>
+                  </div>
+                );
+              })()}
+
+              {/* Stripe / Card */}
+              {(() => {
+                const key = 'card';
+                const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
+                const isActive = activeMethods.includes(key);
+                const toggle = () => {
+                  const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
+                  setSetting('payMethods', next);
+                  setSetting('stripeEnabled', !isActive);
+                  updateSettings({ ...sForm, payMethods: next, stripeEnabled: !isActive });
+                  showToast(isActive ? '💳 Stripe hidden from checkout' : '💳 Stripe shown at checkout');
+                };
+                return (
+                  <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <h3 style={{ margin:0 }}>💳 Card / Stripe</h3>
+                      <button onClick={toggle} style={{
+                        padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
+                        background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
+                        color: isActive ? '#2ecc71' : '#e74c3c',
+                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                    </div>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Stripe card payments (requires Stripe setup).</p>
+                    <div className="adm-field-group">
+                      <label>Stripe Secret Key</label>
+                      <input className="field" type="password" value={sForm.stripeKey || ''} onChange={e => setSetting('stripeKey', e.target.value)} placeholder="sk_live_..." />
+                    </div>
+                    <div className="adm-field-group">
+                      <label>Currency</label>
+                      <select className="field" value={sForm.currency || 'KES'} onChange={e => setSetting('currency', e.target.value)}>
+                        <option value="KES">KES — Kenyan Shilling</option>
+                        <option value="USD">USD — US Dollar</option>
+                        <option value="EUR">EUR — Euro</option>
+                      </select>
+                    </div>
+                    <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Card settings')}>Save Stripe</button>
+                  </div>
+                );
+              })()}
 
               {/* Custom Payment Methods */}
               <div className="card adm-settings-card" style={{ gridColumn:'1/-1' }}>

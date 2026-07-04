@@ -459,6 +459,7 @@ exports.verifyPaystackPayment = onCall(
     }
 
     // ── Step 2: Call Paystack verify API ──────────────────────────────────────
+    let paystackData;
     try {
       console.log("[verifyPaystack] calling Paystack API for ref:", reference);
       const res = await axios.get(
@@ -466,15 +467,27 @@ exports.verifyPaystackPayment = onCall(
         { headers: { Authorization: `Bearer ${secret}` } }
       );
 
-      const data = res.data?.data;
-      console.log("[verifyPaystack] Paystack status:", data?.status, "amount:", data?.amount, "channel:", data?.channel);
+      paystackData = res.data?.data;
+      console.log("[verifyPaystack] Paystack status:", paystackData?.status, "amount:", paystackData?.amount, "channel:", paystackData?.channel);
 
-      if (!data || data.status !== "success") {
-        throw new HttpsError("failed-precondition", `Payment status: ${data?.status || "unknown"}`);
+      if (!paystackData || paystackData.status !== "success") {
+        throw new HttpsError("failed-precondition", `Payment status: ${paystackData?.status || "unknown"}`);
       }
+    } catch (err) {
+      const status = err.response?.status;
+      const psMsg  = err.response?.data?.message;
+      const msg    = psMsg || err.message;
+      console.error("[verifyPaystack] Paystack API error — HTTP", status, ":", msg);
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", msg);
+    }
 
-      // ── Step 3: Unlock books and mark order Completed ─────────────────────
-      if (orderId && userEmail) {
+    // ── Step 3: Unlock books and mark order Completed ─────────────────────────
+    // Payment is confirmed by Paystack — proceed even if Firestore writes fail.
+    // The webhook will also attempt to mark completed, so these writes are
+    // best-effort; we never block returning success to the client.
+    if (orderId && userEmail) {
+      try {
         // Support both new format (orderId != reference) and old format (orderId == reference)
         let orderSnap = await db.collection("orders").doc(orderId).get();
         // If not found by orderId, try by reference directly (old code fallback)
@@ -486,25 +499,25 @@ exports.verifyPaystackPayment = onCall(
           await db.collection("orders").doc(orderSnap.id).update({
             status:          "Completed",
             paystackRef:     reference,
-            paystackChannel: data.channel,
-            paidAmount:      data.amount / 100,
+            paystackChannel: paystackData.channel,
+            paidAmount:      paystackData.amount / 100,
             confirmedAt:     admin.firestore.FieldValue.serverTimestamp(),
             paymentMethod:   "paystack",
           });
           await unlockBooksForUser(userEmail, order.items || []);
           console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderSnap.id);
         }
+      } catch (fsErr) {
+        // Firestore write failed (e.g. IAM/permissions issue) — log it but
+        // DO NOT throw. The webhook will handle the order update. We still
+        // return success to the client because Paystack confirmed the payment.
+        console.error("[verifyPaystack] Firestore update failed (non-fatal):", fsErr.message,
+          "— the paystackWebhook will complete the order. ref:", reference);
       }
-
-      return { success: true, channel: data.channel, amount: data.amount / 100 };
-    } catch (err) {
-      const status = err.response?.status;
-      const psMsg  = err.response?.data?.message;
-      const msg    = psMsg || err.message;
-      console.error("[verifyPaystack] error — HTTP", status, ":", msg, JSON.stringify(err.response?.data || {}));
-      if (err instanceof HttpsError) throw err;
-      throw new HttpsError("internal", msg);
     }
+
+    // Payment is confirmed regardless of Firestore write outcome
+    return { success: true, channel: paystackData.channel, amount: paystackData.amount / 100 };
   }
 );
 

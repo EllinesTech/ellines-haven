@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc,
-         serverTimestamp, query, orderBy } from 'firebase/firestore';
+         serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -144,6 +144,17 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const [composing,   setComposing]   = useState(false);
   const [compErr,     setCompErr]     = useState('');
 
+  // ── Live Chat sessions ─────────────────────────────────────────────────────
+  const [chatSessions,    setChatSessions]    = useState([]);
+  const [activeChat,      setActiveChat]      = useState(null);
+  const [chatThread,      setChatThread]      = useState([]);
+  const [chatReply,       setChatReply]       = useState('');
+  const [chatSending,     setChatSending]     = useState(false);
+  const [agentOnline,     setAgentOnline]     = useState(false);
+  const chatBottomRef = useRef(null);
+  const prevChatIds   = useRef(new Set());
+  const chatMounted   = useRef(false);
+
   // ── Order notifications from admin_notifications ─────────────────────────
   const [orderNotifs, setOrderNotifs] = useState([]);
   const prevOrderIds = useRef(new Set());
@@ -238,6 +249,91 @@ export default function MessagesPanel({ showToast, users = [] }) {
     }, () => {});
     return () => unsub();
   }, [selected?.threadId]);
+
+  // ── Live chat sessions listener ───────────────────────────────────────────
+  useEffect(() => {
+    const q = query(
+      collection(db, 'contact_messages'),
+      where('type', '==', 'live_chat'),
+      orderBy('lastMsgAt', 'desc')
+    );
+    const unsub = onSnapshot(q, snap => {
+      const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // sound for new chat sessions from users
+      if (chatMounted.current) {
+        sessions.forEach(s => {
+          if (!prevChatIds.current.has(s.id) && s.lastSender === 'user') playAdminNotifSound();
+        });
+      }
+      prevChatIds.current = new Set(sessions.map(s => s.id));
+      chatMounted.current = true;
+      setChatSessions(sessions);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  // ── Live chat thread listener ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!activeChat) { setChatThread([]); return; }
+    const q = query(
+      collection(db, 'contact_messages', activeChat, 'messages'),
+      orderBy('createdAt', 'asc')
+    );
+    const unsub = onSnapshot(q, snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setChatThread(msgs);
+      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    }, () => {});
+    return () => unsub();
+  }, [activeChat]);
+
+  // ── Agent online / offline toggle ──────────────────────────────────────────
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_data', 'agent_status'), snap => {
+      setAgentOnline(snap.exists() ? !!snap.data()?.online : false);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  const toggleAgentOnline = async () => {
+    const next = !agentOnline;
+    await setDoc(doc(db, 'site_data', 'agent_status'), {
+      online: next, updatedBy: user?.email, updatedAt: serverTimestamp(),
+    }).catch(() => {});
+    setAgentOnline(next);
+    showToast?.(next ? '🟢 You are now shown as Online' : '⚫ You are now shown as Offline');
+  };
+
+  const sendChatReply = async () => {
+    if (!chatReply.trim() || !activeChat || chatSending) return;
+    setChatSending(true);
+    try {
+      await addDoc(collection(db, 'contact_messages', activeChat, 'messages'), {
+        text:        chatReply.trim(),
+        sender:      'admin',
+        senderName:  user?.name || 'Admin',
+        senderEmail: user?.email || '',
+        createdAt:   serverTimestamp(),
+      });
+      await setDoc(doc(db, 'contact_messages', activeChat), {
+        lastMsg:    chatReply.trim().slice(0, 80),
+        lastMsgAt:  serverTimestamp(),
+        lastSender: 'admin',
+        userRead:   false,
+        status:     'replied',
+      }, { merge: true });
+      setChatReply('');
+    } catch (e) { showToast?.('❌ ' + e.message); }
+    setChatSending(false);
+  };
+
+  const closeChatSession = async (sessionId) => {
+    await setDoc(doc(db, 'contact_messages', sessionId), {
+      status: 'closed', closedAt: serverTimestamp(),
+    }, { merge: true });
+    if (activeChat === sessionId) setActiveChat(null);
+    showToast?.('✅ Chat session closed');
+  };
 
   // ── Open message / seed thread ────────────────────────────────────────────
   const openMessage = async msg => {
@@ -454,20 +550,53 @@ export default function MessagesPanel({ showToast, users = [] }) {
 
       {/* ── Tabs + Filters ── */}
       <div className="adm-messages-filters">
-        {[['messages','💬 Messages',regular.length],['notifications','🔔 Notifications',notifs.length]].map(([k,label,count]) => (
-          <button key={k} className={'adm-filter-btn'+(tab===k?' active':'')} onClick={() => setTab(k)}>
-            {label} <span style={{ marginLeft:4, background:'rgba(255,255,255,0.12)', borderRadius:10, padding:'1px 6px', fontSize:'0.7rem' }}>{count}</span>
+        {[
+          ['messages',      '💬 Messages',     regular.length],
+          ['notifications', '🔔 Notifications', notifs.length],
+          ['livechat',      '⚡ Live Chat',      chatSessions.filter(s => s.status !== 'closed').length],
+        ].map(([k, label, count]) => (
+          <button key={k} className={'adm-filter-btn' + (tab === k ? ' active' : '')} onClick={() => { setTab(k); setSelected(null); }}>
+            {label}
+            {count > 0 && (
+              <span style={{
+                marginLeft: 4,
+                background: k === 'livechat' && chatSessions.some(s => s.lastSender === 'user' && s.status !== 'closed')
+                  ? 'rgba(231,76,60,0.8)' : 'rgba(255,255,255,0.12)',
+                borderRadius: 10, padding: '1px 6px', fontSize: '0.7rem',
+              }}>{count}</span>
+            )}
           </button>
         ))}
-        <span style={{ width:1, background:'rgba(255,255,255,0.1)', margin:'0 6px' }}/>
-        {['all','new','read','replied','spam'].map(f => (
-          <button key={f} className={'adm-filter-btn'+(filter===f?' active':'')} onClick={() => setFilter(f)}
-            style={{ textTransform:'capitalize', fontSize:'0.78rem' }}>
-            {f}{counts[f]>0&&<span style={{ marginLeft:4, background:'rgba(255,255,255,0.1)', borderRadius:10, padding:'0 5px', fontSize:'0.66rem' }}>{counts[f]}</span>}
+        {tab !== 'livechat' && (
+          <>
+            <span style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 6px' }} />
+            {['all', 'new', 'read', 'replied', 'spam'].map(f => (
+              <button key={f} className={'adm-filter-btn' + (filter === f ? ' active' : '')} onClick={() => setFilter(f)}
+                style={{ textTransform: 'capitalize', fontSize: '0.78rem' }}>
+                {f}{counts[f] > 0 && <span style={{ marginLeft: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '0 5px', fontSize: '0.66rem' }}>{counts[f]}</span>}
+              </button>
+            ))}
+          </>
+        )}
+        {tab === 'livechat' && (
+          <button
+            onClick={toggleAgentOnline}
+            style={{
+              marginLeft: 'auto',
+              padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+              background: agentOnline ? 'rgba(46,204,113,0.15)' : 'rgba(100,116,139,0.15)',
+              color: agentOnline ? '#2ecc71' : 'var(--muted)',
+              fontWeight: 700, fontSize: '0.78rem', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: agentOnline ? '#2ecc71' : '#64748b', display: 'inline-block' }} />
+            {agentOnline ? 'You are Online' : 'Go Online'}
           </button>
-        ))}
+        )}
       </div>
-      {/* ── Main grid: list + thread ── */}
+      {/* ── Main grid: list + thread (messages + notifications tabs only) ── */}
+      {tab !== 'livechat' && (
       <div className={`adm-messages-grid ${selected ? 'adm-messages-grid--split' : 'adm-messages-grid--full'}`}>
 
         {/* ── Message list ── */}
@@ -618,6 +747,168 @@ export default function MessagesPanel({ showToast, users = [] }) {
           </div>
         )}
       </div>
+      )} {/* end tab !== 'livechat' */}
+      {tab === 'livechat' && (
+        <div style={{ display: 'grid', gridTemplateColumns: activeChat ? '300px 1fr' : '1fr', gap: 16, minHeight: 500 }}>
+
+          {/* Session list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {chatSessions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>💬</div>
+                <p style={{ fontSize: '0.9rem' }}>No live chat sessions yet</p>
+                <p style={{ fontSize: '0.75rem', marginTop: 6 }}>
+                  Users can start a chat using the 💬 button on the site.
+                  <br />Toggle yourself Online above to let them know an agent is available.
+                </p>
+              </div>
+            ) : chatSessions.map(s => {
+              const isActive = activeChat === s.id;
+              const hasNew   = s.lastSender === 'user' && s.status !== 'closed';
+              return (
+                <div key={s.id}
+                  onClick={() => setActiveChat(s.id)}
+                  style={{
+                    padding: '12px 14px',
+                    background: isActive ? 'rgba(106,99,255,0.12)' : 'var(--card)',
+                    border: `1px solid ${isActive ? 'rgba(106,99,255,0.5)' : 'var(--border)'}`,
+                    borderLeft: `3px solid ${hasNew ? '#e74c3c' : isActive ? '#6c63ff' : 'transparent'}`,
+                    borderRadius: 'var(--r-sm)', cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: 'rgba(106,99,255,0.2)', color: '#6c63ff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700, fontSize: '0.82rem', flexShrink: 0,
+                      }}>{(s.name || '?')[0].toUpperCase()}</div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>{s.name || 'Guest'}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{s.email || ''}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <span style={{
+                        fontSize: '0.62rem', padding: '2px 6px', borderRadius: 10, fontWeight: 700,
+                        background: s.status === 'closed' ? 'rgba(100,116,139,0.12)' : hasNew ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.1)',
+                        color: s.status === 'closed' ? '#64748b' : hasNew ? '#e74c3c' : '#2ecc71',
+                      }}>{s.status === 'closed' ? 'closed' : hasNew ? '● new' : 'active'}</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {s.lastMsg || 'Chat started'}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>{fmtDate(s.lastMsgAt || s.createdAt)}</span>
+                    {s.status !== 'closed' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); closeChatSession(s.id); }}
+                        style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '0.68rem', cursor: 'pointer', padding: '0 4px', fontFamily: 'inherit' }}
+                      >End chat</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Chat thread panel */}
+          {activeChat && (
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              background: 'var(--card)', borderRadius: 'var(--r)',
+              border: '1px solid var(--border)', overflow: 'hidden',
+            }}>
+              {/* header */}
+              {(() => {
+                const s = chatSessions.find(x => x.id === activeChat);
+                return (
+                  <div style={{
+                    padding: '12px 16px', borderBottom: '1px solid var(--border)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: 'linear-gradient(135deg,rgba(108,99,255,0.12),rgba(74,158,255,0.08))',
+                  }}>
+                    <div>
+                      <strong style={{ fontSize: '0.95rem' }}>💬 {s?.name || 'Guest'}</strong>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted)', marginLeft: 10 }}>{s?.email}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {s?.status !== 'closed' && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => closeChatSession(activeChat)}>
+                          End Chat
+                        </button>
+                      )}
+                      <button className="adm-close-btn" onClick={() => setActiveChat(null)}>✕</button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* messages */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, maxHeight: 380 }}>
+                {chatThread.length === 0 && (
+                  <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '30px 0', fontSize: '0.82rem' }}>No messages yet</div>
+                )}
+                {chatThread.map(msg => {
+                  const isAdmin  = msg.sender === 'admin';
+                  const isSystem = msg.sender === 'system';
+                  if (isSystem) return (
+                    <div key={msg.id} style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(255,255,255,0.04)', padding: '4px 10px', borderRadius: 20 }}>
+                      {msg.text}
+                    </div>
+                  );
+                  return (
+                    <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '78%', padding: '9px 14px',
+                        borderRadius: isAdmin ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                        background: isAdmin ? 'rgba(201,168,76,0.16)' : 'rgba(74,158,255,0.1)',
+                        border: isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
+                        fontSize: '0.88rem', lineHeight: 1.55, wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                      }}>{msg.text}</div>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: 3, paddingInline: 4 }}>
+                        {isAdmin ? '🛡️ You' : `👤 ${msg.senderName || 'User'}`}
+                        {msg.createdAt && ' · '}
+                        {msg.createdAt && (() => {
+                          try { const d = msg.createdAt?.toDate?.() || new Date(msg.createdAt); return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
+                        })()}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* reply box */}
+              {chatSessions.find(x => x.id === activeChat)?.status !== 'closed' ? (
+                <div style={{ borderTop: '1px solid var(--border)', padding: '10px 14px', background: 'rgba(0,0,0,0.1)', display: 'flex', gap: 8 }}>
+                  <textarea
+                    className="field"
+                    rows={2}
+                    value={chatReply}
+                    onChange={e => setChatReply(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChatReply(); }}
+                    placeholder="Type reply… (Ctrl+Enter to send)"
+                    style={{ flex: 1, resize: 'none', fontSize: '0.9rem' }}
+                  />
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={sendChatReply}
+                    disabled={chatSending || !chatReply.trim()}
+                    style={{ alignSelf: 'flex-end', minWidth: 80 }}
+                  >{chatSending ? '⏳' : '↩ Reply'}</button>
+                </div>
+              ) : (
+                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  This chat session is closed.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

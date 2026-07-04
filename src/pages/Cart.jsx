@@ -219,16 +219,41 @@ export default function Cart() {
         }
 
         // Otherwise call verify function
-        await callVerifyPaystack({
-          reference,
-          orderId:   orderId || '',
-          userEmail: user.email,
-        });
-
-        clearCart();
-        setStep('done');
+        try {
+          await callVerifyPaystack({
+            reference,
+            orderId:   orderId || '',
+            userEmail: user.email,
+          });
+          clearCart();
+          setStep('done');
+        } catch (verifyErr) {
+          // Verify failed — poll Firestore for up to 15 s in case the webhook
+          // fires while we're waiting (race condition on mobile redirect flow)
+          let confirmed = false;
+          if (orderId) {
+            const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+            for (let i = 0; i < 10; i++) {
+              await new Promise(r => setTimeout(r, 1500));
+              try {
+                const snap2 = await getDoc(fsDoc(db, 'orders', orderId));
+                if (snap2.exists() && snap2.data().status === 'Completed') {
+                  confirmed = true;
+                  break;
+                }
+              } catch { /* keep polling */ }
+            }
+          }
+          if (confirmed) {
+            clearCart();
+            setStep('done');
+          } else {
+            setStkError('Payment may have succeeded. If books are not in your library in a few minutes, contact support with ref: ' + reference);
+            setStep('pay');
+          }
+        }
       } catch {
-        // Verification failed after redirect — show a gentle message
+        // Outer error (e.g. Firestore query failed) — show helpful message
         setStkError('Payment may have succeeded. If books are not in your library in a few minutes, contact support.');
         setStep('pay');
       }
@@ -307,42 +332,64 @@ export default function Cart() {
           callback: (response) => {
             // Payment successful — verify + unlock
             setStep('verifying');
-            callVerifyPaystack({
-              reference: response.reference,
-              orderId:   order.id,
-              userEmail: user.email,
-            })
-              .then(() => {
+
+            // Poll Firestore for up to 15 s to see if the webhook already
+            // confirmed the order (webhook often fires before our verify call).
+            const pollForCompletion = async (orderId, maxAttempts = 10, delayMs = 1500) => {
+              const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+              for (let i = 0; i < maxAttempts; i++) {
+                await new Promise(r => setTimeout(r, delayMs));
+                try {
+                  const snap = await getDoc(fsDoc(db, 'orders', orderId));
+                  if (snap.exists() && snap.data().status === 'Completed') return true;
+                } catch { /* keep polling */ }
+              }
+              return false;
+            };
+
+            // Try verify function first; if it fails, fall back to webhook poll.
+            const doVerify = async () => {
+              try {
+                await callVerifyPaystack({
+                  reference: response.reference,
+                  orderId:   order.id,
+                  userEmail: user.email,
+                });
                 clearCart();
                 setStep('done');
-              })
-              .catch(async (err) => {
-                // Before giving up, check if the Paystack webhook already
-                // confirmed and unlocked the order (race condition where
-                // webhook fires before our verify call completes).
+              } catch (err) {
+                // Verify function failed — check if webhook already handled it
                 try {
                   const { getDoc, doc: fsDoc } = await import('firebase/firestore');
                   const snap = await getDoc(fsDoc(db, 'orders', order.id));
                   if (snap.exists() && snap.data().status === 'Completed') {
-                    // Webhook already handled it — treat as success
                     clearCart();
                     setStep('done');
-                    resolve();
                     return;
                   }
-                } catch { /* fall through to error display */ }
+                } catch { /* fall through to polling */ }
 
-                // Genuine failure — mark order + show error
+                // Poll for up to 15 s — webhook may still be in flight
+                const confirmed = await pollForCompletion(order.id);
+                if (confirmed) {
+                  clearCart();
+                  setStep('done');
+                  return;
+                }
+
+                // Still not confirmed — mark as failed and show helpful message
                 updateDoc(doc(db, 'orders', order.id), {
-                  status: 'PaymentFailed',
+                  status:     'PaymentFailed',
                   failReason: err.message || 'Verification failed',
-                  updatedAt: serverTimestamp(),
+                  updatedAt:  serverTimestamp(),
                 }).catch(() => {});
                 notifyAdminPaymentIssue(order, 'Verification failed: ' + (err.message || 'unknown error'), response.reference);
                 setStkError('Payment received but verification failed. Contact support with ref: ' + response.reference);
                 setStep('pay');
-              })
-              .finally(resolve);
+              }
+            };
+
+            doVerify().finally(resolve);
           },
           onClose: () => {
             // User closed/cancelled the payment popup — return to cart, preserve items
