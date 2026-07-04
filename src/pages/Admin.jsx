@@ -2693,12 +2693,32 @@ export default function Admin() {
             <span className="adm-nav-section-dot adm-nav-section-dot--admin" />
             <span className="adm-nav-label">Manage</span>
           </div>
-          {navItems.filter(n => n.group === 'admin').map(({ k, label, icon }) => (
-            <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} onClick={() => { setTab(k); if (k === 'books') { setBookStatusFilter('all'); setBookTypeFilter('all'); setSearch(''); } }} title={label}>
-              <span className="adm-nav-icon-emoji">{icon}</span>
-              <span className="adm-nav-label">{label}</span>
-            </button>
-          ))}
+          {navItems.filter(n => n.group === 'admin').map(({ k, label, icon }) => {
+            let count = null;
+            if (k === 'messages') count = messages.filter(m => (m.status==='new'||!m.status) && m.type !== 'live_chat' && m.type !== 'notification').length;
+            if (k === 'livechat') count = chatSessions.filter(s => s.lastSender === 'user' && s.status !== 'closed').length;
+            return (
+              <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} style={{}} onClick={() => { setTab(k); if (k === 'books') { setBookStatusFilter('all'); setBookTypeFilter('all'); setSearch(''); } }} title={label}>
+                <span className="adm-nav-icon-emoji">{icon}</span>
+                <span className="adm-nav-label">{label}</span>
+                {count > 0 && (
+                  <span style={{
+                    marginLeft:'auto',
+                    background: k === 'livechat' ? 'rgba(231,76,60,0.2)' : 'rgba(255,255,255,0.1)',
+                    color: k === 'livechat' ? '#e74c3c' : 'var(--muted)',
+                    fontSize:'0.68rem',
+                    fontWeight:700,
+                    padding:'1px 6px',
+                    borderRadius:10,
+                    minWidth:20,
+                    textAlign:'center',
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
           {/* ── Book Categories (shown when Books tab is active) ── */}
           {tab === 'books' && !sidebarCollapsed && (
