@@ -24,11 +24,11 @@ const SITE_CONTEXT = {
 };
 
 const QUICK_REPLIES = [
-  { label: '📚 Browse books', value: 'Show me the books available' },
-  { label: '💳 How to pay',   value: 'How do I pay for a book?' },
-  { label: '📖 My library',   value: 'How do I access my library?' },
-  { label: '✍️ About author', value: 'Tell me about the author' },
-  { label: '🆘 Get help',     value: 'I need help with my account' },
+  { label: '📚 Browse books',    value: 'Show me the books available' },
+  { label: '💳 How to pay',      value: 'How do I pay for a book?' },
+  { label: '📖 My library',      value: 'How do I access my library?' },
+  { label: '✍️ About author',    value: 'Tell me about the author' },
+  { label: '💬 Talk to a human', value: 'I want to talk to a human agent' },
 ];
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -206,6 +206,12 @@ function offlineReply(msg, ctx) {
   if (intents.about > 0) {
     const total = books.filter(b => b.active !== false && b.status !== 'draft').length;
     return `**Ellines Haven** is Kenya's premier digital literary platform — a home for original African stories. 🌍\n\n• **${total} titles** available — Drama, Romance, Mystery, Historical, Fantasy & more\n• Founded by Elijah Mwangi M\n• Part of the **Ellines Group** (Tech · Furniture · Haven)\n• Pay with M-Pesa, Airtel, or card — read instantly\n• Buy once, own forever — no subscriptions\n\nLearn more at __/about__`;
+  }
+
+  // ── TALK TO HUMAN / LIVE CHAT ─────────────────────────────────────────────
+  const wantsHuman = /talk to (a |the )?(human|person|agent|support|someone|real|staff)|live chat|speak to|chat (with|to) (us|someone|agent|human|person|support)|connect me|get help from|i need (a |to talk to )?(human|person|agent)|customer (service|support|care)/i.test(m);
+  if (wantsHuman) {
+    return `__OPEN_LIVE_CHAT__`;
   }
 
   // ── CONTACT / SUPPORT ─────────────────────────────────────────────────────
@@ -443,6 +449,20 @@ Rules:
     }
 
     setTyping(false);
+
+    // Special signal: open live chat widget
+    if (reply === '__OPEN_LIVE_CHAT__') {
+      setMsgs(prev => [...prev, {
+        role: 'assistant',
+        text: `Sure! Connecting you to a live agent now. 💬\n\nOur team is available **Mon–Sat, 8am–8pm EAT**. Type your message and we'll reply as soon as possible.`,
+      }]);
+      setTimeout(() => {
+        setOpen(false);
+        window.dispatchEvent(new CustomEvent('ellines-open-livechat'));
+      }, 1200);
+      return;
+    }
+
     setMsgs(prev => [...prev, { role: 'assistant', text: reply }]);
     if (!open) setUnread(u => u + 1);
   };
