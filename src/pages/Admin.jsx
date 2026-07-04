@@ -1035,6 +1035,12 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
     showToast((updated[key] ? '✅ Enabled: ' : '❌ Disabled: ') + key.replace(/([A-Z])/g,' $1').toLowerCase());
   };
 
+  const setInterval_ = async (val) => {
+    const updated = { ...sc, autoRefreshInterval: val };
+    await saveSiteControls(updated);
+    showToast(`✅ Auto-refresh interval set to ${val} minutes`);
+  };
+
   const controls = [
     { key:'disableRightClick', icon:'🖱️', label:'Disable Right-Click',       desc:'Blocks context menu site-wide. Prevents image/text saving via right-click.', danger:false },
     { key:'disableTextSelect', icon:'🔤', label:'Disable Text Selection',     desc:'Users cannot select or highlight any text on the site.', danger:false },
@@ -1048,6 +1054,17 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
     { key:'readOnlyMode',      icon:'📖', label:'Read-Only Mode',             desc:'Users can browse but cannot purchase, review, or interact.', danger:false },
   ];
 
+  const refreshIntervals = [
+    { label: '5 minutes',  value: 5 },
+    { label: '10 minutes', value: 10 },
+    { label: '15 minutes', value: 15 },
+    { label: '30 minutes', value: 30 },
+    { label: '1 hour',     value: 60 },
+    { label: '2 hours',    value: 120 },
+  ];
+
+  const currentInterval = parseInt(sc.autoRefreshInterval, 10) || 30;
+
   return (
     <div className="adm-page">
       <div className="adm-page-head">
@@ -1059,6 +1076,58 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
 
       <div style={{ background:'rgba(201,168,76,0.07)', border:'1px solid rgba(201,168,76,0.25)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginBottom:24, fontSize:'0.84rem' }}>
         ⚡ <strong style={{ color:'var(--gold)' }}>Real-time:</strong> All changes are saved to Firestore and take effect instantly for every visitor — no page reload required.
+      </div>
+
+      {/* ── Auto Refresh Section ── */}
+      <div className="card" style={{ padding:'20px 24px', marginBottom:20, border: sc.autoRefreshEnabled ? '1px solid rgba(74,158,255,0.35)' : '1px solid var(--border)', background: sc.autoRefreshEnabled ? 'rgba(74,158,255,0.04)' : 'rgba(255,255,255,0.02)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+          <span style={{ fontSize:'1.8rem', flexShrink:0 }}>🔄</span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <strong style={{ fontSize:'0.92rem', display:'block', marginBottom:3 }}>Auto Page Refresh</strong>
+            <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>
+              Automatically reload the page for all regular users after the set interval. Keeps book data, prices, and content fresh without manual reload. Admins are never auto-refreshed.
+            </span>
+            {sc.autoRefreshEnabled && (
+              <span style={{ display:'inline-block', marginTop:6, fontSize:'0.72rem', padding:'2px 8px', borderRadius:10, background:'rgba(74,158,255,0.12)', color:'#4a9eff', border:'1px solid rgba(74,158,255,0.3)' }}>
+                🟢 Active — refreshing every {currentInterval} min for all users
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => toggle('autoRefreshEnabled')}
+            style={{ flexShrink:0, minWidth:64, padding:'8px 16px', borderRadius:'var(--r-sm)', border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.82rem',
+              background: sc.autoRefreshEnabled ? 'rgba(74,158,255,0.2)' : 'rgba(255,255,255,0.06)',
+              color: sc.autoRefreshEnabled ? '#4a9eff' : 'var(--muted)',
+              transition:'all 0.2s',
+            }}>
+            {sc.autoRefreshEnabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+
+        {/* Interval selector — only shown when enabled */}
+        {sc.autoRefreshEnabled && (
+          <div style={{ marginTop:16, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+            <span style={{ fontSize:'0.82rem', color:'var(--muted)', flexShrink:0 }}>Refresh every:</span>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {refreshIntervals.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setInterval_(opt.value)}
+                  style={{
+                    padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer',
+                    fontSize:'0.78rem', fontWeight:600, transition:'all 0.15s',
+                    background: currentInterval === opt.value ? '#4a9eff' : 'rgba(255,255,255,0.07)',
+                    color:       currentInterval === opt.value ? '#fff'   : 'var(--muted)',
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <span style={{ fontSize:'0.75rem', color:'var(--muted)', marginLeft:'auto' }}>
+              Current: <strong style={{ color:'#4a9eff' }}>{currentInterval} min</strong>
+            </span>
+          </div>
+        )}
       </div>
 
       <div style={{ display:'flex', flexDirection:'column', gap:12 }}>

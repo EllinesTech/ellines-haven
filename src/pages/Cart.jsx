@@ -571,7 +571,12 @@ export default function Cart() {
   // ── Cart screen ──────────────────────────────────────────────────────────
   return (
     <main className="cart-page">
-      <div className="page-header"><div className="container"><h1><EditableField field="cart_heading">Your Cart</EditableField></h1><p>{cart.length} item{cart.length !== 1 ? 's' : ''}</p></div></div>
+      <div className="page-header">
+        <div className="container">
+          <h1><EditableField field="cart_heading">Your Cart</EditableField></h1>
+          <p>{cart.length} item{cart.length !== 1 ? 's' : ''}</p>
+        </div>
+      </div>
       <div className="container">
         {/* Payment cancelled notice */}
         {cancelledNotice && (
@@ -584,44 +589,88 @@ export default function Cart() {
             >✕</button>
           </div>
         )}
+
         {cart.length === 0
-          ? <div className="cart-empty">
-              <div className="cart-empty__icon">&#128722;</div>
+          ? (
+            <div className="cart-empty">
+              <div className="cart-empty__icon">🛒</div>
               <h3><EditableField field="cart_empty_heading">Your cart is empty</EditableField></h3>
-              <p><EditableField field="cart_empty_sub">Add some books to get started.</EditableField></p>
+              <p><EditableField field="cart_empty_sub">Discover books you'll love and add them here.</EditableField></p>
               <Link to="/library" className="btn btn-primary"><EditableField field="cart_browse_btn">Browse Books</EditableField></Link>
             </div>
-          : <div className="cart-layout">
+          ) : (
+            <div className="cart-layout">
+
+              {/* ── Left: item list ── */}
               <div className="cart-items">
+                <div className="cart-items-header">
+                  <span>{cart.length} item{cart.length !== 1 ? 's' : ''} in your cart</span>
+                  <button className="cart-clear-btn" onClick={() => { if (window.confirm('Remove all items from cart?')) clearCart(); }}>
+                    Clear cart
+                  </button>
+                </div>
+
                 {cart.map(b => (
                   <div key={b.id} className="cart-item card">
-                    <img src={b.cover || '/logo-icon.png'} alt={b.title} className="cart-item__img" />
+                    <Link to={`/book/${b.id}`} className="cart-item__img-wrap">
+                      <img
+                        src={b.cover || '/logo-icon.png'}
+                        alt={b.title}
+                        className="cart-item__img"
+                        onError={e => { e.target.src = '/logo-icon.png'; }}
+                      />
+                    </Link>
                     <div className="cart-item__info">
                       <span className="cart-item__genre">{b.genre}</span>
                       <h3><Link to={`/book/${b.id}`}>{b.title}</Link></h3>
-                      <p>by {b.author}</p>
-                      <p style={{ color:'var(--muted)', fontSize:'.78rem' }}>{b.pages} pages · {b.readTime}</p>
+                      <p className="cart-item__author">by {b.author}</p>
+                      <p className="cart-item__meta">{b.pages} pages · {b.readTime}</p>
+                      <div className="cart-item__actions">
+                        <button className="cart-item__rm" onClick={() => removeFromCart(b.id)}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                          Remove
+                        </button>
+                        <Link to={`/book/${b.id}`} className="cart-item__view">View details</Link>
+                      </div>
                     </div>
                     <div className="cart-item__right">
                       <div className="cart-item__price">KSh {b.price.toLocaleString()}</div>
-                      <button className="cart-item__rm" onClick={() => removeFromCart(b.id)}>Remove</button>
+                      <span className="cart-item__type">Digital book</span>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* ── Right: order summary ── */}
               <div className="cart-sum card">
-                <h3>Summary</h3>
-                {cart.map(b => (
-                  <div key={b.id} className="cart-sum__row">
-                    <span>{b.title.length > 24 ? b.title.slice(0,24)+'...' : b.title}</span>
-                    <span>KSh {b.price}</span>
-                  </div>
-                ))}
-                <div className="cart-sum__total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
-                <button className="btn btn-primary" style={{ width:'100%' }} onClick={checkout}>Proceed to Checkout</button>
-                {!user && <p className="cart-sum__note">You need to sign in to complete purchase.</p>}
+                <h3>Order Summary</h3>
+                <div className="cart-sum__lines">
+                  {cart.map(b => (
+                    <div key={b.id} className="cart-sum__row">
+                      <span title={b.title}>{b.title.length > 26 ? b.title.slice(0, 26) + '…' : b.title}</span>
+                      <span>KSh {b.price.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="cart-sum__divider" />
+                <div className="cart-sum__total">
+                  <span>Total</span>
+                  <strong>KSh {total.toLocaleString()}</strong>
+                </div>
+                <p className="cart-sum__unlock-note">⚡ Books unlock instantly after payment</p>
+                <button className="btn btn-primary cart-sum__cta" onClick={checkout}>
+                  Proceed to Checkout
+                </button>
+                {!user && (
+                  <p className="cart-sum__note">
+                    <Link to="/login">Sign in</Link> to complete your purchase. Your cart is saved.
+                  </p>
+                )}
+                <Link to="/library" className="cart-sum__continue">← Continue browsing</Link>
               </div>
+
             </div>
+          )
         }
       </div>
     </main>

@@ -300,6 +300,25 @@ function WatermarkOverlay() {
   );
 }
 
+/* ── Auto Refresh — admin-controlled, stored in siteControls ── */
+function AutoRefresh() {
+  const { siteControls, user } = useApp();
+
+  useEffect(() => {
+    const enabled  = siteControls?.autoRefreshEnabled;
+    const interval = parseInt(siteControls?.autoRefreshInterval, 10) || 30;
+    // Never auto-refresh for admins — they'd lose their place mid-edit
+    const isAdmin  = user?.role === 'admin' || user?.role === 'superadmin';
+    if (!enabled || isAdmin) return;
+
+    const ms = interval * 60 * 1000; // minutes → ms
+    const timer = setTimeout(() => window.location.reload(), ms);
+    return () => clearTimeout(timer);
+  }, [siteControls?.autoRefreshEnabled, siteControls?.autoRefreshInterval, user?.role]);
+
+  return null;
+}
+
 /* ── Root App ── */
 export default function App() {
   return (
@@ -309,6 +328,7 @@ export default function App() {
           <BrowserRouter>
             <ScrollToTop />
             <VisitorTracker />
+            <AutoRefresh />
             <SiteControls />
             <WatermarkOverlay />
             <WhatsAppFloat />

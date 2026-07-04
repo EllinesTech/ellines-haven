@@ -92,7 +92,14 @@ export function AppProvider({ children }) {
     if (u && (u.id === 'u1' || u.id === 'a1')) { localStorage.removeItem('eh_user'); return null; }
     return u;
   });
-  const [cart,     setCartState]     = useState(() => load('eh_cart', []));
+  const [cart,     setCartState]     = useState(() => {
+    // Per-user cart key: if user is already loaded, use their cart; else use guest cart
+    const u = load('eh_user', null);
+    const cartKey = (u && u.email && !(u.id === 'u1' || u.id === 'a1'))
+      ? `eh_cart_${u.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`
+      : 'eh_cart_guest';
+    return load(cartKey, []);
+  });
   const [books,    setBooksState]    = useState(() => mergeBooks(load('eh_books', null)));
   const [settings, setSettingsState] = useState(() => load('eh_settings', DEFAULT_SETTINGS));
   const [library,  setLibState]      = useState([]);
@@ -210,8 +217,24 @@ export function AppProvider({ children }) {
     await saveUserPerms(updated);
   };
 
+  // ── Cart key helpers ─────────────────────────────────────────────────────
+  const cartKey = (email) => email
+    ? `eh_cart_${email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`
+    : 'eh_cart_guest';
+
+  const setCart = (vOrFn) => {
+    setCartState(prev => {
+      const next = typeof vOrFn === 'function' ? vOrFn(prev) : vOrFn;
+      // Save under the current user's key (or guest if not logged in)
+      const key = cartKey(user?.email || null);
+      save(key, next);
+      // Also keep legacy key in sync so old bookmarks still work
+      save('eh_cart', next);
+      return next;
+    });
+  };
+
   // ── Setters ──────────────────────────────────────────────────────────────────
-  const setCart     = v => { setCartState(v);     save('eh_cart', v); };
   const setSettings = v => {
     setSettingsState(v);
     save('eh_settings', v);
@@ -278,6 +301,32 @@ export function AppProvider({ children }) {
     if (!user?.email) { setWishlistState([]); return; }
     const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
     setWishlistState(load(key, []));
+  }, [user?.email]); // eslint-disable-line
+
+  // ── Reload cart when user changes (login / logout) ────────────────────────
+  // On login: merge any guest cart items into the user's saved cart
+  // On logout: clear in-memory cart (guest cart is separate and untouched)
+  useEffect(() => {
+    if (!user?.email) {
+      // Logged out — load guest cart
+      setCartState(load('eh_cart_guest', []));
+      return;
+    }
+    const uKey    = cartKey(user.email);
+    const uCart   = load(uKey, []);
+    const gCart   = load('eh_cart_guest', []);
+    if (gCart.length > 0) {
+      // Merge guest items into user cart (no duplicates)
+      const merged = [...uCart];
+      gCart.forEach(g => { if (!merged.find(x => x.id === g.id)) merged.push(g); });
+      setCartState(merged);
+      save(uKey, merged);
+      save('eh_cart', merged);
+      // Clear guest cart after merge
+      save('eh_cart_guest', []);
+    } else {
+      setCartState(uCart);
+    }
   }, [user?.email]); // eslint-disable-line
 
   const updateSettings = patch => setSettings(prev => ({ ...prev, ...patch }));
