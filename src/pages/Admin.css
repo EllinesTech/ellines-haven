@@ -240,6 +240,18 @@
 .adm-messages-grid--split { grid-template-columns: 300px 1fr; }
 .adm-messages-grid--full  { grid-template-columns: 1fr; }
 
+/* Thread empty state */
+.adm-msg-thread-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+  padding: 60px 20px;
+  background: rgba(0,0,0,0.05);
+}
+
 /* Conversation list */
 .adm-msg-list {
   display: flex;

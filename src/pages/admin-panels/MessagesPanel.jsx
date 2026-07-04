@@ -555,7 +555,7 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
           ['notifications', '🔔 Notifications', notifs.length],
           ['livechat',      '⚡ Live Chat',      chatSessions.filter(s => s.status !== 'closed').length],
         ].map(([k, label, count]) => (
-          <button key={k} className={'adm-filter-btn' + (tab === k ? ' active' : '')} onClick={() => { setTab(k); setSelected(null); }}>
+          <button key={k} className={'adm-filter-btn' + (tab === k ? ' active' : '')} onClick={() => { setTab(k); setSelected(null); setActiveChat(null); }}>
             {label}
             {count > 0 && (
               <span style={{
@@ -571,7 +571,8 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
           <>
             <span style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 6px' }} />
             {['all', 'new', 'read', 'replied', 'spam'].map(f => (
-              <button key={f} className={'adm-filter-btn' + (filter === f ? ' active' : '')} onClick={() => setFilter(f)}
+              <button key={f} className={'adm-filter-btn' + (filter === f ? ' active' : '')}
+                onClick={() => { setFilter(f); setSelected(null); }}
                 style={{ textTransform: 'capitalize', fontSize: '0.78rem' }}>
                 {f}{counts[f] > 0 && <span style={{ marginLeft: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '0 5px', fontSize: '0.66rem' }}>{counts[f]}</span>}
               </button>
@@ -597,7 +598,7 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
       </div>
       {/* ── Main grid: list + thread (messages + notifications tabs only) ── */}
       {tab !== 'livechat' && (
-      <div className={`adm-messages-grid ${selected ? 'adm-messages-grid--split' : 'adm-messages-grid--full'}`}>
+      <div className="adm-messages-grid adm-messages-grid--split">
 
         {/* ── Message list ── */}
         <div className="adm-msg-list">
@@ -646,7 +647,7 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
         </div>
 
         {/* ── Thread panel ── */}
-        {selected && (
+        {selected ? (
           <div className="adm-msg-thread">
 
             {/* Header */}
@@ -745,21 +746,27 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
               </div>
             </div>
           </div>
+        ) : (
+          <div className="adm-msg-thread-empty">
+            <div style={{ fontSize:'3rem', marginBottom:12 }}>💬</div>
+            <p style={{ fontSize:'0.95rem', fontWeight:600, marginBottom:6 }}>Select a message</p>
+            <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Click any conversation on the left to read and reply</p>
+          </div>
         )}
       </div>
       )} {/* end tab !== 'livechat' */}
       {tab === 'livechat' && (
-        <div style={{ display: 'grid', gridTemplateColumns: activeChat ? '300px 1fr' : '1fr', gap: 16, minHeight: 500 }}>
+        <div className="adm-messages-grid adm-messages-grid--split">
 
-          {/* Session list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* ── Session list (left column) ── */}
+          <div className="adm-msg-list">
             {chatSessions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
                 <div style={{ fontSize: '2.5rem', marginBottom: 10 }}>💬</div>
-                <p style={{ fontSize: '0.9rem' }}>No live chat sessions yet</p>
-                <p style={{ fontSize: '0.75rem', marginTop: 6 }}>
-                  Users can start a chat using the 💬 button on the site.
-                  <br />Toggle yourself Online above to let them know an agent is available.
+                <p style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: 6 }}>No live chat sessions yet</p>
+                <p style={{ fontSize: '0.75rem' }}>
+                  Users start a chat using the widget on the site.
+                  <br />Toggle <strong>Go Online</strong> above so they know an agent is available.
                 </p>
               </div>
             ) : chatSessions.map(s => {
@@ -770,17 +777,17 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
                   onClick={() => setActiveChat(s.id)}
                   style={{
                     padding: '12px 14px',
-                    background: isActive ? 'rgba(106,99,255,0.12)' : 'var(--card)',
-                    border: `1px solid ${isActive ? 'rgba(106,99,255,0.5)' : 'var(--border)'}`,
+                    background: isActive ? 'rgba(108,99,255,0.1)' : 'transparent',
+                    borderBottom: '1px solid var(--border)',
                     borderLeft: `3px solid ${hasNew ? '#e74c3c' : isActive ? '#6c63ff' : 'transparent'}`,
-                    borderRadius: 'var(--r-sm)', cursor: 'pointer', transition: 'all 0.15s',
+                    cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{
                         width: 32, height: 32, borderRadius: '50%',
-                        background: 'rgba(106,99,255,0.2)', color: '#6c63ff',
+                        background: 'rgba(108,99,255,0.2)', color: '#6c63ff',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontWeight: 700, fontSize: '0.82rem', flexShrink: 0,
                       }}>{(s.name || '?')[0].toUpperCase()}</div>
@@ -789,24 +796,22 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
                         <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{s.email || ''}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                      <span style={{
-                        fontSize: '0.62rem', padding: '2px 6px', borderRadius: 10, fontWeight: 700,
-                        background: s.status === 'closed' ? 'rgba(100,116,139,0.12)' : hasNew ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.1)',
-                        color: s.status === 'closed' ? '#64748b' : hasNew ? '#e74c3c' : '#2ecc71',
-                      }}>{s.status === 'closed' ? 'closed' : hasNew ? '● new' : 'active'}</span>
-                    </div>
+                    <span style={{
+                      fontSize: '0.62rem', padding: '2px 6px', borderRadius: 10, fontWeight: 700,
+                      background: s.status === 'closed' ? 'rgba(100,116,139,0.12)' : hasNew ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.1)',
+                      color: s.status === 'closed' ? '#64748b' : hasNew ? '#e74c3c' : '#2ecc71',
+                    }}>{s.status === 'closed' ? 'closed' : hasNew ? '● new' : 'active'}</span>
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
                     {s.lastMsg || 'Chat started'}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>{fmtDate(s.lastMsgAt || s.createdAt)}</span>
                     {s.status !== 'closed' && (
                       <button
                         onClick={e => { e.stopPropagation(); closeChatSession(s.id); }}
                         style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '0.68rem', cursor: 'pointer', padding: '0 4px', fontFamily: 'inherit' }}
-                      >End chat</button>
+                      >End</button>
                     )}
                   </div>
                 </div>
@@ -814,31 +819,21 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
             })}
           </div>
 
-          {/* Chat thread panel */}
-          {activeChat && (
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              background: 'var(--card)', borderRadius: 'var(--r)',
-              border: '1px solid var(--border)', overflow: 'hidden',
-            }}>
+          {/* ── Chat thread (right column) ── */}
+          {activeChat ? (
+            <div className="adm-msg-thread">
               {/* header */}
               {(() => {
                 const s = chatSessions.find(x => x.id === activeChat);
                 return (
-                  <div style={{
-                    padding: '12px 16px', borderBottom: '1px solid var(--border)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: 'linear-gradient(135deg,rgba(108,99,255,0.12),rgba(74,158,255,0.08))',
-                  }}>
-                    <div>
+                  <div className="adm-msg-thread-topbar">
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <strong style={{ fontSize: '0.95rem' }}>💬 {s?.name || 'Guest'}</strong>
                       <span style={{ fontSize: '0.75rem', color: 'var(--muted)', marginLeft: 10 }}>{s?.email}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                       {s?.status !== 'closed' && (
-                        <button className="btn btn-sm btn-ghost" onClick={() => closeChatSession(activeChat)}>
-                          End Chat
-                        </button>
+                        <button className="btn btn-sm btn-ghost" onClick={() => closeChatSession(activeChat)}>End Chat</button>
                       )}
                       <button className="adm-close-btn" onClick={() => setActiveChat(null)}>✕</button>
                     </div>
@@ -847,7 +842,7 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
               })()}
 
               {/* messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, maxHeight: 380 }}>
+              <div className="adm-msg-thread-body">
                 {chatThread.length === 0 && (
                   <div style={{ textAlign: 'center', color: 'var(--muted)', padding: '30px 0', fontSize: '0.82rem' }}>No messages yet</div>
                 )}
@@ -855,14 +850,14 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
                   const isAdmin  = msg.sender === 'admin';
                   const isSystem = msg.sender === 'system';
                   if (isSystem) return (
-                    <div key={msg.id} style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(255,255,255,0.04)', padding: '4px 10px', borderRadius: 20 }}>
+                    <div key={msg.id} style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(255,255,255,0.04)', padding: '4px 10px', borderRadius: 20, alignSelf: 'center' }}>
                       {msg.text}
                     </div>
                   );
                   return (
                     <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start' }}>
                       <div style={{
-                        maxWidth: '78%', padding: '9px 14px',
+                        maxWidth: '78%', padding: '10px 14px',
                         borderRadius: isAdmin ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
                         background: isAdmin ? 'rgba(201,168,76,0.16)' : 'rgba(74,158,255,0.1)',
                         border: isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
@@ -882,29 +877,37 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
               </div>
 
               {/* reply box */}
-              {chatSessions.find(x => x.id === activeChat)?.status !== 'closed' ? (
-                <div style={{ borderTop: '1px solid var(--border)', padding: '10px 14px', background: 'rgba(0,0,0,0.1)', display: 'flex', gap: 8 }}>
-                  <textarea
-                    className="field"
-                    rows={2}
-                    value={chatReply}
-                    onChange={e => setChatReply(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChatReply(); }}
-                    placeholder="Type reply… (Ctrl+Enter to send)"
-                    style={{ flex: 1, resize: 'none', fontSize: '0.9rem' }}
-                  />
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={sendChatReply}
-                    disabled={chatSending || !chatReply.trim()}
-                    style={{ alignSelf: 'flex-end', minWidth: 80 }}
-                  >{chatSending ? '⏳' : '↩ Reply'}</button>
-                </div>
-              ) : (
-                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted)' }}>
-                  This chat session is closed.
-                </div>
-              )}
+              <div className="adm-msg-thread-reply">
+                {chatSessions.find(x => x.id === activeChat)?.status !== 'closed' ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <textarea
+                      className="field"
+                      rows={2}
+                      value={chatReply}
+                      onChange={e => setChatReply(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendChatReply(); }}
+                      placeholder="Type reply… (Ctrl+Enter to send)"
+                      style={{ flex: 1, resize: 'none', fontSize: '0.9rem' }}
+                    />
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={sendChatReply}
+                      disabled={chatSending || !chatReply.trim()}
+                      style={{ alignSelf: 'flex-end', minWidth: 80 }}
+                    >{chatSending ? '⏳' : '↩ Reply'}</button>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--muted)' }}>
+                    This chat session is closed.
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="adm-msg-thread-empty">
+              <div style={{ fontSize:'3rem', marginBottom:12 }}>💬</div>
+              <p style={{ fontSize:'0.95rem', fontWeight:600, marginBottom:6 }}>Select a chat session</p>
+              <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Click a conversation on the left to view and reply</p>
             </div>
           )}
         </div>
