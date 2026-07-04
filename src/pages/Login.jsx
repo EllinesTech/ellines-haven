@@ -247,66 +247,51 @@ export default function Login() {
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
-      /* 3. Legacy: check localStorage registered users (transition period) */
-      const legacy = getAccounts();
-      const legacyAccount = legacy.find(a => a.email?.toLowerCase() === emailKey);
-      if (legacyAccount) {
-        if (legacyAccount.suspended) { setErr('This account has been suspended.'); setBusy(false); return; }
-
-        // Check Firestore pwOverrides first (cross-device admin password resets)
-        let fsOverridePw = null;
-        try {
-          const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
-          if (regSnap.exists()) {
-            const fsPwOverrides = regSnap.data().pwOverrides || {};
-            fsOverridePw = fsPwOverrides[emailKey] || null;
-          }
-        } catch {}
-
-        const effectivePw = fsOverridePw || legacyAccount.password;
-        if (effectivePw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
-
-        // Migrate to Firestore users collection so next login goes through step 1
-        try {
-          const migrateId = legacyAccount.id || ('u_' + Date.now());
-          await setDoc(doc(db, 'users', migrateId), {
-            id: migrateId,
-            name: legacyAccount.name, email: legacyAccount.email,
-            role: legacyAccount.role || 'user',
-            passwordHash: effectivePw, migratedAt: serverTimestamp(), status: 'active',
-          }, { merge: true });
-        } catch {}
-        const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: legacyAccount.role || 'user' };
-        setUser(sessionUser);
-        await logLogin(legacyAccount.email);
-        navigate(from, { replace: true }); setBusy(false); return;
-      }
-
-      /* 4. Last resort — check Firestore registered_users pwOverrides directly
-         (handles case where user exists in site_data but not in /users collection yet) */
+      /* 3. Legacy: check localStorage registered users OR Firestore site_data/registered_users ── */
+      // First try Firestore directly — don't rely on localStorage timing
       try {
         const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
         if (regSnap.exists()) {
           const regData = regSnap.data();
           const regUser = (regData.registered || []).find(u => u.email?.toLowerCase() === emailKey);
           if (regUser) {
-            const fsPw = (regData.pwOverrides || {})[emailKey] || regUser.password || '';
+            const fsPwOverrides = regData.pwOverrides || {};
+            const localOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+            const fsPw = fsPwOverrides[emailKey] || localOverrides[emailKey] || regUser.password || '';
+            if (regUser.suspended) { setErr('This account has been suspended.'); setBusy(false); return; }
             if (!fsPw) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
             if (fsPw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
-            // Migrate to /users now
+            // Migrate to /users collection for next login
             const uid = regUser.id || ('u_' + Date.now());
             await setDoc(doc(db, 'users', uid), {
               id: uid, name: regUser.name, email: emailKey,
               role: regUser.role || 'user', passwordHash: fsPw,
               migratedAt: serverTimestamp(), status: 'active',
             }, { merge: true }).catch(() => {});
+            // Also sync localStorage for this device
+            localStorage.setItem('eh_registered_users', JSON.stringify(regData.registered));
             const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: regUser.role || 'user' };
             setUser(sessionUser);
             await logLogin(emailKey);
             navigate(from, { replace: true }); setBusy(false); return;
           }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[Login] Firestore registered_users check failed:', e.message);
+      }
+
+      /* 4. Last resort — localStorage registered users (fast path on repeat logins) */
+      const legacy = getAccounts();
+      const legacyAccount = legacy.find(a => a.email?.toLowerCase() === emailKey);
+      if (legacyAccount) {
+        if (legacyAccount.suspended) { setErr('This account has been suspended.'); setBusy(false); return; }
+        const effectivePw = legacyAccount.password;
+        if (effectivePw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
+        const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: legacyAccount.role || 'user' };
+        setUser(sessionUser);
+        await logLogin(legacyAccount.email);
+        navigate(from, { replace: true }); setBusy(false); return;
+      }
 
       setErr('No account found with that email address.');
     } catch (e) {
