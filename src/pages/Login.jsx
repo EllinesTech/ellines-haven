@@ -234,7 +234,7 @@ export default function Login() {
         if (!passwordOk) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
         const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: fsUser.role || 'user' };
         setUser(sessionUser);
-        await logLogin(fsUser.email);
+        await logLogin(fsUser.email, fsUser.name);
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
@@ -243,7 +243,7 @@ export default function Login() {
       if (adminAccount) {
         const sessionUser = { id: adminAccount.id || 'admin01', name: adminAccount.name || 'Admin', email: adminAccount.email, role: adminAccount.role };
         setUser(sessionUser);
-        await logLogin(adminAccount.email);
+        await logLogin(adminAccount.email, adminAccount.name);
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
@@ -258,21 +258,45 @@ export default function Login() {
             const fsPwOverrides = regData.pwOverrides || {};
             const localOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
             const fsPw = fsPwOverrides[emailKey] || localOverrides[emailKey] || regUser.password || '';
-            if (regUser.suspended) { setErr('This account has been suspended.'); setBusy(false); return; }
+            
+            // Check suspension
+            const suspFs = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
+            const suspLeg = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
+            const allSusp = [...new Set([...suspFs, ...suspLeg])];
+            if (allSusp.includes(emailKey) || regUser.suspended) { 
+              setErr('This account has been suspended.'); 
+              setBusy(false); 
+              return; 
+            }
+            
             if (!fsPw) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
             if (fsPw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
-            // Migrate to /users collection for next login
+            
+            // ✅ MIGRATE to /users collection for next login (AUTO-FIX for admin-created accounts)
             const uid = regUser.id || ('u_' + Date.now());
+            const joined = regUser.joined || new Date().toISOString().slice(0, 10);
             await setDoc(doc(db, 'users', uid), {
-              id: uid, name: regUser.name, email: emailKey,
-              role: regUser.role || 'user', passwordHash: fsPw,
-              migratedAt: serverTimestamp(), status: 'active',
-            }, { merge: true }).catch(() => {});
+              id: uid, 
+              name: regUser.name, 
+              email: emailKey,
+              role: regUser.role || 'user', 
+              passwordHash: fsPw,
+              joined,
+              migratedAt: serverTimestamp(), 
+              status: 'active',
+            }, { merge: true }).catch((e) => {
+              console.warn('[Login] Auto-migration to users collection failed:', e.message);
+            });
+            
             // Also sync localStorage for this device
             localStorage.setItem('eh_registered_users', JSON.stringify(regData.registered));
+            const localPwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+            localPwOverrides[emailKey] = fsPw;
+            localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
+            
             const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: regUser.role || 'user' };
             setUser(sessionUser);
-            await logLogin(emailKey);
+            await logLogin(emailKey, regUser.name);
             navigate(from, { replace: true }); setBusy(false); return;
           }
         }
@@ -289,7 +313,7 @@ export default function Login() {
         if (effectivePw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
         const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: legacyAccount.role || 'user' };
         setUser(sessionUser);
-        await logLogin(legacyAccount.email);
+        await logLogin(legacyAccount.email, legacyAccount.name);
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
@@ -348,12 +372,30 @@ export default function Login() {
   );
 }
 
-async function logLogin(email) {
+async function logLogin(email, userName) {
   try {
+    // Log to system logs
     const logsDoc = doc(db, 'site_data', 'system_logs');
     const snap = await getDoc(logsDoc);
     const existing = snap.exists() ? (snap.data().logs || []) : [];
     const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
     await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
-  } catch {}
+    
+    // Track activity and notify admins
+    const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+    await trackActivity({
+      category: NOTIFICATION_CATEGORIES.USER_LOGIN,
+      title: 'User Login',
+      message: `${userName || email} logged in`,
+      userEmail: email,
+      userName: userName || email,
+      metadata: {
+        loginTime: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+      },
+      priority: 'low',
+    });
+  } catch (err) {
+    console.error('[logLogin]', err);
+  }
 }

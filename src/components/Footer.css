@@ -270,3 +270,45 @@
   .footer__bottom-inner { flex-direction: column; text-align: center; gap: 8px; }
   .footer__topband { padding-top: 36px; }
 }
+
+/* ── Newsletter strip in footer ── */
+.footer__newsletter {
+  border-top: 1px solid rgba(201,168,76,0.15);
+  border-bottom: 1px solid rgba(201,168,76,0.1);
+  background: rgba(201,168,76,0.03);
+  padding: 28px 0;
+}
+
+.footer__newsletter-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.footer__newsletter-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.footer__newsletter-text strong {
+  color: var(--text, #f0ece2);
+  font-size: 0.95rem;
+}
+
+.footer__newsletter-text span {
+  font-size: 0.78rem;
+  color: var(--muted, rgba(240,236,226,0.5));
+}
+
+.footer__newsletter-form {
+  flex: 1;
+  max-width: 420px;
+}
+
+@media (max-width: 640px) {
+  .footer__newsletter-inner { flex-direction: column; align-items: flex-start; }
+  .footer__newsletter-form { width: 100%; max-width: none; }
+}

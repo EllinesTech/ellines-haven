@@ -3,7 +3,17 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getAllReadingStats } from '../hooks/useReadingProgress';
 import './MyLibrary.css';
+
+// Helper: get a map of bookId -> progress for current user
+function useReadingProgressMap(userEmail) {
+  const [progressMap, setProgressMap] = useState({});
+  useEffect(() => {
+    setProgressMap(getAllReadingStats(userEmail));
+  }, [userEmail]);
+  return progressMap;
+}
 
 const WA_NUMBER = '254748255466';
 
@@ -15,8 +25,204 @@ function toDownloadUrl(url) {
     if (fileMatch) return `https://drive.google.com/uc?export=download&id=${fileMatch[1]}`;
     const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     if (idMatch) return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
-  } catch {}
+  } catch (e) { /* ignore malformed URL */ void e; }
   return url;
+}
+
+const STATUS_META = {
+  complete:      { label:'Complete',      icon:'✅', color:'#2ecc71', bg:'rgba(46,204,113,0.12)'  },
+  ongoing:       { label:'Ongoing',       icon:'📖', color:'#4a9eff', bg:'rgba(74,158,255,0.12)'  },
+  premium:       { label:'Premium',       icon:'⭐', color:'#c9a84c', bg:'rgba(201,168,76,0.12)'  },
+  'free-preview':{ label:'Free Preview',  icon:'👀', color:'#a855f7', bg:'rgba(168,85,247,0.12)'  },
+  'coming-soon': { label:'Coming Soon',   icon:'🔜', color:'#e8832a', bg:'rgba(232,131,42,0.12)'  },
+  limited:       { label:'Limited',       icon:'⏳', color:'#e74c3c', bg:'rgba(231,76,60,0.12)'   },
+  draft:         { label:'Draft',         icon:'📝', color:'#64748b', bg:'rgba(100,116,139,0.12)' },
+};
+
+// ── Reading Stats Panel ─────────────────────────────────────────────────────
+function ReadingStats({ user, library, catalog, orders }) {
+  const stats = getAllReadingStats(user.email);
+  const booksStarted   = Object.keys(stats).length;
+  const booksCompleted = library.length;
+  const totalOrders    = orders.length;
+  const totalSpent     = orders.filter(o => o.status === 'Completed').reduce((s,o) => s + (o.total||0), 0);
+
+  // Reading challenge — stored locally
+  const challengeKey = `eh_challenge_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
+  const [challenge, setChallenge] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(challengeKey) || '{"goal":5,"year":' + new Date().getFullYear() + '}'); } catch { return { goal: 5, year: new Date().getFullYear() }; }
+  });
+  const [editGoal, setEditGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState(challenge.goal);
+
+  const saveGoal = () => {
+    const g = Math.max(1, Math.min(100, parseInt(goalInput) || 5));
+    const next = { ...challenge, goal: g };
+    setChallenge(next);
+    localStorage.setItem(challengeKey, JSON.stringify(next));
+    setEditGoal(false);
+  };
+
+  const challengePct = Math.min(100, Math.round((booksCompleted / challenge.goal) * 100));
+  const challengeDone = booksCompleted >= challenge.goal;
+
+  // Genres breakdown
+  const genreCounts = {};
+  library.forEach(lb => {
+    const cat = catalog.find(b => b.id === lb.id);
+    if (cat?.genre) genreCounts[cat.genre] = (genreCounts[cat.genre] || 0) + 1;
+  });
+  const topGenres = Object.entries(genreCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+
+  // Last read
+  const lastReadEntry = Object.entries(stats)
+    .sort((a,b) => (b[1].lastRead||0) - (a[1].lastRead||0))[0];
+  const lastReadBook  = lastReadEntry ? catalog.find(b => b.id === lastReadEntry[0]) : null;
+  const lastReadDate  = lastReadEntry
+    ? new Date(lastReadEntry[1].lastRead).toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' })
+    : null;
+
+  // Reading streak — days with reading activity in the last 7 days
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    return d.toLocaleDateString('en-KE');
+  });
+  const activeDays = new Set(
+    Object.values(stats).map(s => s.lastRead ? new Date(s.lastRead).toLocaleDateString('en-KE') : null).filter(Boolean)
+  );
+  const streakDays = last7Days.filter(d => activeDays.has(d)).length;
+
+  const statCards = [
+    { icon:'📚', value: booksCompleted,                      label:'Books Owned'       },
+    { icon:'📖', value: booksStarted,                        label:'Books Started'      },
+    { icon:'🛒', value: totalOrders,                         label:'Total Orders'       },
+    { icon:'💰', value:`KSh ${totalSpent.toLocaleString()}`, label:'Total Spent'        },
+    { icon:'🔥', value:`${streakDays}/7`,                    label:'Active Days (week)' },
+    { icon:'🏆', value: topGenres[0]?.[0] || '—',            label:'Favourite Genre'    },
+  ];
+
+  return (
+    <div className="mylib-stats">
+      <h3 className="mylib-stats-title">📊 Reading Stats</h3>
+
+      {/* ── Reading Challenge ── */}
+      <div className="card mylib-challenge">
+        <div className="mylib-challenge-header">
+          <div>
+            <span className="mylib-challenge-label">{challenge.year} Reading Challenge</span>
+            <h4>
+              {challengeDone
+                ? `🎉 Goal Complete! ${booksCompleted} of ${challenge.goal} books`
+                : `${booksCompleted} of ${challenge.goal} books read`}
+            </h4>
+          </div>
+          {!editGoal ? (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setGoalInput(challenge.goal); setEditGoal(true); }}>
+              Set Goal
+            </button>
+          ) : (
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              <input
+                type="number"
+                min="1" max="100"
+                value={goalInput}
+                onChange={e => setGoalInput(e.target.value)}
+                className="mylib-challenge-input"
+                aria-label="Reading goal"
+              />
+              <button className="btn btn-primary btn-sm" onClick={saveGoal}>Save</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditGoal(false)}>✕</button>
+            </div>
+          )}
+        </div>
+        <div className="mylib-challenge-track">
+          <div
+            className={'mylib-challenge-fill' + (challengeDone ? ' done' : '')}
+            style={{ width: `${challengePct}%` }}
+          />
+        </div>
+        <p className="mylib-challenge-note">
+          {challengeDone
+            ? `You crushed it! 🎉 Consider raising your goal for next time.`
+            : `${Math.max(0, challenge.goal - booksCompleted)} more book${challenge.goal - booksCompleted !== 1 ? 's' : ''} to reach your ${challenge.year} goal.`}
+        </p>
+      </div>
+
+      {/* Stat cards */}
+      <div className="mylib-stats-grid">
+        {statCards.map(s => (
+          <div key={s.label} className="card mylib-stat-card">
+            <span className="mylib-stat-icon">{s.icon}</span>
+            <strong className="mylib-stat-value">{s.value}</strong>
+            <span className="mylib-stat-label">{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Last read */}
+      {lastReadBook && (
+        <div className="card mylib-last-read">
+          <span style={{ fontSize:'1.5rem' }}>📖</span>
+          <div>
+            <strong>Last Read</strong>
+            <p>{lastReadBook.title} <span style={{ color:'var(--muted)', fontSize:'0.8rem' }}>— {lastReadDate}</span></p>
+          </div>
+          <Link to={`/read/${lastReadBook.id}`} className="btn btn-outline btn-sm" style={{ flexShrink:0 }}>
+            Continue →
+          </Link>
+        </div>
+      )}
+
+      {/* Genre breakdown */}
+      {topGenres.length > 0 && (
+        <div className="card mylib-genre-chart">
+          <h4>Genres in Your Library</h4>
+          <div className="mylib-genre-bars">
+            {topGenres.map(([genre, count]) => (
+              <div key={genre} className="mylib-genre-row">
+                <span className="mylib-genre-label">{genre}</span>
+                <div className="mylib-genre-track">
+                  <div
+                    className="mylib-genre-fill"
+                    style={{ width:`${Math.round((count / booksCompleted) * 100)}%` }}
+                  />
+                </div>
+                <span className="mylib-genre-count">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activity heatmap — last 7 days */}
+      <div className="card mylib-heatmap">
+        <h4>Last 7 Days Activity</h4>
+        <div className="mylib-heatmap-row">
+          {last7Days.reverse().map(d => (
+            <div
+              key={d}
+              className={'mylib-heatmap-day' + (activeDays.has(d) ? ' active' : '')}
+              title={d}
+            >
+              <span>{new Date(d).toLocaleDateString('en-KE', { weekday:'short' }).charAt(0)}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mylib-heatmap-note">
+          {streakDays > 0 ? `You read on ${streakDays} of the last 7 days. Keep it up! 🔥` : 'No reading activity this week. Open a book and start! 📚'}
+        </p>
+      </div>
+
+      {library.length === 0 && (
+        <div className="mylib-empty" style={{ marginTop:24 }}>
+          <div className="mylib-empty-icon">📊</div>
+          <h3>No reading data yet</h3>
+          <p>Purchase and read books to start building your reading history.</p>
+          <Link to="/library" className="btn btn-primary">Browse Books</Link>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Account Settings Panel ──────────────────────────────────────────────────
@@ -24,151 +230,173 @@ function AccountSettings({ user, myPerms }) {
   const [prefs, setPrefs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('eh_user_prefs_' + user.email) || '{}'); } catch { return {}; }
   });
-  const [pwForm, setPwForm]   = useState({ current:'', newPw:'', confirm:'' });
-  const [pwMsg,  setPwMsg]    = useState('');
-  const [saved,  setSaved]    = useState('');
+  const [pwForm, setPwForm] = useState({ current:'', newPw:'', confirm:'' });
+  const [pwMsg,  setPwMsg]  = useState('');
+  const [saved,  setSaved]  = useState('');
 
   const savePrefs = (next) => {
     setPrefs(next);
     localStorage.setItem('eh_user_prefs_' + user.email, JSON.stringify(next));
-    setSaved('✅ Preferences saved');
+    setSaved('Preferences saved');
     setTimeout(() => setSaved(''), 2500);
   };
-
   const toggle = (key, def = true) => savePrefs({ ...prefs, [key]: prefs[key] === undefined ? !def : !prefs[key] });
   const get    = (key, def = true) => prefs[key] === undefined ? def : prefs[key];
 
-  const handlePwChange = e => {
+  const handlePwChange = async e => {
     e.preventDefault();
     setPwMsg('');
+    const emailKey = user.email.toLowerCase();
     const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-    const stored    = overrides[user.email.toLowerCase()];
-    // Require current password before allowing change
-    if (stored && pwForm.current !== stored) { setPwMsg('❌ Current password is incorrect'); return; }
-    if (pwForm.newPw.length < 4) { setPwMsg('❌ New password must be at least 4 characters'); return; }
-    if (pwForm.newPw !== pwForm.confirm) { setPwMsg('❌ Passwords do not match'); return; }
-    overrides[user.email.toLowerCase()] = pwForm.newPw;
+    const localOverride = overrides[emailKey];
+
+    // Fetch Firestore password to validate current password properly
+    let storedPw = localOverride || '';
+    try {
+      const { doc: fsDoc, getDoc: fsGet } = await import('firebase/firestore');
+      const { db: fsDb } = await import('../firebase');
+      const snap = await fsGet(fsDoc(fsDb, 'users', user.id || emailKey.replace(/[^a-z0-9]/g, '_')));
+      if (snap.exists()) storedPw = snap.data().passwordHash || localOverride || '';
+    } catch {}
+
+    if (storedPw && pwForm.current !== storedPw) { setPwMsg('error:Current password is incorrect'); return; }
+    if (pwForm.newPw.length < 4) { setPwMsg('error:New password must be at least 4 characters'); return; }
+    if (pwForm.newPw !== pwForm.confirm) { setPwMsg('error:Passwords do not match'); return; }
+
+    // Write to localStorage override
+    overrides[emailKey] = pwForm.newPw;
     localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
-    setPwMsg('✅ Password updated successfully');
-    setPwForm({ current:'', newPw:'', confirm:'' });
+
+    // Write to Firestore — this is what Login checks first on any device
+    try {
+      const { doc: fsDoc, setDoc: fsSet, serverTimestamp: fsSvTs } = await import('firebase/firestore');
+      const { db: fsDb } = await import('../firebase');
+      await fsSet(fsDoc(fsDb, 'users', user.id || emailKey.replace(/[^a-z0-9]/g, '_')),
+        { passwordHash: pwForm.newPw, updatedAt: fsSvTs() }, { merge: true });
+    } catch {}
+
+    setPwMsg('ok:Password updated successfully');
+    setPwForm({ current: '', newPw: '', confirm: '' });
   };
 
+  const isOk      = pwMsg.startsWith('ok:');
+  const pwDisplay = pwMsg.replace(/^(ok|error):/, '');
+
   const preferenceGroups = [
-    {
-      label: 'Reading Experience',
-      items: [
-        { key:'darkReader',     label:'Dark reader background',       desc:'Darker background in the online reader',       def:true  },
-        { key:'largeText',      label:'Larger text by default',       desc:'Start reader with bigger font size',           def:false },
-        { key:'showProgress',   label:'Show reading progress',        desc:'Display chapter progress indicator',           def:true  },
-        { key:'autoNextChapter',label:'Auto-advance chapters',        desc:'Automatically scroll to next chapter',         def:false },
-      ]
-    },
-    {
-      label: 'Notifications',
-      items: [
-        { key:'notifyNewBooks',  label:'New book releases',           desc:'Get notified when new books are published',    def:true  },
-        { key:'notifyOrders',    label:'Order status updates',        desc:'Updates on your payment verification',         def:true  },
-        { key:'notifyPromos',    label:'Promotions & discounts',      desc:'Exclusive deals and promo codes',              def:false },
-      ]
-    },
-    {
-      label: 'Privacy',
-      items: [
-        { key:'showInLeaders',   label:'Show in reading leaderboard', desc:'Let others see you\'ve read a book',           def:true  },
-        { key:'publicProfile',   label:'Public profile',              desc:'Allow others to see your book collection',     def:false },
-      ]
-    },
+    { label:'📖 Reading Experience', items:[
+      { key:'darkReader',      label:'Dark reader background',  desc:'Darker background in the online reader',   def:true  },
+      { key:'largeText',       label:'Larger text by default',  desc:'Start reader with bigger font size',       def:false },
+      { key:'showProgress',    label:'Show reading progress',   desc:'Display chapter progress indicator',       def:true  },
+      { key:'autoNextChapter', label:'Auto-advance chapters',   desc:'Automatically scroll to next chapter',    def:false },
+    ]},
+    { label:'🔔 Notifications', items:[
+      { key:'notifyNewBooks',  label:'New book releases',       desc:'Notified when new books are published',    def:true  },
+      { key:'notifyOrders',    label:'Order status updates',    desc:'Updates on your payment verification',     def:true  },
+      { key:'notifyPromos',    label:'Promotions & discounts',  desc:'Exclusive deals and promo codes',          def:false },
+    ]},
+    { label:'🔒 Privacy', items:[
+      { key:'showInLeaders',   label:'Reading leaderboard',     desc:'Let others see your reading activity',     def:true  },
+      { key:'publicProfile',   label:'Public profile',          desc:'Allow others to see your collection',      def:false },
+    ]},
   ];
 
   return (
-    <div style={{ maxWidth:640, margin:'0 auto', padding:'32px 0 80px' }}>
-      {/* Account Info Card */}
-      <div className="card" style={{ padding:24, marginBottom:20 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
-          <div style={{ width:56, height:56, borderRadius:'50%', background:'linear-gradient(135deg,var(--gold),#e8c96d)', color:'#000', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.4rem', fontWeight:700, flexShrink:0 }}>
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <h3 style={{ fontSize:'1.1rem', marginBottom:3 }}>{user.name}</h3>
-            <span style={{ fontSize:'0.82rem', color:'var(--muted)' }}>{user.email}</span>
-            <span style={{ display:'block', fontSize:'0.72rem', marginTop:4, padding:'2px 8px', background:'rgba(201,168,76,0.1)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.25)', borderRadius:10, width:'fit-content' }}>
-              {user.role === 'admin' ? '🛡 Admin' : user.role === 'superadmin' ? '⭐ Super Admin' : '📚 Reader'}
-            </span>
-          </div>
-          <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I need help with my Ellines Haven account: ' + user.email)}`}
-            target="_blank" rel="noopener noreferrer"
-            className="btn btn-outline btn-sm" style={{ marginLeft:'auto', color:'#25D366', borderColor:'rgba(37,211,102,0.4)', flexShrink:0 }}>
-            💬 Support
-          </a>
+    <div className="mylib-settings">
+      {/* Profile card */}
+      <div className="mylib-settings-profile card">
+        <div className="mylib-settings-avatar">
+          {user.name.charAt(0).toUpperCase()}
         </div>
-        {/* Permission badges */}
-        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+        <div className="mylib-settings-info">
+          <h3>{user.name}</h3>
+          <span>{user.email}</span>
+          <span className="mylib-role-badge">
+            {user.role === 'admin' ? '🛡 Admin' : user.role === 'superadmin' ? '⭐ Super Admin' : '📚 Reader'}
+          </span>
+        </div>
+        <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I need help with my Ellines Haven account: ' + user.email)}`}
+          target="_blank" rel="noopener noreferrer"
+          className="btn btn-sm mylib-support-btn">
+          💬 Support
+        </a>
+      </div>
+
+      {/* Permission badges */}
+      <div className="mylib-perms card">
+        <h4>Account Permissions</h4>
+        <div className="mylib-perms-list">
           {[
-            { key:'canBrowse',     label:'Browse' },
-            { key:'canPurchase',   label:'Purchase' },
+            { key:'canBrowse',     label:'Browse'     },
+            { key:'canPurchase',   label:'Purchase'   },
             { key:'canReadOnline', label:'Read Online' },
-            { key:'canDownload',   label:'Download' },
-            { key:'canReview',     label:'Reviews' },
+            { key:'canDownload',   label:'Download'   },
+            { key:'canReview',     label:'Reviews'    },
+            { key:'canPlaceOrders',label:'Orders'     },
           ].map(p => (
-            <span key={p.key} style={{ fontSize:'0.72rem', padding:'3px 10px', borderRadius:10, background: myPerms?.[p.key]===false ? 'rgba(231,76,60,0.1)' : 'rgba(46,204,113,0.08)', color: myPerms?.[p.key]===false ? '#e74c3c' : '#2ecc71', border: myPerms?.[p.key]===false ? '1px solid rgba(231,76,60,0.3)' : '1px solid rgba(46,204,113,0.25)' }}>
-              {myPerms?.[p.key]===false ? '✗' : '✓'} {p.label}
+            <span key={p.key} className={'mylib-perm-badge' + (myPerms?.[p.key] === false ? ' off' : ' on')}>
+              {myPerms?.[p.key] === false ? '✗' : '✓'} {p.label}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Preferences */}
-      {saved && <div style={{ background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderRadius:'var(--r-sm)', padding:'10px 16px', marginBottom:16, fontSize:'0.84rem', color:'var(--ok)' }}>{saved}</div>}
+      {/* Preference groups */}
+      {saved && (
+        <div className="mylib-saved-msg">✅ {saved}</div>
+      )}
       {preferenceGroups.map(group => (
-        <div key={group.label} className="card" style={{ padding:20, marginBottom:16 }}>
-          <h4 style={{ fontSize:'0.88rem', color:'var(--gold)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>{group.label}</h4>
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {group.items.map(item => (
-              <div key={item.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-                <div style={{ flex:1 }}>
-                  <strong style={{ fontSize:'0.88rem', display:'block' }}>{item.label}</strong>
-                  <span style={{ fontSize:'0.76rem', color:'var(--muted)' }}>{item.desc}</span>
-                </div>
-                <button type="button"
-                  onClick={() => toggle(item.key, item.def)}
-                  style={{ flexShrink:0, padding:'5px 14px', borderRadius:20, border:'none', cursor:'pointer', fontWeight:700, fontSize:'0.78rem', minWidth:52, background: get(item.key, item.def) ? 'rgba(201,168,76,0.18)' : 'rgba(255,255,255,0.06)', color: get(item.key, item.def) ? 'var(--gold)' : 'var(--muted)', transition:'all 0.2s' }}>
-                  {get(item.key, item.def) ? 'ON' : 'OFF'}
-                </button>
+        <div key={group.label} className="card mylib-pref-card">
+          <h4>{group.label}</h4>
+          {group.items.map(item => (
+            <div key={item.key} className="mylib-pref-row">
+              <div>
+                <strong>{item.label}</strong>
+                <span>{item.desc}</span>
               </div>
-            ))}
-          </div>
+              <button type="button"
+                onClick={() => toggle(item.key, item.def)}
+                className={'mylib-toggle-btn' + (get(item.key, item.def) ? ' on' : '')}>
+                {get(item.key, item.def) ? 'ON' : 'OFF'}
+              </button>
+            </div>
+          ))}
         </div>
       ))}
 
-      {/* Change Password */}
-      <div className="card" style={{ padding:20, marginBottom:16 }}>
-        <h4 style={{ fontSize:'0.88rem', color:'var(--gold)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>Change Password</h4>
-        {pwMsg && <div style={{ padding:'8px 12px', borderRadius:'var(--r-sm)', marginBottom:12, fontSize:'0.82rem', background: pwMsg.startsWith('✅') ? 'rgba(46,204,113,0.08)' : 'rgba(231,76,60,0.08)', color: pwMsg.startsWith('✅') ? 'var(--ok)' : '#e74c3c', border: pwMsg.startsWith('✅') ? '1px solid rgba(46,204,113,0.25)' : '1px solid rgba(231,76,60,0.25)' }}>{pwMsg}</div>}
-        <form onSubmit={handlePwChange} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <div>
-            <label style={{ fontSize:'0.8rem', color:'var(--muted)', display:'block', marginBottom:4 }}>Current Password</label>
+      {/* Change password */}
+      <div className="card mylib-pref-card">
+        <h4>🔑 Change Password</h4>
+        {pwMsg && (
+          <div className={'mylib-pw-msg' + (isOk ? ' ok' : ' err')}>
+            {isOk ? '✅' : '❌'} {pwDisplay}
+          </div>
+        )}
+        <form onSubmit={handlePwChange} className="mylib-pw-form">
+          <div className="adm-field-group">
+            <label>Current Password</label>
             <input className="field" type="password" placeholder="Your current password" value={pwForm.current} onChange={e => setPwForm(f=>({...f,current:e.target.value}))} />
           </div>
-          <div>
-            <label style={{ fontSize:'0.8rem', color:'var(--muted)', display:'block', marginBottom:4 }}>New Password</label>
+          <div className="adm-field-group">
+            <label>New Password</label>
             <input className="field" type="password" placeholder="Minimum 4 characters" value={pwForm.newPw} onChange={e => setPwForm(f=>({...f,newPw:e.target.value}))} />
           </div>
-          <div>
-            <label style={{ fontSize:'0.8rem', color:'var(--muted)', display:'block', marginBottom:4 }}>Confirm New Password</label>
+          <div className="adm-field-group">
+            <label>Confirm New Password</label>
             <input className="field" type="password" placeholder="Repeat new password" value={pwForm.confirm} onChange={e => setPwForm(f=>({...f,confirm:e.target.value}))} />
           </div>
-          <button type="submit" className="btn btn-outline btn-sm" style={{ width:'fit-content' }}>Update Password</button>
+          <button type="submit" className="btn btn-outline btn-sm">Update Password</button>
         </form>
       </div>
 
-      {/* Quick contact */}
-      <div className="card" style={{ padding:20, display:'flex', alignItems:'center', gap:14 }}>
-        <span style={{ fontSize:'1.8rem' }}>💬</span>
-        <div style={{ flex:1 }}>
-          <strong style={{ display:'block', marginBottom:3 }}>Need help?</strong>
-          <span style={{ fontSize:'0.8rem', color:'var(--muted)' }}>WhatsApp us directly — we reply fast</span>
+      {/* Support */}
+      <div className="card mylib-support-card">
+        <span style={{ fontSize:'2rem' }}>💬</span>
+        <div>
+          <strong>Need help?</strong>
+          <span>WhatsApp us directly — we reply fast</span>
         </div>
-        <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{ background:'rgba(37,211,102,0.12)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', flexShrink:0 }}>
+        <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer"
+          className="btn btn-sm" style={{ background:'rgba(37,211,102,0.12)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', flexShrink:0 }}>
           Open WhatsApp
         </a>
       </div>
@@ -183,7 +411,10 @@ export default function MyLibrary() {
   const [activeTab,  setActiveTab]  = useState('library');
 
   useEffect(() => {
-    if (!user?.email) { setLiveOrders([]); return; }
+    if (!user?.email) {
+      setLiveOrders([]); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
     const q = query(collection(db, 'orders'), where('userEmail', '==', user.email.toLowerCase()));
     const unsub = onSnapshot(q,
       snap => {
@@ -200,10 +431,13 @@ export default function MyLibrary() {
     <main className="mylib-page">
       <div className="container">
         <div className="mylib-gate">
-          <img src="/logo-nobg3.png" alt="" style={{ height:100, margin:'0 auto 20px', display:'block', filter:'drop-shadow(0 2px 12px rgba(201,168,76,0.5))' }} />
-          <h2>Sign in to view your library</h2>
-          <p>Your purchased books will appear here.</p>
-          <Link to="/login" className="btn btn-primary">Sign In</Link>
+          <img src="/logo-nobg3.png" alt="" className="mylib-gate-logo" />
+          <h2>Your Library Awaits</h2>
+          <p>Sign in to access your books, track orders, and manage your reading journey.</p>
+          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+            <Link to="/login"    className="btn btn-primary">Sign In</Link>
+            <Link to="/register" className="btn btn-outline">Create Account</Link>
+          </div>
         </div>
       </div>
     </main>
@@ -213,174 +447,320 @@ export default function MyLibrary() {
     <main className="mylib-page">
       <div className="container">
         <div className="mylib-gate">
-          <div style={{ fontSize:'3rem', marginBottom:16 }}>🔒</div>
+          <div className="mylib-gate-icon">🔒</div>
           <h2>Library Access Restricted</h2>
-          <p style={{ color:'var(--muted)' }}>Your access has been restricted. Contact support.</p>
+          <p>Your access has been restricted by an administrator. Please contact support.</p>
           <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Contact Support</a>
         </div>
       </div>
     </main>
   );
 
-  const myPending = liveOrders.filter(o => o.status === 'Pending');
+  const myPending   = liveOrders.filter(o => o.status === 'Pending');
+  const myCompleted = liveOrders.filter(o => o.status === 'Completed');
+
+  // Reading progress for all owned books
+  const progressMap = useReadingProgressMap(user.email);
 
   const enrichedLibrary = library.map(lb => {
     const cat = catalog.find(b => b.id === lb.id);
     return {
       ...lb,
-      cover:      cat?.cover      ?? lb.cover,
-      coverType:  cat?.coverType  ?? lb.coverType,
-      coverColor: cat?.coverColor ?? lb.coverColor,
-      coverAccent:cat?.coverAccent?? lb.coverAccent,
-      title:      cat?.title      ?? lb.title,
-      author:     cat?.author     ?? lb.author,
-      genre:      cat?.genre      ?? lb.genre,
-      pages:      cat?.pages      ?? lb.pages,
-      readTime:   cat?.readTime   ?? lb.readTime,
-      driveUrl:   cat?.driveUrl   ?? lb.driveUrl,
+      cover:       cat?.cover       ?? lb.cover,
+      coverType:   cat?.coverType   ?? lb.coverType,
+      coverColor:  cat?.coverColor  ?? lb.coverColor,
+      coverAccent: cat?.coverAccent ?? lb.coverAccent,
+      title:       cat?.title       ?? lb.title,
+      author:      cat?.author      ?? lb.author,
+      genre:       cat?.genre       ?? lb.genre,
+      pages:       cat?.pages       ?? lb.pages,
+      readTime:    cat?.readTime    ?? lb.readTime,
+      driveUrl:    cat?.driveUrl    ?? lb.driveUrl,
+      status:      cat?.status      ?? lb.status,
     };
   });
 
+  const TABS = [
+    { k:'library', label:'📚 My Books',  badge: library.length   || null  },
+    { k:'orders',  label:'🛒 Orders',    badge: myPending.length || null  },
+    { k:'stats',   label:'📊 Stats',     badge: null                       },
+    { k:'account', label:'⚙️ Account',   badge: null                       },
+  ];
+
   return (
     <main className="mylib-page">
-      <div className="page-header">
-        <div className="container" style={{ position: 'relative' }}>
-          <h1>My <span className="gold-text">Library</span></h1>
-          <p>Welcome back, {user.name}. You have <strong>{library.length}</strong> book{library.length !== 1 ? 's' : ''} in your collection.</p>
-          <Link to="/profile" style={{ position:'absolute', top:0, right:0, display:'inline-flex', alignItems:'center', gap:8, background:'rgba(201,168,76,0.12)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'var(--r-sm)', padding:'8px 16px', color:'var(--gold)', fontSize:'0.82rem', fontWeight:600, textDecoration:'none', transition:'all 0.2s' }}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(201,168,76,0.2)'}}
-            onMouseLeave={e=>{e.currentTarget.style.background='rgba(201,168,76,0.12)'}}>
-            👤 My Profile
-          </Link>
+
+      {/* ── Hero header ── */}
+      <div className="mylib-hero">
+        <div className="mylib-hero-glow mylib-hero-glow--a" />
+        <div className="mylib-hero-glow mylib-hero-glow--b" />
+        <div className="container mylib-hero-inner">
+          <div className="mylib-hero-avatar">
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+          <div className="mylib-hero-text">
+            <h1>Welcome back, <span className="gold-text">{user.name.split(' ')[0]}</span></h1>
+            <p>
+              {library.length > 0
+                ? `You have ${library.length} book${library.length !== 1 ? 's' : ''} in your collection`
+                : 'Start building your collection today'}
+              {myPending.length > 0 && <span className="mylib-pending-badge">· {myPending.length} pending payment{myPending.length !== 1 ? 's' : ''}</span>}
+            </p>
+          </div>
+          <div className="mylib-hero-stats">
+            <div className="mylib-hero-stat">
+              <strong>{library.length}</strong>
+              <span>Books</span>
+            </div>
+            <div className="mylib-hero-stat">
+              <strong>{myCompleted.length}</strong>
+              <span>Purchases</span>
+            </div>
+            <div className="mylib-hero-stat">
+              <strong>{liveOrders.length}</strong>
+              <span>Orders</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div style={{ borderBottom:'1px solid var(--dim)', background:'var(--surface)', position:'sticky', top:80, zIndex:10 }}>
-        <div className="container" style={{ display:'flex', gap:0 }}>
-          {[
-            { k:'library',  label:'📚 My Books' },
-            { k:'orders',   label:'🛒 Orders' },
-            { k:'account',  label:'⚙️ Account' },
-          ].map(t => (
+      {/* ── Tab bar ── */}
+      <div className="mylib-tabbar">
+        <div className="container mylib-tabs">
+          {TABS.map(t => (
             <button key={t.k} onClick={() => setActiveTab(t.k)}
-              style={{ padding:'14px 20px', border:'none', background:'none', cursor:'pointer', fontSize:'0.88rem', fontWeight:600, color: activeTab===t.k ? 'var(--gold)' : 'var(--muted)', borderBottom: activeTab===t.k ? '2px solid var(--gold)' : '2px solid transparent', transition:'all 0.2s' }}>
+              className={'mylib-tab' + (activeTab === t.k ? ' active' : '')}>
               {t.label}
+              {t.badge > 0 && <span className="mylib-tab-badge">{t.badge}</span>}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="container">
+      <div className="container mylib-body">
 
-        {/* ── Library tab ── */}
+        {/* ── Pending payment alert ── */}
+        {activeTab === 'library' && myPending.length > 0 && (
+          <div className="mylib-alert">
+            <span className="mylib-alert-icon">⏳</span>
+            <div>
+              <strong>Payment verification in progress</strong>
+              <p>You have {myPending.length} order{myPending.length !== 1 ? 's' : ''} awaiting confirmation. Books unlock automatically once payment is verified.</p>
+            </div>
+            <button onClick={() => setActiveTab('orders')} className="btn btn-outline btn-sm" style={{ flexShrink:0 }}>
+              View Orders
+            </button>
+          </div>
+        )}
+
+        {/* ── LIBRARY TAB ── */}
         {activeTab === 'library' && (
           <>
-            {library.length > 0 && (
-              <div style={{ background:'rgba(46,204,113,0.07)', border:'1px solid rgba(46,204,113,0.25)', borderLeft:'4px solid var(--ok)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginTop:24, marginBottom:8, fontSize:'0.86rem' }}>
-                ✅ <strong style={{ color:'var(--ok)' }}>{library.length} book{library.length !== 1 ? 's' : ''}</strong> in your library — ready to read!
-              </div>
-            )}
-            {library.length === 0 && myPending.length === 0 && (
+            {enrichedLibrary.length === 0 ? (
               <div className="mylib-empty">
-                <div style={{ fontSize:'4rem', marginBottom:16 }}>📚</div>
+                <div className="mylib-empty-icon">📚</div>
                 <h3>Your library is empty</h3>
-                <p>Browse and purchase books to start your collection.</p>
-                <Link to="/library" className="btn btn-primary">Browse Books</Link>
+                <p>Browse our collection and purchase books to start your reading journey.</p>
+                <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+                  <Link to="/library" className="btn btn-primary">Browse Books</Link>
+                  <Link to="/"        className="btn btn-outline">Go Home</Link>
+                </div>
               </div>
-            )}
-            {enrichedLibrary.length > 0 && (
+            ) : (
               <div className="mylib-grid">
                 {enrichedLibrary.map(b => {
-                  const isFullOff    = b.active === false;
-                  const isReadOff    = b.readDeactivated === true;
-                  const isDlOff      = b.downloadDeactivated === true;
-                  const reason       = b.deactivationReason || 'Access restricted by administrator.';
-                  const canRead      = myPerms?.canReadOnline !== false && !isReadOff && !isFullOff;
-                  const canDl        = myPerms?.canDownload   !== false && !isDlOff  && !isFullOff;
+                  const isFullOff = b.active === false;
+                  const isReadOff = b.readDeactivated === true;
+                  const isDlOff   = b.downloadDeactivated === true;
+                  const reason    = b.deactivationReason || 'Access restricted by administrator.';
+                  const canRead   = myPerms?.canReadOnline !== false && !isReadOff && !isFullOff;
+                  const canDl     = myPerms?.canDownload   !== false && !isDlOff   && !isFullOff;
+                  const anyOff    = isFullOff || isReadOff || isDlOff;
+                  const sm        = STATUS_META[b.status || 'complete'] || STATUS_META.complete;
+                  const progress  = progressMap[b.id] || null;
+                  const isReading = progress && progress.chapter > 0;
                   return (
-                    <div key={b.id} className={`mylib-card card${isFullOff ? ' mylib-card--deactivated' : ''}`}>
-                      {b.coverType === 'photo' && b.cover
-                        ? <img src={b.cover} alt={b.title} className="mylib-card__img" />
-                        : <div className="mylib-card__img mylib-card__img--styled" style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
-                            <img src="/logo-icon.png" alt="" style={{ width:40, opacity:0.5 }} />
-                          </div>
-                      }
+                    <div key={b.id} className={'mylib-card card' + (anyOff ? ' mylib-card--restricted' : '') + (isReading ? ' mylib-card--reading' : '')}>
+                      <div className="mylib-card__cover-wrap">
+                        {b.coverType === 'photo' && b.cover
+                          ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
+                          : <div className="mylib-card__cover mylib-card__cover--styled"
+                              style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
+                              <span style={{ fontSize:'1.6rem', opacity:0.35 }}>📖</span>
+                            </div>
+                        }
+                        {/* Currently Reading badge */}
+                        {isReading && !anyOff && (
+                          <div className="mylib-reading-badge">📖 Reading</div>
+                        )}
+                        {/* Status badge on cover */}
+                        {b.status && b.status !== 'complete' && (
+                          <span className="mylib-card__status-badge" style={{ background: sm.bg, color: sm.color, border:`1px solid ${sm.color}40` }}>
+                            {sm.icon} {sm.label}
+                          </span>
+                        )}
+                        {anyOff && <div className="mylib-card__restricted-overlay">🔒 Restricted</div>}
+                      </div>
+
                       <div className="mylib-card__body">
                         <span className="mylib-card__genre">{b.genre}</span>
-                        <h3>{b.title}</h3>
-                        <p>by {b.author}</p>
-                        <p style={{ color:'var(--muted)', fontSize:'.78rem', margin:'4px 0 14px' }}>
-                          {b.pages > 0 ? b.pages + ' pages · ' : ''}{b.readTime}
-                        </p>
-                        {(isFullOff || isReadOff || isDlOff) && (
-                          <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.25)', borderRadius:'var(--r-sm)', padding:'8px 12px', marginBottom:12, fontSize:'0.78rem' }}>
-                            <strong style={{ color:'#e74c3c' }}>⚠ Access Restricted</strong>
-                            <p style={{ color:'var(--muted)', marginTop:3 }}>{reason}</p>
+                        <h3 className="mylib-card__title">{b.title}</h3>
+                        <p className="mylib-card__author">by {b.author}</p>
+                        {(b.pages > 0 || b.readTime) && (
+                          <p className="mylib-card__meta">
+                            {b.pages > 0 ? `${b.pages} pages` : ''}
+                            {b.pages > 0 && b.readTime ? ' · ' : ''}
+                            {b.readTime}
+                          </p>
+                        )}
+
+                        {/* Reading progress bar */}
+                        {isReading && !anyOff && b.chapters && b.chapters.length > 1 && (
+                          <div className="mylib-progress-wrap">
+                            <div className="mylib-progress-track">
+                              <div
+                                className="mylib-progress-fill"
+                                style={{ width: `${Math.min(100, Math.round(((progress.chapter + 1) / b.chapters.length) * 100))}%` }}
+                              />
+                            </div>
+                            <span className="mylib-progress-label">
+                              Ch {progress.chapter + 1}/{b.chapters.length}
+                            </span>
                           </div>
                         )}
-                        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                        {isReading && !anyOff && (!b.chapters || b.chapters.length <= 1) && (
+                          <div className="mylib-progress-wrap">
+                            <span className="mylib-progress-label" style={{ color: 'var(--gold)', fontSize: '0.75rem' }}>
+                              📖 In progress
+                            </span>
+                          </div>
+                        )}
+
+                        {anyOff && (
+                          <div className="mylib-restriction-notice">
+                            <strong>⚠ Access Restricted</strong>
+                            <p>{reason}</p>
+                          </div>
+                        )}
+
+                        <div className="mylib-card__actions">
                           {canRead
-                            ? <Link to={`/read/${b.id}`} className="btn btn-primary btn-sm">Read Online</Link>
-                            : <span className="btn btn-primary btn-sm" style={{ opacity:0.4, cursor:'not-allowed', pointerEvents:'none' }} title={reason}>Read Online</span>
+                            ? <Link to={`/read/${b.id}`} className="btn btn-primary btn-sm">📖 Read Now</Link>
+                            : <span className="btn btn-primary btn-sm mylib-disabled" title={reason}>📖 Read Now</span>
                           }
                           {b.downloadUnlocked && canDl && b.driveUrl
-                            ? <a href={toDownloadUrl(b.driveUrl)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">⬇ Download PDF</a>
+                            ? <a href={toDownloadUrl(b.driveUrl)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">⬇ PDF</a>
                             : b.downloadUnlocked && canDl
-                              ? <span className="btn btn-outline btn-sm" style={{ opacity:0.6, cursor:'default' }}>PDF Coming Soon</span>
+                              ? <span className="btn btn-outline btn-sm mylib-disabled">PDF Soon</span>
                               : b.downloadUnlocked && !canDl
-                                ? <span className="btn btn-outline btn-sm" style={{ opacity:0.4, cursor:'not-allowed', pointerEvents:'none' }} title={reason}>Download Restricted</span>
+                                ? <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
                                 : null
                           }
+                          <Link to={`/book/${b.id}`} className="btn btn-ghost btn-sm">Details</Link>
                         </div>
-                        {b.downloadUnlocked && <p className="mylib-license-note">Licensed to {user.name} only</p>}
+
+                        {b.downloadUnlocked && (
+                          <p className="mylib-license-note">Licensed to {user.name} only</p>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
+
+            {/* Discover more */}
+            {enrichedLibrary.length > 0 && (
+              <div className="mylib-discover">
+                <div>
+                  <strong>Discover more stories</strong>
+                  <span>Browse our full catalogue of original East African fiction</span>
+                </div>
+                <Link to="/library" className="btn btn-outline btn-sm">Browse Library →</Link>
+              </div>
+            )}
           </>
         )}
 
-        {/* ── Orders tab ── */}
+        {/* ── ORDERS TAB ── */}
         {activeTab === 'orders' && (
-          <div style={{ padding:'32px 0 80px' }}>
-            <h3 style={{ fontSize:'1rem', marginBottom:20 }}>Your Orders</h3>
+          <div className="mylib-orders">
             {liveOrders.length === 0 ? (
-              <div style={{ textAlign:'center', padding:'60px 20px', color:'var(--muted)' }}>
-                <div style={{ fontSize:'3rem', marginBottom:12 }}>🛒</div>
-                <p>No orders yet.</p>
-                <Link to="/library" className="btn btn-primary" style={{ marginTop:16, display:'inline-block' }}>Browse Books</Link>
+              <div className="mylib-empty">
+                <div className="mylib-empty-icon">🛒</div>
+                <h3>No orders yet</h3>
+                <p>Your purchase history will appear here once you place an order.</p>
+                <Link to="/library" className="btn btn-primary">Browse Books</Link>
               </div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                {liveOrders.map(o => (
-                  <div key={o.id} className="card" style={{ padding:'16px 20px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', borderLeft: o.status==='Pending' ? '3px solid var(--gold)' : o.status==='Completed' ? '3px solid var(--ok)' : '3px solid var(--err)' }}>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <strong style={{ fontSize:'0.88rem', display:'block' }}>{o.items?.map(i=>i.title).join(', ') || 'Order'}</strong>
-                      <span style={{ fontSize:'0.76rem', color:'var(--muted)' }}>{o.id} · {o.date} · {o.method}</span>
-                      {o.ref && <span style={{ display:'block', fontSize:'0.76rem', color:'var(--gold)', marginTop:2 }}>Ref: {o.ref}</span>}
+              <>
+                {/* Summary row */}
+                <div className="mylib-orders-summary">
+                  {[
+                    { label:'Total Orders',    value: liveOrders.length,                                                        color:'var(--gold)' },
+                    { label:'Completed',       value: myCompleted.length,                                                       color:'#2ecc71'     },
+                    { label:'Pending',         value: myPending.length,                                                         color:'#e8832a'     },
+                    { label:'Total Spent',     value: 'KSh ' + myCompleted.reduce((s,o)=>s+(o.total||0),0).toLocaleString(),   color:'var(--gold)' },
+                  ].map(s => (
+                    <div key={s.label} className="mylib-order-stat card">
+                      <strong style={{ color: s.color }}>{s.value}</strong>
+                      <span>{s.label}</span>
                     </div>
-                    <strong style={{ color:'var(--gold)', flexShrink:0 }}>KSh {(o.total||0).toLocaleString()}</strong>
-                    <span style={{ flexShrink:0, fontSize:'0.75rem', padding:'3px 10px', borderRadius:10, background: o.status==='Completed'?'rgba(46,204,113,0.1)':o.status==='Pending'?'rgba(201,168,76,0.1)':'rgba(231,76,60,0.1)', color: o.status==='Completed'?'var(--ok)':o.status==='Pending'?'var(--gold)':'#e74c3c', border: o.status==='Completed'?'1px solid rgba(46,204,113,0.25)':o.status==='Pending'?'1px solid rgba(201,168,76,0.25)':'1px solid rgba(231,76,60,0.25)' }}>
-                      {o.status}
-                    </span>
-                    {o.status === 'Pending' && (
-                      <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please verify my payment. Ref: ' + (o.ref||'N/A'))}`}
-                        target="_blank" rel="noopener noreferrer" className="btn btn-sm" style={{ background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', flexShrink:0, fontSize:'0.76rem' }}>
-                        Follow Up
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                <div className="mylib-orders-list">
+                  {liveOrders.map(o => {
+                    const statusColor = o.status==='Completed' ? '#2ecc71' : o.status==='Pending' ? '#e8832a' : '#e74c3c';
+                    const statusBg    = o.status==='Completed' ? 'rgba(46,204,113,0.1)' : o.status==='Pending' ? 'rgba(232,131,42,0.1)' : 'rgba(231,76,60,0.1)';
+                    return (
+                      <div key={o.id} className="mylib-order-card card"
+                        style={{ borderLeft: `3px solid ${statusColor}` }}>
+                        <div className="mylib-order-top">
+                          <div className="mylib-order-books">
+                            <strong>{o.items?.map(i => i.title).join(', ') || 'Order'}</strong>
+                            <span className="mylib-order-meta">{o.id} · {o.date} · {o.method}</span>
+                            {o.ref && <span className="mylib-order-ref">Ref: {o.ref}</span>}
+                          </div>
+                          <div className="mylib-order-right">
+                            <strong className="mylib-order-amount">KSh {(o.total||0).toLocaleString()}</strong>
+                            <span className="mylib-order-status-badge"
+                              style={{ background: statusBg, color: statusColor, border:`1px solid ${statusColor}40` }}>
+                              {o.status === 'Completed' ? '✅' : o.status === 'Pending' ? '⏳' : '✕'} {o.status}
+                            </span>
+                          </div>
+                        </div>
+                        {o.status === 'Pending' && (
+                          <div className="mylib-order-pending-row">
+                            <p>⏳ Waiting for payment verification. We'll unlock your books as soon as we confirm your payment.</p>
+                            <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please verify my payment. Ref: ' + (o.ref||'N/A'))}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="btn btn-sm" style={{ background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', flexShrink:0, whiteSpace:'nowrap' }}>
+                              💬 Follow Up on WhatsApp
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         )}
 
-        {/* ── Account tab ── */}
+        {/* ── ACCOUNT TAB ── */}
         {activeTab === 'account' && <AccountSettings user={user} myPerms={myPerms} />}
+
+        {/* ── STATS TAB ── */}
+        {activeTab === 'stats' && (
+          <ReadingStats
+            user={user}
+            library={enrichedLibrary}
+            catalog={catalog}
+            orders={liveOrders}
+          />
+        )}
 
       </div>
     </main>

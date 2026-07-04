@@ -1101,3 +1101,98 @@
 @media (max-width: 768px) {
   .adm-photo-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 }
+
+/* ── Book Status Sub-nav in sidebar ──────────────────────────────────────── */
+/* Hide the inline sub-nav when sidebar is collapsed */
+.adm--collapsed .adm-books-subnav { display: none; }
+
+/* Stat cards: clickable hover lift */
+.adm-stat-card[style*="cursor:pointer"]:hover,
+.adm-stat-card[style*="cursor: pointer"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+}
+
+/* Responsive secondary stats grid */
+@media (max-width: 900px) {
+  .adm-stats-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+  .adm-stats-grid.cols-4 { grid-template-columns: 1fr 1fr; }
+}
+
+/* Book catalogue breakdown pill row */
+.adm-book-status-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.adm-book-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid;
+}
+.adm-book-status-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Books filter tabs row — enhanced */
+.adm-books-filter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* Stat card body alignment */
+.adm-stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.adm-stat-body strong {
+  display: block;
+  line-height: 1;
+  font-weight: 800;
+}
+.adm-stat-body span {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dashboard grid — 2 col on wide, 1 col on narrow */
+.adm-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+}
+@media (max-width: 1100px) {
+  .adm-dash-grid { grid-template-columns: 1fr; }
+}
+
+/* Order rows on dashboard */
+.adm-order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.15s;
+  cursor: default;
+}
+.adm-order-row:hover { background: rgba(255,255,255,0.02); }
+.adm-order-row:last-child { border-bottom: none; }

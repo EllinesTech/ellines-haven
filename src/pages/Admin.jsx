@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 const PageEditorPanel   = lazy(() => import('./admin-panels/PageEditorPanel'));
@@ -15,6 +15,9 @@ const MessagesPanel     = lazy(() => import('./admin-panels/MessagesPanel'));
 const ReportsPanel      = lazy(() => import('./admin-panels/ReportsPanel'));
 const ReviewsPanel      = lazy(() => import('./admin-panels/ReviewsPanel'));
 const EmailPanel        = lazy(() => import('./admin-panels/EmailPanel'));
+const NewsletterPanel   = lazy(() => import('./admin-panels/NewsletterPanel'));
+const VisitorsPanel     = lazy(() => import('./admin-panels/VisitorsPanel'));
+const ActivityPanel     = lazy(() => import('./admin-panels/ActivityPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -1203,7 +1206,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
     const group = byBook[bookId];
     const pendingItems = group.items.filter(n => !n.notified);
     const book = books?.find(b => b.id === bookId);
-    const bookUrl = `https://ellines-haven.pages.dev/book/${bookId}`;
+    const bookUrl = `${window.location.origin}/book/${bookId}`;
 
     try {
       // 1. Mark all as notified in contact_messages
@@ -1377,7 +1380,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
                         </button>
                       )}
                       {/* Quick WhatsApp link per user */}
-                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + (n.name||'there') + ', "' + group.title + '" is now available! 📖 https://ellines-haven.vercel.app/book/' + bookId)}`}
+                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + (n.name||'there') + ', "' + group.title + '" is now available! 📖 ' + window.location.origin + '/book/' + bookId)}`}
                         target="_blank" rel="noopener noreferrer"
                         style={{ fontSize:'0.72rem', padding:'3px 8px', borderRadius:'var(--r-sm)', background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', textDecoration:'none', flexShrink:0 }}>
                         💬 WA
@@ -2145,6 +2148,8 @@ export default function Admin() {
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState('');
   const [orderFilter, setOrderFilter] = useState('all');
+  const [bookStatusFilter, setBookStatusFilter] = useState('all');
+  const [bookTypeFilter,   setBookTypeFilter]   = useState('all');
   const [reviews, setReviews] = useState(MOCK_REVIEWS_INIT);
   const [promos,  setPromos]  = useState(PROMO_INIT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -2508,10 +2513,26 @@ export default function Admin() {
     showToast(`User "${u.name}" permanently deleted`);
   };
 
-  const filtered = books.filter(b =>
-    b.title.toLowerCase().includes(search.toLowerCase()) ||
-    b.genre.toLowerCase().includes(search.toLowerCase())
-  );
+  // Navigate to Books tab with a pre-set status filter
+  const goToBooks = (statusFilter = 'all') => {
+    setBookStatusFilter(statusFilter);
+    setBookTypeFilter('all');
+    setSearch('');
+    setTab('books');
+  };
+
+  const filtered = books.filter(b => {
+    const matchSearch = !search ||
+      b.title.toLowerCase().includes(search.toLowerCase()) ||
+      b.genre.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = bookStatusFilter === 'all'
+      ? true
+      : bookStatusFilter === '__featured__'
+      ? b.featured === true
+      : (b.status || 'complete') === bookStatusFilter;
+    const matchType = bookTypeFilter === 'all' || b.type === bookTypeFilter;
+    return matchSearch && matchStatus && matchType;
+  });
 
   // Real orders only — sorted newest first
   const realOrders = [...liveOrders].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -2529,6 +2550,7 @@ export default function Admin() {
   const navItems = [
     /* ── General admin ── */
     { k:'dashboard',     label:'Dashboard',        icon:'🏠', group:'admin' },
+    { k:'activity',      label:'Activity Feed',    icon:'📊', group:'admin' },
     { k:'books',         label:'Books',             icon:'📚', group:'admin' },
     { k:'covers',        label:'Novel Covers',      icon:'🖼️', group:'admin' },
     { k:'photos',        label:'Site Photos',       icon:'📷', group:'admin' },
@@ -2540,9 +2562,11 @@ export default function Admin() {
     { k:'userbooks',     label:'User Libraries',    icon:'📖', group:'admin' },
     { k:'permissions',   label:'Permissions',       icon:'🔐', group:'admin' },
     { k:'reviews',       label:'Reviews',           icon:'⭐', group:'admin' },
+    { k:'newsletter',    label:'Newsletter',         icon:'📬', group:'admin' },
     { k:'promos',        label:'Promo Codes',       icon:'🎟️', group:'admin' },
     { k:'analytics',     label:'Analytics',         icon:'📊', group:'admin' },
     { k:'reports',       label:'Reports',           icon:'📈', group:'admin' },
+    { k:'visitors',      label:'Site Visitors',     icon:'🌍', group:'admin' },
     { k:'payments',      label:'Payment Methods',   icon:'💳', group:'admin' },
     { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
     { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
@@ -2589,11 +2613,48 @@ export default function Admin() {
             <span className="adm-nav-label">Manage</span>
           </div>
           {navItems.filter(n => n.group === 'admin').map(({ k, label, icon }) => (
-            <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} onClick={() => setTab(k)} title={label}>
+            <button key={k} className={'adm-nav-btn' + (tab === k ? ' active' : '')} onClick={() => { setTab(k); if (k === 'books') { setBookStatusFilter('all'); setBookTypeFilter('all'); setSearch(''); } }} title={label}>
               <span className="adm-nav-icon-emoji">{icon}</span>
               <span className="adm-nav-label">{label}</span>
             </button>
           ))}
+
+          {/* ── Book Categories (shown when Books tab is active) ── */}
+          {tab === 'books' && !sidebarCollapsed && (
+            <div style={{ marginLeft:12, marginTop:2, marginBottom:4, display:'flex', flexDirection:'column', gap:2 }}>
+              {[
+                { label:'All Books',     count: books.length,                                  filter:'all',          color:'var(--muted)' },
+                { label:'Complete',      count: books.filter(b=>b.status==='complete').length,  filter:'complete',     color:'#2ecc71' },
+                { label:'Featured',      count: books.filter(b=>b.featured).length,             filter:'__featured__', color:'#c9a84c' },
+                { label:'Ongoing',       count: books.filter(b=>b.status==='ongoing').length,   filter:'ongoing',      color:'#4a9eff' },
+                { label:'Premium',       count: books.filter(b=>b.status==='premium').length,   filter:'premium',      color:'#c9a84c' },
+                { label:'Coming Soon',   count: books.filter(b=>b.status==='coming-soon').length,filter:'coming-soon', color:'#e8832a' },
+                { label:'Draft',         count: books.filter(b=>b.status==='draft').length,     filter:'draft',        color:'#64748b' },
+              ].map(item => (
+                <button key={item.filter}
+                  onClick={() => { setBookStatusFilter(item.filter); setBookTypeFilter('all'); setSearch(''); }}
+                  style={{
+                    display:'flex', alignItems:'center', justifyContent:'space-between',
+                    padding:'4px 10px 4px 12px',
+                    background: bookStatusFilter === item.filter ? 'rgba(201,168,76,0.08)' : 'transparent',
+                    border: bookStatusFilter === item.filter ? '1px solid rgba(201,168,76,0.2)' : '1px solid transparent',
+                    borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all 0.15s',
+                    color: bookStatusFilter === item.filter ? 'var(--gold)' : 'var(--muted)',
+                    fontSize:'0.73rem',
+                  }}
+                  onMouseEnter={e => { if (bookStatusFilter !== item.filter) e.currentTarget.style.color = 'var(--text)'; }}
+                  onMouseLeave={e => { if (bookStatusFilter !== item.filter) e.currentTarget.style.color = 'var(--muted)'; }}>
+                  <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ width:6, height:6, borderRadius:'50%', background: item.color, flexShrink:0 }} />
+                    {item.label}
+                  </span>
+                  <span style={{ fontSize:'0.68rem', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:8 }}>
+                    {item.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* ── Power Tools — admin & superadmin ── */}
           <div className="adm-nav-divider" />
@@ -2641,6 +2702,35 @@ export default function Admin() {
             <Link to="/profile" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>👤 Profile</Link>
             <Link to="/" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>← Site</Link>
           </div>
+
+          {/* ── Payment Dashboards Quick Links ── */}
+          {!sidebarCollapsed && (
+            <div style={{ marginTop:10, borderTop:'1px solid var(--border)', paddingTop:10 }}>
+              <div style={{ fontSize:'0.65rem', color:'var(--muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6, paddingLeft:2 }}>
+                💳 Payment Dashboards
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <a href="https://dashboard.paystack.com" target="_blank" rel="noopener noreferrer"
+                  style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 10px', background:'rgba(0,196,140,0.07)', border:'1px solid rgba(0,196,140,0.15)', borderRadius:'var(--r-sm)', textDecoration:'none', color:'#00c48c', fontSize:'0.75rem', fontWeight:600, transition:'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(0,196,140,0.14)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(0,196,140,0.07)'}>
+                  <span style={{ fontSize:'0.9rem' }}>🟢</span> Paystack
+                </a>
+                <a href="https://www.paypal.com/signin" target="_blank" rel="noopener noreferrer"
+                  style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 10px', background:'rgba(0,112,243,0.07)', border:'1px solid rgba(0,112,243,0.15)', borderRadius:'var(--r-sm)', textDecoration:'none', color:'#4a9eff', fontSize:'0.75rem', fontWeight:600, transition:'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(0,112,243,0.14)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(0,112,243,0.07)'}>
+                  <span style={{ fontSize:'0.9rem' }}>🅿</span> PayPal
+                </a>
+                <a href="https://developer.safaricom.co.ke" target="_blank" rel="noopener noreferrer"
+                  style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 10px', background:'rgba(46,204,113,0.07)', border:'1px solid rgba(46,204,113,0.15)', borderRadius:'var(--r-sm)', textDecoration:'none', color:'#2ecc71', fontSize:'0.75rem', fontWeight:600, transition:'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(46,204,113,0.14)'}
+                  onMouseLeave={e => e.currentTarget.style.background='rgba(46,204,113,0.07)'}>
+                  <span style={{ fontSize:'0.9rem' }}>📱</span> M-Pesa / Daraja
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -2696,9 +2786,17 @@ export default function Admin() {
                   if (!name.trim() || !email.trim() || !password.trim()) { showToast('❌ All fields are required'); return; }
                   if (password.length < 4) { showToast('❌ Password must be at least 4 characters'); return; }
                   const emailKey = email.trim().toLowerCase();
-                  // Check for duplicates
+                  
+                  // Check for duplicates in local state
                   const existing = users.find(u => u.email.toLowerCase() === emailKey);
                   if (existing) { showToast('❌ An account with that email already exists'); return; }
+                  
+                  // Also check Firestore users collection directly
+                  try {
+                    const fsQuery = query(collection(db, 'users'), where('email', '==', emailKey));
+                    const fsSnap = await getDocs(fsQuery);
+                    if (!fsSnap.empty) { showToast('❌ An account with that email already exists'); return; }
+                  } catch (e) { console.warn('[DuplicateCheck]', e.message); }
 
                   const newUser = { id: (addUserModal==='admin'?'adm_':'usr_') + Date.now(), name: name.trim(), email: emailKey, role: addUserModal==='admin' ? role : 'user', joined: new Date().toISOString().slice(0,10) };
 
@@ -2746,7 +2844,28 @@ export default function Admin() {
                   // Update local UI state
                   setUsers(prev => [...prev, { ...newUser, books:0, status:'Active' }]);
                   addLog('user', (addUserModal==='admin'?'Admin':'User') + ' account created: ' + emailKey);
-                  showToast('✅ Account created for ' + name.trim() + ' — password: ' + password.trim());
+                  showToast(`✅ Account created for ${name.trim()}`);
+                  
+                  // Track activity for admin notification
+                  try {
+                    const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+                    await trackActivity({
+                      category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
+                      title: addUserModal === 'admin' ? 'Admin Account Created' : 'User Account Created',
+                      message: `${user.name} created ${addUserModal === 'admin' ? 'admin' : 'user'} account for ${name.trim()} (${emailKey})`,
+                      userEmail: emailKey,
+                      userName: name.trim(),
+                      metadata: {
+                        createdBy: user.email,
+                        role: newUser.role,
+                        createdAt: newUser.joined,
+                      },
+                      priority: addUserModal === 'admin' ? 'normal' : 'low',
+                    });
+                  } catch (err) {
+                    console.error('[trackActivity]', err);
+                  }
+                  
                   setAddUserModal(null);
                   setAddUserForm({ name:'', email:'', password:'', role:'user' });
                 }}>Create Account</button>
@@ -2810,23 +2929,65 @@ export default function Admin() {
             {/* ── Secondary stats ── */}
             <div className="adm-stats-grid cols-4" style={{ marginBottom:24 }}>
               {[
-                { icon:'✅', label:'Completed Orders', value: allOrders.filter(o=>o.status==='Completed').length, color:'#2ecc71' },
-                { icon:'📖', label:'Featured Books',   value: books.filter(b=>b.featured).length,               color:'#c9a84c' },
-                { icon:'🔜', label:'Coming Soon',      value: books.filter(b=>b.status==='coming-soon').length,  color:'#e8832a' },
-                { icon:'🔔', label:'New This Month',   value: allOrders.filter(o => {
-                    const d = new Date(o.createdAt || o.date);
-                    const n = new Date();
-                    return d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
-                  }).length, color:'#a855f7' },
+                { icon:'✅', label:'Completed Orders',  value: allOrders.filter(o=>o.status==='Completed').length,  color:'#2ecc71', bg:'rgba(46,204,113,0.08)',   click: () => setOrderFilter('completed') || setTab('orders') },
+                { icon:'📖', label:'Featured Books',    value: books.filter(b=>b.featured).length,                 color:'#c9a84c', bg:'rgba(201,168,76,0.08)',   click: () => { setBookStatusFilter('__featured__'); setBookTypeFilter('all'); setTab('books'); } },
+                { icon:'🔜', label:'Coming Soon',       value: books.filter(b=>b.status==='coming-soon').length,   color:'#e8832a', bg:'rgba(232,131,42,0.08)',   click: () => goToBooks('coming-soon') },
+                { icon:'📝', label:'Draft / Hidden',    value: books.filter(b=>b.status==='draft'||b.active===false).length, color:'#64748b', bg:'rgba(100,116,139,0.08)', click: () => goToBooks('draft') },
               ].map(s => (
-                <div key={s.label} className="adm-stat-card card">
-                  <div className="adm-stat-icon" style={{ background:'rgba(255,255,255,0.04)', fontSize:'1.2rem' }}>{s.icon}</div>
+                <div key={s.label} className="adm-stat-card card"
+                  style={{ cursor:'pointer', transition:'transform .15s, box-shadow .15s' }}
+                  onClick={s.click}
+                  onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 20px rgba(0,0,0,0.3)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}>
+                  <div className="adm-stat-icon" style={{ background: s.bg, fontSize:'1.2rem' }}>{s.icon}</div>
                   <div className="adm-stat-body">
                     <strong style={{ color:s.color, fontSize:'1.4rem' }}>{s.value}</strong>
                     <span>{s.label}</span>
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* ── Book Status Breakdown ── */}
+            <div className="card" style={{ padding:'18px 20px', marginBottom:24 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+                <h3 style={{ fontSize:'0.92rem', margin:0 }}>📚 Book Catalogue by Status</h3>
+                <button className="btn btn-outline btn-sm" onClick={() => goToBooks('all')}>Manage All Books</button>
+              </div>
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+                {BOOK_STATUSES.map(s => {
+                  const count = books.filter(b => (b.status||'complete') === s.value).length;
+                  return (
+                    <button key={s.value} onClick={() => goToBooks(s.value)}
+                      style={{
+                        display:'flex', alignItems:'center', gap:8, padding:'8px 16px',
+                        background: count > 0 ? s.bg : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${count > 0 ? s.color + '60' : 'var(--dim)'}`,
+                        borderRadius:20, cursor:'pointer', transition:'all 0.15s',
+                        color: count > 0 ? s.color : 'var(--muted)',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform='translateY(-1px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform=''; }}>
+                      <span style={{ fontSize:'0.82rem' }}>{s.label}</span>
+                      <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.3)', padding:'1px 7px', borderRadius:10 }}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+                <button onClick={() => { setBookStatusFilter('__featured__'); setBookTypeFilter('all'); setTab('books'); }}
+                  style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:20, cursor:'pointer', color:'var(--gold)', transition:'all .15s' }}>
+                  ⭐ Featured <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.featured).length}</span>
+                </button>
+                <button onClick={() => { setBookTypeFilter('novel'); setBookStatusFilter('all'); setTab('books'); }}
+                  style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'rgba(74,158,255,0.06)', border:'1px solid rgba(74,158,255,0.3)', borderRadius:20, cursor:'pointer', color:'#4a9eff', transition:'all .15s' }}>
+                  📖 Novels <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.type==='novel').length}</span>
+                </button>
+                <button onClick={() => { setBookTypeFilter('short-story'); setBookStatusFilter('all'); setTab('books'); }}
+                  style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.3)', borderRadius:20, cursor:'pointer', color:'#a855f7', transition:'all .15s' }}>
+                  ✍️ Short Stories <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.type==='short-story').length}</span>
+                </button>
+              </div>
             </div>
 
             <div className="adm-dash-grid">
@@ -2870,51 +3031,60 @@ export default function Admin() {
               {/* ── Right column: quick stats + actions ── */}
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
-                {/* Top books */}
+                {/* Top books — clickable rows that open book editor */}
                 <div className="card">
                   <div className="adm-card-head">
                     <h3>Top Books</h3>
-                    <button className="btn btn-outline btn-sm" onClick={() => setTab('books')}>Manage</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => goToBooks('all')}>Manage All</button>
                   </div>
                   <div style={{ padding:'0 0 8px' }}>
-                    {books.slice(0,5).map((b,i) => (
-                      <div key={b.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 16px', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                        <span style={{ width:20, height:20, borderRadius:'50%', background:'rgba(201,168,76,0.12)', color:'var(--gold)', fontWeight:700, fontSize:'0.68rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</span>
-                        {b.coverType==='photo'&&b.cover
-                          ? <img src={b.cover} alt="" style={{ width:28, height:40, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
-                          : <div style={{ width:28, height:40, background:b.coverColor||'#1a1a3a', borderRadius:3, flexShrink:0 }} />
-                        }
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:'0.82rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</div>
-                          <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>KSh {b.price} · {b.genre}</div>
+                    {books.slice(0,6).map((b,i) => {
+                      const sm = BOOK_STATUSES.find(s => s.value === (b.status||'complete')) || BOOK_STATUSES[0];
+                      return (
+                        <div key={b.id}
+                          onClick={() => setEditing(b)}
+                          style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 16px', borderBottom:'1px solid rgba(255,255,255,0.03)', cursor:'pointer', transition:'background 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}
+                          onMouseLeave={e => e.currentTarget.style.background=''}>
+                          <span style={{ width:18, height:18, borderRadius:'50%', background:'rgba(201,168,76,0.12)', color:'var(--gold)', fontWeight:700, fontSize:'0.65rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</span>
+                          {b.coverType==='photo' && b.cover
+                            ? <img src={b.cover} alt="" style={{ width:26, height:38, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
+                            : <div style={{ width:26, height:38, background:b.coverColor||'#1a1a3a', borderRadius:3, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.5rem', color:b.coverAccent||'#c9a84c' }}>EH</div>
+                          }
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:'0.8rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</div>
+                            <div style={{ fontSize:'0.68rem', color:'var(--muted)' }}>KSh {b.price} · {b.genre}</div>
+                          </div>
+                          <span style={{ fontSize:'0.65rem', padding:'2px 7px', borderRadius:10, background:sm.bg, color:sm.color, border:`1px solid ${sm.color}35`, flexShrink:0, whiteSpace:'nowrap' }}>
+                            {sm.label.replace(/^[^\s]+\s/,'')}
+                          </span>
                         </div>
-                        <span style={{ fontSize:'0.72rem', padding:'2px 8px', borderRadius:10,
-                          background: b.status==='complete' ? 'rgba(46,204,113,0.1)' : 'rgba(201,168,76,0.1)',
-                          color: b.status==='complete' ? 'var(--ok)' : 'var(--gold)',
-                          border: b.status==='complete' ? '1px solid rgba(46,204,113,0.25)' : '1px solid rgba(201,168,76,0.25)',
-                          flexShrink:0 }}>
-                          {b.status || 'complete'}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Quick Actions */}
                 <div className="card" style={{ padding:20 }}>
-                  <h3 style={{ fontSize:'0.92rem', marginBottom:14 }}>Quick Actions</h3>
+                  <h3 style={{ fontSize:'0.92rem', marginBottom:14 }}>⚡ Quick Actions</h3>
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     <button className="btn btn-primary btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setEditing({})}>
                       📚 Add New Book
                     </button>
                     <button className="btn btn-outline btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('orders')}>
-                      🛒 Review Orders {pendingCount>0 && `(${pendingCount} pending)`}
+                      🛒 Review Orders {pendingCount>0 && <span style={{ marginLeft:4, background:'var(--gold)', color:'#000', padding:'1px 6px', borderRadius:8, fontSize:'0.7rem', fontWeight:700 }}>{pendingCount}</span>}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('users')}>
+                      👥 Manage Users ({users.length})
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('analytics')}>
-                      📊 View Reports
+                      📊 View Analytics
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('notifications')}>
                       🔔 Notifications
+                    </button>
+                    <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('messages')}>
+                      💬 Messages
                     </button>
                     {isSuper && (
                       <button className="btn btn-sm" style={{ justifyContent:'flex-start', background:'rgba(201,168,76,0.08)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.25)' }}
@@ -2934,17 +3104,26 @@ export default function Admin() {
               {[
                 { label:'Firestore', ok:true },
                 { label:'Library',  ok:true },
-                { label:'Orders',   ok:true },
-                { label:'Auth',     ok:true },
+                { label:'Orders',   ok:allOrders.length >= 0 },
+                { label:'Auth',     ok:!!user },
               ].map(s => (
                 <span key={s.label} style={{ fontSize:'0.78rem', display:'flex', alignItems:'center', gap:5 }}>
                   <span style={{ width:7, height:7, borderRadius:'50%', background:s.ok?'var(--ok)':'var(--err)', display:'inline-block', boxShadow:s.ok?'0 0 6px var(--ok)':'' }} />
                   {s.label}
                 </span>
               ))}
-              <span style={{ marginLeft:'auto', fontSize:'0.72rem', color:'var(--muted)' }}>
-                Last refreshed: {new Date().toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' })}
-              </span>
+              <div style={{ marginLeft:'auto', display:'flex', gap:16, alignItems:'center', flexWrap:'wrap' }}>
+                <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
+                  {books.filter(b=>b.active!==false).length} live books · {users.filter(u=>u.status==='Active').length} active users
+                </span>
+                <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
+                  Refreshed {new Date().toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' })}
+                </span>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize:'0.72rem', padding:'3px 10px' }}
+                  onClick={() => { syncOrders(); setTick(t=>t+1); showToast('Refreshed'); }}>
+                  🔄 Sync
+                </button>
+              </div>
             </div>
 
           </div>
@@ -2953,15 +3132,77 @@ export default function Admin() {
         {tab === 'books' && (
           <div className="adm-page">
             <div className="adm-page-head">
-              <div><h1>Books</h1><span className="adm-page-sub">{books.length} titles in the library</span></div>
+              <div>
+                <h1>Books</h1>
+                <span className="adm-page-sub">
+                  {books.length} titles in the catalogue
+                  {bookStatusFilter !== 'all' && (
+                    <span style={{ marginLeft:8, color:'var(--gold)' }}>
+                      · Showing: {BOOK_STATUSES.find(s=>s.value===bookStatusFilter)?.label || bookStatusFilter}
+                    </span>
+                  )}
+                </span>
+              </div>
               <div style={{ display:'flex', gap:10 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setResetConfirm(true)}>Reset Defaults</button>
                 <button className="btn btn-primary" onClick={() => setEditing({})}>+ Add New Book</button>
               </div>
             </div>
+
+            {/* ── Type Tabs ── */}
+            <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
+              {[
+                { value:'all',          label:'All Types',     count: books.length },
+                { value:'novel',        label:'📖 Novels',     count: books.filter(b=>b.type==='novel').length },
+                { value:'short-story',  label:'✍️ Short Stories', count: books.filter(b=>b.type==='short-story').length },
+              ].map(t => (
+                <button key={t.value}
+                  className={'adm-filter-btn' + (bookTypeFilter === t.value ? ' on' : '')}
+                  onClick={() => setBookTypeFilter(t.value)}>
+                  {t.label}
+                  <span style={{ marginLeft:6, fontSize:'0.7rem', opacity:0.7 }}>({t.count})</span>
+                </button>
+              ))}
+            </div>
+
+            {/* ── Status Filter Tabs ── */}
+            <div style={{ display:'flex', gap:6, marginBottom:14, flexWrap:'wrap' }}>
+              <button className={'adm-filter-btn' + (bookStatusFilter === 'all' ? ' on' : '')}
+                onClick={() => setBookStatusFilter('all')}>
+                All Statuses
+                <span style={{ marginLeft:6, fontSize:'0.7rem', opacity:0.7 }}>({books.length})</span>
+              </button>
+              {BOOK_STATUSES.map(s => {
+                const count = books.filter(b => (b.status||'complete') === s.value).length;
+                return (
+                  <button key={s.value}
+                    className={'adm-filter-btn' + (bookStatusFilter === s.value ? ' on' : '')}
+                    style={ bookStatusFilter === s.value
+                      ? { background: s.bg, borderColor: s.color + '80', color: s.color }
+                      : { opacity: count === 0 ? 0.45 : 1 }
+                    }
+                    onClick={() => setBookStatusFilter(s.value)}>
+                    {s.label}
+                    <span style={{ marginLeft:6, fontSize:'0.7rem', opacity:0.7 }}>({count})</span>
+                  </button>
+                );
+              })}
+              <button className={'adm-filter-btn' + (bookStatusFilter === '__featured__' ? ' on' : '')}
+                style={{ borderColor:'rgba(201,168,76,0.4)', color: bookStatusFilter==='__featured__' ? 'var(--gold)' : undefined }}
+                onClick={() => setBookStatusFilter('__featured__')}>
+                ⭐ Featured
+                <span style={{ marginLeft:6, fontSize:'0.7rem', opacity:0.7 }}>({books.filter(b=>b.featured).length})</span>
+              </button>
+            </div>
+
             <div className="adm-toolbar card">
               <input className="field adm-search" placeholder="Search by title or genre..." value={search} onChange={e => setSearch(e.target.value)} />
               <span className="adm-toolbar-count">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+              {(bookStatusFilter !== 'all' || bookTypeFilter !== 'all' || search) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => { setBookStatusFilter('all'); setBookTypeFilter('all'); setSearch(''); }}>
+                  ✕ Clear filters
+                </button>
+              )}
             </div>
             <div className="card" style={{ overflow:'hidden' }}>
               <table className="adm-table adm-books-table">
@@ -3101,7 +3342,43 @@ export default function Admin() {
           <div className="adm-page">
             <div className="adm-page-head">
               <div><h1>Users</h1><span className="adm-page-sub">{users.length} registered accounts</span></div>
-              <button className="btn btn-primary btn-sm" onClick={() => { setAddUserForm({name:'',email:'',password:'',role:'user'}); setAddUserModal('user'); }}>+ Add User</button>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <button className="btn btn-outline btn-sm" onClick={async () => {
+                  if (!confirm('This will sync all users from site_data/registered_users to the users collection. Continue?')) return;
+                  try {
+                    const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
+                    if (!regSnap.exists()) { showToast('❌ No registered users found'); return; }
+                    const regData = regSnap.data();
+                    const registered = regData.registered || [];
+                    const pwOverrides = regData.pwOverrides || {};
+                    let migrated = 0, skipped = 0;
+                    for (const regUser of registered) {
+                      const emailKey = regUser.email?.toLowerCase();
+                      if (!emailKey) { skipped++; continue; }
+                      // Check if already exists in users collection
+                      const q = query(collection(db, 'users'), where('email', '==', emailKey));
+                      const existing = await getDocs(q);
+                      if (!existing.empty) { skipped++; continue; }
+                      // Migrate to users collection
+                      const uid = regUser.id || ('u_' + Date.now() + '_' + Math.random().toString(36).slice(2,7));
+                      const joined = regUser.joined || new Date().toISOString().slice(0, 10);
+                      const pw = pwOverrides[emailKey] || regUser.password || '';
+                      await setDoc(doc(db, 'users', uid), {
+                        id: uid, name: regUser.name || '', email: emailKey,
+                        role: regUser.role || 'user', passwordHash: pw,
+                        joined, migratedAt: serverTimestamp(), status: 'active',
+                      });
+                      migrated++;
+                    }
+                    showToast(`✅ Migration complete: ${migrated} users migrated, ${skipped} skipped (already exist)`);
+                    addLog('system', `User migration: ${migrated} accounts migrated to users collection`);
+                  } catch (e) {
+                    showToast('❌ Migration failed: ' + e.message);
+                    console.error('[Migration]', e);
+                  }
+                }} title="Sync all users from registered_users to users collection">🔄 Migrate Users</button>
+                <button className="btn btn-primary btn-sm" onClick={() => { setAddUserForm({name:'',email:'',password:'',role:'user'}); setAddUserModal('user'); }}>+ Add User</button>
+              </div>
             </div>
 
             {/* Password reset modal */}
@@ -3256,6 +3533,13 @@ export default function Admin() {
           </Suspense>
         )}
 
+        {/* NEWSLETTER */}
+        {tab === 'newsletter' && (
+          <Suspense fallback={<PanelLoader />}>
+            <NewsletterPanel showToast={showToast} />
+          </Suspense>
+        )}
+
         {/* PROMO CODES */}
         {tab === 'promos' && (
           <div className="adm-page">
@@ -3336,6 +3620,20 @@ export default function Admin() {
         {tab === 'reports' && (
           <Suspense fallback={<PanelLoader />}>
             <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+          </Suspense>
+        )}
+
+        {/* -- ACTIVITY FEED -- */}
+        {tab === 'activity' && (
+          <Suspense fallback={<PanelLoader />}>
+            <ActivityPanel user={user} showToast={showToast} />
+          </Suspense>
+        )}
+
+        {/* -- VISITORS -- */}
+        {tab === 'visitors' && (
+          <Suspense fallback={<PanelLoader />}>
+            <VisitorsPanel showToast={showToast} />
           </Suspense>
         )}
 

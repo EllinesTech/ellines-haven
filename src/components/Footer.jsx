@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import NewsletterSignup from './NewsletterSignup';
 import './Footer.css';
 
 const GENRES = ['Romance', 'Mystery', 'Drama', 'Historical', 'Short Stories', 'Fantasy'];
@@ -63,6 +64,7 @@ export default function Footer() {
             <Link to="/register" className="footer__link">Create Account</Link>
             <Link to="/login" className="footer__link">Sign In</Link>
             <Link to="/my-library" className="footer__link">My Library</Link>
+            <Link to="/wishlist" className="footer__link">🔖 My Wishlist</Link>
             <Link to="/cart" className="footer__link">Cart</Link>
           </div>
 
@@ -79,6 +81,19 @@ export default function Footer() {
             </a>
           </div>
 
+        </div>
+      </div>
+
+      {/* ── Newsletter strip ── */}
+      <div className="footer__newsletter">
+        <div className="container footer__newsletter-inner">
+          <div className="footer__newsletter-text">
+            <strong>New releases, straight to your inbox</strong>
+            <span>No spam. Just stories.</span>
+          </div>
+          <div className="footer__newsletter-form">
+            <NewsletterSignup compact />
+          </div>
         </div>
       </div>
 

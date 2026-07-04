@@ -617,3 +617,100 @@ exports.capturePayPalOrder = onCall(
     }
   }
 );
+
+// ── Visitor Tracker — server-side IP + geolocation ────────────────────────────
+// Called by the frontend on every first load.
+// Server reads the REAL client IP from HTTP headers (cannot be faked by client JS).
+// Then fetches geolocation from ip-api.com (free, no key, 45 req/min per IP, JSON).
+exports.trackVisitor = onRequest(
+  {
+    region: "us-central1",
+    cors: true,
+    invoker: "public",
+  },
+  async (req, res) => {
+    // ── CORS — allow the Ellines Haven frontend ──
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST")   { res.status(405).send("Method Not Allowed"); return; }
+
+    try {
+      // ── Extract the true public IP from reverse-proxy headers ──
+      // Cloud Run / Firebase Hosting sets x-forwarded-for with the original client IP first.
+      const xForwardedFor = req.headers["x-forwarded-for"] || "";
+      const xRealIp       = req.headers["x-real-ip"]       || "";
+      const cfConnecting  = req.headers["cf-connecting-ip"] || ""; // Cloudflare
+      const fastlyClient  = req.headers["fastly-client-ip"]|| ""; // Fastly CDN
+
+      // Pick the first real IP: CF > Fastly > x-real-ip > first of x-forwarded-for > socket
+      const rawIp =
+        cfConnecting ||
+        fastlyClient ||
+        xRealIp      ||
+        xForwardedFor.split(",")[0].trim() ||
+        req.socket?.remoteAddress || "";
+
+      // Strip IPv6-mapped IPv4 prefix (::ffff:1.2.3.4 → 1.2.3.4)
+      const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
+
+      const body = req.body || {};
+      const page      = (body.page      || "/").slice(0, 200);
+      const referrer  = (body.referrer  || "direct").slice(0, 200);
+      const userAgent = (body.userAgent || "").slice(0, 300);
+      const device    = (body.device    || "Desktop").slice(0, 30);
+      const userEmail = (body.userEmail || "").slice(0, 200);
+      const userName  = (body.userName  || "").slice(0, 100);
+
+      // ── Geolocate with ip-api.com (free, no key, server-side call) ──
+      // Fields: status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query
+      let geo = {};
+      if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
+        try {
+          const geoRes = await axios.get(
+            `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
+            { timeout: 4000 }
+          );
+          if (geoRes.data?.status === "success") {
+            geo = geoRes.data;
+          } else {
+            console.warn("[trackVisitor] ip-api fallback for", clientIp, ":", geoRes.data?.message);
+          }
+        } catch (geoErr) {
+          console.warn("[trackVisitor] geolocation failed:", geoErr.message);
+        }
+      }
+
+      // ── Write to Firestore ──
+      const visitId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      await db.collection("site_visitors").doc(visitId).set({
+        ip:          geo.query       || clientIp,
+        city:        geo.city        || "",
+        region:      geo.regionName  || geo.region || "",
+        country:     geo.country     || "",
+        countryCode: geo.countryCode || "",
+        lat:         geo.lat         || null,
+        lon:         geo.lon         || null,
+        isp:         geo.isp         || geo.org || "",
+        org:         geo.org         || "",
+        timezone:    geo.timezone    || "",
+        page,
+        referrer,
+        userAgent,
+        device,
+        rawIp:       clientIp,
+        // Logged-in user info (optional — present when visitor is signed in)
+        ...(userEmail ? { userEmail, userName } : {}),
+        visitedAt:   admin.firestore.FieldValue.serverTimestamp(),
+        visitedAtMs: Date.now(),
+      });
+
+      res.status(200).json({ ok: true, ip: geo.query || clientIp });
+    } catch (err) {
+      console.error("[trackVisitor] error:", err.message);
+      // Still return 200 so the frontend doesn't retry / show errors
+      res.status(200).json({ ok: false });
+    }
+  }
+);

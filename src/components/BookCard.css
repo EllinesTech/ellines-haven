@@ -172,3 +172,26 @@
   flex-shrink: 0;
 }
 .bcard__wa-btn:hover { background: #1ebe5d; transform: scale(1.08); color: #fff; }
+
+/* ── Wishlist button on card ── */
+.bcard__wishlist-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 6;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.bcard:hover .bcard__wishlist-btn,
+.bcard__wishlist-btn:has(.wl-btn--active) {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.bcard__wishlist-btn .wl-btn {
+  background: rgba(13,13,26,0.85);
+  backdrop-filter: blur(4px);
+  border-color: rgba(255,255,255,0.15);
+}

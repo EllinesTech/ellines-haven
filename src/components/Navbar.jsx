@@ -3,7 +3,33 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import UserNotificationsBell from './UserNotifications';
+import AdminNotificationsBell from './AdminNotificationsBell';
 import './Navbar.css';
+
+/* Wishlist icon with count badge */
+function WishlistIcon() {
+  const { wishlist, user } = useApp();
+  if (!user) return null;
+  return (
+    <Link
+      to="/wishlist"
+      className="nav__cart"
+      aria-label={`Wishlist (${wishlist.length} saved)`}
+      title="My Wishlist"
+      style={{ position: 'relative' }}
+    >
+      {/* Bookmark SVG */}
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/>
+      </svg>
+      {wishlist.length > 0 && (
+        <span className="nav__cart-badge" style={{ background: 'var(--gold)' }}>
+          {wishlist.length}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 const isAdmin = (role) => role === 'admin' || role === 'superadmin';
 
@@ -58,6 +84,8 @@ export default function Navbar() {
 
           {user ? (
             <>
+              <WishlistIcon />
+              {isAdmin(user.role) && <AdminNotificationsBell user={user} />}
               <UserNotificationsBell user={user} />
               <div className="nav__user">
                 <button className="nav__avatar-btn" onClick={() => setDropdown(d => !d)}>
@@ -75,6 +103,7 @@ export default function Navbar() {
                     : <Link to="/profile" onClick={() => setDropdown(false)}>👤 My Profile</Link>
                   }
                   {!isAdmin(user.role) && <Link to="/my-library" onClick={() => setDropdown(false)}>📚 My Library</Link>}
+              {!isAdmin(user.role) && <Link to="/wishlist" onClick={() => setDropdown(false)}>🔖 My Wishlist</Link>}
                   {isAdmin(user.role) && (
                     <Link to="/admin" onClick={() => setDropdown(false)} className="nav__dropdown-admin">
                       {adminLabel}
@@ -112,6 +141,7 @@ export default function Navbar() {
                 : <NavLink to="/profile" onClick={() => setOpen(false)}>👤 My Profile</NavLink>
               }
               {!isAdmin(user.role) && <NavLink to="/my-library" onClick={() => setOpen(false)}>My Library</NavLink>}
+              {!isAdmin(user.role) && <NavLink to="/wishlist" onClick={() => setOpen(false)}>🔖 Wishlist</NavLink>}
               {isAdmin(user.role) && <NavLink to="/admin" onClick={() => setOpen(false)}>{adminLabel}</NavLink>}
               <button onClick={() => { doLogout(); setOpen(false); }}>Sign Out</button>
             </>

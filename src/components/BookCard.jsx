@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import WishlistButton from './WishlistButton';
 import './BookCard.css';
 
 // Statuses where buying is not applicable
@@ -159,6 +160,12 @@ export default function BookCard({ book }) {
         <div className="bcard__overlay">
           <Link to={`/book/${book.id}`} className="btn btn-primary btn-sm">View Book</Link>
         </div>
+        {/* Wishlist button — top left corner */}
+        {!owned && (
+          <div className="bcard__wishlist-btn" onClick={e => e.stopPropagation()}>
+            <WishlistButton book={book} size="sm" />
+          </div>
+        )}
         {/* Coming Soon / Draft overlay */}
         {NO_PURCHASE_STATUSES.has(book.status) && (
           <div style={{ position:'absolute', inset:0, background:'rgba(10,10,20,0.55)', backdropFilter:'blur(2px)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', zIndex:4, gap:8 }}>

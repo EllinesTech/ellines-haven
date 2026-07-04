@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
+import EditableField from '../components/EditableField';
 import './Legal.css';
 
-const LAST_UPDATED = 'June 2025';
+const LAST_UPDATED = 'July 2026';
 
 export default function Privacy() {
   return (
@@ -18,7 +19,7 @@ export default function Privacy() {
 
         <div className="legal-intro card">
           <p>
-            At <strong>Ellines Haven</strong>, we take your privacy seriously. This Privacy Policy explains what information we collect, how we use it, and your rights regarding your personal data.
+            <EditableField field="privacy_intro">At <strong>Ellines Haven</strong>, we take your privacy seriously. This Privacy Policy explains what information we collect, how we use it, and your rights regarding your personal data.</EditableField>
           </p>
           <p>
             Questions? Contact us at <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a> or WhatsApp <a href="https://wa.me/254748255466">0748 255 466</a>.
@@ -46,6 +47,7 @@ export default function Privacy() {
             <ul>
               <li><strong>Usage data</strong> — pages visited, books viewed, and reading activity on the platform.</li>
               <li><strong>Device information</strong> — browser type, operating system, and device type used to access the platform.</li>
+              <li><strong>IP address and location</strong> — when you visit the site, your IP address and approximate geographic location (city, region, country) are recorded for security, fraud prevention, and anonymous analytics. This is stored securely in our Firebase database and is visible only to authorised administrators. Location data is derived from your IP address and is approximate — we do not use GPS or precise location tracking.</li>
               <li><strong>Local storage</strong> — we use your browser's local storage to keep you signed in and remember your cart and preferences between sessions.</li>
             </ul>
           </section>

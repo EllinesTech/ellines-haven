@@ -2,6 +2,8 @@ import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import BookCard, { waOrderLink, BookStatusBadge } from '../components/BookCard';
+import BookReviews from '../components/BookReviews';
+import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import './BookDetail.css';
@@ -213,12 +215,137 @@ function CoverLightbox({ book, onClose }) {
   );
 }
 
+/* ── Share Book Button ── */
+function ShareBookButton({ book }) {
+  const [copied, setCopied] = useState(false);
+  const url = `${window.location.origin}/book/${book.id}`;
+  const text = `Check out "${book.title}" by ${book.author} on Ellines Haven!`;
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: book.title, text, url });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2200);
+    } catch {
+      window.prompt('Copy this link:', url);
+    }
+  };
+
+  return (
+    <button
+      className="wl-btn wl-btn--md"
+      onClick={handleShare}
+      title="Share this book"
+      aria-label="Share this book"
+      style={{ gap: 7 }}
+    >
+      {copied ? (
+        <>✅ <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Copied!</span></>
+      ) : (
+        <>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Share</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+/* ── Free Sample Preview ── */
+function FreeSample({ book }) {
+  const [open, setOpen] = useState(false);
+  const excerpt = book.excerpt || '';
+  // Show ~300 chars as teaser, full excerpt when expanded
+  const teaser  = excerpt.slice(0, 300);
+  const hasMore = excerpt.length > 300;
+
+  return (
+    <div className="bd-sample">
+      <div className="bd-sample-header">
+        <div>
+          <h3>📖 Free Sample</h3>
+          <p>Read the opening passage before you buy.</p>
+        </div>
+        <button
+          className={'btn btn-outline btn-sm bd-sample-toggle' + (open ? ' active' : '')}
+          onClick={() => setOpen(o => !o)}
+        >
+          {open ? 'Hide Sample' : 'Read Sample'}
+        </button>
+      </div>
+      {open && (
+        <div className="bd-sample-body">
+          <div className="bd-sample-text">
+            {(hasMore && !open ? teaser + '…' : excerpt)
+              .split('\n\n')
+              .map((p, i) => <p key={i}>{p}</p>)}
+          </div>
+          <div className="bd-sample-cta">
+            <span>— End of free sample —</span>
+            <Link to="/cart" className="btn btn-primary btn-sm">
+              Get the full book — KSh {book.price}
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BookDetail() {
   const { id } = useParams();
   const { addToCart, cart, books, user, isOwned, myPerms, siteControls } = useApp();
   const [lightbox, setLightbox] = useState(false);
 
   const book = books.find(b => b.id === id);
+
+  // ── Dynamic page title & OG meta for sharing ──────────────────────────────
+  useEffect(() => {
+    if (!book) return;
+    // Page title
+    document.title = `${book.title} by ${book.author} — Ellines Haven`;
+
+    // OG meta tags (create or update)
+    const setMeta = (property, content) => {
+      let el = document.querySelector(`meta[property="${property}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute('property', property); document.head.appendChild(el); }
+      el.setAttribute('content', content);
+    };
+    const setMetaName = (name, content) => {
+      let el = document.querySelector(`meta[name="${name}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute('name', name); document.head.appendChild(el); }
+      el.setAttribute('content', content);
+    };
+
+    setMeta('og:title',       `${book.title} by ${book.author}`);
+    setMeta('og:description', book.description?.slice(0, 160) || `A ${book.genre} story by ${book.author} — available on Ellines Haven`);
+    setMeta('og:type',        'book');
+    setMeta('og:url',         `${window.location.origin}/book/${book.id}`);
+    if (book.coverType === 'photo' && book.cover) {
+      setMeta('og:image', book.cover);
+    }
+    setMeta('og:site_name',   'Ellines Haven');
+    setMetaName('twitter:card',        'summary_large_image');
+    setMetaName('twitter:title',       `${book.title} by ${book.author}`);
+    setMetaName('twitter:description', book.description?.slice(0, 160) || '');
+
+    return () => {
+      document.title = 'Ellines Haven';
+    };
+  }, [book]);
+
   if (!book) return <div className="bd-missing"><h2>Book not found</h2><Link to="/library" className="btn btn-primary">Back to Library</Link></div>;
 
   // Permission: canViewBookDetails
@@ -388,6 +515,11 @@ export default function BookDetail() {
                 <span>✓ M-Pesa · Card · PayPal accepted</span>
                 <span>✓ Download or read online</span>
               </div>
+              {/* Wishlist button */}
+              <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <WishlistButton book={book} size="md" showLabel />
+                <ShareBookButton book={book} />
+              </div>
             </div>
           </div>
         </div>
@@ -400,6 +532,22 @@ export default function BookDetail() {
           </div>
         </section>
       )}
+
+      {/* ── Free Sample Preview ── */}
+      {!owned && book.excerpt && book.status !== 'coming-soon' && book.status !== 'draft' && (
+        <section className="section bd-sample-section">
+          <div className="container">
+            <FreeSample book={book} />
+          </div>
+        </section>
+      )}
+
+      {/* ── Reader Reviews ── */}
+      <section className="section">
+        <div className="container">
+          <BookReviews book={book} />
+        </div>
+      </section>
 
       {/* ── Cover zoom lightbox ── */}
       {lightbox && <CoverLightbox book={book} onClose={() => setLightbox(false)} />}

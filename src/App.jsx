@@ -1,31 +1,31 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { LanguageProvider } from './context/LanguageContext';
-import { EditModeProvider } from './context/EditModeContext';
+import { EditModeProvider, useEditMode } from './context/EditModeContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WelcomePrompt from './components/WelcomePrompt';
 import EllineaAI from './components/EllineaAI';
 import EditToolbar from './components/EditToolbar';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import './App.css';
 
-/* ── Page loading indicator shown during lazy-chunk navigation ── */
+/* ── Page loading indicator ── */
 function PageLoader() {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       background: 'var(--bg, #0d0d1a)',
       display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: 20,
+      alignItems: 'center', justifyContent: 'center', gap: 20,
     }}>
       <img src="/logo-icon.png" alt="Ellines Haven" style={{ height: 56, opacity: 0.9, animation: 'eh-pulse 1.4s ease-in-out infinite' }} />
       <div style={{ display: 'flex', gap: 7 }}>
         {[0,1,2].map(i => (
           <span key={i} style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: '#c9a84c',
+            width: 8, height: 8, borderRadius: '50%', background: '#c9a84c',
             animation: `eh-bounce 1.1s ease-in-out ${i * 0.18}s infinite`,
           }} />
         ))}
@@ -38,28 +38,135 @@ function PageLoader() {
   );
 }
 
-const Home        = lazy(() => import('./pages/Home'));
-const Library     = lazy(() => import('./pages/Library'));
-const BookDetail  = lazy(() => import('./pages/BookDetail'));
-const Cart        = lazy(() => import('./pages/Cart'));
-const Login       = lazy(() => import('./pages/Login'));
-const Register    = lazy(() => import('./pages/Register'));
-const MyLibrary   = lazy(() => import('./pages/MyLibrary'));
-const Reader      = lazy(() => import('./pages/Reader'));
-const About       = lazy(() => import('./pages/About'));
-const Contact     = lazy(() => import('./pages/Contact'));
-const Admin       = lazy(() => import('./pages/Admin'));
-const Founder     = lazy(() => import('./pages/Founder'));
-const UserProfile = lazy(() => import('./pages/UserProfile'));
+/* ── Lazy page imports ── */
+const Home         = lazy(() => import('./pages/Home'));
+const Library      = lazy(() => import('./pages/Library'));
+const BookDetail   = lazy(() => import('./pages/BookDetail'));
+const Cart         = lazy(() => import('./pages/Cart'));
+const Login        = lazy(() => import('./pages/Login'));
+const Register     = lazy(() => import('./pages/Register'));
+const MyLibrary    = lazy(() => import('./pages/MyLibrary'));
+const Reader       = lazy(() => import('./pages/Reader'));
+const About        = lazy(() => import('./pages/About'));
+const Contact      = lazy(() => import('./pages/Contact'));
+const Admin        = lazy(() => import('./pages/Admin'));
+const Founder      = lazy(() => import('./pages/Founder'));
+const UserProfile  = lazy(() => import('./pages/UserProfile'));
 const AdminProfile = lazy(() => import('./pages/AdminProfile'));
-const FAQ         = lazy(() => import('./pages/FAQ'));
-const Terms       = lazy(() => import('./pages/Terms'));
-const Privacy     = lazy(() => import('./pages/Privacy'));
+const FAQ          = lazy(() => import('./pages/FAQ'));
+const Terms        = lazy(() => import('./pages/Terms'));
+const Privacy      = lazy(() => import('./pages/Privacy'));
+const Wishlist     = lazy(() => import('./pages/Wishlist'));
 
+/* ── Scroll to top on route change ── */
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   return null;
+}
+
+/* ── Visitor Tracker — server-side real IP via Cloud Function ── */
+let _visitorLogged = false;
+const TRACK_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitor';
+
+function VisitorTracker() {
+  const { pathname } = useLocation();
+  const { user } = useApp();
+
+  useEffect(() => {
+    if (_visitorLogged) return;
+    _visitorLogged = true;
+    (async () => {
+      try {
+        const ua = navigator.userAgent || '';
+        let device = 'Desktop';
+        if (/Mobi|Android|iPhone|iPad/i.test(ua)) device = 'Mobile';
+        else if (/Tablet|iPad/i.test(ua)) device = 'Tablet';
+        const referrer = document.referrer
+          ? (() => { try { return new URL(document.referrer).hostname; } catch { return document.referrer.slice(0, 100); } })()
+          : 'direct';
+        await fetch(TRACK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            page: pathname, referrer, userAgent: ua.slice(0, 300), device,
+            userEmail: user?.email || null,
+            userName:  user?.name  || null,
+          }),
+          keepalive: true,
+        });
+      } catch { /* silent */ }
+    })();
+  }, []); // eslint-disable-line
+
+  return null;
+}
+
+/* ── Custom Page Renderer — renders pages created in Admin → Page Editor ── */
+function CustomPageRenderer() {
+  const { pathname } = useLocation();
+  const editCtx = useEditMode();
+  const [pageMeta, setPageMeta] = useState(null);
+  const [content,  setContent]  = useState({});
+  const [loading,  setLoading]  = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setNotFound(false);
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'site_data', 'custom_pages'));
+        if (!snap.exists()) { setNotFound(true); setLoading(false); return; }
+        const pages = snap.data().pages || [];
+        const meta  = pages.find(p => p.path === pathname);
+        if (!meta)  { setNotFound(true); setLoading(false); return; }
+        setPageMeta(meta);
+        const cs = await getDoc(doc(db, 'site_data', meta.key));
+        setContent(cs.exists() ? cs.data() : {});
+      } catch { setNotFound(true); }
+      setLoading(false);
+    })();
+  }, [pathname]); // eslint-disable-line
+
+  if (loading) return (
+    <main style={{ minHeight:'60vh', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <div style={{ color:'var(--muted)', fontSize:'0.88rem' }}>Loading…</div>
+    </main>
+  );
+
+  if (notFound) return <NotFound />;
+
+  const cv = (editCtx?.editMode && editCtx?.pageKey === pageMeta?.key)
+    ? { ...content, ...editCtx.pageData } : content;
+
+  return (
+    <main>
+      <div className="page-header">
+        <div className="container">
+          <h1>{pageMeta.icon} <span className="gold-text">{pageMeta.label}</span></h1>
+          {pageMeta.desc && <p style={{ color:'var(--muted)', marginTop:8 }}>{pageMeta.desc}</p>}
+        </div>
+      </div>
+      <section className="section">
+        <div className="container">
+          <div className="card" style={{ padding:'32px 36px', maxWidth:780, margin:'0 auto', lineHeight:1.8 }}>
+            {cv?.body ? (
+              <div style={{ whiteSpace:'pre-wrap', color:'var(--text)' }}>{cv.body}</div>
+            ) : (
+              <div style={{ textAlign:'center', padding:'40px 0', color:'var(--muted)' }}>
+                <div style={{ fontSize:'2.5rem', marginBottom:12 }}>✏️</div>
+                <p>No content yet.</p>
+                <p style={{ fontSize:'0.82rem', marginTop:8 }}>
+                  Admin: click the <strong style={{ color:'var(--gold)' }}>✏️ Edit Page</strong> button at the bottom to add content.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function Layout({ children }) {
@@ -72,7 +179,7 @@ function Layout({ children }) {
   );
 }
 
-/* ── Global site controls: right-click, DevTools, copy blocking ── */
+/* ── Global site controls: right-click, DevTools, copy, print blocking ── */
 function SiteControls() {
   const { siteControls } = useApp();
   useEffect(() => {
@@ -109,7 +216,6 @@ function SiteControls() {
     return () => handlers.forEach(fn => fn());
   }, [siteControls]);
 
-  // Print block via CSS
   if (siteControls?.disablePrint) {
     const style = document.createElement('style');
     style.id = 'eh-noprint';
@@ -118,20 +224,17 @@ function SiteControls() {
   } else {
     document.getElementById('eh-noprint')?.remove();
   }
-
   return null;
 }
 
-/* ── Floating WhatsApp button — visible on all pages ── */
+/* ── Floating WhatsApp button ── */
 function WhatsAppFloat() {
-  const { user } = useApp();
   return (
     <a href="https://wa.me/254748255466" target="_blank" rel="noopener noreferrer"
       title="Chat with us on WhatsApp"
       style={{
         position:'fixed', bottom:24, right:24, zIndex:8000,
-        width:56, height:56, borderRadius:'50%',
-        background:'#25D366', color:'#fff',
+        width:56, height:56, borderRadius:'50%', background:'#25D366', color:'#fff',
         display:'flex', alignItems:'center', justifyContent:'center',
         boxShadow:'0 4px 20px rgba(37,211,102,0.45)',
         textDecoration:'none', transition:'transform 0.2s, box-shadow 0.2s',
@@ -144,6 +247,8 @@ function WhatsAppFloat() {
     </a>
   );
 }
+
+/* ── Maintenance gate ── */
 function MaintenanceGate({ children }) {
   const { siteControls, user } = useApp();
   if (siteControls?.maintenanceMode && user?.role !== 'admin' && user?.role !== 'superadmin') {
@@ -151,9 +256,7 @@ function MaintenanceGate({ children }) {
       <main style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:40, textAlign:'center', background:'var(--bg)' }}>
         <div style={{ fontSize:'3.5rem' }}>🚧</div>
         <h2 style={{ color:'var(--gold)' }}>Under Maintenance</h2>
-        <p style={{ color:'var(--muted)', maxWidth:380 }}>
-          Ellines Haven is currently undergoing scheduled maintenance. We'll be back shortly.
-        </p>
+        <p style={{ color:'var(--muted)', maxWidth:380 }}>Ellines Haven is currently undergoing scheduled maintenance. We'll be back shortly.</p>
         <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Contact: ellines.haven@gmail.com · WhatsApp: 0748 255 466</p>
       </main>
     );
@@ -161,7 +264,7 @@ function MaintenanceGate({ children }) {
   return children;
 }
 
-/* ── Suspension gate — shown instantly when admin suspends a logged-in user ── */
+/* ── Suspension gate ── */
 function SuspensionGate({ children }) {
   const { user, isUserSuspended, logout } = useApp();
   if (user && isUserSuspended && isUserSuspended(user.email)) {
@@ -169,9 +272,7 @@ function SuspensionGate({ children }) {
       <main style={{ minHeight:'100vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:40, textAlign:'center', background:'var(--bg)' }}>
         <div style={{ fontSize:'3.5rem' }}>🚫</div>
         <h2 style={{ color:'#e74c3c' }}>Account Suspended</h2>
-        <p style={{ color:'var(--muted)', maxWidth:380 }}>
-          Your account has been suspended by the administrator. You cannot access any content until your account is reinstated.
-        </p>
+        <p style={{ color:'var(--muted)', maxWidth:380 }}>Your account has been suspended. Contact support to reinstate it.</p>
         <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Contact support: ellines.haven@gmail.com</p>
         <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
       </main>
@@ -180,110 +281,102 @@ function SuspensionGate({ children }) {
   return children;
 }
 
-/* ── Global watermark overlay when admin enables watermarkAll ── */
+/* ── Watermark overlay ── */
 function WatermarkOverlay() {
   const { siteControls, user } = useApp();
   if (!siteControls?.watermarkAll || !user) return null;
   const text = `${user.name} · ${user.email} · Ellines Haven`;
   return (
-    <div aria-hidden="true" style={{
-      position:'fixed', inset:0, pointerEvents:'none', zIndex:9000,
-      overflow:'hidden', opacity:0.07,
-    }}>
+    <div aria-hidden="true" style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:9000, overflow:'hidden', opacity:0.07 }}>
       {Array.from({ length: 40 }).map((_, i) => (
         <span key={i} style={{
           position:'absolute',
-          top: `${(i % 8) * 13}%`,
-          left: `${Math.floor(i / 8) * 22}%`,
-          transform:'rotate(-30deg)',
-          fontSize:'0.72rem', fontWeight:700,
-          color:'#fff', whiteSpace:'nowrap',
-          letterSpacing:1, userSelect:'none',
+          top:`${(i % 8) * 13}%`, left:`${Math.floor(i / 8) * 22}%`,
+          transform:'rotate(-30deg)', fontSize:'0.72rem', fontWeight:700,
+          color:'#fff', whiteSpace:'nowrap', letterSpacing:1, userSelect:'none',
         }}>{text}</span>
       ))}
     </div>
   );
 }
 
+/* ── Root App ── */
 export default function App() {
   return (
     <AppProvider>
       <LanguageProvider>
         <EditModeProvider>
-        <BrowserRouter>
-          <ScrollToTop />
-          <SiteControls />
-          <WatermarkOverlay />
-          <WhatsAppFloat />
-          <WelcomePrompt />
-          <EllineaAI />
-          <EditToolbar />
-          <MaintenanceGate>
-          <SuspensionGate>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/read/:id" element={<Reader />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/*" element={
-                  <Layout>
-                    <Routes>
-                      <Route path="/"           element={<Home />} />
-                      <Route path="/library"    element={<Library />} />
-                      <Route path="/book/:id"   element={<BookDetail />} />
-                      <Route path="/cart"       element={<Cart />} />
-                      <Route path="/login"      element={<Login />} />
-                      <Route path="/register"   element={<Register />} />
-                      <Route path="/my-library" element={<MyLibrary />} />
-                      <Route path="/about"      element={<About />} />
-                      <Route path="/founder"    element={<Founder />} />
-                      <Route path="/contact"    element={<Contact />} />
-                      <Route path="/profile"       element={<UserProfile />} />
-                      <Route path="/admin-profile" element={<AdminProfile />} />
-                      <Route path="/faq"        element={<FAQ />} />
-                      <Route path="/terms"      element={<Terms />} />
-                      <Route path="/privacy"    element={<Privacy />} />
-                      <Route path="*"           element={<NotFound />} />
-                    </Routes>
-                  </Layout>
-                } />
-              </Routes>
-            </Suspense>
-          </SuspensionGate>
-          </MaintenanceGate>
-        </BrowserRouter>
+          <BrowserRouter>
+            <ScrollToTop />
+            <VisitorTracker />
+            <SiteControls />
+            <WatermarkOverlay />
+            <WhatsAppFloat />
+            <WelcomePrompt />
+            <EllineaAI />
+            <EditToolbar />
+            <MaintenanceGate>
+              <SuspensionGate>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    {/* Full-screen routes — no Navbar/Footer */}
+                    <Route path="/read/:id" element={<Reader />} />
+                    <Route path="/admin"    element={<Admin />} />
+
+                    {/* Layout routes — with Navbar/Footer */}
+                    <Route path="/*" element={
+                      <Layout>
+                        <Routes>
+                          <Route path="/"              element={<Home />} />
+                          <Route path="/library"       element={<Library />} />
+                          <Route path="/book/:id"      element={<BookDetail />} />
+                          <Route path="/cart"          element={<Cart />} />
+                          <Route path="/login"         element={<Login />} />
+                          <Route path="/register"      element={<Register />} />
+                          <Route path="/my-library"    element={<MyLibrary />} />
+                          <Route path="/about"         element={<About />} />
+                          <Route path="/founder"       element={<Founder />} />
+                          <Route path="/contact"       element={<Contact />} />
+                          <Route path="/profile"       element={<UserProfile />} />
+                          <Route path="/admin-profile" element={<AdminProfile />} />
+                          <Route path="/faq"           element={<FAQ />} />
+                          <Route path="/terms"         element={<Terms />} />
+                          <Route path="/privacy"       element={<Privacy />} />
+                          <Route path="/wishlist"      element={<Wishlist />} />
+                          {/* Catch-all: try custom pages first, then 404 */}
+                          <Route path="*" element={<CustomPageRenderer />} />
+                        </Routes>
+                      </Layout>
+                    } />
+                  </Routes>
+                </Suspense>
+              </SuspensionGate>
+            </MaintenanceGate>
+          </BrowserRouter>
         </EditModeProvider>
       </LanguageProvider>
     </AppProvider>
   );
 }
 
+/* ── 404 Not Found ── */
 function NotFound() {
   return (
     <div className="notfound-page">
       <div className="notfound-glow notfound-glow--a" />
       <div className="notfound-glow notfound-glow--b" />
-
       <div className="notfound-inner">
-        {/* Logo */}
         <img src="/logo-icon.png" alt="Ellines Haven" className="notfound-logo" />
-
-        {/* 404 number */}
         <div className="notfound-number" aria-hidden="true">404</div>
-
         <h1 className="notfound-title">Page Not Found</h1>
         <p className="notfound-sub">
-          The page you're looking for doesn't exist — or it may have moved.
-          Let's get you back to the stories.
+          The page you're looking for doesn't exist — or it may have moved. Let's get you back to the stories.
         </p>
-
-        {/* Quick links */}
         <div className="notfound-links">
           <a href="/" className="btn btn-primary">Go Home</a>
           <a href="/library" className="btn btn-outline">Browse Books</a>
           <a href="/contact" className="btn btn-ghost">Contact Us</a>
         </div>
-
-        {/* Decorative quote */}
         <div className="notfound-quote">
           <span>"Every wrong turn is still part of the journey."</span>
         </div>

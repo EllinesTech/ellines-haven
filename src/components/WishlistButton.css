@@ -1,0 +1,72 @@
+.wl-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--r-sm, 8px);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.wl-btn:hover {
+  border-color: var(--gold, #c9a84c);
+  color: var(--gold, #c9a84c);
+  background: rgba(201,168,76,0.07);
+}
+
+.wl-btn--active {
+  border-color: rgba(201,168,76,0.4);
+  color: var(--gold, #c9a84c);
+  background: rgba(201,168,76,0.1);
+}
+
+/* Sizes */
+.wl-btn--sm {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+
+.wl-btn--md {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.wl-btn--lg {
+  padding: 10px 18px;
+  font-size: 0.92rem;
+}
+
+.wl-btn-icon {
+  font-size: 1em;
+  line-height: 1;
+  /* Make inactive look dimmer */
+  filter: grayscale(0.4);
+  transition: filter 0.2s, transform 0.2s;
+}
+
+.wl-btn--active .wl-btn-icon,
+.wl-btn:hover .wl-btn-icon {
+  filter: none;
+  transform: scale(1.1);
+}
+
+.wl-btn-label {
+  font-weight: 500;
+}
+
+/* Small active indicator dot */
+.wl-btn-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold, #c9a84c);
+  border: 2px solid var(--bg, #0d0d1a);
+}

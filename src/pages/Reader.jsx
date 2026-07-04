@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { useReadingProgress } from '../hooks/useReadingProgress';
 import './Reader.css';
 
 /* ─────────────────────────────────────────────
@@ -81,6 +82,34 @@ export default function Reader() {
   const [zoom,      setZoom]      = useState(100);
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
+  const [resumeBanner, setResumeBanner] = useState(false);
+
+  // ── Reading progress ──────────────────────────────────────────────────────
+  const { getProgress, saveProgress } = useReadingProgress(user?.email, id);
+
+  // On mount, check for saved progress and offer to resume
+  useEffect(() => {
+    const saved = getProgress();
+    if (saved && saved.chapter > 0) {
+      setResumeBanner(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const handleResume = () => {
+    const saved = getProgress();
+    if (saved) {
+      setChapter(saved.chapter || 0);
+      setMode('text');
+    }
+    setResumeBanner(false);
+  };
+
+  // Save progress when chapter changes (text mode)
+  useEffect(() => {
+    if (chapter > 0) saveProgress(chapter, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapter]);
 
   // Ownership check — uses Firestore-backed library state from AppContext
   const checkOwned = useCallback(() => {
@@ -283,6 +312,33 @@ export default function Reader() {
           )}
         </div>
       </div>
+
+      {/* ── Resume reading banner ── */}
+      {resumeBanner && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 18px',
+          background: 'rgba(201,168,76,0.12)',
+          borderBottom: '1px solid rgba(201,168,76,0.25)',
+          fontSize: '0.85rem', flexWrap: 'wrap',
+        }}>
+          <span style={{ color: 'var(--gold)' }}>📖 You were reading this book. Resume where you left off?</span>
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ padding: '4px 14px', fontSize: '0.78rem' }}
+            onClick={handleResume}
+          >
+            Resume
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+            onClick={() => setResumeBanner(false)}
+          >
+            Start from beginning
+          </button>
+        </div>
+      )}
 
       {/* ── Watermark strip ── */}
       <div className="reader__watermark">

@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import EditableField from '../components/EditableField';
+import { useEditMode } from '../context/EditModeContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import './FAQ.css';
 
 const FAQS = [
@@ -187,7 +191,7 @@ export default function FAQ() {
         <div className="container faq-hero__inner">
           <span className="badge badge-gold">Help Centre</span>
           <h1>Frequently Asked <span className="gold-text">Questions</span></h1>
-          <p>Everything you need to know about Ellines Haven — payments, reading, accounts, and more.</p>
+          <p><EditableField field="faq_sub">Everything you need to know about Ellines Haven — payments, reading, accounts, and more.</EditableField></p>
 
           {/* Search */}
           <div className="faq-search">

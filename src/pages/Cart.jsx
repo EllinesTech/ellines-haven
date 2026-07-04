@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder } from '../firebase';
+import EditableField from '../components/EditableField';
+import { useEditMode } from '../context/EditModeContext';
 import './Cart.css';
 
 // Paystack public key — live key
@@ -449,7 +451,7 @@ export default function Cart() {
   // ── Payment screen ───────────────────────────────────────────────────────
   if (step === 'pay') return (
     <main className="cart-page">
-      <div className="page-header"><div className="container"><h1>Checkout</h1></div></div>
+      <div className="page-header"><div className="container"><h1><EditableField field="checkout_heading">Checkout</EditableField></h1></div></div>
       <div className="container">
         <div className="pay-layout">
           <div className="pay-form card">
@@ -563,14 +565,14 @@ export default function Cart() {
   // ── Cart screen ──────────────────────────────────────────────────────────
   return (
     <main className="cart-page">
-      <div className="page-header"><div className="container"><h1>Your Cart</h1><p>{cart.length} item{cart.length !== 1 ? 's' : ''}</p></div></div>
+      <div className="page-header"><div className="container"><h1><EditableField field="cart_heading">Your Cart</EditableField></h1><p>{cart.length} item{cart.length !== 1 ? 's' : ''}</p></div></div>
       <div className="container">
         {cart.length === 0
           ? <div className="cart-empty">
               <div className="cart-empty__icon">&#128722;</div>
-              <h3>Your cart is empty</h3>
-              <p>Add some books to get started.</p>
-              <Link to="/library" className="btn btn-primary">Browse Books</Link>
+              <h3><EditableField field="cart_empty_heading">Your cart is empty</EditableField></h3>
+              <p><EditableField field="cart_empty_sub">Add some books to get started.</EditableField></p>
+              <Link to="/library" className="btn btn-primary"><EditableField field="cart_browse_btn">Browse Books</EditableField></Link>
             </div>
           : <div className="cart-layout">
               <div className="cart-items">

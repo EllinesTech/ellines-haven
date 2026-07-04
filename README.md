@@ -11,7 +11,7 @@ Ellines Haven is a full-stack React web application for discovering, purchasing,
 - **Frontend:** React 18 + Vite
 - **Database:** Firebase Firestore (real-time)
 - **Auth:** Custom auth with localStorage + Firestore
-- **Hosting:** Vercel
+- **Hosting:** Cloudflare Pages (development) — production domain TBD
 - **Payments:** M-Pesa, Airtel Money, Visa/MC
 
 ## Features

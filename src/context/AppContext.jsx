@@ -99,6 +99,10 @@ export function AppProvider({ children }) {
   const [orders,   setOrdersState]   = useState([]);
   const [libLoaded, setLibLoaded]    = useState(false);
 
+  // ── Wishlist — per-user, stored in localStorage ───────────────────────────
+  const wishlistKey = user ? `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}` : null;
+  const [wishlist, setWishlistState] = useState(() => load(wishlistKey || 'eh_wishlist_guest', []));
+
   // ── Permissions + Suspension — stored in Firestore so they can't be bypassed ─
   const [userPerms,    setUserPermsState]    = useState(() => {
     try { return JSON.parse(localStorage.getItem('eh_user_perms') || '{}'); } catch { return {}; }
@@ -252,8 +256,29 @@ export function AppProvider({ children }) {
   const setUser = v => {
     setUserState(v);
     if (v) save('eh_user', v); else localStorage.removeItem('eh_user');
-    if (!v) setLibState([]);
+    if (!v) {
+      setLibState([]);
+      setWishlistState([]);
+    }
   };
+
+  // ── Wishlist helpers ──────────────────────────────────────────────────────
+  const toggleWishlist = (book) => {
+    if (!user) { window.location.href = '/login'; return; }
+    const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
+    const already = wishlist.some(b => b.id === book.id);
+    const next = already ? wishlist.filter(b => b.id !== book.id) : [...wishlist, { id: book.id, title: book.title, author: book.author, cover: book.cover, coverType: book.coverType, coverColor: book.coverColor, coverAccent: book.coverAccent, genre: book.genre, price: book.price, status: book.status, addedAt: Date.now() }];
+    setWishlistState(next);
+    save(key, next);
+  };
+  const isWishlisted = (id) => wishlist.some(b => b.id === id);
+
+  // Re-load wishlist when user changes
+  useEffect(() => {
+    if (!user?.email) { setWishlistState([]); return; }
+    const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
+    setWishlistState(load(key, []));
+  }, [user?.email]); // eslint-disable-line
 
   const updateSettings = patch => setSettings(prev => ({ ...prev, ...patch }));
 
@@ -488,6 +513,8 @@ export function AppProvider({ children }) {
       suspendedList, isUserSuspended, setSuspended,
       // Site controls
       siteControls, saveSiteControls,
+      // Wishlist
+      wishlist, toggleWishlist, isWishlisted,
     }}>
       {children}
     </Ctx.Provider>

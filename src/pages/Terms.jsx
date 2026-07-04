@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
+import EditableField from '../components/EditableField';
 import './Legal.css';
 
-const LAST_UPDATED = 'June 2025';
+const LAST_UPDATED = 'July 2026';
 
 export default function Terms() {
   return (
@@ -18,7 +19,7 @@ export default function Terms() {
 
         <div className="legal-intro card">
           <p>
-            Welcome to <strong>Ellines Haven</strong>. By accessing or using our platform — including browsing, creating an account, or purchasing any content — you agree to be bound by these Terms of Service. Please read them carefully.
+            <EditableField field="terms_intro">Welcome to <strong>Ellines Haven</strong>. By accessing or using our platform — including browsing, creating an account, or purchasing any content — you agree to be bound by these Terms of Service. Please read them carefully.</EditableField>
           </p>
           <p>
             If you have questions, contact us at <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a> or on WhatsApp at <a href="https://wa.me/254748255466">0748 255 466</a>.

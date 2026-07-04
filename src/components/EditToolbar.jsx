@@ -3,50 +3,77 @@ import { useApp } from '../context/AppContext';
 import { useLocation } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useState, useEffect } from 'react';
 
 /* Map routes to Firestore doc keys */
 const ROUTE_TO_KEY = {
-  '/':         'home_content',
-  '/about':    'about_content',
-  '/founder':  'founder_content',
-  '/contact':  'contact_content',
-  '/library':  'library_content',
-  '/cart':     'cart_content',
-  '/login':    'login_content',
-  '/register': 'register_content',
+  '/':          'home_content',
+  '/about':     'about_content',
+  '/founder':   'founder_content',
+  '/contact':   'contact_content',
+  '/library':   'library_content',
+  '/cart':      'cart_content',
+  '/login':     'login_content',
+  '/register':  'register_content',
+  '/faq':       'faq_content',
+  '/terms':     'terms_content',
+  '/privacy':   'privacy_content',
+  '/wishlist':  'wishlist_content',
 };
 
 const ROUTE_LABELS = {
-  '/':         '🏠 Home',
-  '/about':    'ℹ️ About',
-  '/founder':  '👤 Founder',
-  '/contact':  '📞 Contact',
-  '/library':  '📚 Library',
-  '/cart':     '🛒 Cart',
-  '/login':    '🔑 Sign In',
-  '/register': '📝 Register',
+  '/':          '🏠 Home',
+  '/about':     'ℹ️ About',
+  '/founder':   '👤 Founder',
+  '/contact':   '📞 Contact',
+  '/library':   '📚 Library',
+  '/cart':      '🛒 Cart',
+  '/login':     '🔑 Sign In',
+  '/register':  '📝 Register',
+  '/faq':       '❓ FAQ',
+  '/terms':     '📄 Terms',
+  '/privacy':   '🔒 Privacy',
+  '/wishlist':  '🔖 Wishlist',
 };
 
 export default function EditToolbar() {
   const { user } = useApp();
   const ctx = useEditMode();
   const { pathname } = useLocation();
+  const [customPageInfo, setCustomPageInfo] = useState(null);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+  // Check if the current path is a custom page
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (ROUTE_TO_KEY[pathname]) { setCustomPageInfo(null); return; }
+
+    getDoc(doc(db, 'site_data', 'custom_pages')).then(snap => {
+      if (!snap.exists()) return;
+      const pages = snap.data().pages || [];
+      const match = pages.find(p => p.path === pathname);
+      setCustomPageInfo(match || null);
+    }).catch(() => {});
+  }, [pathname, isAdmin]);
+
   if (!isAdmin) return null;
   if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return null;
 
-  const pageKey = ROUTE_TO_KEY[pathname];
+  // Determine the page key — built-in or custom
+  const builtInKey = ROUTE_TO_KEY[pathname];
+  const pageKey    = builtInKey || customPageInfo?.key || null;
+  const pageLabel  = ROUTE_LABELS[pathname] || customPageInfo?.label || null;
+
   const { editMode, dirty, saving, toast, enterEdit, exitEdit, saveAll } = ctx;
 
   const handleEdit = async () => {
     if (!pageKey) return;
-    // Load current Firestore values so the editor starts with real content
     let fsData = {};
     try {
       const snap = await getDoc(doc(db, 'site_data', pageKey));
       if (snap.exists()) fsData = snap.data();
-    } catch { /* use empty — page defaults will fill in */ }
+    } catch {}
     enterEdit(pageKey, fsData);
   };
 
@@ -103,7 +130,7 @@ export default function EditToolbar() {
           <>
             {pageKey ? (
               <button onClick={handleEdit} style={btn('var(--gold,#c9a84c)', '#000')}>
-                ✏️ Edit {ROUTE_LABELS[pathname] || 'Page'}
+                ✏️ Edit {pageLabel || 'Page'}
               </button>
             ) : (
               <span style={{ color:'rgba(255,255,255,0.35)', fontSize:'0.75rem', padding:'0 6px' }}>
@@ -117,7 +144,7 @@ export default function EditToolbar() {
         ) : (
           <>
             <span style={{ color:'rgba(201,168,76,0.85)', fontSize:'0.72rem', fontWeight:700, paddingLeft:4 }}>
-              ✏️ {ROUTE_LABELS[pathname]}
+              ✏️ {pageLabel || 'Page'}
             </span>
             {dirty && (
               <span style={{ background:'rgba(231,76,60,0.18)', color:'#e06c5a', fontSize:'0.68rem', padding:'2px 8px', borderRadius:10, border:'1px solid rgba(231,76,60,0.3)', flexShrink:0 }}>

@@ -57,6 +57,25 @@ export default function Contact() {
         status:    'new',
         createdAt: serverTimestamp(),
       });
+      
+      // Track activity and notify admins
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        await trackActivity({
+          category: NOTIFICATION_CATEGORIES.CONTACT_MESSAGE,
+          title: 'New Contact Message',
+          message: `${form.name} sent a message: "${form.subject}"`,
+          userEmail: form.email,
+          userName: form.name,
+          metadata: {
+            subject: form.subject,
+            messagePreview: form.message.substring(0, 100),
+          },
+          priority: 'normal',
+        });
+      } catch (err) {
+        console.error('[trackActivity]', err);
+      }
     } catch { /* silent — WhatsApp fallback still works */ }
 
     // 2. Open WhatsApp pre-filled as fallback

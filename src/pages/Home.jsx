@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import EditableImage from '../components/EditableImage';
+import NewsletterSignup from '../components/NewsletterSignup';
 import { GENRES } from '../data/books';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -517,6 +518,11 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ══════════════════════════════════════
+          NEWSLETTER
+      ══════════════════════════════════════ */}
+      <NewsletterSignup />
 
       {/* ══════════════════════════════════════
           CTA

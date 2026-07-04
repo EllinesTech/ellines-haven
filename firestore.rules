@@ -46,7 +46,20 @@ service cloud.firestore {
     match /users/{d}         { allow read, write: if true; }
 
     // ── Reviews — anyone can read, authenticated users submit ───────────────
-    match /reviews/{d} { allow read, write: if true; }
+    match /reviews/{bookId} {
+      allow read: if true;
+      allow write: if true;
+      match /entries/{entryId} {
+        allow read:  if true;
+        allow write: if true;
+      }
+    }
+
+    // ── Newsletter signups ───────────────────────────────────────────────────
+    match /newsletter_signups/{d} { allow read, write: if true; }
+
+    // ── Newsletter campaigns (sent by admin) ────────────────────────────────
+    match /newsletter_campaigns/{d} { allow read, write: if true; }
 
     // ── Notifications ────────────────────────────────────────────────────────
     match /notifications/{d}      { allow read, write: if true; }
@@ -55,6 +68,11 @@ service cloud.firestore {
     // ── Admin-only collections — write open for now, restrict when Firebase Auth is added ──
     match /admin_logs/{d}          { allow read, write: if true; }
     match /admin_notifications/{d} { allow read, write: if true; }
+    match /admin_preferences/{d}   { allow read, write: if true; }
+    match /activity_logs/{d}       { allow read, write: if true; }
+
+    // ── Visitor tracking — written by Cloud Function server-side ─────────────
+    match /site_visitors/{d} { allow read: if true; allow write: if true; }
 
     // ── Contact messages (support + notifications) ───────────────────────────
     match /contact_messages/{docId} {

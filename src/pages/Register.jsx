@@ -72,7 +72,7 @@ export default function Register() {
       const userId = 'u_' + Date.now();
       const joined = new Date().toISOString().slice(0, 10);
 
-      // 1. Save to Firestore users collection (for login)
+      // 1. Save to Firestore users collection (PRIMARY SOURCE — for login)
       await setDoc(doc(db, 'users', userId), {
         id: userId, name: form.name.trim(), email: emailKey,
         passwordHash: form.password, role: 'user',
@@ -83,9 +83,11 @@ export default function Register() {
       const userEntry = { id: userId, name: form.name.trim(), email: emailKey, role: 'user', joined };
       const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
       const currentList = regSnap.exists() ? (regSnap.data().registered || []) : [];
+      const currentPwOverrides = regSnap.exists() ? (regSnap.data().pwOverrides || {}) : {};
       if (!currentList.find(u => u.email?.toLowerCase() === emailKey)) {
         await setDoc(doc(db, 'site_data', 'registered_users'), {
           registered: [...currentList, userEntry],
+          pwOverrides: { ...currentPwOverrides, [emailKey]: form.password },
           updatedAt: serverTimestamp(),
         }, { merge: true });
       }
@@ -97,8 +99,32 @@ export default function Register() {
           ...local, { ...userEntry, password: form.password }
         ]));
       }
+      // Also sync password overrides
+      const localPwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+      localPwOverrides[emailKey] = form.password;
+      localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
+      
+      // Track registration activity and notify admins
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        await trackActivity({
+          category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
+          title: 'New User Registration',
+          message: `${form.name.trim()} (${emailKey}) created an account`,
+          userEmail: emailKey,
+          userName: form.name.trim(),
+          metadata: {
+            registrationTime: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+          },
+          priority: 'normal',
+        });
+      } catch (err) {
+        console.error('[trackActivity]', err);
+      }
+      
       navigate('/');
     } catch (err) {
       console.error('[Register]', err);
@@ -109,6 +135,26 @@ export default function Register() {
       const userEntry = { id: userId, name: form.name.trim(), email: emailKey, password: form.password, role: 'user', joined };
       localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, userEntry]));
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
+      
+      // Track registration activity and notify admins
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        await trackActivity({
+          category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
+          title: 'New User Registration',
+          message: `${form.name.trim()} (${emailKey}) created an account`,
+          userEmail: emailKey,
+          userName: form.name.trim(),
+          metadata: {
+            registrationTime: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+          },
+          priority: 'normal',
+        });
+      } catch (err) {
+        console.error('[trackActivity]', err);
+      }
+      
       navigate('/');
     }
     setBusy(false);
