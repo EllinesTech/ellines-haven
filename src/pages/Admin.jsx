@@ -18,6 +18,8 @@ const EmailPanel        = lazy(() => import('./admin-panels/EmailPanel'));
 const NewsletterPanel   = lazy(() => import('./admin-panels/NewsletterPanel'));
 const VisitorsPanel     = lazy(() => import('./admin-panels/VisitorsPanel'));
 const ActivityPanel     = lazy(() => import('./admin-panels/ActivityPanel'));
+const SMSPanel          = lazy(() => import('./admin-panels/SMSPanel'));
+const PaymentFeesPanel  = lazy(() => import('./admin-panels/PaymentFeesPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -2637,6 +2639,7 @@ export default function Admin() {
     { k:'reports',       label:'Reports',           icon:'📈', group:'admin' },
     { k:'visitors',      label:'Site Visitors',     icon:'🌍', group:'admin' },
     { k:'payments',      label:'Payment Methods',   icon:'💳', group:'admin' },
+    { k:'payfees',       label:'Fee Calculator',    icon:'🧮', group:'admin' },
     { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
     { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
     { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
@@ -3976,6 +3979,13 @@ export default function Admin() {
 
             </div>
           </div>
+        )}
+
+        {/* -- FEE CALCULATOR TAB -- */}
+        {tab === 'payfees' && (
+          <Suspense fallback={<PanelLoader />}>
+            <PaymentFeesPanel />
+          </Suspense>
         )}
 
         {/* -- PERMISSIONS TAB -- */}

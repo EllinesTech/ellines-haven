@@ -10,6 +10,30 @@ import './Cart.css';
 // Paystack public key — live key
 const PAYSTACK_PUBLIC_KEY = 'pk_live_081be2d1bdd05a16be4cc91b1267553a6444b463';
 
+// ── Paystack fee pass-through (customer bears the cost) ───────────────────────
+// Reverse-pricing formula: grossAmount = netPayout / (1 - feePercent)
+// This ensures that after Paystack deducts its fee, you receive exactly the book price.
+const PAYSTACK_FEES = {
+  mpesa:      0.015,  // 1.5%  — M-Pesa via Paystack
+  card:       0.029,  // 2.9%  — Local Visa / Mastercard / bank
+  intl_card:  0.038,  // 3.8%  — International cards + Apple Pay
+};
+
+/**
+ * Returns the integer amount (in KES cents) to pass to Paystack so that,
+ * after Paystack deducts its fee, you net exactly `desiredNetKes`.
+ */
+function calcPaystackAmount(desiredNetKes, channel) {
+  const feePercent = PAYSTACK_FEES[channel] ?? PAYSTACK_FEES.card;
+  const grossKes   = desiredNetKes / (1 - feePercent);
+  return Math.ceil(grossKes * 100); // integer subunits
+}
+
+const CHANNEL_LABELS = {
+  mpesa:     { label: 'M-Pesa',                    fee: '1.5%' },
+  card:      { label: 'Local Card / Bank',          fee: '2.9%' },
+  intl_card: { label: 'International Card / Apple Pay', fee: '3.8%' },
+};
 // Load Paystack inline script once and wait for it to be ready
 function loadPaystack() {
   return new Promise((resolve, reject) => {
@@ -149,14 +173,15 @@ async function notifyAdminPaymentIssue(order, reason, paystackRef) {
 export default function Cart() {
   const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls } = useApp();
   // steps: cart | pay | stk_waiting | pending | done | verifying | paypal_modal
-  const [step,            setStep]           = useState('cart');
-  const [method,          setMethod]         = useState('paystack');
-  const [phone,           setPhone]          = useState('');
-  const [ref,             setRef]            = useState('');
-  const [busy,            setBusy]           = useState(false);
-  const [stkError,        setStkError]       = useState('');
-  const [placedOrder,     setPlacedOrder]    = useState(null);
-  const [cancelledNotice, setCancelledNotice] = useState(''); // non-empty string = show notice
+  const [step,             setStep]            = useState('cart');
+  const [method,           setMethod]          = useState('paystack');
+  const [paystackChannel,  setPaystackChannel] = useState('mpesa'); // mpesa | card | intl_card
+  const [phone,            setPhone]           = useState('');
+  const [ref,              setRef]             = useState('');
+  const [busy,             setBusy]            = useState(false);
+  const [stkError,         setStkError]        = useState('');
+  const [placedOrder,      setPlacedOrder]     = useState(null);
+  const [cancelledNotice,  setCancelledNotice] = useState(''); // non-empty string = show notice
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
@@ -196,18 +221,26 @@ export default function Cart() {
       setPlacedOrder(order);
       await loadPaystack();
 
+      // Calculate gross amount so customer bears the Paystack fee
+      const paystackAmountCents = calcPaystackAmount(total, paystackChannel);
+      const grossKes = paystackAmountCents / 100;
+      const feeKes   = +(grossKes - total).toFixed(2);
+
       await new Promise((resolve) => {
         const handler = window.PaystackPop.setup({
           key:      PAYSTACK_PUBLIC_KEY,
           email:    user.email,
-          amount:   total * 100,
+          amount:   paystackAmountCents,
           currency: 'KES',
           ref:      order.id,
           metadata: {
-            orderId:   order.id,
-            userEmail: user.email,
-            userName:  user.name,
-            books:     cart.map(b => b.title).join(', '),
+            orderId:          order.id,
+            userEmail:        user.email,
+            userName:         user.name,
+            books:            cart.map(b => b.title).join(', '),
+            netPayout:        total,
+            paystackChannel,
+            paystackFeeKes:   feeKes,
           },
           callback: (response) => {
             // Payment successful — verify + unlock
@@ -476,15 +509,58 @@ export default function Cart() {
               <form onSubmit={submitPaystack}>
                 <div className="pay-mpesa-box">
                   <div style={{ background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderLeft:'3px solid var(--ok)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
-                    ⚡ <strong style={{ color:'var(--ok)' }}>Instant unlock</strong> — pay with M-Pesa, Visa, Mastercard, or bank. Books unlock automatically once payment confirms.
+                    ⚡ <strong style={{ color:'var(--ok)' }}>Instant unlock</strong> — books unlock automatically the moment payment confirms.
                   </div>
-                  <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
-                  <div className="pay-detail-row"><span>Accepted</span><strong>M-Pesa · Visa · Mastercard · Bank</strong></div>
-                  {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
+
+                  {/* Payment method selector — shows total per option, no fee language */}
+                  <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.8px' }}>
+                    Payment method
+                  </p>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18 }}>
+                    {[
+                      { key:'mpesa',     icon:'📱', label:'Pay with M-Pesa' },
+                      { key:'card',      icon:'💳', label:'Pay with Local Card' },
+                      { key:'intl_card', icon:'🌍', label:'Pay with International Card' },
+                    ].map(({ key, icon, label }) => {
+                      const totalKes = calcPaystackAmount(total, key) / 100;
+                      const active   = paystackChannel === key;
+                      return (
+                        <label key={key} style={{
+                          display:'flex', alignItems:'center', justifyContent:'space-between',
+                          padding:'12px 16px', borderRadius:'var(--r-sm)', cursor:'pointer',
+                          border: active ? '2px solid var(--gold)' : '1px solid var(--dim)',
+                          background: active ? 'rgba(201,168,76,0.07)' : 'transparent',
+                          transition:'all 0.15s',
+                        }}>
+                          <span style={{ display:'flex', alignItems:'center', gap:10 }}>
+                            <input
+                              type="radio"
+                              name="paystackChannel"
+                              value={key}
+                              checked={active}
+                              onChange={() => setPaystackChannel(key)}
+                              style={{ accentColor:'var(--gold)', width:15, height:15 }}
+                            />
+                            <span style={{ fontSize:'0.9rem', color: active ? 'var(--text)' : 'var(--muted)', fontWeight: active ? 600 : 400 }}>
+                              {icon} {label}
+                            </span>
+                          </span>
+                          <span style={{ fontWeight: 700, fontSize:'0.95rem', color: active ? 'var(--gold)' : 'var(--muted)' }}>
+                            KSh {(calcPaystackAmount(total, key) / 100).toFixed(2)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:4, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
                 </div>
-                <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
+                <div className="pay-total">
+                  <span>Total</span>
+                  <strong>KSh {(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}</strong>
+                </div>
                 <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy}>
-                  {busy ? 'Opening payment…' : `⚡ Pay KSh ${total.toLocaleString()}`}
+                  {busy ? 'Opening payment…' : `⚡ Pay KSh ${(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}`}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
