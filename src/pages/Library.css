@@ -413,6 +413,10 @@
   .lib-sidebar-backdrop { display: block; }
 
   .lib-sort-select { display: none; }
+
+  /* Mobile nav is 64px, not 80px */
+  .lib-type-bar { top: 64px; }
+  .lib-sidebar { top: 64px; height: calc(100vh - 64px); }
 }
 
 @media (max-width: 640px) {

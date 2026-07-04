@@ -8,7 +8,7 @@
 .wl-hero {
   position: relative;
   overflow: hidden;
-  padding: 56px 0 40px;
+  padding: 100px 0 40px;
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
 }
 
@@ -158,4 +158,8 @@
 @media (max-width: 600px) {
   .wl-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
   .wl-hero-inner { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 768px) {
+  .wl-hero { padding-top: 80px; }
 }

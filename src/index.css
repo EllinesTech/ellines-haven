@@ -66,3 +66,22 @@ select.field option { background:#1a1a30; color:#f0ece2; }
 }
 .btn-wa:hover { background: #1ebe5d; transform: translateY(-1px); color: #fff; }
 .btn-wa:active { transform: translateY(0); }
+
+/* ════════════════════════════════════════
+   GLOBAL RESPONSIVE
+════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Tighter section padding on mobile */
+  .section { padding: 56px 0; }
+  /* Smaller container side padding on very small screens */
+  .container { padding: 0 16px; }
+  /* Page header — reduce top padding to match 64px mobile nav */
+  .page-header { padding: 88px 0 40px; }
+}
+
+@media (max-width: 480px) {
+  .section { padding: 40px 0; }
+  .container { padding: 0 14px; }
+  /* Prevent any element from causing horizontal scroll */
+  body { overflow-x: hidden; }
+}

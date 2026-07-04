@@ -26,6 +26,9 @@
 @media (max-width:768px) {
   .bd-grid { grid-template-columns:1fr; gap:28px; }
   .bd-left { position:static; max-width:280px; margin:0 auto; }
+  .bd-meta { gap: 16px; flex-wrap: wrap; }
+  .bd-purchase { gap: 16px; }
+  .bd-wrap { padding: 90px 0 40px; }
 }
 
 /* Styled (CSS) cover on detail page */

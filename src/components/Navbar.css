@@ -16,6 +16,7 @@
   justify-content: space-between;
   gap: 20px;
   min-height: 80px;
+  overflow: hidden;
 }
 
 .nav__brand {
@@ -140,7 +141,37 @@
   .nav__brand-tagline { display: none; }
   .nav__brand-name { font-size: 1.15rem; }
   .nav__logo-img { height: 52px; max-width: none; }
-  .nav__inner { min-height: 64px; }
+  .nav__inner { min-height: 64px; overflow: hidden; }
+
+  /* On mobile keep only cart + burger visible in the action row;
+     hide the desktop-only extras (language switcher, wishlist bell,
+     admin bell, user-notifications bell, avatar button) */
+  .nav__actions > *:not(.nav__cart):not(.nav__burger):not(.nav__user) {
+    display: none;
+  }
+
+  /* Compact avatar button — hide the name label and chevron,
+     show only the avatar circle so it fits beside the burger */
+  .nav__avatar-btn span,
+  .nav__avatar-btn > svg,
+  .nav__super-badge {
+    display: none;
+  }
+  .nav__avatar-btn {
+    padding: 4px;
+  }
+
+  /* Dropdown stays usable — realign it to avoid going off-screen */
+  .nav__dropdown {
+    right: 0;
+    left: auto;
+    min-width: 180px;
+  }
+
+  /* Reduce gap so everything fits comfortably */
+  .nav__actions {
+    gap: 6px;
+  }
 }
 
 /* Super Admin styles */

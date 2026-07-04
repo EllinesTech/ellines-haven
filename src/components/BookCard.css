@@ -107,6 +107,16 @@
 }
 .bcard:hover .bcard__overlay { opacity: 1; }
 
+/* On touch devices, show a persistent "View" button instead of the hover overlay */
+@media (hover: none) {
+  .bcard__overlay {
+    opacity: 1;
+    background: transparent;
+    align-items: flex-end;
+    padding-bottom: 14px;
+  }
+}
+
 /* ── Badges ── */
 .bcard__new { position: absolute; top: 10px; left: 10px; z-index: 5; }
 .bcard__inspired-badge {
@@ -188,6 +198,14 @@
 .bcard__wishlist-btn:has(.wl-btn--active) {
   opacity: 1;
   transform: scale(1);
+}
+
+/* On touch devices the wishlist button is always visible since hover doesn't work */
+@media (hover: none) {
+  .bcard__wishlist-btn {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .bcard__wishlist-btn .wl-btn {
