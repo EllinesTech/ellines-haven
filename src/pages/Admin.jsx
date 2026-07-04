@@ -2867,7 +2867,7 @@ export default function Admin() {
         )}
 
         {/* All other tabs — scrollable with padding */}
-        {tab !== 'messages' && tab !== 'sms' && (
+        {tab !== 'messages' && tab !== 'livechat' && tab !== 'sms' && (
           <div className="adm-main-scroll">
         {addUserModal && (
           <div className="adm-overlay">
