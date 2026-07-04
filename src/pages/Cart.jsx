@@ -254,8 +254,23 @@ export default function Cart() {
                 clearCart();
                 setStep('done');
               })
-              .catch((err) => {
-                // Verification failed — mark order as failed + notify admin
+              .catch(async (err) => {
+                // Before giving up, check if the Paystack webhook already
+                // confirmed and unlocked the order (race condition where
+                // webhook fires before our verify call completes).
+                try {
+                  const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+                  const snap = await getDoc(fsDoc(db, 'orders', order.id));
+                  if (snap.exists() && snap.data().status === 'Completed') {
+                    // Webhook already handled it — treat as success
+                    clearCart();
+                    setStep('done');
+                    resolve();
+                    return;
+                  }
+                } catch { /* fall through to error display */ }
+
+                // Genuine failure — mark order + show error
                 updateDoc(doc(db, 'orders', order.id), {
                   status: 'PaymentFailed',
                   failReason: err.message || 'Verification failed',

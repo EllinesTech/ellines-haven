@@ -435,15 +435,32 @@ exports.verifyPaystackPayment = onCall(
 
     const secret = PAYSTACK_SECRET.value();
 
+    // ── First check Firestore — webhook may have already confirmed the order ──
+    if (orderId) {
+      try {
+        const orderSnap = await db.collection("orders").doc(orderId).get();
+        if (orderSnap.exists && orderSnap.data().status === "Completed") {
+          console.log("[verifyPaystack] order already completed by webhook:", orderId);
+          const d = orderSnap.data();
+          return { success: true, channel: d.paystackChannel || "unknown", amount: d.paidAmount || 0, source: "webhook" };
+        }
+      } catch (e) {
+        console.warn("[verifyPaystack] Firestore pre-check failed:", e.message);
+      }
+    }
+
     try {
+      console.log("[verifyPaystack] verifying reference:", reference);
       const res = await axios.get(
         `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
         { headers: { Authorization: `Bearer ${secret}` } }
       );
 
       const data = res.data?.data;
+      console.log("[verifyPaystack] Paystack status:", data?.status, "amount:", data?.amount, "channel:", data?.channel);
+
       if (!data || data.status !== "success") {
-        throw new HttpsError("failed-precondition", "Payment not successful");
+        throw new HttpsError("failed-precondition", `Payment status: ${data?.status || "unknown"}`);
       }
 
       // Unlock books if not already done (webhook may have already handled it)
@@ -460,12 +477,17 @@ exports.verifyPaystackPayment = onCall(
             paymentMethod:   "paystack",
           });
           await unlockBooksForUser(userEmail, order.items || []);
+          console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderId);
         }
       }
 
       return { success: true, channel: data.channel, amount: data.amount / 100 };
     } catch (err) {
-      const msg = err.response?.data?.message || err.message;
+      const status  = err.response?.status;
+      const psMsg   = err.response?.data?.message;
+      const msg     = psMsg || err.message;
+      console.error("[verifyPaystack] error — HTTP", status, ":", msg, err.response?.data);
+      if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", msg);
     }
   }
