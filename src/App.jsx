@@ -227,7 +227,58 @@ function SiteControls() {
   return null;
 }
 
-/* ── Floating WhatsApp button ── */
+/* ── Cookie Consent Banner ── */
+function CookieConsent() {
+  const [visible, setVisible] = useState(() => {
+    return !localStorage.getItem('eh_cookie_consent');
+  });
+
+  if (!visible) return null;
+
+  const accept = () => {
+    localStorage.setItem('eh_cookie_consent', 'accepted');
+    setVisible(false);
+  };
+  const decline = () => {
+    localStorage.setItem('eh_cookie_consent', 'declined');
+    setVisible(false);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9500,
+      background: 'rgba(13,13,26,0.97)', backdropFilter: 'blur(12px)',
+      borderTop: '1px solid rgba(201,168,76,0.2)',
+      padding: '18px 24px',
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+      gap: '12px 24px',
+    }}>
+      <div style={{ flex: 1, minWidth: 260 }}>
+        <p style={{ color: 'var(--text)', fontSize: '0.87rem', margin: 0, lineHeight: 1.6 }}>
+          🍪 <strong style={{ color: 'var(--gold)' }}>We use cookies &amp; local storage</strong> to keep you signed in, remember your cart, and personalise your reading experience.
+          By continuing to use Ellines Haven, you agree to our{' '}
+          <a href="/privacy" style={{ color: 'var(--gold)', textDecoration: 'underline' }}>Privacy Policy</a>
+          {' '}and{' '}
+          <a href="/terms" style={{ color: 'var(--gold)', textDecoration: 'underline' }}>Terms of Service</a>.
+        </p>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+        <button
+          onClick={decline}
+          style={{ padding: '8px 18px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--muted)', fontSize: '0.84rem', cursor: 'pointer' }}>
+          Decline
+        </button>
+        <button
+          onClick={accept}
+          style={{ padding: '8px 22px', borderRadius: 6, border: 'none', background: 'var(--gold)', color: '#0d0d1a', fontWeight: 700, fontSize: '0.84rem', cursor: 'pointer' }}>
+          Accept All
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 function WhatsAppFloat() {
   return (
     <a href="https://wa.me/254748255466" target="_blank" rel="noopener noreferrer"
@@ -332,6 +383,7 @@ export default function App() {
             <SiteControls />
             <WatermarkOverlay />
             <WhatsAppFloat />
+            <CookieConsent />
             <WelcomePrompt />
             <EllineaAI />
             <EditToolbar />

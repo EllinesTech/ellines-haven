@@ -108,3 +108,71 @@
   color: var(--muted);
   font-size: 0.72rem;
 }
+
+/* ── Auth alert messages ── */
+.auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-sm, 8px);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  animation: fadeUp 0.22s ease;
+}
+.auth-alert-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.form-error.auth-alert {
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  color: #ff6b6b;
+}
+.form-success.auth-alert {
+  background: rgba(39, 174, 96, 0.1);
+  border: 1px solid rgba(39, 174, 96, 0.35);
+  color: #55d98a;
+}
+
+/* ── Policy acceptance checkboxes ── */
+.auth-policy-box {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(201,168,76,0.18);
+  border-radius: var(--r-sm, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.auth-policy-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.55;
+  padding: 6px 0;
+}
+.auth-policy-check input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.auth-policy-check a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.auth-policy-check a:hover { opacity: 0.85; }
+.auth-policy-check + .auth-policy-check {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 4px;
+  padding-top: 10px;
+}

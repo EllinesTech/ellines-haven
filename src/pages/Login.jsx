@@ -5,6 +5,7 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import './Auth.css';
 
 /* ── The ONE hardcoded account is the super admin only.
@@ -87,6 +88,49 @@ function EyeIcon({ open }) {
     : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 }
 
+/* ── Password attempt tracking ──────────────────────────────────────────────── */
+const MAX_ATTEMPTS   = 5;
+const LOCKOUT_MS     = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_KEY    = 'eh_login_attempts';
+
+function getAttemptData(emailKey) {
+  try {
+    const all = JSON.parse(localStorage.getItem(LOCKOUT_KEY) || '{}');
+    return all[emailKey] || { count: 0, firstAt: null, lockedUntil: null };
+  } catch { return { count: 0, firstAt: null, lockedUntil: null }; }
+}
+
+function recordFailedAttempt(emailKey) {
+  try {
+    const all  = JSON.parse(localStorage.getItem(LOCKOUT_KEY) || '{}');
+    const data = all[emailKey] || { count: 0, firstAt: Date.now(), lockedUntil: null };
+    data.count = (data.count || 0) + 1;
+    data.firstAt = data.firstAt || Date.now();
+    if (data.count >= MAX_ATTEMPTS) {
+      data.lockedUntil = Date.now() + LOCKOUT_MS;
+    }
+    all[emailKey] = data;
+    localStorage.setItem(LOCKOUT_KEY, JSON.stringify(all));
+    return data;
+  } catch { return { count: 0 }; }
+}
+
+function clearAttempts(emailKey) {
+  try {
+    const all = JSON.parse(localStorage.getItem(LOCKOUT_KEY) || '{}');
+    delete all[emailKey];
+    localStorage.setItem(LOCKOUT_KEY, JSON.stringify(all));
+  } catch {}
+}
+
+function getLockoutMessage(data) {
+  if (!data?.lockedUntil) return null;
+  const remaining = data.lockedUntil - Date.now();
+  if (remaining <= 0) return null;
+  const mins = Math.ceil(remaining / 60000);
+  return `Too many failed attempts. Please try again in ${mins} minute${mins !== 1 ? 's' : ''}.`;
+}
+
 /* ── Forgot Password Modal ── */
 function ForgotPasswordModal({ onClose }) {
   const [email,       setEmail]       = useState('');
@@ -98,30 +142,50 @@ function ForgotPasswordModal({ onClose }) {
   const [err,         setErr]         = useState('');
   const [success,     setSuccess]     = useState('');
   const [showPw,      setShowPw]      = useState(false);
+  const [sending,     setSending]     = useState(false);
+  const [deliveredTo, setDeliveredTo] = useState([]); // ['email','sms']
 
   const handleSendCode = async e => {
-    e.preventDefault(); setErr('');
+    e.preventDefault(); setErr(''); setSending(true);
     // Check Firestore users first, then legacy localStorage
     const fsUser = await findUserInFirestore(email).catch(() => null);
     const legacyUsers = getAccounts();
     const found = fsUser || legacyUsers.find(a => a.email?.toLowerCase() === email.toLowerCase());
-    // Also allow admin email
     const isAdmin = email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-    if (!found && !isAdmin) { setErr('No account found with that email address.'); return; }
+    if (!found && !isAdmin) {
+      setErr('No account found with that email address. Please check and try again.');
+      setSending(false); return;
+    }
     const otp = String(Math.floor(100000 + Math.random() * 900000));
-    setCode(otp); setStep('sent');
+    setCode(otp);
+
+    // Attempt to send via Cloud Function (email + SMS if phone available)
+    const phone = fsUser?.phone || found?.phone || '';
+    const delivered = [];
+    try {
+      const fn = httpsCallable(getFunctions(), 'sendPasswordResetOtp');
+      const result = await fn({ email, phone, otp, name: fsUser?.name || found?.name || 'Valued Reader' });
+      if (result.data?.emailSent) delivered.push('email');
+      if (result.data?.smsSent)  delivered.push('SMS');
+    } catch (fnErr) {
+      // Cloud Function not yet deployed or no credentials — OTP is still set locally
+      console.warn('[ForgotPassword] Cloud Function unavailable:', fnErr.message);
+    }
+    setDeliveredTo(delivered);
+    setSending(false);
+    setStep('sent');
   };
 
   const handleVerifyCode = e => {
     e.preventDefault(); setErr('');
-    if (enteredCode !== code) { setErr('Incorrect code. Please try again.'); return; }
+    if (enteredCode !== code) { setErr('That code is incorrect. Please check and try again.'); return; }
     setStep('reset');
   };
 
   const handleReset = async e => {
     e.preventDefault(); setErr('');
-    if (newPw.length < 4) { setErr('Password must be at least 4 characters.'); return; }
-    if (newPw !== confirmPw) { setErr('Passwords do not match.'); return; }
+    if (newPw.length < 6) { setErr('Your password must be at least 6 characters.'); return; }
+    if (newPw !== confirmPw) { setErr('Passwords do not match. Please re-enter.'); return; }
     const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
     overrides[email.toLowerCase()] = newPw;
     localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
@@ -130,7 +194,9 @@ function ForgotPasswordModal({ onClose }) {
       const fsUser = await findUserInFirestore(email);
       if (fsUser) await setDoc(doc(db, 'users', fsUser.id), { passwordHash: newPw, updatedAt: serverTimestamp() }, { merge: true });
     } catch {}
-    setSuccess('Password reset successfully! You can now sign in.');
+    // Clear any lockout for this email
+    clearAttempts(email.toLowerCase());
+    setSuccess('Your password has been reset successfully. You can now sign in with your new password.');
     setStep('done');
   };
 
@@ -143,21 +209,34 @@ function ForgotPasswordModal({ onClose }) {
         </div>
         {step === 'email' && (
           <form onSubmit={handleSendCode} className="reset-body">
-            <p>Enter your account email and we'll send a reset code.</p>
-            {err && <div className="form-error">{err}</div>}
+            <p>Enter your account email and we'll send a 6-digit reset code to your email and mobile phone.</p>
+            {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>Email Address</label>
               <input className="field" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com" required autoFocus /></div>
-            <button type="submit" className="btn btn-primary" style={{width:'100%'}}>Send Reset Code</button>
+            <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={sending}>
+              {sending ? '⏳ Sending…' : '📤 Send Reset Code'}
+            </button>
           </form>
         )}
         {step === 'sent' && (
           <form onSubmit={handleVerifyCode} className="reset-body">
-            <p>A 6-digit code has been sent to <strong style={{color:'var(--gold)'}}>{email}</strong>.</p>
-            <div className="reset-demo-note">
-              <strong>Code:</strong> <strong style={{color:'var(--gold)',fontSize:'1.2em',letterSpacing:3}}>{code}</strong>
-              <br/><small>(In production this would arrive by email/SMS)</small>
-            </div>
-            {err && <div className="form-error">{err}</div>}
+            {deliveredTo.length > 0 ? (
+              <p>
+                A 6-digit reset code was sent to{' '}
+                {deliveredTo.includes('email') && <strong style={{color:'var(--gold)'}}>your email</strong>}
+                {deliveredTo.includes('email') && deliveredTo.includes('SMS') && ' and '}
+                {deliveredTo.includes('SMS') && <strong style={{color:'var(--gold)'}}>your mobile phone</strong>}.
+              </p>
+            ) : (
+              <div>
+                <p>We attempted to send a code to <strong style={{color:'var(--gold)'}}>{email}</strong>.</p>
+                <div className="reset-demo-note">
+                  <strong>Demo code:</strong> <strong style={{color:'var(--gold)',fontSize:'1.2em',letterSpacing:3}}>{code}</strong>
+                  <br/><small>Configure Africa's Talking credentials to enable real SMS/email delivery.</small>
+                </div>
+              </div>
+            )}
+            {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>Enter 6-Digit Code</label>
               <input className="field" type="text" maxLength="6" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="123456" required autoFocus style={{letterSpacing:4,fontSize:'1.2rem',textAlign:'center'}} /></div>
             <button type="submit" className="btn btn-primary" style={{width:'100%'}}>Verify Code</button>
@@ -167,10 +246,10 @@ function ForgotPasswordModal({ onClose }) {
         {step === 'reset' && (
           <form onSubmit={handleReset} className="reset-body">
             <p>Create a new password for <strong style={{color:'var(--gold)'}}>{email}</strong></p>
-            {err && <div className="form-error">{err}</div>}
+            {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>New Password</label>
               <div className="auth-pw-wrap">
-                <input className="field" type={showPw?'text':'password'} value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="Minimum 4 characters" required />
+                <input className="field" type={showPw?'text':'password'} value={newPw} onChange={e=>setNewPw(e.target.value)} placeholder="Minimum 6 characters" required />
                 <button type="button" className="auth-pw-eye" onClick={()=>setShowPw(v=>!v)}><EyeIcon open={showPw}/></button>
               </div></div>
             <div className="form-group"><label>Confirm</label>
@@ -182,7 +261,7 @@ function ForgotPasswordModal({ onClose }) {
           <div className="reset-body" style={{textAlign:'center'}}>
             <div style={{fontSize:'2.5rem',marginBottom:12}}>✅</div>
             <p style={{color:'var(--ok)',fontWeight:600,marginBottom:16}}>{success}</p>
-            <button className="btn btn-primary" style={{width:'100%'}} onClick={onClose}>Sign In Now</button>
+            <button className="btn btn-primary" style={{width:'100%'}} onClick={onClose}>Sign In Now →</button>
           </div>
         )}
       </div>
@@ -198,9 +277,14 @@ export default function Login() {
   const [form,      setForm]      = useState({ email:'', password:'' });
   const [showPw,    setShowPw]    = useState(false);
   const [err,       setErr]       = useState('');
+  const [successMsg,setSuccessMsg]= useState('');
   const [busy,      setBusy]      = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [lc,        setLc]        = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
+
+  const showLoginSuccess = (name) => {
+    setSuccessMsg(`Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`);
+  };
   const editCtx = useEditMode();
 
   useEffect(() => {
@@ -218,37 +302,63 @@ export default function Login() {
 
     const emailKey = form.email.trim().toLowerCase();
 
+    // ── Lockout check ───────────────────────────────────────────────────────
+    const attemptData = getAttemptData(emailKey);
+    if (attemptData.lockedUntil && Date.now() < attemptData.lockedUntil) {
+      setErr(getLockoutMessage(attemptData) || 'Account temporarily locked. Please try again later.');
+      setBusy(false); return;
+    }
+    // If lockout has expired, clear it
+    if (attemptData.lockedUntil && Date.now() >= attemptData.lockedUntil) {
+      clearAttempts(emailKey);
+    }
+
     try {
       /* 1. Check Firestore users collection first */
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
-        if (fsUser.suspended) { setErr('This account has been suspended. Contact support.'); setBusy(false); return; }
-        // Firestore passwordHash is the authoritative password (set by admin reset or registration)
-        // localStorage pwOverrides is a same-device fallback kept for legacy compatibility
+        if (fsUser.suspended) {
+          setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
+          setBusy(false); return;
+        }
         const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
         const localOverride = pwOverrides[emailKey];
-        // Accept: local override (if it matches what admin set on this device) OR Firestore hash
         const fsHash = fsUser.passwordHash || fsUser.password || '';
         const passwordOk = (localOverride && localOverride === form.password) || (fsHash && fsHash === form.password);
-        if (!fsHash && !localOverride) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
-        if (!passwordOk) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
+        if (!fsHash && !localOverride) {
+          setErr('This account has no password set. Please contact support.');
+          setBusy(false); return;
+        }
+        if (!passwordOk) {
+          const data = recordFailedAttempt(emailKey);
+          const remaining = MAX_ATTEMPTS - data.count;
+          if (data.lockedUntil) {
+            setErr(getLockoutMessage(data) || 'Too many failed attempts. Account locked.');
+          } else {
+            setErr(`Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`);
+          }
+          setBusy(false); return;
+        }
+        clearAttempts(emailKey);
         const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: fsUser.role || 'user' };
         setUser(sessionUser);
         await logLogin(fsUser.email, fsUser.name);
+        showLoginSuccess(fsUser.name);
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
       /* 2. Check admin credentials in Firestore */
       const adminAccount = await checkAdminCredentials(emailKey, form.password);
       if (adminAccount) {
+        clearAttempts(emailKey);
         const sessionUser = { id: adminAccount.id || 'admin01', name: adminAccount.name || 'Admin', email: adminAccount.email, role: adminAccount.role };
         setUser(sessionUser);
         await logLogin(adminAccount.email, adminAccount.name);
+        showLoginSuccess(adminAccount.name || 'Admin');
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
       /* 3. Legacy: check localStorage registered users OR Firestore site_data/registered_users ── */
-      // First try Firestore directly — don't rely on localStorage timing
       try {
         const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
         if (regSnap.exists()) {
@@ -259,36 +369,40 @@ export default function Login() {
             const localOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
             const fsPw = fsPwOverrides[emailKey] || localOverrides[emailKey] || regUser.password || '';
             
-            // Check suspension
             const suspFs = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
             const suspLeg = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
             const allSusp = [...new Set([...suspFs, ...suspLeg])];
-            if (allSusp.includes(emailKey) || regUser.suspended) { 
-              setErr('This account has been suspended.'); 
-              setBusy(false); 
-              return; 
+            if (allSusp.includes(emailKey) || regUser.suspended) {
+              setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
+              setBusy(false); return;
             }
             
-            if (!fsPw) { setErr('Account has no password set. Contact support.'); setBusy(false); return; }
-            if (fsPw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
+            if (!fsPw) {
+              setErr('This account has no password set. Please contact support.');
+              setBusy(false); return;
+            }
+            if (fsPw !== form.password) {
+              const data = recordFailedAttempt(emailKey);
+              const remaining = MAX_ATTEMPTS - data.count;
+              if (data.lockedUntil) {
+                setErr(getLockoutMessage(data) || 'Too many failed attempts. Account locked.');
+              } else {
+                setErr(`Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`);
+              }
+              setBusy(false); return;
+            }
+            clearAttempts(emailKey);
             
-            // ✅ MIGRATE to /users collection for next login (AUTO-FIX for admin-created accounts)
             const uid = regUser.id || ('u_' + Date.now());
             const joined = regUser.joined || new Date().toISOString().slice(0, 10);
             await setDoc(doc(db, 'users', uid), {
-              id: uid, 
-              name: regUser.name, 
-              email: emailKey,
-              role: regUser.role || 'user', 
-              passwordHash: fsPw,
-              joined,
-              migratedAt: serverTimestamp(), 
-              status: 'active',
+              id: uid, name: regUser.name, email: emailKey,
+              role: regUser.role || 'user', passwordHash: fsPw,
+              joined, migratedAt: serverTimestamp(), status: 'active',
             }, { merge: true }).catch((e) => {
               console.warn('[Login] Auto-migration to users collection failed:', e.message);
             });
             
-            // Also sync localStorage for this device
             localStorage.setItem('eh_registered_users', JSON.stringify(regData.registered));
             const localPwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
             localPwOverrides[emailKey] = fsPw;
@@ -297,6 +411,7 @@ export default function Login() {
             const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: regUser.role || 'user' };
             setUser(sessionUser);
             await logLogin(emailKey, regUser.name);
+            showLoginSuccess(regUser.name);
             navigate(from, { replace: true }); setBusy(false); return;
           }
         }
@@ -304,22 +419,36 @@ export default function Login() {
         console.warn('[Login] Firestore registered_users check failed:', e.message);
       }
 
-      /* 4. Last resort — localStorage registered users (fast path on repeat logins) */
+      /* 4. Last resort — localStorage registered users */
       const legacy = getAccounts();
       const legacyAccount = legacy.find(a => a.email?.toLowerCase() === emailKey);
       if (legacyAccount) {
-        if (legacyAccount.suspended) { setErr('This account has been suspended.'); setBusy(false); return; }
+        if (legacyAccount.suspended) {
+          setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
+          setBusy(false); return;
+        }
         const effectivePw = legacyAccount.password;
-        if (effectivePw !== form.password) { setErr('Wrong password. Please try again.'); setBusy(false); return; }
+        if (effectivePw !== form.password) {
+          const data = recordFailedAttempt(emailKey);
+          const remaining = MAX_ATTEMPTS - data.count;
+          if (data.lockedUntil) {
+            setErr(getLockoutMessage(data) || 'Too many failed attempts. Account locked.');
+          } else {
+            setErr(`Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`);
+          }
+          setBusy(false); return;
+        }
+        clearAttempts(emailKey);
         const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: legacyAccount.role || 'user' };
         setUser(sessionUser);
         await logLogin(legacyAccount.email, legacyAccount.name);
+        showLoginSuccess(legacyAccount.name);
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
-      setErr('No account found with that email address.');
+      setErr('No account found with that email address. Please check your email or create an account.');
     } catch (e) {
-      setErr('Sign in failed. Please try again.');
+      setErr('Something went wrong. Please check your connection and try again.');
       console.error('[Login]', e);
     }
     setBusy(false);
@@ -336,7 +465,16 @@ export default function Login() {
             <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
           <form onSubmit={submit}>
-            {err && <div className="form-error" style={{marginBottom:'16px'}}>{err}</div>}
+            {err && (
+              <div className="form-error auth-alert" role="alert" style={{marginBottom:'16px'}}>
+                <span className="auth-alert-icon">⚠️</span> {err}
+              </div>
+            )}
+            {successMsg && (
+              <div className="form-success auth-alert" role="status" style={{marginBottom:'16px'}}>
+                <span className="auth-alert-icon">✅</span> {successMsg}
+              </div>
+            )}
             <div className="form-group" style={{marginBottom:'16px'}}>
               <label>Email</label>
               <input className="field" type="email" placeholder="your@email.com"
