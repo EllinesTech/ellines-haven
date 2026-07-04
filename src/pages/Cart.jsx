@@ -580,29 +580,45 @@ export default function Cart() {
       <div className="container">
         <div className="pay-layout">
           <div className="pay-form card">
-            <h3>Choose Payment Method</h3>
-            <div className="pay-methods">
-              {show.paystack && (
-                <button className={'pay-btn' + (method === 'paystack' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paystack'); setStkError(''); }}>💳 Pay Online</button>
-              )}
-              {show.paypal && (
-                <button className={'pay-btn' + (method === 'paypal' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paypal'); setStkError(''); }}>🅿 PayPal</button>
-              )}
-              {show.airtel && (
-                <button className={'pay-btn' + (method === 'airtel' ? ' pay-btn--on' : '')} onClick={() => { setMethod('airtel'); setStkError(''); }}>Airtel Money</button>
-              )}
-              {show.wa && (
-                <button className={'pay-btn' + (method === 'wa' ? ' pay-btn--on' : '')} onClick={() => { setMethod('wa'); setStkError(''); }}>WhatsApp</button>
-              )}
-              {!show.paystack && !show.paypal && !show.airtel && !show.wa && (
-                <div style={{ color:'var(--muted)', fontSize:'0.88rem', padding:'20px 0', textAlign:'center' }}>
-                  No payment methods are currently active. Please contact us via WhatsApp.
-                </div>
-              )}
+
+            {/* ── Accepted payment labels ── */}
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:20, paddingBottom:16, borderBottom:'1px solid var(--dim)' }}>
+              {[
+                { icon:'📱', label:'M-Pesa' },
+                { icon:'💳', label:'Visa / Mastercard' },
+                { icon:'🏦', label:'Bank Transfer' },
+                { icon:'🌍', label:'International Cards' },
+                { icon:'🅿', label:'PayPal' },
+              ].map(({ icon, label }) => (
+                <span key={label} style={{
+                  display:'inline-flex', alignItems:'center', gap:6,
+                  padding:'5px 11px', borderRadius:20,
+                  background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)',
+                  fontSize:'0.78rem', color:'var(--muted)', fontWeight:600,
+                }}>
+                  {icon} {label}
+                </span>
+              ))}
+              <span style={{
+                display:'inline-flex', alignItems:'center', gap:6,
+                padding:'5px 11px', borderRadius:20,
+                background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.2)',
+                fontSize:'0.78rem', color:'var(--ok)', fontWeight:600,
+              }}>
+                ✓ Secure · Instant unlock
+              </span>
             </div>
 
+            {/* ── PayPal tab (only if enabled) ── */}
+            {show.paypal && (
+              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                <button className={'pay-btn' + (method !== 'paypal' ? '' : ' pay-btn--on')} onClick={() => { setMethod('paystack'); setStkError(''); }} style={{ flex:1 }}>💳 Card / M-Pesa</button>
+                <button className={'pay-btn' + (method === 'paypal' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paypal'); setStkError(''); }} style={{ flex:1 }}>🅿 PayPal</button>
+              </div>
+            )}
+
             {/* ── Paystack: M-Pesa / Card / Bank ── */}
-            {method === 'paystack' && (
+            {method !== 'paypal' && (
               <form onSubmit={submitPaystack}>
                 <div className="pay-mpesa-box">
                   <div style={{ background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderLeft:'3px solid var(--ok)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
