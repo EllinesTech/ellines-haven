@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import './Cart.css';
 
@@ -126,6 +126,23 @@ function StkWaiting({ order, onSuccess, onFailed, onCancel }) {
   );
 }
 
+// ── Notify admin of payment issue (cancel / failure) ──────────────────────────
+async function notifyAdminPaymentIssue(order, reason, paystackRef) {
+  try {
+    await setDoc(doc(db, 'admin_notifications', (order?.id || 'unk') + '_issue_' + Date.now()), {
+      type:        'payment_issue',
+      orderId:     order?.id,
+      userName:    order?.userName,
+      userEmail:   order?.userEmail,
+      total:       order?.total,
+      reason,
+      paystackRef: paystackRef || null,
+      status:      'unread',
+      createdAt:   serverTimestamp(),
+    });
+  } catch {}
+}
+
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
   const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls } = useApp();
@@ -164,7 +181,7 @@ export default function Cart() {
 
   const checkout = () => { if (!user) navigate('/login'); else setStep('pay'); };
 
-  // ── Paystack payment flow ────────────────────────────────────────────────────
+  // ── Paystack payment flow ─────────────────────────────────────────────────
   const submitPaystack = async e => {
     e.preventDefault();
     setStkError('');
@@ -188,7 +205,7 @@ export default function Cart() {
             books:     cart.map(b => b.title).join(', '),
           },
           callback: (response) => {
-            // Paystack v1 requires a plain (non-async) callback
+            // Payment successful — verify + unlock
             setStep('verifying');
             callVerifyPaystack({
               reference: response.reference,
@@ -200,12 +217,28 @@ export default function Cart() {
                 setStep('done');
               })
               .catch((err) => {
-                setStkError(err.message || 'Verification failed. Contact support with ref: ' + response.reference);
+                // Verification failed — mark order as failed + notify admin
+                updateDoc(doc(db, 'orders', order.id), {
+                  status: 'PaymentFailed',
+                  failReason: err.message || 'Verification failed',
+                  updatedAt: serverTimestamp(),
+                }).catch(() => {});
+                notifyAdminPaymentIssue(order, 'Verification failed: ' + (err.message || 'unknown error'), response.reference);
+                setStkError('Payment received but verification failed. Contact support with ref: ' + response.reference);
                 setStep('pay');
               })
               .finally(resolve);
           },
           onClose: () => {
+            // User closed/cancelled the payment popup
+            if (order?.id) {
+              updateDoc(doc(db, 'orders', order.id), {
+                status: 'Cancelled',
+                cancelledAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              }).catch(() => {});
+              notifyAdminPaymentIssue(order, 'Customer cancelled payment', null);
+            }
             setStkError('Payment was cancelled.');
             resolve();
           },

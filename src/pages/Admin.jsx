@@ -1572,6 +1572,244 @@ function ItemSummary({ item }) {
   return <td style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{item.id}</td>;
 }
 
+// ── Orders Panel Component ────────────────────────────────────────────────────
+function OrdersPanel({
+  allOrders, filteredOrders, orderFilter, setOrderFilter,
+  pendingCount, revenue, isSuper,
+  handleConfirmOrder, handleRejectOrder, handleArchiveOrder, handleDeleteOrder,
+  books, unlockBooksForBuyer, showToast, setTick, setLiveOrders, syncOrders, user,
+}) {
+  const [selected, setSelected] = useState([]); // bulk selection
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // Only manual-method pending orders need admin verification
+  const manualPending = allOrders.filter(o =>
+    o.status === 'Pending' && !['paystack','mpesa_stk','card_auto'].includes(o.method)
+  );
+
+  const toggleSelect = (id) =>
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const toggleAll = () => {
+    const ids = filteredOrders.map(o => o.id);
+    setSelected(prev => prev.length === ids.length ? [] : ids);
+  };
+
+  const bulkDelete = async () => {
+    if (!selected.length) return;
+    const label = selected.length === 1 ? '1 order' : `${selected.length} orders`;
+    if (!window.confirm(`Move ${label} to Trash?`)) return;
+    setBulkBusy(true);
+    for (const id of selected) await handleDeleteOrder(id, true); // pass silent=true
+    setSelected([]);
+    setBulkBusy(false);
+    showToast(`🗑️ ${label} moved to Trash`);
+  };
+
+  const bulkArchive = async () => {
+    if (!selected.length) return;
+    const label = selected.length === 1 ? '1 order' : `${selected.length} orders`;
+    if (!window.confirm(`Archive ${label}?`)) return;
+    setBulkBusy(true);
+    for (const id of selected) await handleArchiveOrder(id);
+    setSelected([]);
+    setBulkBusy(false);
+    showToast(`📦 ${label} archived`);
+  };
+
+  const deleteUnconfirmed = async () => {
+    const ids = allOrders.filter(o => o.status === 'Pending').map(o => o.id);
+    if (!ids.length) { showToast('No unconfirmed orders'); return; }
+    if (!window.confirm(`Delete all ${ids.length} unconfirmed (Pending) orders?`)) return;
+    setBulkBusy(true);
+    for (const id of ids) await handleDeleteOrder(id, true);
+    setBulkBusy(false);
+    showToast(`🗑️ ${ids.length} unconfirmed orders deleted`);
+  };
+
+  return (
+    <div className="adm-page" style={{ maxWidth:'100%', overflowX:'hidden' }}>
+      {/* Header */}
+      <div className="adm-page-head" style={{ flexWrap:'wrap', gap:8 }}>
+        <div>
+          <h1>Orders</h1>
+          <span className="adm-page-sub">
+            {allOrders.length} orders · KSh {revenue.toLocaleString()} revenue · {pendingCount} pending
+          </span>
+        </div>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <button className="btn btn-sm" style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}
+            onClick={deleteUnconfirmed} disabled={bulkBusy}>
+            🗑 Delete All Unconfirmed
+          </button>
+          {isSuper && (
+            <button className="btn btn-ghost btn-sm" style={{ color:'var(--err)', borderColor:'rgba(231,76,60,0.4)' }}
+              onClick={() => {
+                if (!window.confirm('Clear ALL orders from Firestore? This cannot be undone.')) return;
+                // Delete from Firestore (handled via individual handleDeleteOrder)
+                allOrders.forEach(o => handleDeleteOrder(o.id, true));
+                showToast('All orders cleared');
+              }} disabled={bulkBusy}>
+              Clear All Orders
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Only show manual verification banner for non-Paystack pending orders */}
+      {manualPending.length > 0 && (
+        <div className="adm-alert-box" style={{ marginBottom:12 }}>
+          <strong>⚠ {manualPending.length} manual order{manualPending.length > 1 ? 's' : ''} need verification.</strong>
+          {' '}Check the M-Pesa/Airtel reference code and confirm payment to unlock books for the customer.
+        </div>
+      )}
+
+      {/* Filters + Bulk Actions toolbar */}
+      <div className="adm-toolbar card" style={{ gap:8, flexWrap:'wrap', alignItems:'center' }}>
+        {['all','completed','pending','cancelled','rejected','refunded'].map(f => (
+          <button key={f} className={'adm-filter-btn' + (orderFilter === f ? ' on' : '')}
+            onClick={() => { setOrderFilter(f); setSelected([]); }}>
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+            {f === 'pending' && pendingCount > 0 && <span className="adm-filter-dot">{pendingCount}</span>}
+          </button>
+        ))}
+        <span className="adm-toolbar-count" style={{ marginLeft:'auto' }}>{filteredOrders.length} orders</span>
+        {selected.length > 0 && (
+          <div style={{ display:'flex', gap:6, alignItems:'center', marginLeft:8 }}>
+            <span style={{ fontSize:'0.82rem', color:'var(--gold)', fontWeight:600 }}>{selected.length} selected</span>
+            <button className="btn btn-sm" style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}
+              onClick={bulkDelete} disabled={bulkBusy}>🗑 Delete</button>
+            <button className="btn btn-sm" style={{ background:'rgba(100,116,139,0.1)', color:'var(--muted)', border:'1px solid var(--dim)' }}
+              onClick={bulkArchive} disabled={bulkBusy}>📦 Archive</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelected([])}>✕ Clear</button>
+          </div>
+        )}
+      </div>
+
+      {/* Responsive table wrapper */}
+      <div className="card" style={{ overflowX:'auto', maxWidth:'100%' }}>
+        <table className="adm-table" style={{ minWidth:700, tableLayout:'auto' }}>
+          <thead>
+            <tr>
+              <th style={{ width:32 }}>
+                <input type="checkbox"
+                  checked={selected.length === filteredOrders.length && filteredOrders.length > 0}
+                  onChange={toggleAll} title="Select all" />
+              </th>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Books</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredOrders.map(o => {
+              const isPending    = o.status === 'Pending';
+              const isCancelled  = o.status === 'Cancelled' || o.status === 'PaymentFailed';
+              const isAuto       = ['paystack','mpesa_stk'].includes(o.method);
+              const bookNames    = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '—');
+              const amount       = o.total || o.amount || 0;
+              const customer     = o.userName || o.customer || '—';
+              const email        = o.userEmail || o.email || '';
+              const isSelected   = selected.includes(o.id);
+              return (
+                <tr key={o.id}
+                  style={{
+                    background: isSelected ? 'rgba(201,168,76,0.07)'
+                      : isCancelled ? 'rgba(231,76,60,0.04)'
+                      : isPending && !isAuto ? 'rgba(201,168,76,0.04)'
+                      : undefined,
+                  }}>
+                  <td><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(o.id)} /></td>
+                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{o.id?.slice(0,16)}…</code></td>
+                  <td>
+                    <strong style={{ fontSize:'0.85rem' }}>{customer}</strong>
+                    <span style={{ display:'block', fontSize:'0.73rem', color:'var(--muted)' }}>{email}</span>
+                  </td>
+                  <td style={{ maxWidth:140, fontSize:'0.78rem', color:'var(--muted)' }}>{bookNames}</td>
+                  <td><strong style={{ color:'var(--gold)' }}>KSh {amount.toLocaleString()}</strong></td>
+                  <td>
+                    <span className="adm-method-badge" style={{ fontSize:'0.72rem' }}>{o.method}</span>
+                    {isAuto && <span style={{ display:'block', fontSize:'0.68rem', color:'var(--ok)', marginTop:2 }}>auto</span>}
+                  </td>
+                  <td>
+                    <span className={'adm-status adm-status--' + (o.status||'').toLowerCase()} style={{ fontSize:'0.75rem' }}>
+                      {o.status}
+                    </span>
+                    {isCancelled && o.failReason && (
+                      <span style={{ display:'block', fontSize:'0.68rem', color:'var(--err)', marginTop:2 }}>
+                        {o.failReason.slice(0,40)}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ color:'var(--muted)', fontSize:'0.75rem', whiteSpace:'nowrap' }}>
+                    {o.date ? o.date.slice(0,10) : '—'}
+                  </td>
+                  <td className="adm-actions" style={{ whiteSpace:'nowrap' }}>
+                    {/* Manual verification only for non-auto pending orders */}
+                    {isPending && !isAuto && (
+                      <>
+                        <button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>
+                          ✅ Confirm
+                        </button>
+                        <button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>
+                          ✕ Reject
+                        </button>
+                      </>
+                    )}
+                    {/* Admin can manually confirm auto-payment orders if system had issues */}
+                    {isPending && isAuto && (
+                      <button className="adm-act-btn adm-act-confirm" style={{ opacity:0.7, fontSize:'0.72rem' }}
+                        onClick={() => handleConfirmOrder(o.id, customer)}
+                        title="Force-confirm if auto-payment webhook failed">
+                        ⚡ Force Confirm
+                      </button>
+                    )}
+                    <button className="adm-act-btn adm-act-archive" onClick={() => handleArchiveOrder(o.id)}>📦</button>
+                    <button className="adm-act-btn adm-act-del" onClick={() => handleDeleteOrder(o.id)}>🗑️</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {filteredOrders.length === 0 && <div className="adm-empty">No orders match this filter.</div>}
+      </div>
+
+      {/* Manual Unlock Tool */}
+      <div className="card" style={{ padding:24, marginTop:24, border:'1px solid rgba(201,168,76,0.2)' }}>
+        <h3 style={{ marginBottom:6, fontSize:'0.95rem' }}>Manual Book Unlock</h3>
+        <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>
+          Use this when a customer has paid but books weren't unlocked automatically (e.g. webhook missed).
+        </p>
+        <ManualUnlockForm books={books} showToast={showToast} onUnlock={async (email, bookIds) => {
+          const emailLow = email.trim().toLowerCase();
+          const booksToUnlock = bookIds.map(bid => books.find(b => b.id === bid)).filter(Boolean).map(b => ({ ...b, downloadUnlocked: true }));
+          if (!booksToUnlock.length) { showToast('No valid books selected'); return; }
+          try {
+            await unlockBooksForBuyer(emailLow, booksToUnlock);
+            const manualOrder = {
+              id: 'ORD-MANUAL-' + Date.now(),
+              userId: null, userName: emailLow.split('@')[0], userEmail: emailLow,
+              items: booksToUnlock.map(b => ({ id: b.id, title: b.title, price: b.price })),
+              total: booksToUnlock.reduce((s, b) => s + (b.price || 0), 0),
+              method: 'manual', ref: 'MANUAL-UNLOCK', status: 'Completed',
+              date: new Date().toISOString().slice(0, 10), createdAt: serverTimestamp(),
+            };
+            await setDoc(doc(db, 'orders', manualOrder.id), manualOrder);
+            showToast('✅ Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow);
+            setTick(t => t + 1);
+          } catch (err) { showToast('❌ Unlock failed: ' + err.message); }
+        }} />
+      </div>
+    </div>
+  );
+}
+
 function ArchivesPanel({ db, showToast, onRestore }) {
   const [items,      setItems]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -2077,20 +2315,17 @@ export default function Admin() {
   };
 
   // Delete order — moves to trash (soft delete)
-  const handleDeleteOrder = async (orderId) => {
-    if (!window.confirm('Move this order to Trash? It can be restored later.')) return;
+  const handleDeleteOrder = async (orderId, silent = false) => {
+    if (!silent && !window.confirm('Move this order to Trash? It can be restored later.')) return;
     try {
       const order = allOrders.find(o => o.id === orderId);
       if (!order) return;
       await setDoc(doc(db, 'trash', orderId), {
-        ...order,
-        type: 'order',
-        trashedAt: serverTimestamp(),
-        trashedBy: user?.email,
+        ...order, type: 'order', trashedAt: serverTimestamp(), trashedBy: user?.email,
       });
       await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
       setLiveOrders(prev => prev.filter(o => o.id !== orderId));
-      showToast('🗑️ Order moved to Trash');
+      if (!silent) showToast('🗑️ Order moved to Trash');
     } catch (e) { showToast('❌ Delete failed: ' + e.message); }
   };
 
@@ -2682,156 +2917,27 @@ export default function Admin() {
         {tab === 'photos' && (
           <PhotosTab showToast={showToast} />
         )}
-        {/* ORDERS */}
         {tab === 'orders' && (
-          <div className="adm-page">
-            <div className="adm-page-head">
-              <div>
-                <h1>Orders</h1>
-                <span className="adm-page-sub">{allOrders.length} orders — KSh {revenue.toLocaleString()} revenue — {pendingCount} pending verification</span>
-              </div>
-              {/* Super Admin: clear stale/orphaned orders */}
-              {isSuper && (
-                <button className="btn btn-ghost btn-sm" style={{color:'var(--err)',borderColor:'rgba(231,76,60,0.4)'}}
-                  onClick={() => {
-                    if (!window.confirm('Clear ALL stale/orphaned orders from storage? Real pending orders will also be removed.')) return;
-                    localStorage.removeItem('eh_orders');
-                    setLiveOrders([]);
-                    syncOrders();
-                    setTick(t => t + 1);
-                    showToast('All orders cleared — users can re-order');
-                  }}>
-                  Clear All Stale Orders
-                </button>
-              )}
-            </div>
-            {pendingCount > 0 && (
-              <div className="adm-alert-box">
-                <strong>{pendingCount} order{pendingCount > 1 ? 's' : ''} waiting for your verification.</strong> Check the M-Pesa reference code and confirm payment to unlock the books for the customer.
-              </div>
-            )}
-            <div className="adm-toolbar card" style={{ gap:8 }}>
-              {['all','completed','pending','rejected','refunded'].map(f => (
-                <button key={f} className={'adm-filter-btn' + (orderFilter === f ? ' on' : '')} onClick={() => setOrderFilter(f)}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                  {f === 'pending' && pendingCount > 0 && <span className="adm-filter-dot">{pendingCount}</span>}
-                </button>
-              ))}
-              <span className="adm-toolbar-count" style={{ marginLeft:'auto' }}>{filteredOrders.length} orders</span>
-            </div>
-            <div className="card" style={{ overflow:'hidden' }}>
-              <table className="adm-table">
-                <thead>
-                  <tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Method</th><th>Ref / Code</th><th>Status</th><th>Date</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {filteredOrders.map(o => {
-                    const isPending = o.status === 'Pending';
-                    const bookNames = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '');
-                    const amount    = o.total  || o.amount || 0;
-                    const customer  = o.userName || o.customer || '';
-                    const email     = o.userEmail || o.email || '';
-                    return (
-                      <tr key={o.id} style={isPending ? { background:'rgba(201,168,76,0.04)' } : {}}>
-                        <td><code className="adm-code">{o.id}</code></td>
-                        <td>
-                          <strong>{customer}</strong>
-                          <span style={{ display:'block', fontSize:'0.75rem', color:'var(--muted)' }}>{email}</span>
-                        </td>
-                        <td style={{ maxWidth:180, fontSize:'0.8rem' }}>{bookNames}</td>
-                        <td><strong>KSh {amount.toLocaleString()}</strong></td>
-                        <td><span className="adm-method-badge">{o.method}</span></td>
-                        <td>
-                          {o.ref
-                            ? <code className="adm-code" style={{ color:'var(--gold)', letterSpacing:1 }}>{o.ref}</code>
-                            : <span style={{ color:'var(--muted)', fontSize:'0.78rem' }}></span>
-                          }
-                        </td>
-                        <td><span className={'adm-status adm-status--' + o.status.toLowerCase()}>{o.status}</span>
-                          {o.status === 'Completed' && o.userName && (
-                            <span style={{ display:'block', fontSize:'0.7rem', color:'var(--ok)', marginTop:3 }}>
-                              Owned by {o.userName}
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ color:'var(--muted)', fontSize:'0.78rem' }}>{o.date ? o.date.slice(0,10) : ''}</td>
-                        <td className="adm-actions">
-                          {isPending && (
-                            <>
-                              <button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>
-                                ✅ Confirm
-                              </button>
-                              <button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>
-                                ✕ Reject
-                              </button>
-                            </>
-                          )}
-                          <button className="adm-act-btn adm-act-archive"
-                            onClick={() => handleArchiveOrder(o.id)}
-                            title="Archive this order — removes from active list, stored in Archives">
-                            📦 Archive
-                          </button>
-                          <button className="adm-act-btn adm-act-del"
-                            onClick={() => handleDeleteOrder(o.id)}
-                            title="Move to Trash — can be restored">
-                            🗑️ Delete
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {filteredOrders.length === 0 && <div className="adm-empty">No orders match this filter.</div>}
-            </div>
-
-            {/* Manual Unlock Tool — Super Admin / Admin can unlock books for any user by email */}
-            {/* This handles cases where user's order is from a different port/session */}
-            <div className="card" style={{padding:24,marginTop:24,border:'1px solid rgba(201,168,76,0.2)'}}>
-              <h3 style={{marginBottom:6,fontSize:'0.95rem'}}>Manual Book Unlock</h3>
-              <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>
-                Use this when a customer has paid but their order is not visible (e.g. placed on a different browser session).
-                Enter their email and select the book to unlock directly.
-              </p>
-              <ManualUnlockForm books={books} showToast={showToast} onUnlock={async (email, bookIds) => {
-                const emailLow = email.trim().toLowerCase();
-                const booksToUnlock = bookIds
-                  .map(bid => books.find(b => b.id === bid))
-                  .filter(Boolean)
-                  .map(b => ({ ...b, downloadUnlocked: true }));
-
-                if (booksToUnlock.length === 0) { showToast('No valid books selected'); return; }
-
-                try {
-                  // Write directly to Firestore — this is what the app reads
-                  await unlockBooksForBuyer(emailLow, booksToUnlock);
-
-                  // Also create an audit order in Firestore so it's traceable
-                  const manualOrder = {
-                    id: 'ORD-MANUAL-' + Date.now(),
-                    userId: null,
-                    userName: emailLow.split('@')[0],
-                    userEmail: emailLow,
-                    items: booksToUnlock.map(b => ({ id: b.id, title: b.title, price: b.price })),
-                    total: booksToUnlock.reduce((s, b) => s + (b.price || 0), 0),
-                    method: 'manual',
-                    ref: 'MANUAL-UNLOCK',
-                    status: 'Completed',
-                    date: new Date().toISOString().slice(0, 10),
-                    createdAt: serverTimestamp(),
-                  };
-                  await setDoc(doc(db, 'orders', manualOrder.id), manualOrder);
-
-                  showToast('✅ Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow + ' — they will see it immediately on their device');
-                  setTick(t => t + 1);
-                } catch (err) {
-                  console.error('Manual unlock failed:', err);
-                  showToast('❌ Unlock failed: ' + err.message);
-                }
-              }} />
-            </div>
-
-          </div>
+          <OrdersPanel
+            allOrders={allOrders}
+            filteredOrders={filteredOrders}
+            orderFilter={orderFilter}
+            setOrderFilter={setOrderFilter}
+            pendingCount={pendingCount}
+            revenue={revenue}
+            isSuper={isSuper}
+            handleConfirmOrder={handleConfirmOrder}
+            handleRejectOrder={handleRejectOrder}
+            handleArchiveOrder={handleArchiveOrder}
+            handleDeleteOrder={handleDeleteOrder}
+            books={books}
+            unlockBooksForBuyer={unlockBooksForBuyer}
+            showToast={showToast}
+            setTick={setTick}
+            setLiveOrders={setLiveOrders}
+            syncOrders={syncOrders}
+            user={user}
+          />
         )}
 
         {/* ARCHIVES */}
