@@ -185,6 +185,55 @@ export default function Cart() {
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
+  // ── Handle Paystack callback redirect (mobile payments) ──────────────────
+  // Paystack redirects to /cart?trxref=ORD-xxx_yyy&reference=ORD-xxx_yyy
+  // after the customer pays on mobile. We detect those params and auto-verify.
+  useEffect(() => {
+    const params    = new URLSearchParams(window.location.search);
+    const reference = params.get('reference') || params.get('trxref');
+    if (!reference || !user) return;
+
+    // Clean the URL so a refresh doesn't re-trigger
+    window.history.replaceState({}, '', window.location.pathname);
+
+    setStep('verifying');
+
+    // Look up the order by paystackRef in Firestore
+    (async () => {
+      try {
+        const { getDocs, collection, query, where } = await import('firebase/firestore');
+        const snap = await getDocs(
+          query(collection(db, 'orders'), where('paystackRef', '==', reference))
+        );
+
+        const orderDoc   = snap.empty ? null : snap.docs[0];
+        const orderId    = orderDoc?.id || null;
+        const orderData  = orderDoc?.data() || {};
+
+        // If webhook already completed it — go straight to done
+        if (orderData.status === 'Completed') {
+          clearCart();
+          setStep('done');
+          return;
+        }
+
+        // Otherwise call verify function
+        await callVerifyPaystack({
+          reference,
+          orderId:   orderId || '',
+          userEmail: user.email,
+        });
+
+        clearCart();
+        setStep('done');
+      } catch {
+        // Verification failed after redirect — show a gentle message
+        setStkError('Payment may have succeeded. If books are not in your library in a few minutes, contact support.');
+        setStep('pay');
+      }
+    })();
+  }, [user]); // eslint-disable-line
+
   const methodLabels = { mpesa: 'M-Pesa', airtel: 'Airtel Money', card: 'Card', paypal: 'PayPal' };
 
   // ── Permission / site-control gates ─────────────────────────────────────
