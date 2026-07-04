@@ -5,16 +5,24 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import './Cart.css';
 
-// Paystack public key — test key, safe to expose in frontend
-const PAYSTACK_PUBLIC_KEY = 'pk_test_d48ed3967ced2938fbd4f1e20b9394b52c979928';
+// Paystack public key — live key
+const PAYSTACK_PUBLIC_KEY = 'pk_live_081be2d1bdd05a16be4cc91b1267553a6444b463';
 
-// Load Paystack inline script once
+// Load Paystack inline script once and wait for it to be ready
 function loadPaystack() {
-  return new Promise((resolve) => {
-    if (window.PaystackPop) { resolve(); return; }
+  return new Promise((resolve, reject) => {
+    if (window.PaystackPop?.setup) { resolve(); return; }
+    // Remove any stale script tag
+    const existing = document.querySelector('script[src*="paystack"]');
+    if (existing) existing.remove();
     const s = document.createElement('script');
     s.src = 'https://js.paystack.co/v1/inline.js';
-    s.onload = resolve;
+    s.async = true;
+    s.onload = () => {
+      // Give it a tick to initialize
+      setTimeout(resolve, 100);
+    };
+    s.onerror = () => reject(new Error('Failed to load Paystack script'));
     document.head.appendChild(s);
   });
 }
