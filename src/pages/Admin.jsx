@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 const PageEditorPanel   = lazy(() => import('./admin-panels/PageEditorPanel'));
@@ -1579,53 +1579,68 @@ function OrdersPanel({
   handleConfirmOrder, handleRejectOrder, handleArchiveOrder, handleDeleteOrder,
   books, unlockBooksForBuyer, showToast, setTick, setLiveOrders, syncOrders, user,
 }) {
-  const [selected, setSelected] = useState([]); // bulk selection
-  const [bulkBusy, setBulkBusy] = useState(false);
+  const [selected,    setSelected]   = useState([]);
+  const [bulkBusy,    setBulkBusy]   = useState(false);
+  const [bulkAction,  setBulkAction] = useState('');
+  const [refundModal, setRefundModal]= useState(null);
 
-  // Only manual-method pending orders need admin verification
   const manualPending = allOrders.filter(o =>
     o.status === 'Pending' && !['paystack','mpesa_stk','card_auto'].includes(o.method)
   );
+  const refundCount = allOrders.filter(o => o.status === 'Refunded').length;
 
-  const toggleSelect = (id) =>
+  const toggleSelect = id =>
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-
   const toggleAll = () => {
     const ids = filteredOrders.map(o => o.id);
     setSelected(prev => prev.length === ids.length ? [] : ids);
   };
 
-  const bulkDelete = async () => {
-    if (!selected.length) return;
-    const label = selected.length === 1 ? '1 order' : `${selected.length} orders`;
-    if (!window.confirm(`Move ${label} to Trash?`)) return;
-    setBulkBusy(true);
-    for (const id of selected) await handleDeleteOrder(id, true); // pass silent=true
-    setSelected([]);
-    setBulkBusy(false);
-    showToast(`🗑️ ${label} moved to Trash`);
+  const handleRefundOrder = async (orderId, note = '') => {
+    await updateDoc(doc(db, 'orders', orderId), {
+      status: 'Refunded', refundedAt: new Date().toISOString(),
+      refundedBy: user?.email, ...(note ? { refundNote: note } : {}),
+    });
+    setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status:'Refunded', refundNote: note } : o));
   };
 
-  const bulkArchive = async () => {
+  const executeBulk = async (action) => {
     if (!selected.length) return;
     const label = selected.length === 1 ? '1 order' : `${selected.length} orders`;
-    if (!window.confirm(`Archive ${label}?`)) return;
-    setBulkBusy(true);
-    for (const id of selected) await handleArchiveOrder(id);
-    setSelected([]);
-    setBulkBusy(false);
-    showToast(`📦 ${label} archived`);
+    const msgs = { confirm:`Confirm ${label}? Books unlock.`, reject:`Reject ${label}?`, refund:`Mark ${label} as Refunded?`, archive:`Archive ${label}?`, delete:`Move ${label} to Trash?` };
+    if (!window.confirm(msgs[action])) return;
+    setBulkBusy(true); setBulkAction(action);
+    for (const id of selected) {
+      const o = allOrders.find(x => x.id === id);
+      try {
+        if (action === 'confirm') await handleConfirmOrder(id, o?.userName || '', true);
+        else if (action === 'reject')  await handleRejectOrder(id, true);
+        else if (action === 'archive') await handleArchiveOrder(id);
+        else if (action === 'delete')  await handleDeleteOrder(id, true);
+        else if (action === 'refund')  await handleRefundOrder(id);
+      } catch {}
+    }
+    setSelected([]); setBulkBusy(false); setBulkAction('');
+    showToast(`✅ ${label} — ${action} complete`);
   };
 
   const deleteUnconfirmed = async () => {
     const ids = allOrders.filter(o => o.status === 'Pending').map(o => o.id);
-    if (!ids.length) { showToast('No unconfirmed orders'); return; }
-    if (!window.confirm(`Delete all ${ids.length} unconfirmed (Pending) orders?`)) return;
+    if (!ids.length) { showToast('No pending orders'); return; }
+    if (!window.confirm(`Delete all ${ids.length} unconfirmed orders?`)) return;
     setBulkBusy(true);
     for (const id of ids) await handleDeleteOrder(id, true);
     setBulkBusy(false);
     showToast(`🗑️ ${ids.length} unconfirmed orders deleted`);
   };
+
+  const BULK_ACTIONS = [
+    { key:'confirm', label:'✅ Confirm', color:'rgba(46,204,113,0.15)',  text:'#2ecc71', border:'rgba(46,204,113,0.4)' },
+    { key:'reject',  label:'✕ Reject',  color:'rgba(231,76,60,0.1)',    text:'#e74c3c', border:'rgba(231,76,60,0.35)' },
+    { key:'refund',  label:'↩ Refund',  color:'rgba(168,85,247,0.1)',   text:'#a855f7', border:'rgba(168,85,247,0.35)' },
+    { key:'archive', label:'📦 Archive',color:'rgba(100,116,139,0.1)',  text:'var(--muted)', border:'var(--dim)' },
+    { key:'delete',  label:'🗑 Delete', color:'rgba(231,76,60,0.1)',    text:'#e74c3c', border:'rgba(231,76,60,0.35)' },
+  ];
 
   return (
     <div className="adm-page" style={{ maxWidth:'100%', overflowX:'hidden' }}>
@@ -1634,143 +1649,111 @@ function OrdersPanel({
         <div>
           <h1>Orders</h1>
           <span className="adm-page-sub">
-            {allOrders.length} orders · KSh {revenue.toLocaleString()} revenue · {pendingCount} pending
+            {allOrders.length} orders · KSh {revenue.toLocaleString()} revenue · {pendingCount} pending · {refundCount} refunded
           </span>
         </div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
           <button className="btn btn-sm" style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}
-            onClick={deleteUnconfirmed} disabled={bulkBusy}>
-            🗑 Delete All Unconfirmed
-          </button>
+            onClick={deleteUnconfirmed} disabled={bulkBusy}>🗑 Delete All Unconfirmed</button>
           {isSuper && (
             <button className="btn btn-ghost btn-sm" style={{ color:'var(--err)', borderColor:'rgba(231,76,60,0.4)' }}
-              onClick={() => {
-                if (!window.confirm('Clear ALL orders from Firestore? This cannot be undone.')) return;
-                // Delete from Firestore (handled via individual handleDeleteOrder)
-                allOrders.forEach(o => handleDeleteOrder(o.id, true));
-                showToast('All orders cleared');
-              }} disabled={bulkBusy}>
-              Clear All Orders
-            </button>
+              onClick={() => { if (!window.confirm('Clear ALL orders?')) return; allOrders.forEach(o => handleDeleteOrder(o.id, true)); showToast('All orders cleared'); }}
+              disabled={bulkBusy}>Clear All</button>
           )}
         </div>
       </div>
 
-      {/* Only show manual verification banner for non-Paystack pending orders */}
       {manualPending.length > 0 && (
         <div className="adm-alert-box" style={{ marginBottom:12 }}>
           <strong>⚠ {manualPending.length} manual order{manualPending.length > 1 ? 's' : ''} need verification.</strong>
-          {' '}Check the M-Pesa/Airtel reference code and confirm payment to unlock books for the customer.
+          {' '}Check the M-Pesa/Airtel reference and confirm payment to unlock books.
         </div>
       )}
 
-      {/* Filters + Bulk Actions toolbar */}
+      {/* Filter tabs */}
       <div className="adm-toolbar card" style={{ gap:8, flexWrap:'wrap', alignItems:'center' }}>
         {['all','completed','pending','cancelled','rejected','refunded'].map(f => (
           <button key={f} className={'adm-filter-btn' + (orderFilter === f ? ' on' : '')}
             onClick={() => { setOrderFilter(f); setSelected([]); }}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
-            {f === 'pending' && pendingCount > 0 && <span className="adm-filter-dot">{pendingCount}</span>}
+            {f === 'pending'  && pendingCount > 0 && <span className="adm-filter-dot">{pendingCount}</span>}
+            {f === 'refunded' && refundCount > 0  && <span className="adm-filter-dot" style={{ background:'#a855f7' }}>{refundCount}</span>}
           </button>
         ))}
         <span className="adm-toolbar-count" style={{ marginLeft:'auto' }}>{filteredOrders.length} orders</span>
-        {selected.length > 0 && (
-          <div style={{ display:'flex', gap:6, alignItems:'center', marginLeft:8 }}>
-            <span style={{ fontSize:'0.82rem', color:'var(--gold)', fontWeight:600 }}>{selected.length} selected</span>
-            <button className="btn btn-sm" style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}
-              onClick={bulkDelete} disabled={bulkBusy}>🗑 Delete</button>
-            <button className="btn btn-sm" style={{ background:'rgba(100,116,139,0.1)', color:'var(--muted)', border:'1px solid var(--dim)' }}
-              onClick={bulkArchive} disabled={bulkBusy}>📦 Archive</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected([])}>✕ Clear</button>
-          </div>
-        )}
       </div>
 
-      {/* Responsive table wrapper */}
-      <div className="card" style={{ overflowX:'auto', maxWidth:'100%' }}>
-        <table className="adm-table" style={{ minWidth:700, tableLayout:'auto' }}>
+      {/* Bulk action bar */}
+      {selected.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:'var(--r-sm)', padding:'10px 16px', marginTop:8 }}>
+          <span style={{ fontWeight:700, color:'var(--gold)', fontSize:'0.88rem' }}>{selected.length} selected</span>
+          {BULK_ACTIONS.map(a => (
+            <button key={a.key}
+              style={{ padding:'5px 12px', background:a.color, color:a.text, border:`1px solid ${a.border}`, borderRadius:6, cursor:'pointer', fontSize:'0.8rem', fontWeight:600, fontFamily:'inherit', opacity:bulkBusy ? 0.5 : 1 }}
+              onClick={() => executeBulk(a.key)} disabled={bulkBusy}>
+              {bulkBusy && bulkAction === a.key ? '…' : a.label}
+            </button>
+          ))}
+          <button style={{ marginLeft:'auto', background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit' }}
+            onClick={() => setSelected([])}>✕ Clear</button>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="card" style={{ overflowX:'auto', maxWidth:'100%', marginTop:8 }}>
+        <table className="adm-table" style={{ minWidth:680, tableLayout:'auto' }}>
           <thead>
             <tr>
-              <th style={{ width:32 }}>
-                <input type="checkbox"
+              <th style={{ width:36, paddingLeft:12 }}>
+                <input type="checkbox" style={{ cursor:'pointer' }}
                   checked={selected.length === filteredOrders.length && filteredOrders.length > 0}
                   onChange={toggleAll} title="Select all" />
               </th>
-              <th>Order ID</th>
-              <th>Customer</th>
-              <th>Books</th>
-              <th>Amount</th>
-              <th>Method</th>
-              <th>Status</th>
-              <th>Date</th>
-              <th>Actions</th>
+              <th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th>
+              <th>Method</th><th>Status</th><th>Date</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredOrders.map(o => {
-              const isPending    = o.status === 'Pending';
-              const isCancelled  = o.status === 'Cancelled' || o.status === 'PaymentFailed';
-              const isAuto       = ['paystack','mpesa_stk'].includes(o.method);
-              const bookNames    = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '—');
-              const amount       = o.total || o.amount || 0;
-              const customer     = o.userName || o.customer || '—';
-              const email        = o.userEmail || o.email || '';
-              const isSelected   = selected.includes(o.id);
+              const isPending   = o.status === 'Pending';
+              const isCompleted = o.status === 'Completed';
+              const isCancelled = o.status === 'Cancelled' || o.status === 'PaymentFailed';
+              const isRefunded  = o.status === 'Refunded';
+              const isAuto      = ['paystack','mpesa_stk'].includes(o.method);
+              const bookNames   = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '—');
+              const amount      = o.total || o.amount || 0;
+              const customer    = o.userName || o.customer || '—';
+              const email       = o.userEmail || o.email || '';
+              const isSelected  = selected.includes(o.id);
+              const rowBg       = isSelected ? 'rgba(201,168,76,0.09)' : isCancelled ? 'rgba(231,76,60,0.04)' : isRefunded ? 'rgba(168,85,247,0.04)' : isPending && !isAuto ? 'rgba(201,168,76,0.04)' : undefined;
               return (
-                <tr key={o.id}
-                  style={{
-                    background: isSelected ? 'rgba(201,168,76,0.07)'
-                      : isCancelled ? 'rgba(231,76,60,0.04)'
-                      : isPending && !isAuto ? 'rgba(201,168,76,0.04)'
-                      : undefined,
-                  }}>
-                  <td><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(o.id)} /></td>
-                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{o.id?.slice(0,16)}…</code></td>
-                  <td>
-                    <strong style={{ fontSize:'0.85rem' }}>{customer}</strong>
-                    <span style={{ display:'block', fontSize:'0.73rem', color:'var(--muted)' }}>{email}</span>
+                <tr key={o.id} style={{ background:rowBg }}>
+                  <td style={{ paddingLeft:12 }}>
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(o.id)} style={{ cursor:'pointer' }} />
                   </td>
-                  <td style={{ maxWidth:140, fontSize:'0.78rem', color:'var(--muted)' }}>{bookNames}</td>
+                  <td><code className="adm-code" style={{ fontSize:'0.68rem' }}>{(o.id||'').slice(0,14)}…</code></td>
+                  <td>
+                    <strong style={{ fontSize:'0.84rem' }}>{customer}</strong>
+                    <span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{email}</span>
+                  </td>
+                  <td style={{ maxWidth:130, fontSize:'0.76rem', color:'var(--muted)' }}>{bookNames.length > 40 ? bookNames.slice(0,40)+'…' : bookNames}</td>
                   <td><strong style={{ color:'var(--gold)' }}>KSh {amount.toLocaleString()}</strong></td>
                   <td>
-                    <span className="adm-method-badge" style={{ fontSize:'0.72rem' }}>{o.method}</span>
-                    {isAuto && <span style={{ display:'block', fontSize:'0.68rem', color:'var(--ok)', marginTop:2 }}>auto</span>}
+                    <span className="adm-method-badge" style={{ fontSize:'0.7rem' }}>{o.method}</span>
+                    {isAuto && <span style={{ display:'block', fontSize:'0.65rem', color:'var(--ok)', marginTop:1 }}>auto</span>}
                   </td>
                   <td>
-                    <span className={'adm-status adm-status--' + (o.status||'').toLowerCase()} style={{ fontSize:'0.75rem' }}>
-                      {o.status}
-                    </span>
-                    {isCancelled && o.failReason && (
-                      <span style={{ display:'block', fontSize:'0.68rem', color:'var(--err)', marginTop:2 }}>
-                        {o.failReason.slice(0,40)}
-                      </span>
-                    )}
+                    <span className={'adm-status adm-status--' + (o.status||'unknown').toLowerCase()} style={{ fontSize:'0.73rem' }}>{o.status}</span>
+                    {isCancelled && o.failReason && <span style={{ display:'block', fontSize:'0.66rem', color:'var(--err)', marginTop:2 }}>{(o.failReason||'').slice(0,36)}</span>}
+                    {isRefunded  && o.refundNote && <span style={{ display:'block', fontSize:'0.66rem', color:'#a855f7', marginTop:2 }}>{(o.refundNote||'').slice(0,36)}</span>}
                   </td>
-                  <td style={{ color:'var(--muted)', fontSize:'0.75rem', whiteSpace:'nowrap' }}>
-                    {o.date ? o.date.slice(0,10) : '—'}
-                  </td>
-                  <td className="adm-actions" style={{ whiteSpace:'nowrap' }}>
-                    {/* Manual verification only for non-auto pending orders */}
-                    {isPending && !isAuto && (
-                      <>
-                        <button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>
-                          ✅ Confirm
-                        </button>
-                        <button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>
-                          ✕ Reject
-                        </button>
-                      </>
-                    )}
-                    {/* Admin can manually confirm auto-payment orders if system had issues */}
-                    {isPending && isAuto && (
-                      <button className="adm-act-btn adm-act-confirm" style={{ opacity:0.7, fontSize:'0.72rem' }}
-                        onClick={() => handleConfirmOrder(o.id, customer)}
-                        title="Force-confirm if auto-payment webhook failed">
-                        ⚡ Force Confirm
-                      </button>
-                    )}
-                    <button className="adm-act-btn adm-act-archive" onClick={() => handleArchiveOrder(o.id)}>📦</button>
-                    <button className="adm-act-btn adm-act-del" onClick={() => handleDeleteOrder(o.id)}>🗑️</button>
+                  <td style={{ color:'var(--muted)', fontSize:'0.73rem', whiteSpace:'nowrap' }}>{o.date ? o.date.slice(0,10) : '—'}</td>
+                  <td className="adm-actions" style={{ whiteSpace:'nowrap', gap:3 }}>
+                    {isPending && !isAuto && (<><button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>✅</button><button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>✕</button></>)}
+                    {isPending && isAuto  && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.7, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm">⚡</button>)}
+                    {isCompleted && (<button className="adm-act-btn" style={{ background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:'0.72rem' }} onClick={() => setRefundModal(o)}>↩ Refund</button>)}
+                    <button className="adm-act-btn adm-act-archive" onClick={() => handleArchiveOrder(o.id)} title="Archive">📦</button>
+                    <button className="adm-act-btn adm-act-del"     onClick={() => handleDeleteOrder(o.id)} title="Delete">🗑️</button>
                   </td>
                 </tr>
               );
@@ -1780,31 +1763,170 @@ function OrdersPanel({
         {filteredOrders.length === 0 && <div className="adm-empty">No orders match this filter.</div>}
       </div>
 
-      {/* Manual Unlock Tool */}
+      {refundModal && (
+        <RefundModal order={refundModal} onClose={() => setRefundModal(null)}
+          onConfirm={async (note) => {
+            await handleRefundOrder(refundModal.id, note);
+            setRefundModal(null);
+            showToast('↩ Refund issued for ' + refundModal.id.slice(0,12));
+          }} />
+      )}
+
       <div className="card" style={{ padding:24, marginTop:24, border:'1px solid rgba(201,168,76,0.2)' }}>
         <h3 style={{ marginBottom:6, fontSize:'0.95rem' }}>Manual Book Unlock</h3>
-        <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>
-          Use this when a customer has paid but books weren't unlocked automatically (e.g. webhook missed).
-        </p>
+        <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Use this when a customer paid but books weren't unlocked automatically.</p>
         <ManualUnlockForm books={books} showToast={showToast} onUnlock={async (email, bookIds) => {
           const emailLow = email.trim().toLowerCase();
-          const booksToUnlock = bookIds.map(bid => books.find(b => b.id === bid)).filter(Boolean).map(b => ({ ...b, downloadUnlocked: true }));
+          const booksToUnlock = bookIds.map(bid => books.find(b => b.id === bid)).filter(Boolean).map(b => ({ ...b, downloadUnlocked:true }));
           if (!booksToUnlock.length) { showToast('No valid books selected'); return; }
           try {
             await unlockBooksForBuyer(emailLow, booksToUnlock);
-            const manualOrder = {
-              id: 'ORD-MANUAL-' + Date.now(),
-              userId: null, userName: emailLow.split('@')[0], userEmail: emailLow,
-              items: booksToUnlock.map(b => ({ id: b.id, title: b.title, price: b.price })),
-              total: booksToUnlock.reduce((s, b) => s + (b.price || 0), 0),
-              method: 'manual', ref: 'MANUAL-UNLOCK', status: 'Completed',
-              date: new Date().toISOString().slice(0, 10), createdAt: serverTimestamp(),
-            };
-            await setDoc(doc(db, 'orders', manualOrder.id), manualOrder);
+            const mo = { id:'ORD-MANUAL-'+Date.now(), userId:null, userName:emailLow.split('@')[0], userEmail:emailLow, items:booksToUnlock.map(b=>({id:b.id,title:b.title,price:b.price})), total:booksToUnlock.reduce((s,b)=>s+(b.price||0),0), method:'manual', ref:'MANUAL-UNLOCK', status:'Completed', date:new Date().toISOString().slice(0,10), createdAt:serverTimestamp() };
+            await setDoc(doc(db,'orders',mo.id), mo);
             showToast('✅ Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow);
-            setTick(t => t + 1);
+            setTick(t => t+1);
           } catch (err) { showToast('❌ Unlock failed: ' + err.message); }
         }} />
+      </div>
+    </div>
+  );
+}
+
+// ── Refunds Panel ─────────────────────────────────────────────────────────────
+function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
+  const [refundModal, setRefundModal] = useState(null);
+  const refunded  = allOrders.filter(o => o.status === 'Refunded');
+  const completed = allOrders.filter(o => o.status === 'Completed');
+  const totalRefunded = refunded.reduce((s, o) => s + (o.total || o.amount || 0), 0);
+
+  return (
+    <div className="adm-page">
+      <div className="adm-page-head">
+        <div>
+          <h1>Refunds</h1>
+          <span className="adm-page-sub">
+            {refunded.length} refunded · KSh {totalRefunded.toLocaleString()} total · {completed.length} completed orders eligible
+          </span>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:20 }}>
+        {[
+          { label:'Total Refunded',   value: refunded.length,                color:'#a855f7', bg:'rgba(168,85,247,0.1)'  },
+          { label:'KSh Refunded',     value: 'KSh '+totalRefunded.toLocaleString(), color:'#e74c3c', bg:'rgba(231,76,60,0.08)' },
+          { label:'Eligible Orders',  value: completed.length,               color:'#2ecc71', bg:'rgba(46,204,113,0.08)' },
+        ].map(s => (
+          <div key={s.label} className="card" style={{ padding:'16px 20px', background:s.bg, border:`1px solid ${s.color}30` }}>
+            <strong style={{ fontSize:'1.4rem', color:s.color, display:'block' }}>{s.value}</strong>
+            <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{s.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Refunded orders */}
+      {refunded.length > 0 && (
+        <div className="card" style={{ overflowX:'auto', marginBottom:24 }}>
+          <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--dim)', display:'flex', alignItems:'center', gap:10 }}>
+            <h3 style={{ margin:0, fontSize:'0.95rem' }}>Refunded Orders</h3>
+          </div>
+          <table className="adm-table" style={{ minWidth:600 }}>
+            <thead><tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Date</th><th>Note</th></tr></thead>
+            <tbody>
+              {refunded.map(o => (
+                <tr key={o.id} style={{ background:'rgba(168,85,247,0.03)' }}>
+                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{(o.id||'').slice(0,14)}…</code></td>
+                  <td><strong style={{ fontSize:'0.84rem' }}>{o.userName || '—'}</strong><span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{o.userEmail}</span></td>
+                  <td style={{ fontSize:'0.76rem', color:'var(--muted)', maxWidth:120 }}>{(o.items||[]).map(i=>i.title).join(', ') || '—'}</td>
+                  <td><strong style={{ color:'#a855f7' }}>KSh {(o.total||o.amount||0).toLocaleString()}</strong></td>
+                  <td style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{o.refundedAt ? o.refundedAt.slice(0,10) : o.date?.slice(0,10) || '—'}</td>
+                  <td style={{ fontSize:'0.75rem', color:'var(--muted)', maxWidth:120 }}>{o.refundNote || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Completed orders — can be refunded */}
+      <div className="card" style={{ overflowX:'auto' }}>
+        <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--dim)', display:'flex', alignItems:'center', gap:10 }}>
+          <h3 style={{ margin:0, fontSize:'0.95rem' }}>Completed Orders — Issue Refund</h3>
+          <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{completed.length} eligible</span>
+        </div>
+        {completed.length === 0 ? (
+          <div className="adm-empty">No completed orders available for refund.</div>
+        ) : (
+          <table className="adm-table" style={{ minWidth:600 }}>
+            <thead><tr><th>Order ID</th><th>Customer</th><th>Books</th><th>Amount</th><th>Method</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody>
+              {completed.map(o => (
+                <tr key={o.id}>
+                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{(o.id||'').slice(0,14)}…</code></td>
+                  <td><strong style={{ fontSize:'0.84rem' }}>{o.userName || '—'}</strong><span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{o.userEmail}</span></td>
+                  <td style={{ fontSize:'0.76rem', color:'var(--muted)', maxWidth:120 }}>{(o.items||[]).map(i=>i.title).join(', ') || '—'}</td>
+                  <td><strong style={{ color:'var(--gold)' }}>KSh {(o.total||o.amount||0).toLocaleString()}</strong></td>
+                  <td><span className="adm-method-badge" style={{ fontSize:'0.7rem' }}>{o.method}</span></td>
+                  <td style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{o.date?.slice(0,10) || '—'}</td>
+                  <td>
+                    <button className="adm-act-btn"
+                      style={{ background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:'0.75rem' }}
+                      onClick={() => setRefundModal(o)}>
+                      ↩ Refund
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {refundModal && (
+        <RefundModal order={refundModal} onClose={() => setRefundModal(null)}
+          onConfirm={async (note) => {
+            await handleRefundOrder(refundModal.id, note);
+            setRefundModal(null);
+          }} />
+      )}
+    </div>
+  );
+}
+
+// ── Refund Modal ──────────────────────────────────────────────────────────────
+function RefundModal({ order, onClose, onConfirm }) {
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const amount   = order.total || order.amount || 0;
+  const customer = order.userName || order.userEmail || '—';
+  const submit = async e => { e.preventDefault(); setBusy(true); await onConfirm(note); setBusy(false); };
+  return (
+    <div className="adm-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="adm-confirm card" style={{ maxWidth:460, width:'95vw' }}>
+        <h3 style={{ marginBottom:4 }}>↩ Issue Refund</h3>
+        <p style={{ fontSize:'0.84rem', color:'var(--muted)', marginBottom:16 }}>
+          Order <strong style={{ color:'var(--gold)' }}>{order.id?.slice(0,16)}…</strong> · {customer}
+        </p>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, background:'rgba(0,0,0,0.2)', borderRadius:'var(--r-sm)', padding:'12px 16px', marginBottom:16 }}>
+          <div><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Amount</span><br/><strong style={{ color:'var(--gold)' }}>KSh {amount.toLocaleString()}</strong></div>
+          <div><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Method</span><br/><strong>{order.method}</strong></div>
+          <div style={{ gridColumn:'1/-1' }}><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Books</span><br/><span style={{ fontSize:'0.78rem' }}>{(order.items||[]).map(i=>i.title).join(', ') || '—'}</span></div>
+        </div>
+        <div style={{ background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.25)', borderLeft:'3px solid #a855f7', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.82rem', color:'#a855f7' }}>
+          ⚠ This records the refund in the system. Actual money transfer must be done manually via Paystack dashboard or M-Pesa.
+        </div>
+        <form onSubmit={submit}>
+          <div className="form-group" style={{ marginBottom:16 }}>
+            <label style={{ fontSize:'0.82rem' }}>Refund Note (optional)</label>
+            <input className="field" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Customer request, duplicate charge…" />
+          </div>
+          <div style={{ display:'flex', gap:10 }}>
+            <button type="submit" className="btn btn-sm"
+              style={{ background:'rgba(168,85,247,0.15)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.4)', flex:1 }}
+              disabled={busy}>{busy ? 'Processing…' : '↩ Confirm Refund'}</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} disabled={busy}>Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -2396,9 +2518,12 @@ export default function Admin() {
   const allOrders = realOrders;
 
   const revenue      = allOrders.filter(o => o.status === 'Completed').reduce((s, o) => s + (Number(o.amount) || Number(o.total) || 0), 0);
-  const pendingCount = realOrders.filter(o => o.status === 'Pending').length; // only real orders can be pending
+  const pendingCount  = realOrders.filter(o => o.status === 'Pending').length;
+  const refundCount   = realOrders.filter(o => o.status === 'Refunded').length;
   const filteredOrders = orderFilter === 'all'
     ? allOrders
+    : orderFilter === 'cancelled'
+    ? allOrders.filter(o => o.status === 'Cancelled' || o.status === 'PaymentFailed')
     : allOrders.filter(o => o.status.toLowerCase() === orderFilter);
 
   const navItems = [
@@ -2408,6 +2533,7 @@ export default function Admin() {
     { k:'covers',        label:'Novel Covers',      icon:'🖼️', group:'admin' },
     { k:'photos',        label:'Site Photos',       icon:'📷', group:'admin' },
     { k:'orders',        label:'Orders' + (pendingCount > 0 ? ` (${pendingCount})` : ''), icon:'🛒', group:'admin' },
+    { k:'refunds',       label:'Refunds' + (refundCount > 0 ? ` (${refundCount})` : ''),  icon:'↩', group:'admin' },
     { k:'archives',      label:'Archives',          icon:'📦', group:'admin' },
     { k:'trash',         label:'Trash',             icon:'🗑️', group:'admin' },
     { k:'users',         label:'Users',             icon:'👥', group:'admin' },
@@ -2937,6 +3063,22 @@ export default function Admin() {
             setLiveOrders={setLiveOrders}
             syncOrders={syncOrders}
             user={user}
+          />
+        )}
+
+        {/* REFUNDS */}
+        {tab === 'refunds' && (
+          <RefundsPanel
+            allOrders={allOrders}
+            handleRefundOrder={async (orderId, note) => {
+              await updateDoc(doc(db, 'orders', orderId), {
+                status: 'Refunded', refundedAt: new Date().toISOString(),
+                refundedBy: user?.email, ...(note ? { refundNote: note } : {}),
+              });
+              setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status:'Refunded', refundNote: note } : o));
+              showToast('↩ Refund issued');
+            }}
+            showToast={showToast}
           />
         )}
 
