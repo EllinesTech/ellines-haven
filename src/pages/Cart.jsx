@@ -148,14 +148,15 @@ async function notifyAdminPaymentIssue(order, reason, paystackRef) {
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
   const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls } = useApp();
-  // steps: cart | pay | stk_waiting | pending | done
-  const [step,        setStep]        = useState('cart');
-  const [method,      setMethod]      = useState('paystack');
-  const [phone,       setPhone]       = useState('');
-  const [ref,         setRef]         = useState('');
-  const [busy,        setBusy]        = useState(false);
-  const [stkError,    setStkError]    = useState('');
-  const [placedOrder, setPlacedOrder] = useState(null);
+  // steps: cart | pay | stk_waiting | pending | done | verifying | paypal_modal
+  const [step,            setStep]           = useState('cart');
+  const [method,          setMethod]         = useState('paystack');
+  const [phone,           setPhone]          = useState('');
+  const [ref,             setRef]            = useState('');
+  const [busy,            setBusy]           = useState(false);
+  const [stkError,        setStkError]       = useState('');
+  const [placedOrder,     setPlacedOrder]    = useState(null);
+  const [cancelledNotice, setCancelledNotice] = useState(''); // non-empty string = show notice
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
@@ -180,7 +181,10 @@ export default function Cart() {
     </main>
   );
 
-  const checkout = () => { if (!user) navigate('/login'); else setStep('pay'); };
+  const checkout = () => {
+    setCancelledNotice('');
+    if (!user) navigate('/login'); else setStep('pay');
+  };
 
   // ── Paystack payment flow ─────────────────────────────────────────────────
   const submitPaystack = async e => {
@@ -231,7 +235,7 @@ export default function Cart() {
               .finally(resolve);
           },
           onClose: () => {
-            // User closed/cancelled the payment popup
+            // User closed/cancelled the payment popup — return to cart, preserve items
             if (order?.id) {
               updateDoc(doc(db, 'orders', order.id), {
                 status: 'Cancelled',
@@ -240,7 +244,8 @@ export default function Cart() {
               }).catch(() => {});
               notifyAdminPaymentIssue(order, 'Customer cancelled payment', null);
             }
-            setStkError('Payment was cancelled.');
+            setCancelledNotice('Payment was cancelled. Your cart is unchanged — add, remove, or proceed when ready.');
+            setStep('cart');
             resolve();
           },
         });
@@ -330,13 +335,14 @@ export default function Cart() {
           },
           onCancel: () => {
             updateDoc(doc(db, 'orders', order.id), { status: 'Cancelled', cancelledAt: serverTimestamp(), updatedAt: serverTimestamp() }).catch(() => {});
-            setStkError('PayPal payment was cancelled.');
-            setStep('pay');
+            setCancelledNotice('PayPal payment was cancelled. Your cart is unchanged — modify it or try a different payment method.');
+            setStep('cart');
             resolve();
           },
           onError: (err) => {
             setStkError('PayPal error: ' + (err?.message || 'unknown error'));
-            setStep('pay');
+            setCancelledNotice('PayPal encountered an error. Your cart is still here — please try again.');
+            setStep('cart');
             resolve();
           },
           style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', height: 48 },
@@ -567,6 +573,17 @@ export default function Cart() {
     <main className="cart-page">
       <div className="page-header"><div className="container"><h1><EditableField field="cart_heading">Your Cart</EditableField></h1><p>{cart.length} item{cart.length !== 1 ? 's' : ''}</p></div></div>
       <div className="container">
+        {/* Payment cancelled notice */}
+        {cancelledNotice && (
+          <div className="cart-cancelled-notice" role="alert">
+            <span>⚠ {cancelledNotice}</span>
+            <button
+              className="cart-cancelled-notice__close"
+              onClick={() => setCancelledNotice('')}
+              aria-label="Dismiss"
+            >✕</button>
+          </div>
+        )}
         {cart.length === 0
           ? <div className="cart-empty">
               <div className="cart-empty__icon">&#128722;</div>
