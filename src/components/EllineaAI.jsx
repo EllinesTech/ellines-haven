@@ -131,6 +131,11 @@ function offlineReply(msg, ctx) {
   const top = Object.entries(intents).sort((a,b)=>b[1]-a[1])[0];
   const topIntent = top[1] > 0 ? top[0] : null;
 
+  // ── TALK TO HUMAN — checked first, before any book/intent matching ────────
+  if (/talk(ing)? to (a |the )?(human|person|agent|support|someone|real|staff)|live chat|speak (to|with)|chat (with|to) (us|someone|agent|human|person|support)|connect me|get help from|i (need|want) (a |to )?(human|person|agent|support|talk)|customer (service|support|care)|real (person|agent|human)|transfer me|hand(off| me over)|escalate/i.test(m)) {
+    return `__OPEN_LIVE_CHAT__`;
+  }
+
   // ── SWAHILI first (before anything else) ─────────────────────────────────
   if (intents.swahili > 0) {
     return `Karibu sana! 😊 Naweza kukusaidia na:\n• 📚 Vitabu vilivyopo (${books.filter(b=>b.active!==false&&b.status!=='draft').length} vitabu)\n• 💳 Jinsi ya kulipa (M-Pesa, Airtel, Kadi)\n• 📖 Kufikia maktaba yako\n• 🔑 Akaunti yako\n\nNiambie unachohitaji! Pia unaweza kuwasiliana nasi kwa WhatsApp: **0748 255 466**`;
@@ -206,12 +211,6 @@ function offlineReply(msg, ctx) {
   if (intents.about > 0) {
     const total = books.filter(b => b.active !== false && b.status !== 'draft').length;
     return `**Ellines Haven** is Kenya's premier digital literary platform — a home for original African stories. 🌍\n\n• **${total} titles** available — Drama, Romance, Mystery, Historical, Fantasy & more\n• Founded by Elijah Mwangi M\n• Part of the **Ellines Group** (Tech · Furniture · Haven)\n• Pay with M-Pesa, Airtel, or card — read instantly\n• Buy once, own forever — no subscriptions\n\nLearn more at __/about__`;
-  }
-
-  // ── TALK TO HUMAN / LIVE CHAT ─────────────────────────────────────────────
-  const wantsHuman = /talk to (a |the )?(human|person|agent|support|someone|real|staff)|live chat|speak to|chat (with|to) (us|someone|agent|human|person|support)|connect me|get help from|i need (a |to talk to )?(human|person|agent)|customer (service|support|care)/i.test(m);
-  if (wantsHuman) {
-    return `__OPEN_LIVE_CHAT__`;
   }
 
   // ── CONTACT / SUPPORT ─────────────────────────────────────────────────────
