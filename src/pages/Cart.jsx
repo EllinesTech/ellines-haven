@@ -227,12 +227,24 @@ export default function Cart() {
       const feeKes   = +(grossKes - total).toFixed(2);
 
       await new Promise((resolve) => {
+        // Generate a unique Paystack reference and store it on the order
+        // so both the webhook AND the verify function can find the order.
+        const paystackRef = order.id + '_' + Date.now();
+
+        // Save the paystackRef to Firestore immediately so the webhook can
+        // look up the order the moment Paystack fires charge.success
+        updateDoc(doc(db, 'orders', order.id), {
+          paystackRef,
+          paystackChannel,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+
         const handler = window.PaystackPop.setup({
           key:      PAYSTACK_PUBLIC_KEY,
           email:    user.email,
           amount:   paystackAmountCents,
           currency: 'KES',
-          ref:      order.id,
+          ref:      paystackRef,
           metadata: {
             orderId:          order.id,
             userEmail:        user.email,
