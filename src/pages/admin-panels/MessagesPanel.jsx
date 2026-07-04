@@ -443,7 +443,7 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
   };
 
   const notifs   = messages.filter(m => m.type === 'notification');
-  const regular  = messages.filter(m => m.type !== 'notification');
+  const regular  = messages.filter(m => m.type !== 'notification' && m.type !== 'live_chat');
   const base     = tab === 'notifications' ? notifs : regular;
   const filtered = base.filter(m => {
     const matchF = filter === 'all' || m.status === filter;
@@ -462,7 +462,7 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
     replied: base.filter(m => m.status==='replied').length,
     spam: base.filter(m => m.status==='spam').length,
   };
-  const newCount = messages.filter(m => m.status==='new'||!m.status).length;
+  const newCount = messages.filter(m => (m.status==='new'||!m.status) && m.type !== 'live_chat' && m.type !== 'notification').length;
 
   // Users available to compose to (exclude only yourself)
   const regularUsers = users.filter(u =>
@@ -580,20 +580,9 @@ export default function MessagesPanel({ showToast, users = [], defaultTab = 'mes
           </>
         )}
         {tab === 'livechat' && (
-          <button
-            onClick={toggleAgentOnline}
-            style={{
-              marginLeft: 'auto',
-              padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
-              background: agentOnline ? 'rgba(46,204,113,0.15)' : 'rgba(100,116,139,0.15)',
-              color: agentOnline ? '#2ecc71' : 'var(--muted)',
-              fontWeight: 700, fontSize: '0.78rem', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: agentOnline ? '#2ecc71' : '#64748b', display: 'inline-block' }} />
-            {agentOnline ? 'You are Online' : 'Go Online'}
-          </button>
+          <span style={{ marginLeft:'auto', fontSize:'0.77rem', color:'var(--muted)' }}>
+            Agent status &amp; sessions shown in left panel
+          </span>
         )}
       </div>
       {/* ── Main grid: list + thread (messages + notifications tabs only) ── */}
