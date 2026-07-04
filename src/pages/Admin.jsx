@@ -12,6 +12,7 @@ const PluginsPanel      = lazy(() => import('./admin-panels/PluginsPanel'));
 const GodModePanel      = lazy(() => import('./admin-panels/GodModePanel'));
 const IntegrationsPanel = lazy(() => import('./admin-panels/IntegrationsPanel'));
 const MessagesPanel     = lazy(() => import('./admin-panels/MessagesPanel'));
+const LiveChatPanel     = lazy(() => import('./admin-panels/LiveChatPanel'));
 const ReportsPanel      = lazy(() => import('./admin-panels/ReportsPanel'));
 const ReviewsPanel      = lazy(() => import('./admin-panels/ReviewsPanel'));
 const EmailPanel        = lazy(() => import('./admin-panels/EmailPanel'));
@@ -2843,14 +2844,16 @@ export default function Admin() {
         {/* Messages tab — full height, no padding */}
         {tab === 'messages' && (
           <div className="adm-main-messages">
-            <MessagesPanel showToast={showToast} users={users} defaultTab="messages" />
+            <MessagesPanel showToast={showToast} users={users} />
           </div>
         )}
 
         {/* Live Chat tab — full height, no padding */}
         {tab === 'livechat' && (
           <div className="adm-main-messages">
-            <MessagesPanel showToast={showToast} users={users} defaultTab="livechat" />
+            <Suspense fallback={<PanelLoader />}>
+              <LiveChatPanel showToast={showToast} />
+            </Suspense>
           </div>
         )}
 
