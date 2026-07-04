@@ -1,6 +1,7 @@
 .nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
   padding: 6px 0;
+  overflow: visible;
   transition: background .3s, padding .3s, border-color .3s;
 }
 .nav--solid {
@@ -16,7 +17,7 @@
   justify-content: space-between;
   gap: 20px;
   min-height: 80px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .nav__brand {
@@ -104,7 +105,7 @@
   border-radius: var(--r); min-width: 190px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.7);
   overflow: hidden;
-  z-index: 2000;
+  z-index: 3000;
 }
 .nav__dropdown a, .nav__dropdown button {
   display: block; width: 100%; text-align: left;
@@ -141,7 +142,7 @@
   .nav__brand-tagline { display: none; }
   .nav__brand-name { font-size: 1.15rem; }
   .nav__logo-img { height: 52px; max-width: none; }
-  .nav__inner { min-height: 64px; overflow: hidden; }
+  .nav__inner { min-height: 64px; overflow: visible; }
 
   /* On mobile keep only cart + burger visible in the action row;
      hide the desktop-only extras (language switcher, wishlist bell,

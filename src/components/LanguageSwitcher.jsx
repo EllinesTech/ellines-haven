@@ -36,7 +36,7 @@ export default function LanguageSwitcher() {
           position: 'absolute', top: '110%', right: 0,
           background: 'var(--card)', border: '1px solid var(--border)',
           borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          minWidth: 180, zIndex: 1000, overflow: 'hidden',
+          minWidth: 180, zIndex: 3000, overflow: 'hidden',
           maxHeight: 320, overflowY: 'auto',
         }}>
           <div style={{ padding: '8px 12px 6px', fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>

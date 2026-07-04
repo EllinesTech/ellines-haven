@@ -29,7 +29,7 @@
   position: relative;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 24px 0 20px;
+  padding: 104px 0 20px;
   overflow: hidden;
 }
 .mylib-hero-glow {
@@ -124,7 +124,7 @@
   background: var(--surface);
   border-bottom: 1px solid var(--dim);
   position: sticky;
-  top: 72px;
+  top: 86px;
   z-index: 20;
 }
 .mylib-tabs {
@@ -525,6 +525,8 @@
   .mylib-orders-summary { grid-template-columns: 1fr 1fr; }
   .mylib-tab           { padding: 12px 14px; font-size: 0.82rem; }
   .mylib-settings      { padding: 8px 0 60px; }
+  .mylib-hero          { padding-top: 82px; }
+  .mylib-tabbar        { top: 72px; }
 }
 @media (max-width: 420px) {
   .mylib-hero-stats    { display: none; }

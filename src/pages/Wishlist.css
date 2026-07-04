@@ -8,7 +8,7 @@
 .wl-hero {
   position: relative;
   overflow: hidden;
-  padding: 100px 0 40px;
+  padding: 112px 0 40px;
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
 }
 
@@ -161,5 +161,5 @@
 }
 
 @media (max-width: 768px) {
-  .wl-hero { padding-top: 80px; }
+  .wl-hero { padding-top: 82px; }
 }
