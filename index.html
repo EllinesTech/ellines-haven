@@ -12,6 +12,12 @@
     <meta name="keywords" content="Ellines Haven, Elijah Mwangi, Kenyan novels, African literature, East Africa books, online bookstore Kenya" />
     <meta name="author" content="Elijah Mwangi M" />
 
+    <!-- Google Fonts — non-blocking preload -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" /></noscript>
+
     <!-- Preconnect to external origins for faster first paint -->
     <link rel="preconnect" href="https://firestore.googleapis.com" />
     <link rel="preconnect" href="https://firebase.googleapis.com" />
@@ -36,6 +42,10 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Paystack — preload so it's ready before checkout -->
+    <link rel="preload" href="https://js.paystack.co/v1/inline.js" as="script" />
+    <link rel="preconnect" href="https://js.paystack.co" />
+
   </head>
   <body>
     <div id="root"></div>

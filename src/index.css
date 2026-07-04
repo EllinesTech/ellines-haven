@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap');
+/* Fonts loaded via <link> in index.html for non-blocking render */
 :root {
   --bg:#0d0d1a; --surface:#13132b; --card:#161628;
   --border:rgba(201,168,76,0.18); --dim:rgba(255,255,255,0.07);

@@ -187,21 +187,23 @@ export default function Cart() {
             userName:  user.name,
             books:     cart.map(b => b.title).join(', '),
           },
-          callback: async (response) => {
+          callback: (response) => {
+            // Paystack v1 requires a plain (non-async) callback
             setStep('verifying');
-            try {
-              await callVerifyPaystack({
-                reference: response.reference,
-                orderId:   order.id,
-                userEmail: user.email,
-              });
-              clearCart();
-              setStep('done');
-            } catch (err) {
-              setStkError(err.message || 'Verification failed. Contact support with ref: ' + response.reference);
-              setStep('pay');
-            }
-            resolve();
+            callVerifyPaystack({
+              reference: response.reference,
+              orderId:   order.id,
+              userEmail: user.email,
+            })
+              .then(() => {
+                clearCart();
+                setStep('done');
+              })
+              .catch((err) => {
+                setStkError(err.message || 'Verification failed. Contact support with ref: ' + response.reference);
+                setStep('pay');
+              })
+              .finally(resolve);
           },
           onClose: () => {
             setStkError('Payment was cancelled.');

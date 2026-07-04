@@ -127,26 +127,22 @@ export function AppProvider({ children }) {
     return () => unsub();
   }, []); // eslint-disable-line
 
-  // Real-time listener for admin-created users — syncs to localStorage on every device
+  // One-time fetch for admin-created users — syncs to localStorage (no persistent listener needed)
   useEffect(() => {
-    const unsub = onSnapshot(USERS_DOC(), (snap) => {
+    getDoc(USERS_DOC()).then(snap => {
       if (!snap.exists()) return;
       const data = snap.data();
-      // Sync registered users to localStorage so Login.jsx can find them
       if (data.registered) {
         localStorage.setItem('eh_registered_users', JSON.stringify(data.registered));
       }
       if (data.pwOverrides) {
-        // Merge with any local overrides (don't clobber local password resets)
         const local = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-        const merged = { ...local, ...data.pwOverrides };
-        localStorage.setItem('eh_pw_overrides', JSON.stringify(merged));
+        localStorage.setItem('eh_pw_overrides', JSON.stringify({ ...local, ...data.pwOverrides }));
       }
       if (data.roleOverrides) {
         localStorage.setItem('eh_role_overrides', JSON.stringify(data.roleOverrides));
       }
-    }, () => {});
-    return () => unsub();
+    }).catch(() => {});
   }, []); // eslint-disable-line
 
   // Auto-logout suspended users in real time — fires as soon as admin suspends
@@ -274,38 +270,44 @@ export function AppProvider({ children }) {
   useEffect(() => {
     (async () => {
       try {
+        const local        = load('eh_books', []);
+        const savedAt      = load('eh_books_savedAt', 0);
+        const cacheAge     = Date.now() - savedAt;
+        const CACHE_TTL    = 5 * 60 * 1000; // 5 minutes — use local cache if fresh
+
         const [booksSnap, coversSnap] = await Promise.all([getDoc(BOOKS_DOC()), getDoc(COVERS_DOC())]);
         if (!booksSnap.exists()) return;
         const fsBooks = booksSnap.data().books || [];
         if (!fsBooks.length) return;
 
-        const coversMap   = coversSnap.exists() ? (coversSnap.data().covers || {}) : {};
+        const coversMap = coversSnap.exists() ? (coversSnap.data().covers || {}) : {};
+
+        // ── Chapter loading: use local cache if fresh, skip Firestore reads ──
         const chaptersMap = {};
-
-        await Promise.all(fsBooks.map(async b => {
-          try {
-            const snap = await getDoc(CHAPTER_DOC(b.id));
-            if (snap.exists() && snap.data().chapters?.length > 0) chaptersMap[b.id] = snap.data().chapters;
-          } catch {}
-        }));
-
-        const local = load('eh_books', []);
-        // Always keep local chapters (they may have just been saved)
+        // Always pull local chapters first (fastest — no network)
         local.forEach(b => { if (b.chapters?.length > 0) chaptersMap[b.id] = b.chapters; });
 
-        // Reapply covers + chapters onto Firestore books
-        const withAll = reapplyLargeFields(fsBooks, coversMap, chaptersMap);
+        // Only fetch chapters from Firestore for books that don't have them locally
+        // AND only if cache is stale — avoids 15 reads on every page load
+        const booksNeedingChapters = cacheAge > CACHE_TTL
+          ? fsBooks.filter(b => !chaptersMap[b.id])
+          : []; // Use cached chapters when cache is fresh
 
-        // Firestore is authoritative for covers — only keep local cover if Firestore
-        // has NO cover for this book (i.e. it was never uploaded to Firestore)
+        if (booksNeedingChapters.length > 0) {
+          await Promise.all(booksNeedingChapters.map(async b => {
+            try {
+              const snap = await getDoc(CHAPTER_DOC(b.id));
+              if (snap.exists() && snap.data().chapters?.length > 0) chaptersMap[b.id] = snap.data().chapters;
+            } catch {}
+          }));
+        }
+
+        const withAll  = reapplyLargeFields(fsBooks, coversMap, chaptersMap);
         const localMap = new Map((local || []).map(b => [b.id, b]));
         const finalBooks = withAll.map(b => {
           const loc = localMap.get(b.id);
           if (!loc) return b;
-          // Only fall back to local cover if Firestore has no cover at all
-          if (!b.cover && loc.cover?.startsWith('data:')) {
-            return { ...b, cover: loc.cover, coverType: loc.coverType };
-          }
+          if (!b.cover && loc.cover?.startsWith('data:')) return { ...b, cover: loc.cover, coverType: loc.coverType };
           return b;
         });
 
