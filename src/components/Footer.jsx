@@ -42,7 +42,7 @@ export default function Footer() {
             {/* Payment badges */}
             <div className="footer__payments">
               <span className="footer__pay-label">We accept:</span>
-              {['M-Pesa', 'Airtel Money', 'Visa / MC'].map(p => (
+              {['M-Pesa', 'Airtel Money', 'Visa / MC', 'PayPal'].map(p => (
                 <span key={p} className="footer__pay-chip">{p}</span>
               ))}
             </div>

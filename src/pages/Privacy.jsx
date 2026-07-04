@@ -37,7 +37,7 @@ export default function Privacy() {
             <h3>Information you provide directly:</h3>
             <ul>
               <li><strong>Account information</strong> — your name, email address, and password when you register.</li>
-              <li><strong>Payment information</strong> — your phone number, M-Pesa transaction reference codes, and the payment method you choose. We do not store card numbers or M-Pesa PINs.</li>
+              <li><strong>Payment information</strong> — your phone number (for M-Pesa), transaction reference codes, and the payment method you choose. We do not store card numbers, M-Pesa PINs, or PayPal passwords. Paystack and PayPal process card/PayPal data on their own secure platforms and we receive only a payment confirmation reference.</li>
               <li><strong>Profile information</strong> — optional phone number and bio you add to your profile.</li>
               <li><strong>Communications</strong> — messages you send us via our contact form or WhatsApp.</li>
               <li><strong>Notification requests</strong> — email addresses submitted to be notified about upcoming books.</li>
@@ -76,7 +76,7 @@ export default function Privacy() {
             <p>We do not sell, rent, or trade your personal information to any third party.</p>
             <p>We may share your data in the following limited circumstances:</p>
             <ul>
-              <li><strong>Service providers</strong> — such as Google Firebase for data storage. These providers process your data only on our behalf and under strict confidentiality.</li>
+              <li><strong>Service providers</strong> — Google Firebase (data storage), Paystack (payment processing), PayPal (payment processing). These providers process your data only as needed to complete transactions and operate under strict confidentiality obligations.</li>
               <li><strong>Legal requirements</strong> — if required by Kenyan law, a court order, or government authority.</li>
               <li><strong>Business transfers</strong> — if Ellines Haven is acquired or merges with another entity, your data may transfer as part of that transaction. You will be notified of any such change.</li>
             </ul>

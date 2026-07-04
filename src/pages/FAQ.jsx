@@ -9,27 +9,35 @@ const FAQS = [
     items: [
       {
         q: 'How do I pay for a book?',
-        a: 'We accept M-Pesa, Airtel Money, and card. After adding a book to your cart, you proceed to checkout, choose your payment method, send the payment to our till/number, enter the transaction code, and submit. Our team verifies your payment — usually within minutes during business hours.',
+        a: 'We accept M-Pesa (STK push), Airtel Money, Paystack (Visa, Mastercard, bank transfer, M-Pesa), and PayPal. Choose your preferred method at checkout. Paystack and PayPal unlock your books instantly and automatically. Airtel Money requires submitting a transaction code for manual verification.',
+      },
+      {
+        q: 'What is the fastest way to pay?',
+        a: 'Paystack and PayPal are the fastest — books unlock automatically within seconds of payment confirmation. Paystack supports M-Pesa, Visa, Mastercard, and bank transfers. PayPal works great for international payments.',
+      },
+      {
+        q: 'Can I pay with a Visa or Mastercard?',
+        a: 'Yes. Choose "Pay Online" at checkout (powered by Paystack) or PayPal. Both accept Visa, Mastercard, and other major cards.',
+      },
+      {
+        q: 'Can I pay via PayPal?',
+        a: "Yes! Select PayPal at checkout. You'll be taken to PayPal's secure portal where you can pay using your PayPal balance, linked bank, or any card on your PayPal account. Payments are processed in USD — the approximate KES equivalent is shown before you confirm.",
       },
       {
         q: 'What is the M-Pesa till number or paybill?',
-        a: 'Our M-Pesa details are shown at checkout. You can also send money directly to our M-Pesa number: 0748 255 466 (Ellines Haven). Always use the number or till shown at checkout as it may be updated.',
+        a: 'Our M-Pesa details are shown at checkout. You can also send directly to 0748 255 466 (Ellines Haven). For instant STK push, simply select "Pay Online" — M-Pesa is included as a Paystack payment option.',
       },
       {
         q: 'How long does payment verification take?',
-        a: 'Usually within a few minutes during business hours (8am–8pm EAT, Monday to Saturday). Outside those hours it may take slightly longer but we aim to confirm all orders the same day.',
-      },
-      {
-        q: 'What happens after I submit my payment reference?',
-        a: `Your order goes to "Pending Verification". Once our team confirms your M-Pesa transaction code matches the amount, your books are automatically unlocked in your library. You'll see them immediately in My Library.`,
+        a: 'Paystack and PayPal verify instantly — books unlock in seconds. Airtel Money is verified manually, usually within minutes during business hours (8am–8pm EAT, Mon–Sat).',
       },
       {
         q: 'Can I pay via WhatsApp instead?',
-        a: 'Yes! If you prefer, click the "Order via WhatsApp" button on any book or at checkout. This opens a pre-filled message to our team who will guide you through payment manually.',
+        a: 'Yes! Click "Order via WhatsApp" on any book or at checkout. This opens a pre-filled message to our team who will guide you through payment manually.',
       },
       {
         q: 'Do you offer refunds?',
-        a: 'Because our books are digital and delivered instantly, we generally do not offer refunds after access has been granted. If there is a technical issue preventing you from reading your purchased book, contact us on WhatsApp at 0748 255 466 and we will make it right.',
+        a: 'Because our books are digital and delivered instantly, we generally do not offer refunds after access has been granted. If there is a technical issue preventing you from accessing your book, contact us on WhatsApp at 0748 255 466 and we will resolve it.',
       },
     ],
   },

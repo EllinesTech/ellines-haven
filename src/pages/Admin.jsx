@@ -3468,11 +3468,11 @@ export default function Admin() {
 
               {/* Card Payments */}
               <div className="card adm-settings-card">
-                <h3>💳 Card Payments</h3>
-                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Enable Stripe for Visa/Mastercard payments.</p>
+                <h3>💳 Card & International Payments</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Stripe for card payments. Paystack is already live.</p>
                 <div className="adm-field-group">
                   <label className="adm-check" style={{ marginBottom:12 }}>
-                    <input type="checkbox" checked={!!sForm.stripeEnabled} onChange={e => setSetting('stripeEnabled', e.target.checked)} /> Enable card payments
+                    <input type="checkbox" checked={!!sForm.stripeEnabled} onChange={e => setSetting('stripeEnabled', e.target.checked)} /> Enable Stripe card payments
                   </label>
                 </div>
                 <div className="adm-field-group">
@@ -3490,22 +3490,48 @@ export default function Admin() {
                 <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Card settings')}>Save Card Settings</button>
               </div>
 
+              {/* PayPal Settings */}
+              <div className="card adm-settings-card">
+                <h3>🅿 PayPal</h3>
+                <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>
+                  Accept PayPal, credit &amp; debit cards internationally. Charges in USD — KES equivalent shown to customer.
+                  Set <code style={{ color:'var(--gold)', fontSize:'0.78rem' }}>PAYPAL_CLIENT_ID</code>,{' '}
+                  <code style={{ color:'var(--gold)', fontSize:'0.78rem' }}>PAYPAL_CLIENT_SECRET</code>, and{' '}
+                  <code style={{ color:'var(--gold)', fontSize:'0.78rem' }}>PAYPAL_MODE</code> as Firebase secrets.
+                </p>
+                <div className="adm-field-group">
+                  <label>PayPal Client ID <span style={{ color:'var(--muted)', fontSize:'0.72rem' }}>(public — used to load PayPal SDK)</span></label>
+                  <input className="field" value={sForm.paypalClientId || ''} onChange={e => setSetting('paypalClientId', e.target.value)} placeholder="AXxxx… (live or sandbox)" />
+                </div>
+                <div className="adm-field-group">
+                  <label className="adm-check">
+                    <input type="checkbox" checked={!!sForm.paypalEnabled} onChange={e => setSetting('paypalEnabled', e.target.checked)} /> Show PayPal at checkout
+                  </label>
+                </div>
+                <div className="adm-info-note" style={{ marginTop:10, fontSize:'0.76rem' }}>
+                  💡 See <strong>functions/MPESA_SETUP.md → Part 3</strong> for full PayPal setup instructions including Firebase secrets.
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop:10 }} onClick={() => saveSettings('PayPal settings')}>Save PayPal Settings</button>
+              </div>
+
               {/* Active methods toggle */}
               <div className="card adm-settings-card">
                 <h3>✅ Active at Checkout</h3>
                 <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Toggle which payment methods customers can see at checkout.</p>
                 <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                   {[
-                    { key:'mpesa',  label:'M-Pesa',      icon:'📱' },
-                    { key:'airtel', label:'Airtel Money', icon:'📶' },
-                    { key:'card',   label:'Card (Stripe)',icon:'💳' },
+                    { key:'mpesa',    label:'M-Pesa (STK Push)', icon:'📱' },
+                    { key:'paystack', label:'Paystack (M-Pesa · Card · Bank)', icon:'🟢' },
+                    { key:'paypal',   label:'PayPal (International)', icon:'🅿' },
+                    { key:'airtel',   label:'Airtel Money', icon:'📶' },
+                    { key:'card',   label:'Card (Stripe)', icon:'💳' },
                   ].map(m => {
-                    const active = (sForm.payMethods || ['mpesa','airtel','card']).includes(m.key);
+                    const active = (sForm.payMethods || ['mpesa','paystack','airtel','card']).includes(m.key);
                     return (
                       <label key={m.key} className="adm-check" style={{ fontSize:'0.9rem' }}>
                         <input type="checkbox" checked={active}
                           onChange={e => {
-                            const cur = sForm.payMethods || ['mpesa','airtel','card'];
+                            const cur = sForm.payMethods || ['mpesa','paystack','airtel','card'];
                             setSetting('payMethods', e.target.checked ? [...cur, m.key] : cur.filter(x => x !== m.key));
                           }}
                         /> {m.icon} {m.label}
@@ -3514,7 +3540,7 @@ export default function Admin() {
                   })}
                 </div>
                 <div className="adm-info-note" style={{ marginTop:16 }}>
-                  Current flow: customer pays and enters M-Pesa/Airtel transaction code ? admin verifies in Orders tab ? books unlock automatically.
+                  Paystack &amp; PayPal unlock books <strong>automatically</strong>. Airtel Money requires manual verification in the Orders tab.
                 </div>
                 <button className="btn btn-primary btn-sm" style={{ marginTop:14 }} onClick={() => saveSettings('Payment methods')}>Save Active Methods</button>
               </div>

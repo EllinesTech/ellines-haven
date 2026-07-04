@@ -1,6 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { useState, useMemo } from 'react';
 
 /* ── Helpers ── */
 const fmtKsh  = n => 'KSh ' + Number(n || 0).toLocaleString();
@@ -8,7 +6,7 @@ const fmtDate = s => { try { return new Date(s).toLocaleDateString('en-KE', { da
 const monthKey = ts => { const d = new Date(ts || Date.now()); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
 const monthLabel = key => { const [y,m] = key.split('-'); return new Date(y, m-1, 1).toLocaleString('en-KE',{month:'short',year:'numeric'}); };
 
-export default function ReportsPanel({ orders = [], books = [], users = [], showToast }) {
+export default function ReportsPanel({ orders = [], showToast }) {
   const [range, setRange] = useState('all'); // all | month | week
   const [exportBusy, setExportBusy] = useState(false);
 
@@ -101,7 +99,16 @@ export default function ReportsPanel({ orders = [], books = [], users = [], show
     showToast?.('📊 Report exported');
   };
 
-  const methodColors = { mpesa:'#2ecc71', airtel:'#e8832a', card:'#4a9eff', unknown:'#64748b' };
+  const methodColors = {
+    mpesa:'#2ecc71', airtel:'#e8832a', card:'#4a9eff',
+    paystack:'#00c48c', paypal:'#0070f0',
+    mpesa_stk:'#2ecc71', wa:'#25D366', unknown:'#64748b',
+  };
+  const methodLabel = m => ({
+    mpesa:'M-Pesa', mpesa_stk:'M-Pesa STK', airtel:'Airtel Money',
+    card:'Card', paystack:'Paystack', paypal:'PayPal',
+    wa:'WhatsApp', unknown:'Other',
+  }[m] || m);
 
   return (
     <div className="adm-page">
@@ -198,7 +205,7 @@ export default function ReportsPanel({ orders = [], books = [], users = [], show
                 return (
                   <div key={m.method}>
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:5, alignItems:'center' }}>
-                      <span style={{ fontWeight:600, color:'var(--text)', textTransform:'capitalize' }}>{m.method}</span>
+                      <span style={{ fontWeight:600, color:'var(--text)' }}>{methodLabel(m.method)}</span>
                       <div style={{ display:'flex', gap:12 }}>
                         <span style={{ color:'var(--muted)' }}>{m.count} orders</span>
                         <span style={{ color, fontWeight:700 }}>{fmtKsh(m.revenue)}</span>
@@ -276,7 +283,7 @@ export default function ReportsPanel({ orders = [], books = [], users = [], show
                       {(o.items||[]).map(i=>i.title).join(', ').slice(0,60) + ((o.items||[]).map(i=>i.title).join(', ').length>60?'…':'')}
                     </td>
                     <td><strong style={{ color:'var(--gold)' }}>{fmtKsh(o.total)}</strong></td>
-                    <td><span className="adm-method-badge" style={{ textTransform:'capitalize' }}>{o.method}</span></td>
+                    <td><span className="adm-method-badge">{methodLabel(o.method)}</span></td>
                     <td style={{ fontSize:'0.78rem', color:'var(--muted)', whiteSpace:'nowrap' }}>{fmtDate(o.createdAt || o.date)}</td>
                   </tr>
                 ))}

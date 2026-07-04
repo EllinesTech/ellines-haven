@@ -22,5 +22,7 @@ export const functions = getFunctions(app, 'us-central1');
 export const callStkPush          = (data) => httpsCallable(functions, 'stkPush')(data);
 export const callQueryPayStatus   = (data) => httpsCallable(functions, 'queryPaymentStatus')(data);
 export const callVerifyPaystack   = (data) => httpsCallable(functions, 'verifyPaystackPayment')(data);
+export const callCreatePayPalOrder  = (data) => httpsCallable(functions, 'createPayPalOrder')(data);
+export const callCapturePayPalOrder = (data) => httpsCallable(functions, 'capturePayPalOrder')(data);
 
 export default app;

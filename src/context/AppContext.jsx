@@ -81,6 +81,8 @@ const DEFAULT_SETTINGS = {
   mpesaPhone:'0748255466', mpesaTill:'', mpesaName:'Ellines Haven',
   airtelNum:'', stripeEnabled:false, stripeKey:'', currency:'KES',
   payMethods:['mpesa','airtel','card'],
+  paypalClientId:'', paypalEnabled:false,
+  flutterwaveKey:'', flutterwaveEnabled:false,
 };
 
 export function AppProvider({ children }) {

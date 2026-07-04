@@ -52,9 +52,10 @@ export default function Terms() {
             <h2>4. Purchases and Payments</h2>
             <ul>
               <li>All prices are displayed in Kenyan Shillings (KSh) and include applicable taxes.</li>
-              <li>Payment is accepted via M-Pesa, Airtel Money, and card where available.</li>
-              <li>Book access is granted after payment has been verified by our team.</li>
-              <li>Verification typically occurs within minutes during business hours (8am–8pm EAT, Mon–Sat).</li>
+              <li>Payment is accepted via M-Pesa (STK push), Airtel Money, Paystack (Visa, Mastercard, bank transfer, M-Pesa), and PayPal.</li>
+              <li>Paystack and PayPal payments are verified automatically — books unlock instantly upon confirmation.</li>
+              <li>Airtel Money payments are verified manually, typically within minutes during business hours (8am–8pm EAT, Mon–Sat).</li>
+              <li>PayPal charges are processed in USD; the approximate KES equivalent is displayed at checkout.</li>
               <li>We reserve the right to cancel orders where payment cannot be verified.</li>
               <li>Prices may change at any time without prior notice.</li>
             </ul>

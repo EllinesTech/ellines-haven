@@ -291,10 +291,10 @@ export default function Home() {
       <div className="trust-bar">
         <div className="container trust-bar__inner">
           {[
-            { icon:'📱', title:'M-Pesa & Airtel',  desc:'Instant mobile payments'  },
-            { icon:'⬇️', title:'Download Forever', desc:'Buy once, keep forever'    },
-            { icon:'📖', title:'Read Online',       desc:'Beautiful built-in reader' },
-            { icon:'🔒', title:'Secure & Safe',     desc:'Protected transactions'    },
+            { icon:'📱', title:'M-Pesa, Airtel & PayPal', desc:'Instant secure payments'    },
+            { icon:'⬇️', title:'Download Forever',        desc:'Buy once, keep forever'     },
+            { icon:'📖', title:'Read Online',              desc:'Beautiful built-in reader'  },
+            { icon:'🔒', title:'Secure & Safe',            desc:'Protected transactions'     },
           ].map(f => (
             <div key={f.title} className="trust-bar__item">
               <span className="trust-bar__icon">{f.icon}</span>

@@ -45,7 +45,33 @@
     <!-- Paystack — preload so it's ready before checkout -->
     <link rel="preload" href="https://js.paystack.co/v1/inline.js" as="script" />
     <link rel="preconnect" href="https://js.paystack.co" />
-
+    <!-- PayPal — preconnect so SDK loads faster -->
+    <link rel="preconnect" href="https://www.paypal.com" />
+    <link rel="preconnect" href="https://www.paypalobjects.com" />
+    <link rel="dns-prefetch" href="https://www.paypal.com" />
+    <!-- Structured data — BookStore schema for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BookStore",
+      "name": "Ellines Haven",
+      "description": "Kenya's premier digital bookstore — original novels and short stories by Elijah Mwangi M, inspired by true East African stories.",
+      "url": "https://ellines-haven.pages.dev",
+      "logo": "https://ellines-haven.pages.dev/logo-icon.png",
+      "image": "https://ellines-haven.pages.dev/logo-rect.png",
+      "telephone": "+254748255466",
+      "email": "ellines.haven@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Nairobi",
+        "addressCountry": "KE"
+      },
+      "paymentAccepted": "M-Pesa, Paystack, PayPal, Airtel Money, Visa, Mastercard",
+      "currenciesAccepted": "KES, USD",
+      "openingHours": "Mo-Sa 08:00-20:00",
+      "sameAs": ["https://ellinestech.co.ke"]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

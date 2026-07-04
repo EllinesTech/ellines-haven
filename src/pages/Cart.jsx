@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db, callVerifyPaystack } from '../firebase';
+import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder } from '../firebase';
 import './Cart.css';
 
 // Paystack public key — live key
@@ -157,8 +157,7 @@ export default function Cart() {
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
-  const methods      = settings.payMethods || ['mpesa', 'airtel', 'card'];
-  const methodLabels = { mpesa: 'M-Pesa', airtel: 'Airtel Money', card: 'Card' };
+  const methodLabels = { mpesa: 'M-Pesa', airtel: 'Airtel Money', card: 'Card', paypal: 'PayPal' };
 
   // ── Permission / site-control gates ─────────────────────────────────────
   if (user && myPerms?.canPurchase === false) return (
@@ -265,6 +264,112 @@ export default function Cart() {
     setStep('pending');
   };
 
+  // ── PayPal payment flow ────────────────────────────────────────────────────
+  const submitPayPal = async e => {
+    e.preventDefault();
+    setStkError('');
+    setBusy(true);
+    try {
+      const order = await placeOrder([...cart], 'paypal', '', '');
+      setPlacedOrder(order);
+
+      // Convert KES → USD for PayPal (approximate rate; use a live rate API in production)
+      const KES_TO_USD = 0.0077;
+      const usdAmount  = (total * KES_TO_USD).toFixed(2);
+
+      // Create PayPal order via Cloud Function
+      const { data: ppData } = await callCreatePayPalOrder({
+        amount:    usdAmount,
+        orderId:   order.id,
+        userEmail: user.email,
+        currency:  'USD',
+      });
+
+      if (!ppData.paypalOrderId) throw new Error('Failed to create PayPal order');
+
+      if (!window.paypal) {
+        await new Promise((resolve, reject) => {
+          // Use the client-id from settings or fallback to sandbox for safety
+          const clientId = settings.paypalClientId || 'test';
+          const s = document.createElement('script');
+          s.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=USD&intent=capture`;
+          s.async = true;
+          s.onload = () => setTimeout(resolve, 200);
+          s.onerror = () => reject(new Error('Failed to load PayPal SDK'));
+          document.head.appendChild(s);
+        });
+      }
+
+      if (!window.paypal?.Buttons) throw new Error('PayPal SDK not available. Check PayPal Client ID in settings.');
+
+      setStep('paypal_modal');
+
+      // Render PayPal buttons in a modal container
+      await new Promise((resolve) => {
+        window.paypal.Buttons({
+          createOrder: () => ppData.paypalOrderId,
+          onApprove: async (data) => {
+            setStep('verifying');
+            try {
+              await callCapturePayPalOrder({
+                paypalOrderId: data.orderID,
+                orderId: order.id,
+                userEmail: user.email,
+              });
+              clearCart();
+              setStep('done');
+              resolve();
+            } catch (err) {
+              updateDoc(doc(db, 'orders', order.id), { status: 'PaymentFailed', failReason: err.message, updatedAt: serverTimestamp() }).catch(() => {});
+              setStkError('PayPal capture failed: ' + (err.message || 'unknown error'));
+              setStep('pay');
+              resolve();
+            }
+          },
+          onCancel: () => {
+            updateDoc(doc(db, 'orders', order.id), { status: 'Cancelled', cancelledAt: serverTimestamp(), updatedAt: serverTimestamp() }).catch(() => {});
+            setStkError('PayPal payment was cancelled.');
+            setStep('pay');
+            resolve();
+          },
+          onError: (err) => {
+            setStkError('PayPal error: ' + (err?.message || 'unknown error'));
+            setStep('pay');
+            resolve();
+          },
+          style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', height: 48 },
+        }).render('#paypal-button-container');
+      });
+    } catch (err) {
+      const msg = err?.details || err?.message || 'PayPal payment failed. Try again.';
+      setStkError(msg);
+      setStep('pay');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── PayPal modal screen ───────────────────────────────────────────────────
+  if (step === 'paypal_modal') return (
+    <main className="cart-page">
+      <div className="container" style={{ maxWidth:520, margin:'60px auto' }}>
+        <div className="card" style={{ padding:'30px 24px', textAlign:'center' }}>
+          <div style={{ fontSize:'2.5rem', marginBottom:12 }}>🅿</div>
+          <h2 style={{ marginBottom:6 }}>Pay with PayPal</h2>
+          <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:8 }}>
+            You'll be charged <strong style={{ color:'var(--gold)' }}>USD ~${(total * 0.0077).toFixed(2)}</strong>
+            <span style={{ color:'var(--muted)', fontSize:'0.78rem' }}> (≈ KSh {total.toLocaleString()})</span>
+          </p>
+          <p style={{ color:'var(--muted)', fontSize:'0.78rem', marginBottom:20 }}>Complete your payment securely via PayPal.</p>
+          <div id="paypal-button-container" style={{ minHeight:48 }} />
+          <button className="btn btn-ghost btn-sm" style={{ marginTop:16, width:'100%' }} onClick={() => setStep('pay')}>
+            ← Back to Payment Options
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+
   // ── STK Waiting screen (legacy) ──────────────────────────────────────────
   if (step === 'stk_waiting') return (
     <main className="cart-page">
@@ -351,6 +456,9 @@ export default function Cart() {
             <h3>Choose Payment Method</h3>
             <div className="pay-methods">
               <button className={'pay-btn' + (method === 'paystack' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paystack'); setStkError(''); }}>💳 Pay Online</button>
+              {(settings.paypalEnabled || settings.paypalClientId) && (
+                <button className={'pay-btn' + (method === 'paypal' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paypal'); setStkError(''); }}>🅿 PayPal</button>
+              )}
               <button className={'pay-btn' + (method === 'airtel'   ? ' pay-btn--on' : '')} onClick={() => { setMethod('airtel');   setStkError(''); }}>Airtel Money</button>
               <button className={'pay-btn' + (method === 'wa'       ? ' pay-btn--on' : '')} onClick={() => { setMethod('wa');       setStkError(''); }}>WhatsApp</button>
             </div>
@@ -369,6 +477,29 @@ export default function Cart() {
                 <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
                 <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy}>
                   {busy ? 'Opening payment…' : `⚡ Pay KSh ${total.toLocaleString()}`}
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
+              </form>
+            )}
+
+            {/* ── PayPal ── */}
+            {method === 'paypal' && (
+              <form onSubmit={submitPayPal}>
+                <div className="pay-mpesa-box">
+                  <div style={{ background:'rgba(0,112,240,0.07)', border:'1px solid rgba(0,112,240,0.2)', borderLeft:'3px solid #0070f0', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
+                    🅿 <strong style={{ color:'#0070f0' }}>PayPal</strong> — pay with your PayPal balance, linked bank, Visa, or Mastercard. Globally accepted.
+                  </div>
+                  <div className="pay-detail-row"><span>Amount (KES)</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
+                  <div className="pay-detail-row"><span>Amount (USD approx.)</span><strong style={{ color:'#0070f0' }}>~${(total * 0.0077).toFixed(2)}</strong></div>
+                  <div className="pay-detail-row"><span>Accepted</span><strong>PayPal · Visa · Mastercard · Bank</strong></div>
+                  <p style={{ color:'var(--muted)', fontSize:'0.76rem', marginTop:10 }}>
+                    Note: PayPal processes in USD. The USD amount shown is approximate.
+                  </p>
+                  {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
+                </div>
+                <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
+                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px', background:'#0070f0', borderColor:'#0070f0' }} disabled={busy}>
+                  {busy ? 'Connecting to PayPal…' : `🅿 Pay with PayPal`}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
@@ -418,6 +549,8 @@ export default function Cart() {
             <div className="pay-trust">
               {method === 'paystack'
                 ? <><span>⚡ Books unlock instantly after payment</span><span>M-Pesa · Card · Bank supported</span></>
+                : method === 'paypal'
+                ? <><span>🅿 PayPal secure checkout</span><span>Books unlock automatically on payment</span></>
                 : <><span>Books unlock after payment is verified</span><span>Usually within minutes</span></>
               }
             </div>

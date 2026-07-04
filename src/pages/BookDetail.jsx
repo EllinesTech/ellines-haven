@@ -385,7 +385,7 @@ export default function BookDetail() {
               )}
               <div className="bd-trust">
                 <span>✓ Instant access after payment</span>
-                <span>✓ M-Pesa &amp; Card accepted</span>
+                <span>✓ M-Pesa · Card · PayPal accepted</span>
                 <span>✓ Download or read online</span>
               </div>
             </div>

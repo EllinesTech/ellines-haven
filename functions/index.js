@@ -24,6 +24,9 @@ const PASSKEY         = defineSecret("MPESA_PASSKEY");
 const CALLBACK_URL    = defineSecret("MPESA_CALLBACK_URL");
 const MPESA_ENV       = defineSecret("MPESA_ENV");
 const PAYSTACK_SECRET = defineSecret("PAYSTACK_SECRET");
+const PAYPAL_CLIENT_ID     = defineSecret("PAYPAL_CLIENT_ID");
+const PAYPAL_CLIENT_SECRET = defineSecret("PAYPAL_CLIENT_SECRET");
+const PAYPAL_MODE          = defineSecret("PAYPAL_MODE"); // "sandbox" | "live"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const libDocId = (email) =>
@@ -446,6 +449,170 @@ exports.verifyPaystackPayment = onCall(
       return { success: true, channel: data.channel, amount: data.amount / 100 };
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
+      throw new HttpsError("internal", msg);
+    }
+  }
+);
+
+// ── PayPal ─────────────────────────────────────────────────────────────────────
+// Get PayPal OAuth2 access token
+async function getPayPalToken(clientId, clientSecret, mode) {
+  const base = mode === "live"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com";
+  const creds = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  const res = await axios.post(
+    `${base}/v1/oauth2/token`,
+    "grant_type=client_credentials",
+    {
+      headers: {
+        Authorization: `Basic ${creds}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    }
+  );
+  return { token: res.data.access_token, base };
+}
+
+// Create a PayPal Order (callable — frontend requests a PayPal order ID)
+exports.createPayPalOrder = onCall(
+  {
+    secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { amount, orderId, userEmail, currency } = request.data;
+    if (!amount || !orderId || !userEmail) {
+      throw new HttpsError("invalid-argument", "Missing: amount, orderId, userEmail");
+    }
+
+    const clientId     = PAYPAL_CLIENT_ID.value();
+    const clientSecret = PAYPAL_CLIENT_SECRET.value();
+    const mode         = PAYPAL_MODE.value() || "live";
+
+    try {
+      const { token, base } = await getPayPalToken(clientId, clientSecret, mode);
+      const cur = (currency || "USD").toUpperCase();
+      // PayPal only accepts USD natively — for KES orders, amount should be converted before calling
+      const res = await axios.post(
+        `${base}/v2/checkout/orders`,
+        {
+          intent: "CAPTURE",
+          purchase_units: [
+            {
+              reference_id: orderId,
+              amount: { currency_code: cur, value: parseFloat(amount).toFixed(2) },
+              description: "Ellines Haven — Book Purchase",
+            },
+          ],
+          application_context: {
+            brand_name: "Ellines Haven",
+            landing_page: "NO_PREFERENCE",
+            user_action: "PAY_NOW",
+          },
+        },
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+      );
+
+      const ppOrderId = res.data.id;
+
+      // Store the PayPal order ID against our order so capture can find it
+      await db.collection("orders").doc(orderId).update({
+        paypalOrderId: ppOrderId,
+        paypalMode: mode,
+        paypalCurrency: cur,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return { success: true, paypalOrderId: ppOrderId };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      console.error("[createPayPalOrder] error:", msg, err.response?.data);
+      throw new HttpsError("internal", msg);
+    }
+  }
+);
+
+// Capture a PayPal Order (callable — called after customer approves on PayPal)
+exports.capturePayPalOrder = onCall(
+  {
+    secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { paypalOrderId, orderId, userEmail } = request.data;
+    if (!paypalOrderId || !orderId || !userEmail) {
+      throw new HttpsError("invalid-argument", "Missing: paypalOrderId, orderId, userEmail");
+    }
+
+    const clientId     = PAYPAL_CLIENT_ID.value();
+    const clientSecret = PAYPAL_CLIENT_SECRET.value();
+    const mode         = PAYPAL_MODE.value() || "live";
+
+    try {
+      const { token, base } = await getPayPalToken(clientId, clientSecret, mode);
+      const res = await axios.post(
+        `${base}/v2/checkout/orders/${paypalOrderId}/capture`,
+        {},
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+      );
+
+      const capture   = res.data.purchase_units?.[0]?.payments?.captures?.[0];
+      const captureId = capture?.id || "";
+      const paidAmt   = parseFloat(capture?.amount?.value || 0);
+      const currency  = capture?.amount?.currency_code || "USD";
+
+      if (res.data.status !== "COMPLETED") {
+        throw new HttpsError("failed-precondition", `PayPal order status: ${res.data.status}`);
+      }
+
+      // Fetch order to get items
+      const orderSnap = await db.collection("orders").doc(orderId).get();
+      if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
+      const order = orderSnap.data();
+
+      if (order.status === "Completed") {
+        return { success: true, captureId, alreadyCompleted: true };
+      }
+
+      // Mark completed
+      await db.collection("orders").doc(orderId).update({
+        status:         "Completed",
+        paypalCaptureId: captureId,
+        paypalOrderId,
+        paidAmount:     paidAmt,
+        paypalCurrency: currency,
+        confirmedAt:    admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:      admin.firestore.FieldValue.serverTimestamp(),
+        paymentMethod:  "paypal",
+      });
+
+      // Unlock books
+      await unlockBooksForUser(order.userEmail || userEmail, order.items || []);
+      console.log("[capturePayPalOrder] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+
+      // Notify admin
+      await db.collection("admin_notifications").doc(orderId + "_pp").set({
+        type:           "order_confirmed_auto",
+        orderId,
+        userName:       order.userName,
+        userEmail:      order.userEmail,
+        total:          paidAmt,
+        paypalCaptureId: captureId,
+        currency,
+        status:         "unread",
+        createdAt:      admin.firestore.FieldValue.serverTimestamp(),
+      }).catch(() => {});
+
+      return { success: true, captureId };
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      console.error("[capturePayPalOrder] error:", msg, err.response?.data);
+      if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", msg);
     }
   }
