@@ -623,34 +623,36 @@ export default function MessagesPanel({ showToast, users = [] }) {
             const isActive = selected?.id === m.id;
             const isListSelected = listSelected.has(m.id);
             return (
-              <div key={m.id}
-                style={{ position:'relative', display:'flex', alignItems:'stretch', gap: listSelectMode ? 8 : 0 }}>
-                {/* checkbox */}
-                {listSelectMode && (
-                  <div
-                    onClick={() => toggleListSelect(m.id)}
-                    style={{
-                      width:20, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', paddingLeft:8, cursor:'pointer',
-                    }}>
-                    <div style={{
-                      width:18, height:18, borderRadius:4,
-                      border:`2px solid ${isListSelected?'var(--gold)':'rgba(255,255,255,0.2)'}`,
-                      background: isListSelected ? 'var(--gold)' : 'transparent',
-                      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
-                    }}>
-                      {isListSelected && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                    </div>
-                  </div>
-                )}
-                <div onClick={() => listSelectMode ? toggleListSelect(m.id) : openMessage(m)}
+              <div key={m.id} style={{ position:'relative' }}>
+                <div
+                  onClick={() => listSelectMode ? toggleListSelect(m.id) : openMessage(m)}
                   style={{
-                    flex:1,
                     padding:'14px 16px',
+                    paddingLeft: listSelectMode ? '46px' : '16px',
                     background: isActive ? 'rgba(201,168,76,0.09)' : isListSelected ? 'rgba(201,168,76,0.06)' : 'var(--card)',
-                    border: isActive ? '1px solid rgba(201,168,76,0.45)' : '1px solid var(--border)',
+                    border: isListSelected ? '1px solid rgba(201,168,76,0.45)' : isActive ? '1px solid rgba(201,168,76,0.45)' : '1px solid var(--border)',
                     borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .15s',
-                    borderLeft:`3px solid ${st==='new'?'#e8832a':isActive?'var(--gold)':'transparent'}`,
+                    borderLeft:`3px solid ${isListSelected?'var(--gold)':st==='new'?'#e8832a':isActive?'var(--gold)':'transparent'}`,
                   }}>
+                  {/* ── Checkbox — floated left inside the row ── */}
+                  {listSelectMode && (
+                    <div
+                      onClick={e => { e.stopPropagation(); toggleListSelect(m.id); }}
+                      style={{
+                        position:'absolute', left:14, top:'50%', transform:'translateY(-50%)',
+                        width:20, height:20, borderRadius:5, cursor:'pointer', flexShrink:0,
+                        border:`2px solid ${isListSelected ? 'var(--gold)' : 'rgba(255,255,255,0.35)'}`,
+                        background: isListSelected ? 'var(--gold)' : 'rgba(255,255,255,0.04)',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        transition:'all 0.12s', zIndex:2,
+                      }}>
+                      {isListSelected && (
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                          <polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                  )}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                       <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.15)', color:'var(--gold)', fontWeight:700, fontSize:'0.88rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -671,7 +673,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   </div>
                   <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{fmtDate(m.createdAt)}</div>
                 </div>
-                {/* quick delete in normal mode */}
+                {/* quick delete — only in normal mode */}
                 {!listSelectMode && (
                   <button
                     onClick={e => { e.stopPropagation(); deleteMsg(m.id); }}
