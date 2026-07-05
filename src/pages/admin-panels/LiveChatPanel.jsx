@@ -33,8 +33,9 @@ export default function LiveChatPanel({ showToast }) {
   const [chatReply,       setChatReply]       = useState('');
   const [chatSending,     setChatSending]     = useState(false);
   const [agentOnline,     setAgentOnline]     = useState(false);
-  const [selected,   setSelected]   = useState(new Set()); // multi-select
-  const [delConfirm, setDelConfirm] = useState(null);      // sessionId | 'bulk' | null
+  const [loading,         setLoading]         = useState(true);
+  const [selected,        setSelected]        = useState(new Set());
+  const [delConfirm,      setDelConfirm]      = useState(null);
   const chatBottomRef     = useRef(null);
   const prevChatIds       = useRef(new Set());
   const chatMounted       = useRef(false);
