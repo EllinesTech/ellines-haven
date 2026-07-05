@@ -1,6 +1,12 @@
+/* ══════════════════════════════════════════════════════
+   NAVBAR — fully responsive, no overflow on any device
+══════════════════════════════════════════════════════ */
 .nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
   padding: 6px 0;
+  /* Critical: prevent the nav itself from being wider than the viewport */
+  width: 100%;
+  max-width: 100vw;
   overflow: visible;
   transition: background .3s, padding .3s, border-color .3s;
 }
@@ -11,20 +17,27 @@
   border-bottom: 1px solid rgba(201,168,76,.18);
   box-shadow: 0 4px 30px rgba(0,0,0,.5);
 }
+
+/* Inner row — brand | links(desktop) | actions */
 .nav__inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px;
   min-height: 80px;
+  /* Never wider than viewport */
+  width: 100%;
   overflow: visible;
 }
 
+/* ── Brand ── */
 .nav__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
+  gap: 10px;
+  /* Allow brand to shrink on small screens instead of pushing actions off screen */
+  flex: 1 1 auto;
+  min-width: 0;
   text-decoration: none;
   overflow: visible;
 }
@@ -47,6 +60,7 @@
   flex-direction: column;
   gap: 1px;
   line-height: 1;
+  min-width: 0;
 }
 .nav__brand-name {
   font-family: 'Playfair Display', serif;
@@ -68,13 +82,21 @@
 /* keep old helpers hidden */
 .ellines-logo { display: none; }
 
-.nav__links { display: flex; list-style: none; gap: 30px; }
+/* ── Desktop links ── */
+.nav__links { display: flex; list-style: none; gap: 30px; flex-shrink: 0; }
 .nav__links a { font-size: .9rem; font-weight: 500; color: var(--muted); transition: color .2s; }
 .nav__links a:hover, .nav__links a.active { color: var(--gold); }
 
-.nav__actions { display: flex; align-items: center; gap: 10px; }
+/* ── Actions row (right side) ── */
+.nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0; /* Never let this compress — it contains the burger */
+}
 
-.nav__cart { position: relative; color: var(--muted); padding: 6px; transition: color .2s; }
+/* ── Cart / icon buttons ── */
+.nav__cart { position: relative; color: var(--muted); padding: 6px; transition: color .2s; display: flex; align-items: center; }
 .nav__cart:hover { color: var(--gold); }
 .nav__cart-badge {
   position: absolute; top: -4px; right: -4px;
@@ -84,12 +106,14 @@
   display: flex; align-items: center; justify-content: center;
 }
 
+/* ── User avatar + dropdown ── */
 .nav__user { position: relative; }
 .nav__avatar-btn {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 12px; border-radius: var(--r-sm);
   color: var(--text); cursor: pointer;
   transition: background .2s;
+  white-space: nowrap;
 }
 .nav__avatar-btn:hover { background: rgba(255,255,255,.08); }
 .nav__avatar {
@@ -97,12 +121,13 @@
   background: var(--grad-gold); color: var(--on-gold);
   font-weight: 700; font-size: .82rem;
   display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
 .nav__dropdown {
   position: absolute; top: calc(100% + 8px); right: 0;
   background: #13131f;
   border: 1px solid rgba(201,168,76,0.3);
-  border-radius: var(--r); min-width: 190px;
+  border-radius: var(--r); min-width: 200px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.7);
   overflow: hidden;
   z-index: 3000;
@@ -115,67 +140,131 @@
 }
 .nav__dropdown a:hover, .nav__dropdown button:hover { background: rgba(201,168,76,0.1); color: var(--gold); }
 
+/* Logout in dropdown — distinct style */
+.nav__dropdown-logout {
+  border-top: 1px solid rgba(255,255,255,0.06) !important;
+  color: #e74c3c !important;
+}
+.nav__dropdown-logout:hover { background: rgba(231,76,60,0.1) !important; color: #e74c3c !important; }
+
+/* ── Auth buttons (desktop only) ── */
 .nav__auth { display: flex; gap: 8px; }
 
-.nav__burger { display: none; flex-direction: column; gap: 5px; padding: 4px; }
+/* ── Burger ── */
+.nav__burger { display: none; flex-direction: column; gap: 5px; padding: 6px; cursor: pointer; }
 .nav__burger span { display: block; width: 22px; height: 2px; background: var(--text); border-radius: 2px; transition: all .3s; }
 .nav__burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
 .nav__burger.open span:nth-child(2) { opacity: 0; }
 .nav__burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
+/* ── Mobile drawer ── */
 .nav__mobile {
   display: flex; flex-direction: column;
-  background: rgba(19,19,43,.98); border-top: 1px solid var(--border);
-  padding: 12px 16px 20px;
+  background: rgba(13,13,30,.99);
+  border-top: 1px solid var(--border);
+  padding: 8px 16px 24px;
+  /* Ensure it doesn't overflow horizontally */
+  width: 100%;
+  overflow-x: hidden;
 }
 .nav__mobile a, .nav__mobile button {
-  display: block; padding: 12px 14px;
+  display: flex; align-items: center;
+  padding: 13px 14px;
   font-size: .95rem; color: var(--text); border-radius: var(--r-sm);
   transition: background .2s; text-align: left; cursor: pointer;
+  width: 100%; border: none; background: none; font-family: 'Inter', sans-serif;
 }
 .nav__mobile a:hover, .nav__mobile button:hover { background: rgba(255,255,255,.06); color: var(--gold); }
-.nav__mobile-divider { height: 1px; background: var(--dim); margin: 8px 0; }
+.nav__mobile-divider { height: 1px; background: var(--dim); margin: 6px 0; }
 
+/* Sign out button in mobile drawer — red tint */
+.nav__mobile-signout {
+  color: #e74c3c !important;
+  margin-top: 4px;
+}
+.nav__mobile-signout:hover { background: rgba(231,76,60,0.08) !important; }
+
+/* User info header in mobile drawer */
+.nav__mobile-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(201,168,76,0.06);
+  border-radius: var(--r-sm);
+  margin-bottom: 4px;
+}
+.nav__mobile-user-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--grad-gold);
+  color: var(--on-gold);
+  font-weight: 800;
+  font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.nav__mobile-user-name { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.nav__mobile-user-role { font-size: 0.72rem; color: var(--gold); margin-top: 1px; }
+
+/* ════════════════════════════════════════
+   MOBILE BREAKPOINT — max-width: 768px
+   Goal: brand(logo+name) | [cart] [avatar] [burger]
+   Everything else moves to the mobile drawer
+════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .nav__links, .nav__auth { display: none; }
+  /* Hide desktop-only elements */
+  .nav__links,
+  .nav__auth { display: none; }
+
+  /* Show burger */
   .nav__burger { display: flex; }
+
+  /* Tighter navbar height */
+  .nav__inner { min-height: 60px; gap: 8px; }
+
+  /* Shrink logo */
+  .nav__logo-img { height: 44px; }
+
+  /* Shrink brand text */
   .nav__brand-tagline { display: none; }
-  .nav__brand-name { font-size: 1.15rem; }
-  .nav__logo-img { height: 52px; max-width: none; }
-  .nav__inner { min-height: 64px; overflow: visible; }
+  .nav__brand-name { font-size: 1.1rem; }
 
-  /* On mobile keep only cart + burger visible in the action row;
-     hide the desktop-only extras (language switcher, wishlist bell,
-     admin bell, user-notifications bell, avatar button) */
-  .nav__actions > *:not(.nav__cart):not(.nav__burger):not(.nav__user) {
-    display: none;
-  }
+  /* Hide desktop-only action items — LanguageSwitcher, extra bells */
+  /* We use a class-based approach for clarity */
+  .nav__hide-mobile { display: none !important; }
 
-  /* Compact avatar button — hide the name label and chevron,
-     show only the avatar circle so it fits beside the burger */
-  .nav__avatar-btn span,
+  /* Compact avatar button — show just the circle, no name/chevron */
+  .nav__avatar-btn-label,
   .nav__avatar-btn > svg,
-  .nav__super-badge {
-    display: none;
-  }
-  .nav__avatar-btn {
-    padding: 4px;
-  }
+  .nav__super-badge { display: none; }
+  .nav__avatar-btn { padding: 3px; }
 
-  /* Dropdown stays usable — realign it to avoid going off-screen */
+  /* Tighter actions gap */
+  .nav__actions { gap: 4px; }
+
+  /* Dropdown — keep it inside viewport, never go off right edge */
   .nav__dropdown {
     right: 0;
     left: auto;
-    min-width: 180px;
-  }
-
-  /* Reduce gap so everything fits comfortably */
-  .nav__actions {
-    gap: 6px;
+    min-width: 200px;
+    /* If near left edge, shift right to stay inside viewport */
+    max-width: calc(100vw - 16px);
   }
 }
 
-/* Super Admin styles */
+/* ── Very small phones (320–380px) ── */
+@media (max-width: 380px) {
+  .nav__logo-img { height: 38px; }
+  .nav__brand-name { font-size: 0.98rem; }
+  .nav__inner { gap: 6px; }
+  .nav__actions { gap: 2px; }
+  .nav__cart { padding: 5px; }
+}
+
+/* ════════════════════════════════════════
+   Super Admin styles
+════════════════════════════════════════ */
 .nav__avatar--super {
   background: linear-gradient(135deg, #c9a84c, #e8c96d);
   color: #000;

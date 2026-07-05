@@ -71,12 +71,42 @@ select.field option { background:#1a1a30; color:#f0ece2; }
    GLOBAL RESPONSIVE — mobile-first fixes
 ════════════════════════════════════════ */
 
-/* ── Prevent horizontal overflow on all devices ── */
-html, body {
+/* ════════════════════════════════════════
+   GLOBAL RESPONSIVE — prevent any content
+   from being hidden or overflowing on mobile
+════════════════════════════════════════ */
+
+/* Prevent horizontal scroll on the page — but NEVER clip content vertically */
+html {
   overflow-x: hidden;
-  max-width: 100vw;
+}
+body {
+  overflow-x: hidden;
+  /* Allow full width — images/grids will wrap naturally */
+  width: 100%;
+  min-width: 0;
 }
 *, *::before, *::after { box-sizing: border-box; }
+
+/* All images and videos are responsive by default */
+img, video, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Tables that overflow scroll horizontally instead of clipping */
+table {
+  border-collapse: collapse;
+}
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix: inputs never exceed their container */
+input, select, textarea {
+  max-width: 100%;
+}
 
 /* ── Floating action buttons — clean vertical stack ──
    All three buttons use the same right edge (20px)

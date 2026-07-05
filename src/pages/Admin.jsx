@@ -2225,7 +2225,23 @@ export default function Admin() {
   const [reviews, setReviews] = useState(MOCK_REVIEWS_INIT);
   const [promos,  setPromos]  = useState(PROMO_INIT);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // ── Multi-select state (shared, keyed by tab) ─────────────────────────────
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Detect mobile
+  const isMobile = () => typeof window !== 'undefined' && window.innerWidth <= 768;
+
+  const toggleSidebar = () => {
+    if (isMobile()) {
+      setMobileSidebarOpen(o => !o);
+    } else {
+      setSidebarCollapsed(c => !c);
+    }
+  };
+
+  // Close mobile sidebar on tab change
+  useEffect(() => {
+    if (isMobile()) setMobileSidebarOpen(false);
+  }, [tab]); // eslint-disable-line
   const [selectedIds, setSelectedIds] = useState(new Set());
   const toggleSelect  = id => setSelectedIds(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n; });
   const selectAll     = ids => setSelectedIds(new Set(ids));
@@ -2696,15 +2712,25 @@ export default function Admin() {
   ];
 
   return (
-    <div className={`adm${sidebarCollapsed ? ' adm--collapsed' : ''}`}>
-      {/* ── Sidebar collapse toggle ── */}
+    <div className={`adm${sidebarCollapsed ? ' adm--collapsed' : ''}${mobileSidebarOpen ? ' adm--mobile-open' : ''}`}>
+      {/* ── Sidebar toggle — works as hamburger on mobile, collapse on desktop ── */}
       <button
         className="adm-sidebar-toggle"
-        onClick={() => setSidebarCollapsed(c => !c)}
-        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        onClick={toggleSidebar}
+        title={mobileSidebarOpen ? 'Close menu' : sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-label="Toggle sidebar"
       >
-        {sidebarCollapsed ? '→' : '←'}
+        {mobileSidebarOpen ? '✕' : sidebarCollapsed ? '→' : '☰'}
       </button>
+
+      {/* ── Mobile backdrop — tap to close sidebar ── */}
+      {mobileSidebarOpen && (
+        <div
+          style={{ position:'fixed', inset:0, zIndex:298 }}
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
       <aside className="adm-sidebar">
         <div className="adm-sidebar-logo">

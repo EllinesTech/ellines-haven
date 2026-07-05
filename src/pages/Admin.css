@@ -10,17 +10,17 @@
 .adm-sidebar-toggle {
   position: fixed;
   top: 50%;
-  left: 208px;
+  left: 260px;
   transform: translateY(-50%);
   z-index: 200;
-  width: 20px;
-  height: 40px;
+  width: 22px;
+  height: 42px;
   border-radius: 0 8px 8px 0;
   background: var(--gold);
   color: #000;
   border: none;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -28,7 +28,7 @@
   transition: left 0.25s;
   box-shadow: 3px 0 10px rgba(0,0,0,0.3);
 }
-.adm--collapsed .adm-sidebar-toggle { left: 48px; }
+.adm--collapsed .adm-sidebar-toggle { left: 60px; }
 
 /* ── Sidebar ── */
 .adm-sidebar {
@@ -817,19 +817,173 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Responsive ── */
+/* ══════════════════════════════════════════════════════
+   ADMIN — FULLY RESPONSIVE MOBILE LAYOUT
+   Mobile: sidebar slides in as a drawer from the left,
+   triggered by the existing sidebar-toggle button
+══════════════════════════════════════════════════════ */
+
+/* ── Responsive breakpoints ── */
 @media (max-width: 1024px) {
   .adm-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .adm-dash-grid  { grid-template-columns: 1fr; }
   .adm-settings-grid { grid-template-columns: 1fr; }
+  .adm-stats-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Tablet / Small laptop ── */
+@media (max-width: 900px) {
+  /* Sidebar becomes narrower but stays fixed */
+  .adm-sidebar { width: 220px !important; }
+  .adm-main    { margin-left: 220px !important; }
+  .adm--collapsed .adm-sidebar { width: 56px !important; }
+  .adm--collapsed .adm-main    { margin-left: 56px !important; }
+}
+
+/* ── Mobile — sidebar becomes an overlay drawer ── */
 @media (max-width: 768px) {
-  .adm-sidebar { position: static; width: 100%; flex-direction: row; flex-wrap: wrap; height: auto; }
-  .adm-sidebar-footer { flex-direction: row; align-items: center; }
-  .adm-main { margin-left: 0; padding: 20px; }
-  .adm-stats-grid { grid-template-columns: 1fr 1fr; }
-  .adm-form-grid { grid-template-columns: 1fr; }
+  /* Full-screen admin layout */
+  .adm {
+    position: relative;
+  }
+
+  /* Sidebar: fixed overlay that slides in from left */
+  .adm-sidebar {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    width: 260px !important;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Ensure the sidebar is always full-height with scroll */
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-direction: column;
+  }
+
+  /* When sidebar is open on mobile — slide it in */
+  .adm--mobile-open .adm-sidebar {
+    transform: translateX(0);
+    box-shadow: 4px 0 40px rgba(0,0,0,0.7);
+  }
+
+  /* Dimming overlay behind sidebar on mobile */
+  .adm--mobile-open::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 299;
+    backdrop-filter: blur(2px);
+  }
+
+  /* Main content — full width, no left margin on mobile */
+  .adm-main {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+
+  /* Toggle button repositions to top-left on mobile */
+  .adm-sidebar-toggle {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    transform: none;
+    z-index: 301;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+  /* When sidebar is open on mobile, move toggle to ride beside it */
+  .adm--mobile-open .adm-sidebar-toggle {
+    left: 268px;
+  }
+  /* Keep collapsed toggle in normal position (not needed on mobile, but reset it) */
+  .adm--collapsed .adm-sidebar-toggle {
+    left: 14px;
+    top: 14px;
+    transform: none;
+  }
+
+  /* Main scroll area — full width, reasonable padding */
+  .adm-main-scroll {
+    padding: 16px 14px;
+  }
+
+  /* Page max-width — let it fill the screen */
+  .adm-page {
+    max-width: 100%;
+  }
+  .adm-main-scroll > * {
+    max-width: 100%;
+  }
+
+  /* Page head — stack on mobile */
+  .adm-page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .adm-page-head > div:last-child {
+    justify-content: flex-start;
+  }
+
+  /* Stats grid — always 2 cols on mobile */
+  .adm-stats-grid,
+  .adm-stats-grid.cols-4,
+  .adm-stats-grid.cols-5 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Form grids — single column */
+  .adm-form-grid  { grid-template-columns: 1fr; }
   .adm-styled-row { grid-template-columns: 1fr; }
+  .adm-settings-grid { grid-template-columns: 1fr; }
+  .adm-dash-grid { grid-template-columns: 1fr; }
+
+  /* Tables — horizontal scroll */
+  .adm-table { min-width: 500px; }
+  .card:has(.adm-table) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Toolbar — wrap on small screens */
+  .adm-toolbar { flex-wrap: wrap; }
+  .adm-search  { max-width: 100%; flex: 1 1 200px; }
+
+  /* Book form overlay — full screen on mobile */
+  .adm-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .adm-bookform {
+    max-width: 100%;
+    max-height: 95vh;
+    border-radius: var(--r) var(--r) 0 0;
+  }
+
+  /* Messages / Live Chat split — stack vertically */
+  .adm-messages-grid--split {
+    grid-template-columns: 1fr;
+  }
+  .adm-livechat-shell {
+    grid-template-columns: 1fr;
+  }
+
+  /* Photo grid — smaller on mobile */
+  .adm-photo-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+
+  /* Pay add form */
+  .adm-pay-add-form > div { grid-template-columns: 1fr !important; }
+}
+
+/* ── Very small phones ── */
+@media (max-width: 380px) {
+  .adm-main-scroll { padding: 12px 10px; }
+  .adm-stats-grid,
+  .adm-stats-grid.cols-4,
+  .adm-stats-grid.cols-5 { grid-template-columns: 1fr 1fr; }
+  .adm-stat-card { padding: 12px 10px; }
+  .adm-stat-body strong { font-size: 1.1rem; }
+  .adm-page-head h1 { font-size: 1.25rem; }
 }
 
 /* ── New admin elements ── */
@@ -946,9 +1100,7 @@
   line-height: 1.6;
 }
 
-@media (max-width: 768px) {
-  .adm-settings-grid { grid-template-columns: 1fr; }
-}
+/* Settings grid mobile override — handled in main responsive block above */
 
 /* Custom payment method add form */
 .adm-pay-add-form {
