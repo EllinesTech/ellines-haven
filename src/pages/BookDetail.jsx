@@ -410,6 +410,25 @@ export default function BookDetail() {
               <span className="bd-genre">{book.genre}</span>
               <h1 className="bd-title">{book.title}</h1>
               <p className="bd-author">by <strong>{book.author}</strong></p>
+
+              {/* ── Genre tags ── */}
+              {book.genres && book.genres.length > 0 && (
+                <div className="bd-genre-tags">
+                  {book.genres.map(g => (
+                    <span key={g} className="bd-genre-tag">{g}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Setting ── */}
+              {book.setting && (
+                <div className="bd-setting">
+                  <span className="bd-setting-icon">📍</span>
+                  <span>{book.setting}</span>
+                </div>
+              )}
+
+              {/* ── Status notice ── */}
               {book.status && book.status !== 'complete' && (() => {
                 const meta = {
                   ongoing:      { msg:'This book is being released in chapters. New chapters added regularly.', color:'#4a9eff' },
@@ -431,7 +450,13 @@ export default function BookDetail() {
                 <span style={{color:'var(--gold)'}}>{'★'.repeat(Math.floor(book.rating))}</span>
                 <strong>{book.rating}</strong>
                 <span className="bd-muted">({book.reviews} reviews)</span>
+                {book.audienceRating && (
+                  <span className="bd-audience-tag">{book.audienceRating}</span>
+                )}
               </div>
+              {book.ratingQuote && (
+                <blockquote className="bd-rating-quote">{book.ratingQuote}</blockquote>
+              )}
               <div className="bd-meta">
                 {book.status === 'ongoing'
                   ? <>
@@ -452,11 +477,38 @@ export default function BookDetail() {
                   : <>
                       <div><small>Pages</small><strong>{book.pages > 0 ? book.pages : '—'}</strong></div>
                       <div><small>Read Time</small><strong>{book.readTime}</strong></div>
+                      {book.chapterCount > 0 && (
+                        <div><small>Chapters</small><strong>{book.chapterCount}</strong></div>
+                      )}
                       <div><small>Published</small><strong>{new Date(book.date).toLocaleDateString('en-KE',{year:'numeric',month:'short'})}</strong></div>
                     </>
                 }
               </div>
-              <p className="bd-desc">{book.description}</p>
+              {/* ── Excerpt (short teaser) ── */}
+              {book.excerpt && (
+                <div className="bd-excerpt-block">
+                  <p className="bd-excerpt-text">{book.excerpt}</p>
+                </div>
+              )}
+
+              {/* ── Themes ── */}
+              {book.themes && book.themes.length > 0 && (
+                <div className="bd-themes">
+                  <span className="bd-themes-label">Themes:</span>
+                  <div className="bd-themes-list">
+                    {book.themes.map(t => (
+                      <span key={t} className="bd-theme-tag">{t}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Full Description ── */}
+              <div className="bd-full-desc">
+                {(book.description || '').split('\n\n').map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
 
               {/* Coming Soon / Draft — no purchase, just notify */}
               {(book.status === 'coming-soon' || book.status === 'draft') ? (
@@ -524,6 +576,48 @@ export default function BookDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Author's Note ── */}
+      {book.authorNote && (
+        <section className="section bd-authornote-section">
+          <div className="container">
+            <div className="bd-authornote">
+              <div className="bd-authornote-header">
+                <span className="bd-authornote-icon">✍️</span>
+                <h2>Author's Note</h2>
+              </div>
+              <div className="bd-authornote-body">
+                {book.authorNote.split('\n\n').map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+              <div className="bd-authornote-sig">— {book.author}</div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Table of Contents ── */}
+      {book.tableOfContents && book.tableOfContents.length > 0 && (
+        <section className="section bd-toc-section">
+          <div className="container">
+            <div className="bd-toc">
+              <div className="bd-toc-header">
+                <h2>Table of Contents</h2>
+                <span className="bd-toc-count">{book.tableOfContents.length} {book.type === 'short-story' ? 'stories' : 'chapters'}</span>
+              </div>
+              <ol className="bd-toc-list">
+                {book.tableOfContents.map((item, i) => (
+                  <li key={i} className="bd-toc-item">
+                    <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="bd-toc-title">{item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '')}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
+      )}
       {related.length > 0 && (
         <section className="section">
           <div className="container">

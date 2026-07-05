@@ -273,3 +273,237 @@
   color: var(--muted);
   font-style: italic;
 }
+
+/* ════════════════════════════════════════
+   RICH BOOK DETAIL — NEW FIELDS
+════════════════════════════════════════ */
+
+/* ── Genre tags ── */
+.bd-genre-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.bd-genre-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(201,168,76,0.08);
+  border: 1px solid rgba(201,168,76,0.22);
+  border-radius: 20px;
+  color: rgba(200,196,215,0.85);
+  font-size: 0.73rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+/* ── Setting ── */
+.bd-setting {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.83rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.bd-setting-icon { font-size: 0.9rem; }
+
+/* ── Audience rating badge in stars row ── */
+.bd-audience-tag {
+  display: inline-block;
+  padding: 2px 9px;
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 12px;
+  color: #e74c3c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-left: 4px;
+}
+
+/* ── Rating quote ── */
+.bd-rating-quote {
+  margin: 0 0 20px;
+  padding: 12px 18px;
+  border-left: 3px solid var(--gold);
+  background: rgba(201,168,76,0.05);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: rgba(200,196,215,0.75);
+  font-size: 0.88rem;
+  font-style: italic;
+  line-height: 1.6;
+}
+
+/* ── Excerpt block ── */
+.bd-excerpt-block {
+  margin-bottom: 18px;
+  padding: 16px 20px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--dim);
+  border-radius: var(--r-sm);
+}
+.bd-excerpt-text {
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── Themes ── */
+.bd-themes {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.bd-themes-label {
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  padding-top: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bd-themes-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bd-theme-tag {
+  display: inline-block;
+  padding: 4px 11px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--dim);
+  border-radius: 20px;
+  color: var(--muted);
+  font-size: 0.73rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.bd-theme-tag:hover {
+  color: var(--text);
+  border-color: rgba(201,168,76,0.3);
+}
+
+/* ── Full description ── */
+.bd-full-desc {
+  color: var(--muted);
+  line-height: 1.85;
+  font-size: 0.97rem;
+  margin-bottom: 32px;
+}
+.bd-full-desc p { margin-bottom: 14px; }
+.bd-full-desc p:last-child { margin-bottom: 0; }
+
+/* ════════════════════════════════════════
+   AUTHOR'S NOTE SECTION
+════════════════════════════════════════ */
+.bd-authornote-section {
+  background: rgba(255,255,255,0.015);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.bd-authornote {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 0;
+}
+.bd-authornote-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.bd-authornote-icon { font-size: 1.6rem; }
+.bd-authornote-header h2 {
+  font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+  margin: 0;
+}
+.bd-authornote-body {
+  color: rgba(200,196,215,0.78);
+  line-height: 1.9;
+  font-size: 0.97rem;
+}
+.bd-authornote-body p { margin-bottom: 14px; }
+.bd-authornote-body p:last-child { margin-bottom: 16px; }
+.bd-authornote-sig {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  color: var(--gold);
+  font-size: 1rem;
+  margin-top: 8px;
+}
+
+/* ════════════════════════════════════════
+   TABLE OF CONTENTS SECTION
+════════════════════════════════════════ */
+.bd-toc-section { background: var(--bg); }
+.bd-toc {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.bd-toc-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.bd-toc-header h2 {
+  font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+  margin: 0;
+}
+.bd-toc-count {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+  background: rgba(201,168,76,0.1);
+  border: 1px solid rgba(201,168,76,0.2);
+  padding: 3px 10px;
+  border-radius: 20px;
+  color: var(--gold);
+}
+.bd-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bd-toc-item {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  transition: background 0.15s;
+  cursor: default;
+}
+.bd-toc-item:hover { background: rgba(255,255,255,0.03); }
+.bd-toc-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gold);
+  opacity: 0.7;
+  min-width: 24px;
+  font-family: monospace;
+  flex-shrink: 0;
+}
+.bd-toc-title {
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.bd-toc-item:hover .bd-toc-title { color: var(--text); }
+
+@media (max-width: 768px) {
+  .bd-authornote { padding: 28px 0; }
+  .bd-toc-item { padding: 10px 10px; gap: 12px; }
+  .bd-themes { flex-direction: column; gap: 6px; }
+}
