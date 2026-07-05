@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, getDocs, writeBatch, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, getDocs, writeBatch, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -54,15 +54,12 @@ export default function LiveChatPanel({ showToast }) {
   // ── Live chat sessions listener ───────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
-    // NOTE: no orderBy here — combining where() + orderBy() requires a composite
-    // Firestore index that may not exist. Sort client-side instead.
-    const q = query(
-      collection(db, 'contact_messages'),
-      where('type', '==', 'live_chat')
-    );
-    const unsub = onSnapshot(q, snap => {
+    // Fetch ALL contact_messages and filter client-side — avoids any Firestore
+    // index requirements (where + orderBy combos need composite indexes).
+    const unsub = onSnapshot(collection(db, 'contact_messages'), snap => {
       const sessions = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => d.type === 'live_chat')
         .sort((a, b) => {
           const ta = a.lastMsgAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
           const tb = b.lastMsgAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
@@ -87,7 +84,10 @@ export default function LiveChatPanel({ showToast }) {
       chatMounted.current = true;
       setChatSessions(sessions);
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => {
+      console.error('[LiveChatPanel] sessions listener error:', err.message);
+      setLoading(false);
+    });
     return () => unsub();
   }, []);
 

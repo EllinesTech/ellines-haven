@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, writeBatch,
-         serverTimestamp, query, orderBy, where, getDocs } from 'firebase/firestore';
+         serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -207,9 +207,14 @@ export default function MessagesPanel({ showToast, users = [] }) {
   // ── Messages listener ─────────────────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
-    const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, snap => {
-      const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const unsub = onSnapshot(collection(db, 'contact_messages'), snap => {
+      const fresh = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() || 0;
+          const tb = b.createdAt?.toMillis?.() || 0;
+          return tb - ta;
+        });
       if (mounted.current) {
         const hasNew = fresh.some(m =>
           !prevIds.current.has(m.id) &&
@@ -222,7 +227,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
       mounted.current = true;
       setMessages(fresh);
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => { console.error('[MessagesPanel] listener error:', err.message); setLoading(false); });
     return () => unsub();
   }, []);
 
@@ -253,20 +258,31 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const openMessage = async msg => {
     const threadId = msg.threadId || msg.id;
     const newStatus = msg.status === 'new' || !msg.status ? 'read' : msg.status;
-    // Update local state immediately so badge changes right away
     setSelected({ ...msg, threadId, status: newStatus });
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: newStatus, threadId } : m));
     setReplyDraft(''); setSendErr('');
-    if (msg.status === 'new' || !msg.status) {
+
+    // Always ensure threadId is persisted on the doc
+    if (msg.status === 'new' || !msg.status || !msg.threadId) {
       await setDoc(doc(db, 'contact_messages', msg.id),
-        { status: 'read', threadId, updatedAt: serverTimestamp() }, { merge: true });
-      if (!msg.threadId) {
-        await setDoc(doc(db, 'contact_messages', threadId, 'messages', 'msg_0'), {
-          text: msg.message || '', sender: 'user',
-          senderName: msg.name || 'User', senderEmail: msg.email,
-          createdAt: msg.createdAt || serverTimestamp(),
-        }).catch(() => {});
-      }
+        { status: newStatus, threadId, updatedAt: serverTimestamp() }, { merge: true });
+    }
+
+    // Seed the subcollection with the original message if it's empty
+    // This handles both legacy messages (no threadId) and new ones where seeding failed
+    if (msg.message) {
+      try {
+        const subSnap = await getDocs(collection(db, 'contact_messages', threadId, 'messages'));
+        if (subSnap.empty) {
+          await setDoc(doc(db, 'contact_messages', threadId, 'messages', 'msg_0'), {
+            text: msg.message,
+            sender: 'user',
+            senderName: msg.name || 'User',
+            senderEmail: msg.email || '',
+            createdAt: msg.createdAt || serverTimestamp(),
+          });
+        }
+      } catch {}
     }
   };
 

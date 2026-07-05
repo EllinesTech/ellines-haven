@@ -2345,15 +2345,12 @@ export default function Admin() {
   }, []);
 
   // Live chat sessions listener — for nav bar badge count
+  // Fetch all contact_messages + filter client-side — no index requirements
   useEffect(() => {
-    // No orderBy — avoids composite index requirement. Sort client-side.
-    const q = query(
-      collection(db, 'contact_messages'),
-      where('type', '==', 'live_chat')
-    );
-    const unsub = onSnapshot(q, snap => {
+    const unsub = onSnapshot(collection(db, 'contact_messages'), snap => {
       const sessions = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => d.type === 'live_chat')
         .sort((a, b) => {
           const ta = a.lastMsgAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
           const tb = b.lastMsgAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
@@ -2366,8 +2363,7 @@ export default function Admin() {
 
   // Messages listener — for nav bar badge count
   useEffect(() => {
-    const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, snap => {
+    const unsub = onSnapshot(collection(db, 'contact_messages'), snap => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setMessages(msgs);
     }, () => {});
