@@ -390,17 +390,56 @@ export default function EllineaAI() {
   const { user, books } = useApp();
   const location = useLocation();
 
+  // ── Chat settings from Firestore (admin-controlled) ──────────────────────
+  const [chatSettings, setChatSettings] = useState(null);
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'site_data', 'chat_settings'), snap => {
+      if (snap.exists()) setChatSettings(snap.data());
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  // Derived settings with fallbacks
+  const widgetEnabled  = chatSettings ? chatSettings.widgetEnabled  !== false : true;
+  const aiTabEnabled   = chatSettings ? chatSettings.aiTabEnabled   !== false : true;
+  const liveTabEnabled = chatSettings ? chatSettings.liveTabEnabled !== false : true;
+  const waTabEnabled   = chatSettings ? chatSettings.waTabEnabled   !== false : true;
+  const aiDisplayName  = chatSettings?.aiName      || AI_NAME;
+  const aiTagline      = chatSettings?.aiTagline   || AI_TAGLINE;
+  const aiWelcome      = chatSettings?.aiWelcomeMessage ||
+    `Hi! I'm **${aiDisplayName}**, your Ellines Haven assistant. Ask me anything about books, payments, your account, or the platform! 📚\n\nWant to talk to a human? Click the **💬 Live Agent** tab above.`;
+  const quickReplies   = chatSettings?.quickReplies || QUICK_REPLIES;
+  const waNumbers      = chatSettings?.waNumbers    || [
+    { num: '254748255466', label: '0748 255 466', role: 'Primary support' },
+    { num: '254728807213', label: '0728 807 213', role: 'Alternate' },
+  ];
+  const waEmail        = chatSettings?.waEmail         || 'ellines.haven@gmail.com';
+  const waSupportHours = chatSettings?.waSupportHours  || 'Mon–Sat\n8am–8pm EAT';
+  const waResponseTime = chatSettings?.waResponseTime  || 'Usually under\n1 hour';
+  const liveOnlineMsg  = chatSettings?.liveOnlineMessage  || 'Agent online';
+  const liveOfflineMsg = chatSettings?.liveOfflineMessage || 'Leave a message — reply within 24 hrs';
+
   // ── AI tab state ──────────────────────────────────────────────────────────
   const [open,     setOpen]     = useState(false);
-  const [tab,      setTab]      = useState('ai'); // 'ai' | 'live'
-  const [msgs,     setMsgs]     = useState([
-    { role: 'assistant', text: `Hi! I'm **${AI_NAME}**, your Ellines Haven assistant. Ask me anything about books, payments, your account, or the platform! 📚\n\nWant to talk to a human? Click the **💬 Live Agent** tab above.` }
+  const [tab,      setTab]      = useState('ai'); // 'ai' | 'live' | 'wa'
+  // msgs initialized with a static fallback; updated once when aiWelcome loads from Firestore
+  const [msgs,        setMsgs]     = useState([
+    { role: 'assistant', text: `Hi! I'm **Ellinea**, your Ellines Haven assistant. Ask me anything about books, payments, your account, or the platform! 📚\n\nWant to talk to a human? Click the 💬 Live Agent tab.` }
   ]);
+  const welcomeSetRef  = useRef(false);
   const [input,    setInput]    = useState('');
   const [typing,   setTyping]   = useState(false);
   const [aiConfig, setAiConfig] = useState(null);
   const [unread,   setUnread]   = useState(0);
   const bottomRef  = useRef(null);
+
+  // Update welcome message ONCE when Firestore settings arrive and it differs from default
+  useEffect(() => {
+    if (welcomeSetRef.current) return;
+    if (!chatSettings?.aiWelcomeMessage) return;
+    welcomeSetRef.current = true;
+    setMsgs([{ role: 'assistant', text: chatSettings.aiWelcomeMessage }]);
+  }, [chatSettings?.aiWelcomeMessage]); // eslint-disable-line
 
   // ── Live-chat tab state ───────────────────────────────────────────────────
   const [chatId,        setChatId]        = useState(null);
@@ -564,7 +603,7 @@ Rules:
     if (!open) setUnread(u => u + 1);
   };
 
-  const clearChat = () => setMsgs([{ role: 'assistant', text: `Hi again! I'm **${AI_NAME}**, ready to help. What can I do for you? 😊\n\nWant a human? Click the **💬 Live Agent** tab.` }]);
+  const clearChat = () => setMsgs([{ role: 'assistant', text: `Hi again! I'm **${aiDisplayName}**, ready to help. What can I do for you? 😊\n\nWant a human? Click the **💬 Live Agent** tab.` }]);
 
   // ── Live-chat send ────────────────────────────────────────────────────────
   const sendChat = async () => {
@@ -631,8 +670,10 @@ Rules:
     }
   };
 
-  // Don't show on admin page
+  // Don't show on admin page, and respect admin widget toggle
   if (location.pathname === '/admin') return null;
+  // Only hide widget if settings have loaded AND explicitly disabled
+  if (chatSettings !== null && widgetEnabled === false) return null;
 
   const totalUnread = unread + liveUnread;
 
@@ -642,7 +683,7 @@ Rules:
       <button
         className="ellinea-fab"
         onClick={() => { setOpen(o => !o); setUnread(0); if (tab === 'live') setLiveUnread(0); }}
-        aria-label="Ellinea AI & Live Chat"
+        aria-label="Chat with Ellines Haven"
       >
         {open ? (
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -650,7 +691,7 @@ Rules:
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         )}
         {!open && totalUnread > 0 && <span className="ellinea-fab-badge">{totalUnread > 9 ? '9+' : totalUnread}</span>}
-        {!open && <span className="ellinea-fab-label">{AI_NAME}</span>}
+        {!open && <span className="ellinea-fab-label">{aiDisplayName}</span>}
       </button>
 
       {/* ── Chat window ── */}
@@ -658,42 +699,48 @@ Rules:
         <div className="ellinea-window">
           {/* Tab bar — Ellinea AI | Live Agent | WhatsApp */}
           <div className="ellinea-tabs">
-            <button
-              className={'ellinea-tab' + (tab === 'ai' ? ' ellinea-tab--active' : '')}
-              onClick={() => { setTab('ai'); setUnread(0); }}
-            >
-              ✦ {AI_NAME}
-              {unread > 0 && tab !== 'ai' && <span className="ellinea-tab-badge">{unread}</span>}
-            </button>
-            <button
-              className={'ellinea-tab' + (tab === 'live' ? ' ellinea-tab--active ellinea-tab--live' : '')}
-              onClick={() => { setTab('live'); setLiveUnread(0); }}
-            >
-              💬 Live Agent
-              {liveUnread > 0 && tab !== 'live' && <span className="ellinea-tab-badge">{liveUnread}</span>}
-              <span className={'ellinea-agent-dot' + (agentOnline ? ' ellinea-agent-dot--on' : '')} title={agentOnline ? 'Agent online' : 'Leave a message'} />
-            </button>
-            <button
-              className={'ellinea-tab ellinea-tab--wa' + (tab === 'wa' ? ' ellinea-tab--active ellinea-tab--wa-active' : '')}
-              onClick={() => setTab('wa')}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              WhatsApp
-            </button>
+            {aiTabEnabled && (
+              <button
+                className={'ellinea-tab' + (tab === 'ai' ? ' ellinea-tab--active' : '')}
+                onClick={() => { setTab('ai'); setUnread(0); }}
+              >
+                ✦ {aiDisplayName}
+                {unread > 0 && tab !== 'ai' && <span className="ellinea-tab-badge">{unread}</span>}
+              </button>
+            )}
+            {liveTabEnabled && (
+              <button
+                className={'ellinea-tab' + (tab === 'live' ? ' ellinea-tab--active ellinea-tab--live' : '')}
+                onClick={() => { setTab('live'); setLiveUnread(0); }}
+              >
+                💬 Live Agent
+                {liveUnread > 0 && tab !== 'live' && <span className="ellinea-tab-badge">{liveUnread}</span>}
+                <span className={'ellinea-agent-dot' + (agentOnline ? ' ellinea-agent-dot--on' : '')} title={agentOnline ? liveOnlineMsg : liveOfflineMsg} />
+              </button>
+            )}
+            {waTabEnabled && (
+              <button
+                className={'ellinea-tab ellinea-tab--wa' + (tab === 'wa' ? ' ellinea-tab--active ellinea-tab--wa-active' : '')}
+                onClick={() => setTab('wa')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                WhatsApp
+              </button>
+            )}
           </div>
 
           {/* ── AI TAB ── */}
-          {tab === 'ai' && (
+          {tab === 'ai' && aiTabEnabled && (
             <>
               <div className="ellinea-header">
                 <div className="ellinea-avatar">✦</div>
                 <div>
-                  <div className="ellinea-name">{AI_NAME}</div>
+                  <div className="ellinea-name">{aiDisplayName}</div>
                   <div className="ellinea-status">
                     <span className="ellinea-dot" />
-                    {aiConfig?.apiKey ? 'GPT-powered · Online' : 'Always available'}
+                    {aiConfig?.apiKey ? 'GPT-powered · Online' : aiTagline}
                   </div>
                 </div>
                 <div className="ellinea-header-actions">
@@ -716,9 +763,9 @@ Rules:
                 )}
                 <div ref={bottomRef} />
               </div>
-              {msgs.length <= 2 && (
+              {msgs.length <= 2 && quickReplies.length > 0 && (
                 <div className="ellinea-quickreplies">
-                  {QUICK_REPLIES.map((q, i) => (
+                  {quickReplies.map((q, i) => (
                     <button key={i} className="ellinea-qr" onClick={() => send(q.value)}>{q.label}</button>
                   ))}
                 </div>
@@ -737,13 +784,13 @@ Rules:
                 </button>
               </div>
               <div className="ellinea-footer">
-                Powered by <strong>Ellinea</strong> · Ellines Haven AI
+                Powered by <strong>{aiDisplayName}</strong> · Ellines Haven AI
               </div>
             </>
           )}
 
           {/* ── LIVE AGENT TAB ── */}
-          {tab === 'live' && (
+          {tab === 'live' && liveTabEnabled && (
             <>
               <div className="ellinea-lc-header">
                 <div style={{ width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1rem', flexShrink:0 }}>💬</div>
@@ -751,7 +798,7 @@ Rules:
                   <div style={{ fontWeight:700, color:'#fff', fontSize:'0.9rem' }}>Ellines Haven Support</div>
                   <div style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.75)', display:'flex', alignItems:'center', gap:5 }}>
                     <span style={{ width:6, height:6, borderRadius:'50%', background: agentOnline ? '#2ecc71' : 'rgba(255,255,255,0.35)', flexShrink:0, display:'inline-block' }}/>
-                    {agentOnline ? 'Agent online' : 'Leave a message — reply within 24 hrs'}
+                    {agentOnline ? liveOnlineMsg : liveOfflineMsg}
                   </div>
                 </div>
                 <button onClick={resetLiveChat} title="New chat" style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:6, padding:'3px 8px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit' }}>New</button>
@@ -790,7 +837,7 @@ Rules:
             </>
           )}
           {/* ── WHATSAPP TAB ── */}
-          {tab === 'wa' && (
+          {tab === 'wa' && waTabEnabled && (
             <>
               {/* Header */}
               <div style={{
@@ -828,10 +875,10 @@ Rules:
                 {/* Info cards */}
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap: 8, margin:'4px 0' }}>
                   {[
-                    { icon:'🕐', label:'Hours', value:'Mon–Sat\n8am–8pm EAT' },
-                    { icon:'⚡', label:'Response', value:'Usually under\n1 hour' },
+                    { icon:'🕐', label:'Hours',    value: waSupportHours },
+                    { icon:'⚡', label:'Response', value: waResponseTime },
                     { icon:'💳', label:'Help with', value:'Payments &\norders' },
-                    { icon:'📚', label:'Books', value:'All titles &\ndownloads' },
+                    { icon:'📚', label:'Books',    value:'All titles &\ndownloads' },
                   ].map(c => (
                     <div key={c.label} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:'10px 12px', textAlign:'center' }}>
                       <div style={{ fontSize:'1.2rem', marginBottom:4 }}>{c.icon}</div>
@@ -844,12 +891,9 @@ Rules:
                 {/* Phone numbers */}
                 <div style={{ background:'rgba(37,211,102,0.06)', border:'1px solid rgba(37,211,102,0.2)', borderRadius:12, padding:'14px 16px' }}>
                   <div style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.5)', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.5px' }}>Contact Numbers</div>
-                  {[
-                    { num: '254748255466', label: '0748 255 466', role: 'Primary support' },
-                    { num: '254728807213', label: '0728 807 213', role: 'Alternate' },
-                  ].map(p => (
-                    <a key={p.num} href={`https://wa.me/${p.num}`} target="_blank" rel="noopener noreferrer"
-                      style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'rgba(37,211,102,0.1)', border:'1px solid rgba(37,211,102,0.3)', borderRadius:10, textDecoration:'none', marginBottom:8, transition:'background 0.15s' }}
+                  {waNumbers.map((p, idx) => (
+                    <a key={idx} href={`https://wa.me/${p.num}`} target="_blank" rel="noopener noreferrer"
+                      style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'rgba(37,211,102,0.1)', border:'1px solid rgba(37,211,102,0.3)', borderRadius:10, textDecoration:'none', marginBottom: idx < waNumbers.length - 1 ? 8 : 0, transition:'background 0.15s' }}
                       onMouseEnter={e => e.currentTarget.style.background='rgba(37,211,102,0.2)'}
                       onMouseLeave={e => e.currentTarget.style.background='rgba(37,211,102,0.1)'}
                     >
@@ -866,14 +910,14 @@ Rules:
                 </div>
 
                 {/* Email */}
-                <a href="mailto:ellines.haven@gmail.com"
+                <a href={`mailto:${waEmail}`}
                   style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 14px', background:'rgba(74,158,255,0.08)', border:'1px solid rgba(74,158,255,0.2)', borderRadius:10, textDecoration:'none', transition:'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background='rgba(74,158,255,0.15)'}
                   onMouseLeave={e => e.currentTarget.style.background='rgba(74,158,255,0.08)'}
                 >
                   <div style={{ width:32, height:32, borderRadius:'50%', background:'rgba(74,158,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1rem', flexShrink:0 }}>📧</div>
                   <div>
-                    <div style={{ fontSize:'0.82rem', fontWeight:600, color:'#7eb6ff' }}>ellines.haven@gmail.com</div>
+                    <div style={{ fontSize:'0.82rem', fontWeight:600, color:'#7eb6ff' }}>{waEmail}</div>
                     <div style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.45)' }}>Email support — reply within 24 hrs</div>
                   </div>
                 </a>
