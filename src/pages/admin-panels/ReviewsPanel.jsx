@@ -23,6 +23,14 @@ export default function ReviewsPanel({ books = [], showToast, isSuper }) {
   const [addMode,  setAddMode]  = useState(false);
   const [newRev,   setNewRev]   = useState({ user: '', email: '', book: '', rating: 5, text: '' });
   const [saving,   setSaving]   = useState(false);
+  const [bulkSelected, setBulkSelected] = useState(new Set());
+  const toggleBulkSelect = (id) => {
+    const next = new Set(bulkSelected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setBulkSelected(next);
+  };
+  const selectAllBulk = (ids) => setBulkSelected(new Set(ids));
+  const clearBulkSelect = () => setBulkSelected(new Set());
 
   /* Real-time Firestore listener */
   useEffect(() => {
@@ -217,11 +225,50 @@ export default function ReviewsPanel({ books = [], showToast, isSuper }) {
         ))}
       </div>
 
+      {/* Bulk action bar */}
+      {bulkSelected.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', marginBottom: 8, background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: 'var(--r)', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, color: 'var(--gold)', fontSize: '0.88rem' }}>{bulkSelected.size} review{bulkSelected.size !== 1 ? 's' : ''} selected</span>
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
+            if (!window.confirm('Publish ' + bulkSelected.size + ' review(s)?')) return;
+            for (const id of bulkSelected) {
+              const r = reviews.find(x => x.id === id);
+              if (r) await persist(r.id, { status: 'Published' });
+            }
+            setReviews(prev => prev.map(r => bulkSelected.has(r.id) ? { ...r, status: 'Published' } : r));
+            clearBulkSelect();
+            showToast('✅ Published ' + bulkSelected.size + ' review(s)');
+          }}>✓ Approve</button>
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
+            if (!window.confirm('Flag ' + bulkSelected.size + ' review(s)?')) return;
+            for (const id of bulkSelected) {
+              const r = reviews.find(x => x.id === id);
+              if (r) await persist(r.id, { status: 'Flagged' });
+            }
+            setReviews(prev => prev.map(r => bulkSelected.has(r.id) ? { ...r, status: 'Flagged' } : r));
+            clearBulkSelect();
+            showToast('🚩 Flagged ' + bulkSelected.size + ' review(s)');
+          }}>🚩 Flag</button>
+          <button className="btn btn-ghost btn-sm" onClick={async () => {
+            if (!window.confirm('Delete ' + bulkSelected.size + ' review(s)?')) return;
+            for (const id of bulkSelected) {
+              try {
+                await deleteDoc(doc(db, 'reviews', id));
+              } catch {}
+            }
+            setReviews(prev => prev.filter(r => !bulkSelected.has(r.id)));
+            clearBulkSelect();
+            showToast('🗑️ Deleted ' + bulkSelected.size + ' review(s)');
+          }}>🗑️ Delete</button>
+          <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={clearBulkSelect}>✕ Clear</button>
+        </div>
+      )}
+
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <input className="field" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search reviews…" style={{ width: 220, padding: '7px 10px', fontSize: '0.82rem' }} />
         {['all', 'pending', 'published', 'flagged'].map(f => (
-          <button key={f} className={'adm-filter-btn' + (filter === f ? ' active' : '')} onClick={() => setFilter(f)}
+          <button key={f} className={'adm-filter-btn' + (filter === f ? ' active' : '')} onClick={() => { setFilter(f); clearBulkSelect(); }}
             style={{ textTransform: 'capitalize' }}>
             {f} {f !== 'all' && <span style={{ marginLeft: 4, fontSize: '0.7rem', background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '0 5px' }}>{counts[f] ?? 0}</span>}
           </button>
@@ -241,6 +288,7 @@ export default function ReviewsPanel({ books = [], showToast, isSuper }) {
           <table className="adm-table">
             <thead>
               <tr>
+                <th style={{ width: 34 }}><input type="checkbox" onChange={e => e.target.checked ? selectAllBulk(filtered.map(r => r.id)) : clearBulkSelect()} checked={filtered.length > 0 && filtered.every(r => bulkSelected.has(r.id))} style={{ cursor: 'pointer', accentColor: 'var(--gold)' }} /></th>
                 <th>Reader</th>
                 <th>Book</th>
                 <th>Rating</th>
@@ -252,7 +300,8 @@ export default function ReviewsPanel({ books = [], showToast, isSuper }) {
             </thead>
             <tbody>
               {filtered.map(r => (
-                <tr key={r.id} style={{ cursor: 'pointer' }} onClick={() => setSelected(r)}>
+                <tr key={r.id} style={{ cursor: 'pointer', background: bulkSelected.has(r.id) ? 'rgba(201,168,76,0.07)' : undefined }} onClick={() => setSelected(r)}>
+                  <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={bulkSelected.has(r.id)} onChange={() => toggleBulkSelect(r.id)} style={{ cursor: 'pointer', accentColor: 'var(--gold)' }} /></td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{r.user}</div>
                     {r.email && <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>{r.email}</div>}
