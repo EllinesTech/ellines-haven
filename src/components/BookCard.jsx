@@ -160,12 +160,10 @@ export default function BookCard({ book }) {
         <div className="bcard__overlay">
           <Link to={`/book/${book.id}`} className="btn btn-primary btn-sm">View Book</Link>
         </div>
-        {/* Wishlist button — top left corner */}
-        {!owned && (
-          <div className="bcard__wishlist-btn" onClick={e => e.stopPropagation()}>
-            <WishlistButton book={book} size="sm" />
-          </div>
-        )}
+        {/* Wishlist button — top right corner, always visible */}
+        <div className="bcard__wishlist-btn" onClick={e => e.stopPropagation()}>
+          <WishlistButton book={book} size="sm" />
+        </div>
         {/* Coming Soon / Draft overlay */}
         {NO_PURCHASE_STATUSES.has(book.status) && (
           <div style={{ position:'absolute', inset:0, background:'rgba(10,10,20,0.55)', backdropFilter:'blur(2px)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', zIndex:4, gap:8 }}>
@@ -178,7 +176,7 @@ export default function BookCard({ book }) {
         {book.isNew && <span className="badge badge-gold bcard__new">New</span>}
         {book.inspired && <span className="bcard__inspired-badge">✦ True Story</span>}
         {book.status && book.status !== 'complete' && !NO_PURCHASE_STATUSES.has(book.status) && (
-          <BookStatusBadge status={book.status} style={{ position:'absolute', top:10, right:10, zIndex:5 }} />
+          <BookStatusBadge status={book.status} style={{ position:'absolute', bottom: book.inspired ? 36 : 10, left:10, zIndex:5 }} />
         )}
       </div>
       <div className="bcard__body">

@@ -290,7 +290,18 @@ export function AppProvider({ children }) {
     if (!user) { window.location.href = '/login'; return; }
     const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
     const already = wishlist.some(b => b.id === book.id);
-    const next = already ? wishlist.filter(b => b.id !== book.id) : [...wishlist, { id: book.id, title: book.title, author: book.author, cover: book.cover, coverType: book.coverType, coverColor: book.coverColor, coverAccent: book.coverAccent, genre: book.genre, price: book.price, status: book.status, addedAt: Date.now() }];
+    const next = already
+      ? wishlist.filter(b => b.id !== book.id)
+      : [
+          ...wishlist,
+          {
+            // Snapshot all fields so new books with any extra properties are preserved
+            ...book,
+            // Overwrite large/mutable fields with safe lightweight copies
+            chapters: undefined,  // don't store full chapter content in wishlist
+            addedAt: Date.now(),
+          },
+        ];
     setWishlistState(next);
     save(key, next);
   };

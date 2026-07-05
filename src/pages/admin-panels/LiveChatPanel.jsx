@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, getDocs, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -33,7 +33,8 @@ export default function LiveChatPanel({ showToast }) {
   const [chatReply,       setChatReply]       = useState('');
   const [chatSending,     setChatSending]     = useState(false);
   const [agentOnline,     setAgentOnline]     = useState(false);
-  const [loading,         setLoading]         = useState(true);
+  const [selected,   setSelected]   = useState(new Set()); // multi-select
+  const [delConfirm, setDelConfirm] = useState(null);      // sessionId | 'bulk' | null
   const chatBottomRef     = useRef(null);
   const prevChatIds       = useRef(new Set());
   const chatMounted       = useRef(false);
@@ -144,7 +145,73 @@ export default function LiveChatPanel({ showToast }) {
     showToast?.('✅ Chat session closed');
   };
 
+  // ── Delete a single session + its messages subcollection ──────────────────
+  const deleteChatSession = async (sessionId) => {
+    try {
+      // Delete all messages in subcollection first
+      const msgsSnap = await getDocs(collection(db, 'contact_messages', sessionId, 'messages'));
+      await Promise.all(msgsSnap.docs.map(d => deleteDoc(d.ref)));
+      // Delete the parent session doc
+      await deleteDoc(doc(db, 'contact_messages', sessionId));
+      if (activeChat === sessionId) setActiveChat(null);
+      setSelected(prev => { const n = new Set(prev); n.delete(sessionId); return n; });
+      showToast?.('🗑 Chat session deleted');
+    } catch (e) {
+      showToast?.('❌ Delete failed: ' + e.message);
+    }
+    setDelConfirm(null);
+  };
+
+  // ── Bulk delete all selected sessions ────────────────────────────────────
+  const bulkDelete = async () => {
+    const ids = Array.from(selected);
+    try {
+      await Promise.all(ids.map(async id => {
+        const msgsSnap = await getDocs(collection(db, 'contact_messages', id, 'messages'));
+        await Promise.all(msgsSnap.docs.map(d => deleteDoc(d.ref)));
+        await deleteDoc(doc(db, 'contact_messages', id));
+      }));
+      if (selected.has(activeChat)) setActiveChat(null);
+      setSelected(new Set());
+      showToast?.(`🗑 ${ids.length} session${ids.length > 1 ? 's' : ''} deleted`);
+    } catch (e) {
+      showToast?.('❌ Bulk delete failed: ' + e.message);
+    }
+    setDelConfirm(null);
+  };
+
+  const toggleSelect = (id, e) => {
+    e.stopPropagation();
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const selectAll  = () => setSelected(new Set(chatSessions.map(s => s.id)));
+  const clearSel   = () => setSelected(new Set());
+
   return (
+    <>
+    {/* ── Delete confirmation modal ── */}
+    {delConfirm && (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+        onClick={e => e.target === e.currentTarget && setDelConfirm(null)}>
+        <div style={{ background:'var(--surface)', border:'1px solid rgba(231,76,60,0.4)', borderRadius:'var(--r)', padding:28, maxWidth:380, width:'100%', textAlign:'center' }}>
+          <div style={{ fontSize:'2.5rem', marginBottom:10 }}>🗑</div>
+          <h3 style={{ marginBottom:8, color:'#e74c3c' }}>
+            {delConfirm === 'bulk' ? `Delete ${selected.size} session${selected.size > 1 ? 's' : ''}?` : 'Delete this chat session?'}
+          </h3>
+          <p style={{ fontSize:'0.85rem', color:'var(--muted)', marginBottom:20 }}>
+            This permanently removes the session and all messages. This cannot be undone.
+          </p>
+          <div style={{ display:'flex', gap:10, justifyContent:'center' }}>
+            <button className="btn btn-sm" onClick={delConfirm === 'bulk' ? bulkDelete : () => deleteChatSession(delConfirm)}
+              style={{ background:'rgba(231,76,60,0.15)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.4)' }}>
+              🗑 Delete
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setDelConfirm(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="adm-messages-shell">
       {/* ── Page header ── */}
       <div className="adm-messages-topbar">
@@ -158,6 +225,28 @@ export default function LiveChatPanel({ showToast }) {
             </span>
           </span>
         </div>
+        {/* Bulk action toolbar — shown when sessions are selected */}
+        {selected.size > 0 && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            <span style={{ fontSize:'0.82rem', color:'var(--gold)', fontWeight:600 }}>
+              {selected.size} selected
+            </span>
+            <button className="btn btn-sm" onClick={clearSel}
+              style={{ background:'rgba(255,255,255,0.06)', color:'var(--muted)', border:'1px solid var(--dim)' }}>
+              ✕ Clear
+            </button>
+            <button className="btn btn-sm" onClick={() => setDelConfirm('bulk')}
+              style={{ background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}>
+              🗑 Delete Selected
+            </button>
+          </div>
+        )}
+        {/* Select all when none selected */}
+        {selected.size === 0 && chatSessions.length > 0 && (
+          <button className="btn btn-ghost btn-sm" onClick={selectAll} style={{ fontSize:'0.78rem' }}>
+            ☑ Select All
+          </button>
+        )}
       </div>
 
       {/* ── Main grid: session list + thread ── */}
@@ -196,38 +285,55 @@ export default function LiveChatPanel({ showToast }) {
                 </p>
               </div>
             ) : chatSessions.map(s => {
-              const isActive = activeChat === s.id;
-              const hasNew   = s.lastSender === 'user' && s.status !== 'closed';
+              const isActive   = activeChat === s.id;
+              const hasNew     = s.lastSender === 'user' && s.status !== 'closed';
+              const isSelected = selected.has(s.id);
               return (
                 <div key={s.id}
                   className={'adm-livechat-session-row' + (isActive ? ' active' : '') + (hasNew ? ' has-new' : '')}
                   onClick={() => setActiveChat(s.id)}
+                  style={{ outline: isSelected ? '2px solid rgba(201,168,76,0.45)' : undefined, outlineOffset: '-2px' }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                  {/* Top row: checkbox + avatar + name + status */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+                      <input
+                        type="checkbox" checked={isSelected}
+                        onChange={e => toggleSelect(s.id, e)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ accentColor:'var(--gold)', width:13, height:13, flexShrink:0, cursor:'pointer' }}
+                      />
                       <div className="adm-livechat-avatar">{(s.name || '?')[0].toUpperCase()}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name || 'Guest'}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.email || ''}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:600, fontSize:'0.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name || 'Guest'}</div>
+                        <div style={{ fontSize:'0.7rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.email || ''}</div>
                       </div>
                     </div>
                     <span className={'adm-livechat-status-badge' + (s.status === 'closed' ? ' closed' : hasNew ? ' new' : ' active')}>
                       {s.status === 'closed' ? 'closed' : hasNew ? '● new' : 'active'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                  {/* Preview */}
+                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4, paddingLeft:21 }}>
                     {s.lastMsg || 'Chat started'}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>{fmtDate(s.lastMsgAt || s.createdAt)}</span>
-                    {s.status !== 'closed' && (
-                      <button
-                        onClick={e => { e.stopPropagation(); closeChatSession(s.id); }}
-                        style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '0.68rem', cursor: 'pointer', padding: '0 4px', fontFamily: 'inherit', transition: 'color 0.15s' }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#e74c3c'}
-                        onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-                      >End</button>
-                    )}
+                  {/* Bottom: timestamp + End + Delete */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingLeft:21 }}>
+                    <span style={{ fontSize:'0.68rem', color:'var(--muted)' }}>{fmtDate(s.lastMsgAt || s.createdAt)}</span>
+                    <div style={{ display:'flex', gap:3 }} onClick={e => e.stopPropagation()}>
+                      {s.status !== 'closed' && (
+                        <button onClick={() => closeChatSession(s.id)}
+                          style={{ background:'none', border:'none', color:'var(--muted)', fontSize:'0.68rem', cursor:'pointer', padding:'1px 5px', fontFamily:'inherit', borderRadius:3, transition:'color 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.color='var(--gold)'}
+                          onMouseLeave={e => e.currentTarget.style.color='var(--muted)'}
+                          title="End chat">End</button>
+                      )}
+                      <button onClick={() => setDelConfirm(s.id)}
+                        style={{ background:'none', border:'none', color:'var(--muted)', fontSize:'0.75rem', cursor:'pointer', padding:'1px 5px', fontFamily:'inherit', borderRadius:3, transition:'color 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.color='#e74c3c'}
+                        onMouseLeave={e => e.currentTarget.style.color='var(--muted)'}
+                        title="Delete session">🗑</button>
+                    </div>
                   </div>
                 </div>
               );
@@ -251,6 +357,12 @@ export default function LiveChatPanel({ showToast }) {
                     {s?.status !== 'closed' && (
                       <button className="btn btn-sm btn-ghost" onClick={() => closeChatSession(activeChat)}>End Chat</button>
                     )}
+                    <button className="btn btn-sm"
+                      onClick={() => setDelConfirm(activeChat)}
+                      style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)' }}
+                      title="Delete this session permanently">
+                      🗑 Delete
+                    </button>
                     <button className="adm-close-btn" onClick={() => setActiveChat(null)}>✕</button>
                   </div>
                 </div>
@@ -330,5 +442,6 @@ export default function LiveChatPanel({ showToast }) {
         )}
       </div>
     </div>
+    </>
   );
 }

@@ -14,7 +14,7 @@ export default function Wishlist() {
     return (
       <main className="wl-page">
         <div className="container wl-gate">
-          <div className="wl-gate-icon">🔖</div>
+          <div className="wl-gate-icon">♡</div>
           <h2>Your Wishlist</h2>
           <p>Sign in to save books you want to read later.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -39,11 +39,11 @@ export default function Wishlist() {
         <div className="wl-hero-glow" />
         <div className="container wl-hero-inner">
           <div>
-            <h1>🔖 My Wishlist</h1>
+            <h1>♥ My Wishlist</h1>
             <p>
               {enriched.length > 0
-                ? `${enriched.length} book${enriched.length !== 1 ? 's' : ''} saved for later`
-                : 'Save books you want to read later'}
+                ? `${enriched.length} book${enriched.length !== 1 ? 's' : ''} on your wishlist`
+                : 'Add books you want to read later'}
             </p>
           </div>
           <Link to="/library" className="btn btn-outline btn-sm">
@@ -55,10 +55,10 @@ export default function Wishlist() {
       <div className="container wl-body">
         {enriched.length === 0 ? (
           <div className="wl-empty">
-            <div className="wl-empty-icon">🔖</div>
+            <div className="wl-empty-icon">♡</div>
             <h3>Your wishlist is empty</h3>
             <p>
-              Browse the library and click the bookmark icon on any book to save it here.
+              Browse the library and tap the heart icon on any book to add it here.
             </p>
             <Link to="/library" className="btn btn-primary">Browse Library</Link>
           </div>

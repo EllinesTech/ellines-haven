@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   collection, query, orderBy, onSnapshot,
-  doc, setDoc, addDoc, serverTimestamp, where,
+  doc, setDoc, addDoc, deleteDoc, serverTimestamp, where, writeBatch, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import './UserMessages.css';
@@ -44,6 +44,13 @@ export default function UserMessages({ user }) {
   const [loading,      setLoading]     = useState(true);
   const [sendError,    setSendError]   = useState('');
   const [sendSuccess,  setSendSuccess] = useState(false);
+  // multi-select for thread messages
+  const [selectMode,   setSelectMode]  = useState(false);
+  const [selectedMsgs, setSelectedMsgs] = useState(new Set());
+  const [deleting,     setDeleting]    = useState(false);
+  // multi-select for conversations
+  const [convoSelectMode, setConvoSelectMode] = useState(false);
+  const [selectedConvos,  setSelectedConvos]  = useState(new Set());
   const bottomRef     = useRef(null);
   const prevConvosRef = useRef([]);
   const mountedRef    = useRef(false);
@@ -184,6 +191,81 @@ export default function UserMessages({ user }) {
     setSending(false);
   };
 
+  // ── Delete helpers ──────────────────────────────────────────────────────────
+
+  /** Delete a single message the user sent */
+  const deleteMessage = async (msgId) => {
+    if (!activeConvo) return;
+    try {
+      await deleteDoc(doc(db, 'contact_messages', activeConvo, 'messages', msgId));
+      setSelectedMsgs(s => { const n = new Set(s); n.delete(msgId); return n; });
+    } catch {}
+  };
+
+  /** Delete selected messages (user's own only) */
+  const deleteSelectedMsgs = async () => {
+    if (!activeConvo || selectedMsgs.size === 0) return;
+    if (!window.confirm(`Delete ${selectedMsgs.size} message${selectedMsgs.size > 1 ? 's' : ''}?`)) return;
+    setDeleting(true);
+    const batch = writeBatch(db);
+    selectedMsgs.forEach(id => {
+      const msg = thread.find(m => m.id === id);
+      if (msg?.sender === 'user') batch.delete(doc(db, 'contact_messages', activeConvo, 'messages', id));
+    });
+    await batch.commit().catch(() => {});
+    setSelectedMsgs(new Set());
+    setSelectMode(false);
+    setDeleting(false);
+  };
+
+  /** Delete an entire conversation */
+  const deleteConversation = async (convoId) => {
+    if (!window.confirm('Delete this conversation? This cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      // delete all subcollection messages first
+      const subSnap = await getDocs(collection(db, 'contact_messages', convoId, 'messages'));
+      const batch = writeBatch(db);
+      subSnap.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db, 'contact_messages', convoId));
+      await batch.commit();
+      setConvos(prev => prev.filter(c => c.id !== convoId));
+      if (activeConvo === convoId) { setActiveConvo(null); setThread([]); }
+    } catch {}
+    setDeleting(false);
+  };
+
+  /** Delete selected conversations */
+  const deleteSelectedConvos = async () => {
+    if (selectedConvos.size === 0) return;
+    if (!window.confirm(`Delete ${selectedConvos.size} conversation${selectedConvos.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setDeleting(true);
+    for (const id of selectedConvos) {
+      try {
+        const subSnap = await getDocs(collection(db, 'contact_messages', id, 'messages'));
+        const batch = writeBatch(db);
+        subSnap.docs.forEach(d => batch.delete(d.ref));
+        batch.delete(doc(db, 'contact_messages', id));
+        await batch.commit();
+      } catch {}
+    }
+    setConvos(prev => prev.filter(c => !selectedConvos.has(c.id)));
+    if (selectedConvos.has(activeConvo)) { setActiveConvo(null); setThread([]); }
+    setSelectedConvos(new Set());
+    setConvoSelectMode(false);
+    setDeleting(false);
+  };
+
+  const toggleConvoSelect = (id) => {
+    setSelectedConvos(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
+  const toggleMsgSelect = (id) => {
+    const msg = thread.find(m => m.id === id);
+    if (msg?.sender !== 'user') return;
+    setSelectedMsgs(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
   const activeConvoData = convos.find(c => c.id === activeConvo);
   const unread = convos.filter(c => c.lastSender === 'admin' && c.userRead === false).length;
 
@@ -200,12 +282,40 @@ export default function UserMessages({ user }) {
           </h2>
           <p className="um-sub">Your conversations with the Ellines Haven team</p>
         </div>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={() => { setNewMode(true); setActiveConvo(null); setSendError(''); }}
-        >
-          + New Message
-        </button>
+        <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+          {!convoSelectMode ? (
+            <>
+              {convos.length > 0 && (
+                <button className="btn btn-ghost btn-sm"
+                  onClick={() => { setConvoSelectMode(true); setSelectedConvos(new Set()); }}
+                  style={{ fontSize:'0.74rem', padding:'4px 10px' }}>
+                  ☑ Select
+                </button>
+              )}
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => { setNewMode(true); setActiveConvo(null); setSendError(''); }}
+              >
+                + New Message
+              </button>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize:'0.74rem', color:'var(--muted)' }}>{selectedConvos.size} selected</span>
+              <button className="btn btn-sm"
+                disabled={deleting || selectedConvos.size === 0}
+                onClick={deleteSelectedConvos}
+                style={{ fontSize:'0.74rem', padding:'4px 10px', background:'rgba(231,76,60,0.15)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)', borderRadius:'var(--r-sm)', cursor:'pointer', opacity:selectedConvos.size===0?0.4:1 }}>
+                {deleting ? '⏳' : `🗑 Delete (${selectedConvos.size})`}
+              </button>
+              <button className="btn btn-ghost btn-sm"
+                onClick={() => { setConvoSelectMode(false); setSelectedConvos(new Set()); }}
+                style={{ fontSize:'0.74rem', padding:'4px 10px' }}>
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Main layout ── */}
@@ -235,25 +345,54 @@ export default function UserMessages({ user }) {
           {convos.map(c => {
             const isUnread = c.lastSender === 'admin' && c.userRead === false;
             const isActive = activeConvo === c.id;
+            const isConvoSelected = selectedConvos.has(c.id);
             return (
               <div key={c.id}
-                onClick={() => openConversation(c)}
-                className={`um-row${isActive ? ' um-row--active' : ''}${isUnread ? ' um-row--unread' : ''}`}
+                style={{ position:'relative', display:'flex', alignItems:'center' }}
               >
-                <div className={`um-row-avatar${isUnread ? ' um-row-avatar--admin' : ''}`}>
-                  {isUnread ? '🛡️' : (user.name?.[0] || 'U').toUpperCase()}
+                {/* checkbox in select mode */}
+                {convoSelectMode && (
+                  <div
+                    onClick={() => toggleConvoSelect(c.id)}
+                    style={{
+                      width:18, height:18, borderRadius:4, flexShrink:0, marginLeft:10,
+                      border:`2px solid ${isConvoSelected?'var(--gold)':'rgba(255,255,255,0.2)'}`,
+                      background: isConvoSelected ? 'var(--gold)' : 'transparent',
+                      display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer',
+                    }}>
+                    {isConvoSelected && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </div>
+                )}
+                <div
+                  onClick={() => convoSelectMode ? toggleConvoSelect(c.id) : openConversation(c)}
+                  className={`um-row${isActive ? ' um-row--active' : ''}${isUnread ? ' um-row--unread' : ''}`}
+                  style={{ flex:1 }}
+                >
+                  <div className={`um-row-avatar${isUnread ? ' um-row-avatar--admin' : ''}`}>
+                    {isUnread ? '🛡️' : (user.name?.[0] || 'U').toUpperCase()}
+                  </div>
+                  <div className="um-row-body">
+                    <div className="um-row-subject">{c.subject || 'No subject'}</div>
+                    <div className="um-row-preview">{c.lastMsg || c.message || '—'}</div>
+                  </div>
+                  <div className="um-row-right">
+                    <span className="um-row-time">{fmtTime(c.lastMsgAt || c.createdAt)}</span>
+                    {isUnread && <span className="um-dot" />}
+                    {c.status === 'replied' && !isUnread && (
+                      <span className="um-replied-badge">↩ replied</span>
+                    )}
+                  </div>
                 </div>
-                <div className="um-row-body">
-                  <div className="um-row-subject">{c.subject || 'No subject'}</div>
-                  <div className="um-row-preview">{c.lastMsg || c.message || '—'}</div>
-                </div>
-                <div className="um-row-right">
-                  <span className="um-row-time">{fmtTime(c.lastMsgAt || c.createdAt)}</span>
-                  {isUnread && <span className="um-dot" />}
-                  {c.status === 'replied' && !isUnread && (
-                    <span className="um-replied-badge">↩ replied</span>
-                  )}
-                </div>
+                {/* quick delete btn (non-select mode) */}
+                {!convoSelectMode && (
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteConversation(c.id); }}
+                    title="Delete conversation"
+                    style={{ position:'absolute', right:6, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'rgba(255,255,255,0.18)', cursor:'pointer', padding:'3px 5px', fontSize:'0.78rem', lineHeight:1, borderRadius:4, zIndex:1 }}
+                    onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.85)'}
+                    onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.18)'}
+                  >🗑</button>
+                )}
               </div>
             );
           })}
@@ -324,7 +463,42 @@ export default function UserMessages({ user }) {
                     {activeConvoData?.status === 'replied' ? '↩ Admin replied' : '📨 Awaiting reply'}
                   </span>
                 </div>
-                <button className="um-close-btn" onClick={() => setActiveConvo(null)}>✕</button>
+                <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                  {!selectMode ? (
+                    <>
+                      {thread.filter(m => m.sender === 'user').length > 0 && (
+                        <button className="btn btn-ghost btn-sm"
+                          onClick={() => { setSelectMode(true); setSelectedMsgs(new Set()); }}
+                          style={{ fontSize:'0.72rem', padding:'3px 8px' }}>
+                          ☑ Select
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteConversation(activeConvo)}
+                        title="Delete conversation"
+                        className="btn btn-ghost btn-sm"
+                        style={{ fontSize:'0.72rem', padding:'3px 8px', color:'#e74c3c' }}>
+                        🗑 Delete
+                      </button>
+                      <button className="um-close-btn" onClick={() => setActiveConvo(null)}>✕</button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{selectedMsgs.size} selected</span>
+                      <button
+                        disabled={deleting || selectedMsgs.size === 0}
+                        onClick={deleteSelectedMsgs}
+                        style={{ fontSize:'0.72rem', padding:'3px 8px', background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', cursor:'pointer', opacity:selectedMsgs.size===0?0.4:1 }}>
+                        {deleting ? '⏳' : `🗑 Delete (${selectedMsgs.size})`}
+                      </button>
+                      <button className="btn btn-ghost btn-sm"
+                        onClick={() => { setSelectMode(false); setSelectedMsgs(new Set()); }}
+                        style={{ fontSize:'0.72rem', padding:'3px 8px' }}>
+                        Cancel
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="um-messages">
@@ -334,7 +508,10 @@ export default function UserMessages({ user }) {
                   </div>
                 )}
                 {thread.map(msg => (
-                  <div key={msg.id} className={`um-msg ${msg.sender === 'user' ? 'um-msg--user' : 'um-msg--admin'}`}>
+                  <div key={msg.id} className={`um-msg ${msg.sender === 'user' ? 'um-msg--user' : 'um-msg--admin'}`}
+                    style={{ cursor: selectMode && msg.sender === 'user' ? 'pointer' : 'default' }}
+                    onClick={() => selectMode && toggleMsgSelect(msg.id)}
+                  >
                     {msg.sender === 'admin' && (
                       <div className="um-avatar um-avatar--admin">🛡️</div>
                     )}
@@ -342,10 +519,36 @@ export default function UserMessages({ user }) {
                       <span className="um-sender-name">
                         {msg.sender === 'admin' ? 'Ellines Haven Team' : 'You'}
                       </span>
-                      <div className={`um-bubble ${msg.sender === 'user' ? 'um-bubble--user' : 'um-bubble--admin'}`}>
-                        {msg.text}
+                      <div style={{ position:'relative', display:'flex', alignItems:'center', gap:6, flexDirection: msg.sender==='user'?'row-reverse':'row' }}>
+                        {/* select checkbox (user messages only) */}
+                        {selectMode && msg.sender === 'user' && (
+                          <div style={{
+                            width:16, height:16, borderRadius:4, flexShrink:0,
+                            border:`2px solid ${selectedMsgs.has(msg.id)?'var(--gold)':'rgba(255,255,255,0.25)'}`,
+                            background: selectedMsgs.has(msg.id) ? 'var(--gold)' : 'transparent',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                          }}>
+                            {selectedMsgs.has(msg.id) && <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                        )}
+                        <div className={`um-bubble ${msg.sender === 'user' ? 'um-bubble--user' : 'um-bubble--admin'}`}
+                          style={{ outline: selectedMsgs.has(msg.id) ? '2px solid var(--gold)' : 'none', transition:'outline 0.1s' }}>
+                          {msg.text}
+                        </div>
                       </div>
-                      <span className="um-time">{fmtTime(msg.createdAt)}</span>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexDirection: msg.sender==='user'?'row-reverse':'row' }}>
+                        <span className="um-time">{fmtTime(msg.createdAt)}</span>
+                        {/* delete own message button (non-select mode) */}
+                        {msg.sender === 'user' && !selectMode && (
+                          <button
+                            onClick={e => { e.stopPropagation(); deleteMessage(msg.id); }}
+                            title="Delete message"
+                            style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', cursor:'pointer', padding:'0 2px', fontSize:'0.65rem', lineHeight:1 }}
+                            onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.8)'}
+                            onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.2)'}
+                          >🗑</button>
+                        )}
+                      </div>
                     </div>
                     {msg.sender === 'user' && (
                       <div className="um-avatar um-avatar--user">

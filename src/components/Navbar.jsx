@@ -29,7 +29,7 @@ function WishlistIcon({ count }) {
     <Link
       to="/wishlist"
       className="nav__cart nav__hide-mobile"
-      aria-label={`Wishlist (${count} saved)`}
+      aria-label={`Wishlist (${count} books)`}
       title="My Wishlist"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"

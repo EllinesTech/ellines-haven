@@ -9,8 +9,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  collection, doc, setDoc, addDoc, onSnapshot,
-  serverTimestamp, query, orderBy,
+  collection, doc, setDoc, addDoc, onSnapshot, deleteDoc, writeBatch,
+  serverTimestamp, query, orderBy, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
@@ -40,13 +40,16 @@ function playPing() {
 export default function LiveChat() {
   const { user } = useApp();
 
-  const [open,      setOpen]      = useState(false);
-  const [chatId,    setChatId]    = useState(null);
-  const [messages,  setMessages]  = useState([]);
-  const [draft,     setDraft]     = useState('');
-  const [sending,   setSending]   = useState(false);
+  const [open,        setOpen]        = useState(false);
+  const [chatId,      setChatId]      = useState(null);
+  const [messages,    setMessages]    = useState([]);
+  const [draft,       setDraft]       = useState('');
+  const [sending,     setSending]     = useState(false);
   const [agentOnline, setAgentOnline] = useState(false);
-  const [unread,    setUnread]    = useState(0);
+  const [unread,      setUnread]      = useState(0);
+  const [selectMode,  setSelectMode]  = useState(false);
+  const [selected,    setSelected]    = useState(new Set());
+  const [deleting,    setDeleting]    = useState(false);
 
   const bottomRef    = useRef(null);
   const prevMsgCount = useRef(0);
@@ -239,6 +242,60 @@ export default function LiveChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
+  /* ── delete a single message (user can only delete their own) ── */
+  const deleteMessage = async (msgId, sender) => {
+    if (sender !== 'user' || !chatId) return; // users can only delete their own msgs
+    try {
+      await deleteDoc(doc(db, 'contact_messages', chatId, 'messages', msgId));
+      setSelected(s => { const n = new Set(s); n.delete(msgId); return n; });
+    } catch {}
+  };
+
+  /* ── bulk delete selected messages ── */
+  const deleteSelected = async () => {
+    if (!chatId || selected.size === 0) return;
+    if (!window.confirm(`Delete ${selected.size} message${selected.size > 1 ? 's' : ''}?`)) return;
+    setDeleting(true);
+    const batch = writeBatch(db);
+    selected.forEach(id => {
+      // only allow deleting user's own messages
+      const msg = messages.find(m => m.id === id);
+      if (msg?.sender === 'user') {
+        batch.delete(doc(db, 'contact_messages', chatId, 'messages', id));
+      }
+    });
+    await batch.commit().catch(() => {});
+    setSelected(new Set());
+    setSelectMode(false);
+    setDeleting(false);
+  };
+
+  /* ── clear all user messages ── */
+  const clearMyMessages = async () => {
+    if (!chatId) return;
+    if (!window.confirm('Clear all your messages from this chat?')) return;
+    setDeleting(true);
+    const batch = writeBatch(db);
+    messages.forEach(m => {
+      if (m.sender === 'user') {
+        batch.delete(doc(db, 'contact_messages', chatId, 'messages', m.id));
+      }
+    });
+    await batch.commit().catch(() => {});
+    setSelectMode(false);
+    setSelected(new Set());
+    setDeleting(false);
+  };
+
+  const toggleSelect = (id, sender) => {
+    if (sender !== 'user') return; // can only select own messages
+    setSelected(s => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
   /* ── reset chat (start new session) ── */
   const resetChat = () => {
     localStorage.removeItem('eh_live_chat_id');
@@ -375,14 +432,51 @@ export default function LiveChat() {
             </button>
           </div>
 
+          {/* multi-select toolbar */}
+          {chatId && (
+            <div style={{
+              display:'flex', alignItems:'center', gap:6, padding:'6px 10px',
+              background:'rgba(0,0,0,0.25)', borderBottom:'1px solid rgba(255,255,255,0.07)',
+              flexShrink:0,
+            }}>
+              {!selectMode ? (
+                <>
+                  <button onClick={() => { setSelectMode(true); setSelected(new Set()); }}
+                    style={{ background:'none', border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.7)', borderRadius:6, padding:'3px 9px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit' }}>
+                    ☑ Select
+                  </button>
+                  <button onClick={clearMyMessages} disabled={deleting || messages.filter(m=>m.sender==='user').length===0}
+                    style={{ background:'none', border:'1px solid rgba(231,76,60,0.3)', color:'rgba(231,76,60,0.8)', borderRadius:6, padding:'3px 9px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit', opacity: messages.filter(m=>m.sender==='user').length===0?0.4:1 }}>
+                    🗑 Clear Mine
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize:'0.68rem', color:'rgba(255,255,255,0.6)', marginRight:2 }}>
+                    {selected.size} selected
+                  </span>
+                  <button onClick={deleteSelected} disabled={deleting || selected.size === 0}
+                    style={{ background: selected.size>0?'rgba(231,76,60,0.2)':'none', border:'1px solid rgba(231,76,60,0.4)', color:'#e74c3c', borderRadius:6, padding:'3px 9px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit', opacity:selected.size===0?0.4:1 }}>
+                    {deleting ? '⏳' : `🗑 Delete (${selected.size})`}
+                  </button>
+                  <button onClick={() => { setSelectMode(false); setSelected(new Set()); }}
+                    style={{ background:'none', border:'1px solid rgba(255,255,255,0.15)', color:'rgba(255,255,255,0.6)', borderRadius:6, padding:'3px 9px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit', marginLeft:'auto' }}>
+                    Cancel
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* messages area */}
           <div style={{
             flex:      1,
             overflowY: 'auto',
-            padding:   '14px 12px',
+            padding:   selectMode ? '14px 12px 14px 32px' : '14px 12px',
             display:   'flex',
             flexDirection: 'column',
             gap:       10,
+            transition: 'padding 0.15s',
           }}>
             {messages.length === 0 && (
               <div style={{ textAlign:'center', padding:'24px 12px', color:'var(--muted,#7a7a9a)', fontSize:'0.82rem' }}>
@@ -414,27 +508,61 @@ export default function LiveChat() {
             {messages.map(msg => {
               const isUser   = msg.sender === 'user';
               const isSystem = msg.sender === 'system';
+              const isSelectedMsg = selected.has(msg.id);
               if (isSystem) return (
                 <div key={msg.id} style={{ textAlign:'center', fontSize:'0.72rem', color:'var(--muted,#7a7a9a)', padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:20 }}>
                   {msg.text}
                 </div>
               );
               return (
-                <div key={msg.id} style={{ display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                <div key={msg.id}
+                  style={{ display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start', position:'relative' }}
+                  onClick={() => selectMode && isUser && toggleSelect(msg.id, msg.sender)}
+                >
+                  {/* selection indicator */}
+                  {selectMode && isUser && (
+                    <div style={{
+                      position:'absolute', left:-22, top:'50%', transform:'translateY(-50%)',
+                      width:16, height:16, borderRadius:4,
+                      border:'2px solid rgba(106,99,255,0.7)',
+                      background: isSelectedMsg ? '#6c63ff' : 'transparent',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      cursor:'pointer', flexShrink:0,
+                    }}>
+                      {isSelectedMsg && <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </div>
+                  )}
                   <div style={{
                     maxWidth:    '80%',
                     padding:     '9px 13px',
                     borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                    background:   isUser ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)',
+                    background:   isSelectedMsg
+                      ? 'rgba(231,76,60,0.25)'
+                      : isUser ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)',
                     color:        '#fff',
                     fontSize:     '0.88rem',
                     lineHeight:   1.55,
                     wordBreak:    'break-word',
                     whiteSpace:   'pre-wrap',
+                    cursor:       selectMode && isUser ? 'pointer' : 'default',
+                    transition:   'background 0.15s',
+                    outline:      isSelectedMsg ? '2px solid rgba(231,76,60,0.5)' : 'none',
                   }}>{msg.text}</div>
-                  <span style={{ fontSize:'0.65rem', color:'var(--muted,#7a7a9a)', marginTop:3, paddingInline:4 }}>
-                    {isUser ? 'You' : '🛡️ Agent'} · {fmtTime(msg.createdAt)}
-                  </span>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3, paddingInline:4 }}>
+                    <span style={{ fontSize:'0.65rem', color:'var(--muted,#7a7a9a)' }}>
+                      {isUser ? 'You' : '🛡️ Agent'} · {fmtTime(msg.createdAt)}
+                    </span>
+                    {/* delete own message (non-select mode) */}
+                    {isUser && !selectMode && (
+                      <button
+                        onClick={e => { e.stopPropagation(); deleteMessage(msg.id, msg.sender); }}
+                        title="Delete message"
+                        style={{ background:'none', border:'none', color:'rgba(255,255,255,0.25)', cursor:'pointer', padding:'0 2px', fontSize:'0.65rem', lineHeight:1, display:'flex', alignItems:'center' }}
+                        onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.8)'}
+                        onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.25)'}
+                      >🗑</button>
+                    )}
+                  </div>
                 </div>
               );
             })}

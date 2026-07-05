@@ -3,31 +3,39 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: none;
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(13,13,26,0.82);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: var(--r-sm, 8px);
-  color: var(--muted);
+  color: rgba(255,255,255,0.7);
   cursor: pointer;
   font-family: inherit;
   transition: all 0.2s;
   white-space: nowrap;
+  line-height: 1;
 }
 
 .wl-btn:hover {
-  border-color: var(--gold, #c9a84c);
-  color: var(--gold, #c9a84c);
-  background: rgba(201,168,76,0.07);
+  border-color: #e74c3c;
+  color: #e74c3c;
+  background: rgba(231,76,60,0.12);
+  transform: scale(1.08);
 }
 
 .wl-btn--active {
-  border-color: rgba(201,168,76,0.4);
-  color: var(--gold, #c9a84c);
-  background: rgba(201,168,76,0.1);
+  border-color: rgba(231,76,60,0.5);
+  color: #e74c3c;
+  background: rgba(231,76,60,0.15);
+}
+
+.wl-btn--active:hover {
+  border-color: #e74c3c;
+  background: rgba(231,76,60,0.22);
 }
 
 /* Sizes */
 .wl-btn--sm {
-  padding: 5px 10px;
+  padding: 6px 8px;
   font-size: 0.78rem;
 }
 
@@ -41,32 +49,21 @@
   font-size: 0.92rem;
 }
 
+/* Heart icon */
 .wl-btn-icon {
-  font-size: 1em;
-  line-height: 1;
-  /* Make inactive look dimmer */
-  filter: grayscale(0.4);
-  transition: filter 0.2s, transform 0.2s;
+  flex-shrink: 0;
+  transition: transform 0.2s, color 0.2s;
 }
 
-.wl-btn--active .wl-btn-icon,
 .wl-btn:hover .wl-btn-icon {
-  filter: none;
+  transform: scale(1.2);
+}
+
+.wl-btn--active .wl-btn-icon {
   transform: scale(1.1);
 }
 
 .wl-btn-label {
   font-weight: 500;
-}
-
-/* Small active indicator dot */
-.wl-btn-dot {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--gold, #c9a84c);
-  border: 2px solid var(--bg, #0d0d1a);
+  font-size: 0.78rem;
 }

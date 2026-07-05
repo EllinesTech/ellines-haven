@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc,
-         serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, writeBatch,
+         serverTimestamp, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -143,6 +143,14 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const [compBody,    setCompBody]    = useState('');
   const [composing,   setComposing]   = useState(false);
   const [compErr,     setCompErr]     = useState('');
+  // Multi-select for message list
+  const [listSelectMode,  setListSelectMode]  = useState(false);
+  const [listSelected,    setListSelected]    = useState(new Set());
+  const [listDeleting,    setListDeleting]    = useState(false);
+  // Multi-select for thread messages (admin can delete any message)
+  const [threadSelectMode, setThreadSelectMode] = useState(false);
+  const [threadSelected,   setThreadSelected]   = useState(new Set());
+  const [threadDeleting,   setThreadDeleting]   = useState(false);
 
   // ── Order notifications from admin_notifications ─────────────────────────
   const [orderNotifs, setOrderNotifs] = useState([]);
@@ -342,10 +350,89 @@ export default function MessagesPanel({ showToast, users = [] }) {
 
   const deleteMsg = async id => {
     if (!window.confirm('Delete this message?')) return;
-    await deleteDoc(doc(db, 'contact_messages', id)).catch(() => {});
+    // also delete subcollection messages
+    try {
+      const subSnap = await getDocs(collection(db, 'contact_messages', id, 'messages'));
+      const batch = writeBatch(db);
+      subSnap.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db, 'contact_messages', id));
+      await batch.commit();
+    } catch {
+      await deleteDoc(doc(db, 'contact_messages', id)).catch(() => {});
+    }
     setMessages(prev => prev.filter(m => m.id !== id));
     if (selected?.id === id) setSelected(null);
     showToast?.('🗑 Deleted');
+  };
+
+  // ── Bulk delete selected messages (list) ────────────────────────────────────
+  const deleteBulkMessages = async () => {
+    if (listSelected.size === 0) return;
+    if (!window.confirm(`Delete ${listSelected.size} conversation${listSelected.size > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    setListDeleting(true);
+    for (const id of listSelected) {
+      try {
+        const subSnap = await getDocs(collection(db, 'contact_messages', id, 'messages'));
+        const batch = writeBatch(db);
+        subSnap.docs.forEach(d => batch.delete(d.ref));
+        batch.delete(doc(db, 'contact_messages', id));
+        await batch.commit();
+      } catch {}
+    }
+    setMessages(prev => prev.filter(m => !listSelected.has(m.id)));
+    if (listSelected.has(selected?.id)) setSelected(null);
+    setListSelected(new Set());
+    setListSelectMode(false);
+    setListDeleting(false);
+    showToast?.(`🗑 Deleted ${listSelected.size} conversation${listSelected.size > 1 ? 's' : ''}`);
+  };
+
+  const toggleListSelect = (id) => {
+    setListSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
+  const selectAllList = () => {
+    setListSelected(new Set(filtered.map(m => m.id)));
+  };
+
+  // ── Thread message delete (admin) ────────────────────────────────────────────
+  const deleteThreadMessage = async (msgId) => {
+    if (!selected?.threadId) return;
+    try {
+      await deleteDoc(doc(db, 'contact_messages', selected.threadId, 'messages', msgId));
+      setThreadSelected(s => { const n = new Set(s); n.delete(msgId); return n; });
+    } catch {}
+  };
+
+  const deleteSelectedThreadMsgs = async () => {
+    if (!selected?.threadId || threadSelected.size === 0) return;
+    if (!window.confirm(`Delete ${threadSelected.size} message${threadSelected.size > 1 ? 's' : ''}?`)) return;
+    setThreadDeleting(true);
+    const batch = writeBatch(db);
+    threadSelected.forEach(id => batch.delete(doc(db, 'contact_messages', selected.threadId, 'messages', id)));
+    await batch.commit().catch(() => {});
+    setThreadSelected(new Set());
+    setThreadSelectMode(false);
+    setThreadDeleting(false);
+    showToast?.('🗑 Messages deleted');
+  };
+
+  const clearThreadMessages = async () => {
+    if (!selected?.threadId) return;
+    if (!window.confirm('Clear ALL messages in this conversation? This cannot be undone.')) return;
+    setThreadDeleting(true);
+    const subSnap = await getDocs(collection(db, 'contact_messages', selected.threadId, 'messages')).catch(() => ({ docs:[] }));
+    const batch = writeBatch(db);
+    subSnap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit().catch(() => {});
+    setThreadSelectMode(false);
+    setThreadSelected(new Set());
+    setThreadDeleting(false);
+    showToast?.('🗑 Conversation cleared');
+  };
+
+  const toggleThreadSelect = (id) => {
+    setThreadSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
   const notifs   = messages.filter(m => m.type === 'notification');
@@ -443,11 +530,33 @@ export default function MessagesPanel({ showToast, users = [] }) {
             )}
           </span>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <button className="btn btn-primary" onClick={() => { setComposeOpen(true); setCompErr(''); setToSearch(''); setToEmail(''); setCompSubject(''); setCompBody(''); }}>
-            ✉️ New Message
-          </button>
-          <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:180 }} />
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          {!listSelectMode ? (
+            <>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setListSelectMode(true); setListSelected(new Set()); }} style={{ fontSize:'0.78rem' }}>
+                ☑ Select
+              </button>
+              <button className="btn btn-primary" onClick={() => { setComposeOpen(true); setCompErr(''); setToSearch(''); setToEmail(''); setCompSubject(''); setCompBody(''); }}>
+                ✉️ New Message
+              </button>
+              <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:180 }} />
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize:'0.82rem', color:'var(--muted)' }}>{listSelected.size} selected</span>
+              <button className="btn btn-ghost btn-sm" onClick={selectAllList} style={{ fontSize:'0.78rem' }}>Select All ({filtered.length})</button>
+              <button
+                disabled={listDeleting || listSelected.size === 0}
+                onClick={deleteBulkMessages}
+                style={{ padding:'6px 14px', background:'rgba(231,76,60,0.15)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)', borderRadius:'var(--r-sm)', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit', opacity:listSelected.size===0?0.4:1 }}>
+                {listDeleting ? '⏳ Deleting…' : `🗑 Delete (${listSelected.size})`}
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setListSelectMode(false); setListSelected(new Set()); }} style={{ fontSize:'0.78rem' }}>
+                Cancel
+              </button>
+              <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:150 }} />
+            </>
+          )}
         </div>
       </div>
 
@@ -496,34 +605,66 @@ export default function MessagesPanel({ showToast, users = [] }) {
             const st = m.status || 'new';
             const sc = m.type==='notification' ? SC.notification : (SC[st] || SC.new);
             const isActive = selected?.id === m.id;
+            const isListSelected = listSelected.has(m.id);
             return (
-              <div key={m.id} onClick={() => openMessage(m)}
-                style={{
-                  padding:'14px 16px',
-                  background: isActive ? 'rgba(201,168,76,0.09)' : 'var(--card)',
-                  border: isActive ? '1px solid rgba(201,168,76,0.45)' : '1px solid var(--border)',
-                  borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .15s',
-                  borderLeft:`3px solid ${st==='new'?'#e8832a':isActive?'var(--gold)':'transparent'}`,
-                }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                    <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.15)', color:'var(--gold)', fontWeight:700, fontSize:'0.88rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      {(m.name||'?')[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <strong style={{ fontSize:'0.92rem', display:'block' }}>{m.name||'Anonymous'}</strong>
-                      <span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{m.email||'—'}</span>
+              <div key={m.id}
+                style={{ position:'relative', display:'flex', alignItems:'stretch', gap: listSelectMode ? 8 : 0 }}>
+                {/* checkbox */}
+                {listSelectMode && (
+                  <div
+                    onClick={() => toggleListSelect(m.id)}
+                    style={{
+                      width:20, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', paddingLeft:8, cursor:'pointer',
+                    }}>
+                    <div style={{
+                      width:18, height:18, borderRadius:4,
+                      border:`2px solid ${isListSelected?'var(--gold)':'rgba(255,255,255,0.2)'}`,
+                      background: isListSelected ? 'var(--gold)' : 'transparent',
+                      display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+                    }}>
+                      {isListSelected && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                     </div>
                   </div>
-                  <span style={{ fontSize:'0.65rem', padding:'3px 8px', borderRadius:10, background:sc.bg, color:sc.color, border:`1px solid ${sc.border}`, fontWeight:700, textTransform:'uppercase', flexShrink:0 }}>
-                    {m.type==='notification' ? '🔔' : st}
-                  </span>
+                )}
+                <div onClick={() => listSelectMode ? toggleListSelect(m.id) : openMessage(m)}
+                  style={{
+                    flex:1,
+                    padding:'14px 16px',
+                    background: isActive ? 'rgba(201,168,76,0.09)' : isListSelected ? 'rgba(201,168,76,0.06)' : 'var(--card)',
+                    border: isActive ? '1px solid rgba(201,168,76,0.45)' : '1px solid var(--border)',
+                    borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .15s',
+                    borderLeft:`3px solid ${st==='new'?'#e8832a':isActive?'var(--gold)':'transparent'}`,
+                  }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.15)', color:'var(--gold)', fontWeight:700, fontSize:'0.88rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        {(m.name||'?')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <strong style={{ fontSize:'0.92rem', display:'block' }}>{m.name||'Anonymous'}</strong>
+                        <span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{m.email||'—'}</span>
+                      </div>
+                    </div>
+                    <span style={{ fontSize:'0.65rem', padding:'3px 8px', borderRadius:10, background:sc.bg, color:sc.color, border:`1px solid ${sc.border}`, fontWeight:700, textTransform:'uppercase', flexShrink:0 }}>
+                      {m.type==='notification' ? '🔔' : st}
+                    </span>
+                  </div>
+                  <div style={{ fontSize:'0.88rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:3 }}>{m.subject||'No subject'}</div>
+                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}>
+                    {m.lastAdminReply ? '↩ '+m.lastAdminReply : (m.message||'').slice(0,70)}
+                  </div>
+                  <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{fmtDate(m.createdAt)}</div>
                 </div>
-                <div style={{ fontSize:'0.88rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:3 }}>{m.subject||'No subject'}</div>
-                <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}>
-                  {m.lastAdminReply ? '↩ '+m.lastAdminReply : (m.message||'').slice(0,70)}
-                </div>
-                <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{fmtDate(m.createdAt)}</div>
+                {/* quick delete in normal mode */}
+                {!listSelectMode && (
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteMsg(m.id); }}
+                    title="Delete"
+                    style={{ position:'absolute', top:10, right:10, background:'none', border:'none', color:'rgba(255,255,255,0.18)', cursor:'pointer', padding:'3px 5px', fontSize:'0.78rem', borderRadius:4, zIndex:1 }}
+                    onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.85)'}
+                    onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.18)'}
+                  >🗑</button>
+                )}
               </div>
             );
           })}
@@ -548,9 +689,43 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   }
                 </div>
               </div>
-              <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-                <button className="adm-act-btn adm-act-del" onClick={() => deleteMsg(selected.id)}>🗑</button>
-                <button className="adm-close-btn" onClick={() => setSelected(null)}>✕</button>
+              <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap', alignItems:'center', justifyContent:'flex-end' }}>
+                {!threadSelectMode ? (
+                  <>
+                    {thread.length > 0 && (
+                      <button
+                        onClick={() => { setThreadSelectMode(true); setThreadSelected(new Set()); }}
+                        style={{ fontSize:'0.74rem', padding:'4px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit' }}>
+                        ☑ Select
+                      </button>
+                    )}
+                    {thread.length > 0 && (
+                      <button
+                        onClick={clearThreadMessages}
+                        disabled={threadDeleting}
+                        style={{ fontSize:'0.74rem', padding:'4px 8px', background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit' }}>
+                        🗑 Clear All
+                      </button>
+                    )}
+                    <button className="adm-act-btn adm-act-del" onClick={() => deleteMsg(selected.id)}>🗑 Del Conv</button>
+                    <button className="adm-close-btn" onClick={() => setSelected(null)}>✕</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize:'0.74rem', color:'var(--muted)' }}>{threadSelected.size} selected</span>
+                    <button
+                      disabled={threadDeleting || threadSelected.size === 0}
+                      onClick={deleteSelectedThreadMsgs}
+                      style={{ fontSize:'0.74rem', padding:'4px 10px', background:'rgba(231,76,60,0.12)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit', opacity:threadSelected.size===0?0.4:1 }}>
+                      {threadDeleting ? '⏳' : `🗑 Delete (${threadSelected.size})`}
+                    </button>
+                    <button
+                      onClick={() => { setThreadSelectMode(false); setThreadSelected(new Set()); }}
+                      style={{ fontSize:'0.74rem', padding:'4px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit' }}>
+                      Cancel
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -587,23 +762,51 @@ export default function MessagesPanel({ showToast, users = [] }) {
 
               {thread.map(t => {
                 const isAdmin = t.sender === 'admin';
+                const isTSelected = threadSelected.has(t.id);
                 return (
-                  <div key={t.id} style={{ display:'flex', gap:10, alignSelf:isAdmin?'flex-end':'flex-start', maxWidth:'80%', flexDirection:isAdmin?'row-reverse':'row' }}>
+                  <div key={t.id}
+                    style={{ display:'flex', gap:10, alignSelf:isAdmin?'flex-end':'flex-start', maxWidth:'80%', flexDirection:isAdmin?'row-reverse':'row', cursor: threadSelectMode ? 'pointer' : 'default' }}
+                    onClick={() => threadSelectMode && toggleThreadSelect(t.id)}
+                  >
                     <div style={{ width:36, height:36, borderRadius:'50%', background:isAdmin?'rgba(201,168,76,0.18)':'rgba(74,158,255,0.15)', color:isAdmin?'var(--gold)':'#4a9eff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:isAdmin?'0.9rem':'1.1rem', fontWeight:700, flexShrink:0, alignSelf:'flex-end' }}>
                       {isAdmin ? (t.senderName||'A')[0].toUpperCase() : '👤'}
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:isAdmin?'flex-end':'flex-start' }}>
-                      <div style={{ fontSize:'0.73rem', color:'var(--muted)', padding:'0 4px' }}>
-                        {isAdmin ? '🛡️ Admin' : t.senderName} · {fmtDate(t.createdAt)}
+                      <div style={{ fontSize:'0.73rem', color:'var(--muted)', padding:'0 4px', display:'flex', alignItems:'center', gap:6, flexDirection:isAdmin?'row-reverse':'row' }}>
+                        <span>{isAdmin ? '🛡️ Admin' : t.senderName} · {fmtDate(t.createdAt)}</span>
+                        {/* select checkbox */}
+                        {threadSelectMode && (
+                          <div style={{
+                            width:16, height:16, borderRadius:4, flexShrink:0,
+                            border:`2px solid ${isTSelected?'var(--gold)':'rgba(255,255,255,0.25)'}`,
+                            background: isTSelected ? 'var(--gold)' : 'transparent',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                          }}>
+                            {isTSelected && <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                        )}
                       </div>
-                      <div style={{
-                        background: isAdmin ? 'rgba(201,168,76,0.14)' : 'rgba(74,158,255,0.09)',
-                        border: isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
-                        borderRadius: isAdmin ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
-                        padding:'14px 18px', fontSize:'1rem', lineHeight:1.75,
-                        whiteSpace:'pre-wrap', wordBreak:'break-word',
-                      }}>
-                        {t.text}
+                      <div style={{ position:'relative', display:'flex', alignItems:'flex-end', gap:6, flexDirection:isAdmin?'row-reverse':'row' }}>
+                        <div style={{
+                          background: isTSelected ? 'rgba(231,76,60,0.18)' : isAdmin ? 'rgba(201,168,76,0.14)' : 'rgba(74,158,255,0.09)',
+                          border: isTSelected ? '2px solid rgba(231,76,60,0.4)' : isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
+                          borderRadius: isAdmin ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
+                          padding:'14px 18px', fontSize:'1rem', lineHeight:1.75,
+                          whiteSpace:'pre-wrap', wordBreak:'break-word',
+                          transition:'background 0.1s, border 0.1s',
+                        }}>
+                          {t.text}
+                        </div>
+                        {/* delete button (non-select mode) */}
+                        {!threadSelectMode && (
+                          <button
+                            onClick={e => { e.stopPropagation(); deleteThreadMessage(t.id); }}
+                            title="Delete message"
+                            style={{ background:'none', border:'none', color:'rgba(255,255,255,0.18)', cursor:'pointer', padding:'2px 4px', fontSize:'0.72rem', lineHeight:1, flexShrink:0, alignSelf:'center' }}
+                            onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.85)'}
+                            onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.18)'}
+                          >🗑</button>
+                        )}
                       </div>
                     </div>
                   </div>
