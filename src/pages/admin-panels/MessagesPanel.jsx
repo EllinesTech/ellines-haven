@@ -270,18 +270,22 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const openMessage = async msg => {
     const threadId = msg.threadId || msg.id;
     const newStatus = msg.status === 'new' || !msg.status ? 'read' : msg.status;
+    // Set selected immediately so the right panel opens right away
     setSelected({ ...msg, threadId, status: newStatus });
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, status: newStatus, threadId } : m));
     setReplyDraft(''); setSendErr('');
 
-    // Always ensure threadId is persisted on the doc
-    if (msg.status === 'new' || !msg.status || !msg.threadId) {
-      await setDoc(doc(db, 'contact_messages', msg.id),
-        { status: newStatus, threadId, updatedAt: serverTimestamp() }, { merge: true });
+    // Background Firestore updates — don't block the UI
+    try {
+      if (msg.status === 'new' || !msg.status || !msg.threadId) {
+        await setDoc(doc(db, 'contact_messages', msg.id),
+          { status: newStatus, threadId, updatedAt: serverTimestamp() }, { merge: true });
+      }
+    } catch (e) {
+      console.warn('[openMessage] status update failed:', e.message);
     }
 
     // Seed the subcollection with the original message if it's empty
-    // This handles both legacy messages (no threadId) and new ones where seeding failed
     if (msg.message) {
       try {
         const subSnap = await getDocs(collection(db, 'contact_messages', threadId, 'messages'));
@@ -294,7 +298,9 @@ export default function MessagesPanel({ showToast, users = [] }) {
             createdAt: msg.createdAt || serverTimestamp(),
           });
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[openMessage] thread seed failed:', e.message);
+      }
     }
   };
 
@@ -634,7 +640,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
             return (
               <div key={m.id} style={{ position:'relative' }}>
                 <div
-                  onClick={() => listSelectMode ? toggleListSelect(m.id) : openMessage(m)}
+                  onClick={() => openMessage(m)}
                   style={{
                     padding:'14px 16px',
                     background: isActive ? 'rgba(201,168,76,0.09)' : isListSelected ? 'rgba(201,168,76,0.06)' : 'var(--card)',
@@ -644,13 +650,13 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      {/* ── Native checkbox always visible ── */}
+                      {/* ── Checkbox — stopPropagation so it doesn't open the thread ── */}
                       <input
                         type="checkbox"
                         checked={isListSelected}
-                        onChange={() => toggleListSelect(m.id)}
+                        onChange={e => { e.stopPropagation(); toggleListSelect(m.id); }}
                         onClick={e => e.stopPropagation()}
-                        style={{ width:16, height:16, flexShrink:0, cursor:'pointer', accentColor:'var(--gold)' }}
+                        style={{ width:16, height:16, flexShrink:0, cursor:'pointer', accentColor:'var(--gold)', pointerEvents:'auto' }}
                       />
                       <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.15)', color:'var(--gold)', fontWeight:700, fontSize:'0.88rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                         {(m.name||'?')[0].toUpperCase()}
