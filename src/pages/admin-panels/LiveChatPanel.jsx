@@ -343,42 +343,22 @@ export default function LiveChatPanel({ showToast }) {
               const isActive   = activeChat === s.id;
               const hasNew     = s.lastSender === 'user' && s.status !== 'closed';
               const isSelected = selected.has(s.id);
-              const inSelectMode = selected.size > 0;
               return (
                 <div key={s.id}
                   className={'adm-livechat-session-row' + (isActive ? ' active' : '') + (hasNew ? ' has-new' : '')}
-                  onClick={() => inSelectMode ? toggleSelect(s.id) : setActiveChat(s.id)}
-                  style={{
-                    outline: isSelected ? '2px solid rgba(201,168,76,0.45)' : undefined,
-                    outlineOffset: '-2px',
-                    paddingLeft: inSelectMode ? 42 : undefined,
-                    position: 'relative',
-                    cursor: 'pointer',
-                  }}
+                  onClick={() => setActiveChat(s.id)}
+                  style={{ outline: isSelected ? '2px solid rgba(201,168,76,0.45)' : undefined, outlineOffset: '-2px' }}
                 >
-                  {/* ── Custom checkbox — only shown when any session is selected ── */}
-                  {inSelectMode && (
-                    <div
-                      onClick={e => { e.stopPropagation(); toggleSelect(s.id); }}
-                      style={{
-                        position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                        width: 20, height: 20, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
-                        border: `2px solid ${isSelected ? 'var(--gold)' : 'rgba(255,255,255,0.3)'}`,
-                        background: isSelected ? 'var(--gold)' : 'rgba(255,255,255,0.04)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.12s', zIndex: 2,
-                      }}>
-                      {isSelected && (
-                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                          <polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Top row: avatar + name + status */}
+                  {/* Top row: checkbox + avatar + name + status */}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(s.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width:16, height:16, flexShrink:0, cursor:'pointer', accentColor:'var(--gold)' }}
+                      />
                       <div className="adm-livechat-avatar">{(s.name || '?')[0].toUpperCase()}</div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontWeight:600, fontSize:'0.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name || 'Guest'}</div>
@@ -390,11 +370,11 @@ export default function LiveChatPanel({ showToast }) {
                     </span>
                   </div>
                   {/* Preview */}
-                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}>
+                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4, paddingLeft:24 }}>
                     {s.lastMsg || 'Chat started'}
                   </div>
                   {/* Bottom: timestamp + End + Delete */}
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingLeft:24 }}>
                     <span style={{ fontSize:'0.68rem', color:'var(--muted)' }}>{fmtDate(s.lastMsgAt || s.createdAt)}</span>
                     <div style={{ display:'flex', gap:3 }} onClick={e => e.stopPropagation()}>
                       {s.status !== 'closed' && (
@@ -404,7 +384,7 @@ export default function LiveChatPanel({ showToast }) {
                           onMouseLeave={e => e.currentTarget.style.color='var(--muted)'}
                           title="End chat">End</button>
                       )}
-                      <button onClick={() => setDelConfirm(s.id)}
+                      <button onClick={e => { e.stopPropagation(); setDelConfirm(s.id); }}
                         style={{ background:'none', border:'none', color:'var(--muted)', fontSize:'0.75rem', cursor:'pointer', padding:'1px 5px', fontFamily:'inherit', borderRadius:3, transition:'color 0.15s' }}
                         onMouseEnter={e => e.currentTarget.style.color='#e74c3c'}
                         onMouseLeave={e => e.currentTarget.style.color='var(--muted)'}

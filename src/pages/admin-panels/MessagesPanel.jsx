@@ -144,7 +144,6 @@ export default function MessagesPanel({ showToast, users = [] }) {
   const [composing,   setComposing]   = useState(false);
   const [compErr,     setCompErr]     = useState('');
   // Multi-select for message list
-  const [listSelectMode,  setListSelectMode]  = useState(false);
   const [listSelected,    setListSelected]    = useState(new Set());
   const [listDeleting,    setListDeleting]    = useState(false);
   // Multi-select for thread messages (admin can delete any message)
@@ -547,32 +546,30 @@ export default function MessagesPanel({ showToast, users = [] }) {
           </span>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          {!listSelectMode ? (
-            <>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setListSelectMode(true); setListSelected(new Set()); }} style={{ fontSize:'0.78rem' }}>
-                ☑ Select
-              </button>
-              <button className="btn btn-primary" onClick={() => { setComposeOpen(true); setCompErr(''); setToSearch(''); setToEmail(''); setCompSubject(''); setCompBody(''); }}>
-                ✉️ New Message
-              </button>
-              <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:180 }} />
-            </>
-          ) : (
+          {/* Bulk controls — appear automatically when any checkbox is ticked */}
+          {listSelected.size > 0 && (
             <>
               <span style={{ fontSize:'0.82rem', color:'var(--muted)' }}>{listSelected.size} selected</span>
-              <button className="btn btn-ghost btn-sm" onClick={selectAllList} style={{ fontSize:'0.78rem' }}>Select All ({filtered.length})</button>
+              <button className="btn btn-ghost btn-sm" onClick={selectAllList} style={{ fontSize:'0.78rem' }}>
+                Select All ({filtered.length})
+              </button>
               <button
                 disabled={listDeleting || listSelected.size === 0}
                 onClick={deleteBulkMessages}
                 style={{ padding:'6px 14px', background:'rgba(231,76,60,0.15)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)', borderRadius:'var(--r-sm)', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit', opacity:listSelected.size===0?0.4:1 }}>
                 {listDeleting ? '⏳ Deleting…' : `🗑 Delete (${listSelected.size})`}
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setListSelectMode(false); setListSelected(new Set()); }} style={{ fontSize:'0.78rem' }}>
-                Cancel
+              <button className="btn btn-ghost btn-sm"
+                onClick={() => setListSelected(new Set())}
+                style={{ fontSize:'0.78rem' }}>
+                Clear
               </button>
-              <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:150 }} />
             </>
           )}
+          <button className="btn btn-primary" onClick={() => { setComposeOpen(true); setCompErr(''); setToSearch(''); setToEmail(''); setCompSubject(''); setCompBody(''); }}>
+            ✉️ New Message
+          </button>
+          <input className="field" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} style={{ width:180 }} />
         </div>
       </div>
 
@@ -628,33 +625,21 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   onClick={() => listSelectMode ? toggleListSelect(m.id) : openMessage(m)}
                   style={{
                     padding:'14px 16px',
-                    paddingLeft: listSelectMode ? '46px' : '16px',
                     background: isActive ? 'rgba(201,168,76,0.09)' : isListSelected ? 'rgba(201,168,76,0.06)' : 'var(--card)',
                     border: isListSelected ? '1px solid rgba(201,168,76,0.45)' : isActive ? '1px solid rgba(201,168,76,0.45)' : '1px solid var(--border)',
                     borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .15s',
                     borderLeft:`3px solid ${isListSelected?'var(--gold)':st==='new'?'#e8832a':isActive?'var(--gold)':'transparent'}`,
                   }}>
-                  {/* ── Checkbox — floated left inside the row ── */}
-                  {listSelectMode && (
-                    <div
-                      onClick={e => { e.stopPropagation(); toggleListSelect(m.id); }}
-                      style={{
-                        position:'absolute', left:14, top:'50%', transform:'translateY(-50%)',
-                        width:20, height:20, borderRadius:5, cursor:'pointer', flexShrink:0,
-                        border:`2px solid ${isListSelected ? 'var(--gold)' : 'rgba(255,255,255,0.35)'}`,
-                        background: isListSelected ? 'var(--gold)' : 'rgba(255,255,255,0.04)',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        transition:'all 0.12s', zIndex:2,
-                      }}>
-                      {isListSelected && (
-                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                          <polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      )}
-                    </div>
-                  )}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      {/* ── Native checkbox always visible ── */}
+                      <input
+                        type="checkbox"
+                        checked={isListSelected}
+                        onChange={() => toggleListSelect(m.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width:16, height:16, flexShrink:0, cursor:'pointer', accentColor:'var(--gold)' }}
+                      />
                       <div style={{ width:36, height:36, borderRadius:'50%', background:'rgba(201,168,76,0.15)', color:'var(--gold)', fontWeight:700, fontSize:'0.88rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                         {(m.name||'?')[0].toUpperCase()}
                       </div>
@@ -673,16 +658,14 @@ export default function MessagesPanel({ showToast, users = [] }) {
                   </div>
                   <div style={{ fontSize:'0.7rem', color:'var(--muted)' }}>{fmtDate(m.createdAt)}</div>
                 </div>
-                {/* quick delete — only in normal mode */}
-                {!listSelectMode && (
-                  <button
-                    onClick={e => { e.stopPropagation(); deleteMsg(m.id); }}
-                    title="Delete"
-                    style={{ position:'absolute', top:10, right:10, background:'none', border:'none', color:'rgba(255,255,255,0.18)', cursor:'pointer', padding:'3px 5px', fontSize:'0.78rem', borderRadius:4, zIndex:1 }}
-                    onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.85)'}
-                    onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.18)'}
-                  >🗑</button>
-                )}
+                {/* quick delete button */}
+                <button
+                  onClick={e => { e.stopPropagation(); deleteMsg(m.id); }}
+                  title="Delete"
+                  style={{ position:'absolute', top:10, right:10, background:'none', border:'none', color:'rgba(255,255,255,0.18)', cursor:'pointer', padding:'3px 5px', fontSize:'0.78rem', borderRadius:4, zIndex:1 }}
+                  onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.85)'}
+                  onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.18)'}
+                >🗑</button>
               </div>
             );
           })}
