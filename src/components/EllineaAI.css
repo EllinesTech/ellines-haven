@@ -2,14 +2,14 @@
    ELLINEA AI ASSISTANT
 ═══════════════════════════════════════ */
 
-/* ── FAB button ── */
+/* ── FAB button — single unified button, bottom-right ── */
 .ellinea-fab {
   position: fixed;
-  bottom: 80px; /* stack above WhatsApp: 20 + 50 + 10 */
+  bottom: 20px; /* only button now — sits at bottom-right corner */
   right: 20px;
   z-index: 8500;
-  width: 50px;
-  height: 50px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: linear-gradient(135deg, #c9a84c, #e8d080, #9e7a2a);
   border: none;
@@ -55,14 +55,23 @@
 }
 .ellinea-fab:hover .ellinea-fab-label { opacity: 1; }
 
-/* ── Chat window ── */
+/* ── WhatsApp tab style ── */
+.ellinea-tab--wa { color: rgba(37,211,102,0.6); }
+.ellinea-tab--wa:hover { color: #25D366; }
+.ellinea-tab--wa-active {
+  color: #25D366 !important;
+  border-bottom-color: #25D366 !important;
+  background: rgba(37,211,102,0.06) !important;
+}
+
+/* ── Chat window position — above the single FAB ── */
 .ellinea-window {
   position: fixed;
-  bottom: 140px;
-  right: 80px;
+  bottom: 84px; /* 20px bottom + 54px FAB + 10px gap */
+  right: 20px;
   z-index: 8600;
   width: 360px;
-  max-height: 580px;
+  max-height: 600px;
   display: flex;
   flex-direction: column;
   background: #0f0f22;
@@ -368,22 +377,32 @@
     left: 0;
     bottom: 0;
     width: 100vw;
-    max-height: 85vh;
+    max-height: 88vh;
     border-radius: 20px 20px 0 0;
     border-bottom: none;
   }
-  .ellinea-fab { bottom: 80px; right: 16px; width: 48px; height: 48px; }
+  .ellinea-fab {
+    bottom: 16px;
+    right: 16px;
+    width: 50px;
+    height: 50px;
+  }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {
   .ellinea-window {
     right: 12px;
-    bottom: 140px;
+    bottom: 84px;
     width: calc(100vw - 24px);
-    max-height: 70vh;
+    max-height: 72vh;
     border-radius: 16px;
   }
-  .ellinea-fab { bottom: 80px; right: 16px; width: 50px; height: 50px; }
+  .ellinea-fab {
+    bottom: 16px;
+    right: 16px;
+    width: 52px;
+    height: 52px;
+  }
 }
 
 /* ── Links in chat bubbles ── */
