@@ -39,7 +39,7 @@ export const BOOKS = [
     themes: ['Love', 'Marriage', 'Betrayal', 'Trust', 'Family', 'Financial Abuse', 'Infidelity', 'Redemption', 'Parenthood', 'Emotional Survival'],
     excerpt: `Brian and Diana had everything the world could see — a beautiful home, successful careers, and two daughters they adored.\n\nBut behind the smiles, silence was replacing love. Ambition created distance. Loneliness opened dangerous doors.\n\nWhen betrayal finally stepped out of the shadows, Brian was left with one brutal question:\n\nWas marriage the scam — or had they both simply stopped trying?\n\nSet in modern Kenya. Inspired by real life.`,
     description: `Some stories begin with betrayal. This one begins with love.\n\nIn 2013, Brian and Diana meet as college students in Karen, Nairobi. A friendship that slowly becomes something deeper — built on trust, shared dreams, and real hope.\n\nYears later, Brian is a successful entrepreneur. Diana is a respected bank manager in Nyeri. They have a beautiful wedding, a growing family, two daughters they adore. A life people point at and say — that's the dream.\n\nBut behind that life, something is quietly breaking.\n\nLong trips. Late nights. Unanswered questions. Money that goes missing. The kind of loneliness that doesn't announce itself — it just settles in, slowly, until one day the person sleeping next to you feels like a stranger.\n\nAs trust erodes, secrets grow. Promises break. And a marriage that once seemed unshakable starts coming apart — one painful piece at a time.\n\nSet across Nairobi, Nyeri, and modern Kenya, Marriage Is a Scam is an honest, emotional novel that doesn't take sides. It simply asks the question most people are afraid to answer:\n\nWas marriage the scam — or were the people inside it simply unprepared for the truth?`,
-    authorNote: `This novel is inspired by real-life experiences and conversations shared by ordinary people navigating love, marriage, betrayal, and healing.\n\nWhile some events and characters have been fictionalized for storytelling purposes, the emotions, struggles, and lessons reflect realities experienced by many families today.\n\nThis book is not intended to condemn marriage. It is an invitation to look beyond appearances and ask difficult questions about love, commitment, trust, and personal responsibility.`,
+    authorNote: `This novel came from real conversations — with people who trusted me with the parts of their marriages they couldn't tell anyone else.\n\nThe names are changed. Some scenes are composite. But the pain, the confusion, the quiet unraveling — that is all real. I have heard versions of this story more times than I can count, from people who looked completely fine from the outside.\n\nI didn't write this book to attack marriage. I wrote it because I believe that honesty — even when it's uncomfortable — is more useful than silence.\n\nIf this story makes you ask hard questions about your own life, good. That's exactly what it's supposed to do.`,
     tableOfContents: [
       'Chapter 1 — The First Meeting',
       'Chapter 2 — Something Like Love',
@@ -96,7 +96,7 @@ export const BOOKS = [
     themes: ['Grief', 'Trauma', 'Identity', 'Loss', 'Resilience', 'Healing', 'Purpose', 'Loneliness', 'Survival'],
     excerpt: 'Some wounds don\'t heal. They just teach you how to carry them.',
     description: 'Pain is Elijah Mwangi M\'s most personal work — a raw, honest novel about grief, trauma, and the long road back to yourself. It follows a young man navigating life after catastrophic loss, exploring how pain shapes identity, relationships, and purpose. Written during one of the most difficult seasons of Elijah\'s own life, every page carries the weight of something truly lived.',
-    authorNote: 'This novel was written in the darkest season of my life. I didn\'t write it to impress anyone. I wrote it because the only way I knew how to survive was to put the pain somewhere it could breathe. If you are carrying something heavy, I hope this book reminds you that you are not alone.',
+    authorNote: `Pain was written in the worst season of my life. I didn't set out to write a novel — I set out to survive, and this is what came out.\n\nEvery page is honest. Some of it is uncomfortable to read because it was uncomfortable to live. If you're carrying something heavy right now, I hope this book reminds you that grief is not weakness. It's proof that something mattered.`,
     tableOfContents: [
       'Chapter 1 — Before Everything Broke',
       'Chapter 2 — The Day It Started',
@@ -149,7 +149,7 @@ export const BOOKS = [
     themes: ['Identity', 'Resistance', 'Land Rights', 'Family Legacy', 'Colonialism', 'Courage', 'Love Across Generations'],
     excerpt: 'A sweeping tale set against the backdrop of colonial Kenya, following a young woman fighting for her family\'s land and dignity.',
     description: 'A sweeping tale set against the backdrop of colonial Kenya, following a young woman fighting for her family\'s land and dignity. Through vivid landscapes and complex characters, this novel explores identity, resistance, and love across generations. Every character in this book is drawn from real people — their courage, their loss, their silent heroism.',
-    authorNote: 'This story was given to me by the elders — people who lived through it, who survived it, and who trusted me to tell it with honesty. I have tried to honor that trust on every page.',
+    authorNote: `Every character in this book is borrowed from a real person. The elders who remembered. The women who fought. The men who stayed silent when they should have spoken.\n\nI was trusted with these stories, and I tried to honour that trust on every page. This is their history — I just held the pen.`,
     tableOfContents: [
       'Chapter 1 — The Land Remembers',
       'Chapter 2 — Before the Strangers Came',
@@ -187,7 +187,7 @@ export const BOOKS = [
     themes: ['Joy', 'Grief', 'Connection', 'Nature', 'Loss', 'Community', 'Hope', 'The Human Moment'],
     excerpt: 'Seven lives, seven sunsets — each story unfolding across an unforgettable evening in East Africa.',
     description: 'Seven stories, seven lives, each unfolding across a single unforgettable sunset somewhere in East Africa. From the banks of Lake Victoria to the corridors of Nairobi, these tales illuminate joy, grief, and the small moments that define us. Every story in this collection is drawn from a real conversation, a real person, a real moment Elijah witnessed or was told.',
-    authorNote: 'People think grand events shape us. I disagree. It is the quiet evenings, the last light of the day, the moment just before night falls — that is where real life happens. These seven stories are from those moments.',
+    authorNote: `People think grand events shape us. I disagree. It's the quiet evenings — the last light before night, the moment just before you say goodbye — that's where real life actually happens.\n\nThese seven stories are from those moments. All of them real. All of them given to me by people I'll never forget.`,
     tableOfContents: [
       'Story 1 — The Fisherman\'s Last Catch (Lake Victoria)',
       'Story 2 — Yellow Dress (Nairobi, CBD)',
@@ -222,7 +222,7 @@ export const BOOKS = [
     themes: ['Power', 'Family Secrets', 'Justice', 'Loyalty', 'Deception', 'The Past', 'Corruption'],
     excerpt: 'A retired detective returns to Mombasa and stumbles into a decades-old conspiracy on the Swahili coast.',
     description: 'When a retired detective returns to Mombasa for her sister\'s wedding, she stumbles into a decades-old conspiracy that could reshape the city\'s most powerful family. A gripping thriller soaked in the heat and intrigue of the Swahili coast.',
-    authorNote: 'Every coast city has secrets. Mombasa has more than most. This story was shaped by real conversations with people who grew up in the shadow of old power and learned early not to ask too many questions.',
+    authorNote: `Every coast city keeps secrets. Mombasa keeps more than most.\n\nThis story was shaped by people who grew up in the shadow of old power and learned early that some questions are dangerous to ask out loud. I asked them anyway — and wrote down what they told me.`,
     tableOfContents: [
       'Chapter 1 — The Invitation',
       'Chapter 2 — Coming Home',
@@ -257,7 +257,7 @@ export const BOOKS = [
     themes: ['Second Chances', 'Vulnerability', 'Trust', 'Healing', 'Love', 'Secrets', 'Journey'],
     excerpt: 'Two strangers meet on a dusty Rift Valley road carrying secrets neither is ready to share.',
     description: 'Two strangers meet on a dusty road through the Rift Valley, carrying secrets neither is ready to share. A tender, slow-burning romance about second chances and the courage to be vulnerable.',
-    authorNote: 'I met them on a matatu somewhere between Nakuru and Eldoret. Two people who clearly had history, or were about to. I never found out what happened. So I wrote the version I hoped was true.',
+    authorNote: `Somewhere between Nakuru and Eldoret, I watched two strangers on a matatu who clearly had a history — or were about to make one. I never found out what happened between them.\n\nSo I wrote the version I hoped was true.`,
     tableOfContents: [
       'Chapter 1 — The Breakdown',
       'Chapter 2 — The Stranger',
@@ -292,7 +292,7 @@ export const BOOKS = [
     themes: ['Mythology', 'Power', 'Coming of Age', 'Sacrifice', 'Identity', 'Prophecy', 'Community', 'Darkness vs Light'],
     excerpt: 'In a world where lightning speaks, one girl must learn its language before darkness consumes the land.',
     description: 'In a world where lightning speaks, one girl must learn its language before darkness consumes the land. An epic fantasy rooted in East African mythology, filled with wonder and peril.',
-    authorNote: 'My grandmother used to say that thunder was the ancestors speaking. I never forgot that. This book is my attempt to build the world she described with her words — to show that our mythology is as rich and powerful as any story ever told.',
+    authorNote: `My grandmother used to say that thunder was the ancestors speaking. I never forgot that.\n\nThis book is my attempt to build the world she described with her words — to show that our mythology is not folklore. It is foundation. It is as rich and powerful as any story ever put on paper.`,
     tableOfContents: [
       'Chapter 1 — The Storm Child',
       'Chapter 2 — The Village at the Edge of Everything',
@@ -330,7 +330,7 @@ export const BOOKS = [
     themes: ['Ambition', 'Obsession', 'Identity', 'Trauma', 'Speed', 'The Past', 'Escape'],
     excerpt:'A story of speed, obsession, and the ghosts we chase in the dark.',
     description:'A gripping novel that blurs the line between ambition and madness. Following a young man caught between the thrill of supercars and the haunting echoes of his past, this story tears through the streets of Nairobi and beyond — asking what we are truly running from, and what we leave behind.',
-    authorNote: 'Some people run from their problems. Others buy faster cars. This story is about both.',
+    authorNote: `Some people run from their problems. Others buy faster cars.\n\nThis story is about the kind of man who does both — and what he finds when he finally runs out of road.`,
     tableOfContents: [
       'Chapter 1 — Zero to Sixty',
       'Chapter 2 — The Ghost',
@@ -364,7 +364,7 @@ export const BOOKS = [
     themes: ['Survival', 'Loyalty', 'Love Under Pressure', 'Identity', 'Time', 'Sacrifice', 'Truth'],
     excerpt: 'Nineteen days. That\'s all it took to unravel a lifetime.',
     description: '19 Days is a gripping, emotionally charged novel that unfolds across nineteen relentless days in the life of one man caught between who he was and who he must become. Every hour is a choice. Every decision carries weight. Inspired by true events, this story strips away pretence and lays bare the raw cost of survival, loyalty, and love under pressure.',
-    authorNote: 'I lived through nineteen days that I cannot fully explain, even now. I can only write what they felt like. That is what this book is.',
+    authorNote: `Nineteen days. I can't fully explain what happened in them, even now. I can only describe what they felt like — the weight of each hour, the cost of every choice.\n\nThat is what this book is. Not a perfect account. An honest one.`,
     tableOfContents: [
       'Day 1 — The Call',
       'Day 2 — Everything Changes',
@@ -416,7 +416,7 @@ export const BOOKS = [
     themes: ['Ambition', 'Love', 'Decision', 'City Life', 'Midnight', 'Survival', 'Human Connection'],
     excerpt: 'Three raw tales of love, ambition and midnight decisions in the city that never sleeps.',
     description: 'Three interconnected tales set in Nairobi after midnight, where ambition and love collide under neon lights. Raw, honest, and deeply human stories from the heartbeat of East Africa.',
-    authorNote: 'Nairobi is a different city after midnight. The pretence drops. People say what they really mean. These three stories were all born in that honest dark.',
+    authorNote: `Nairobi changes after midnight. The performance drops. People stop pretending.\n\nThese three stories were born in that honesty — in the conversations that only happen when it's late, the city is loud, and there's nothing left to lose.`,
     tableOfContents: [
       'Story 1 — The Club on Ngong Road',
       'Story 2 — Last Matatu',
