@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, getDocs, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, getDocs, writeBatch, serverTimestamp, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -36,6 +36,10 @@ export default function LiveChatPanel({ showToast }) {
   const [loading,         setLoading]         = useState(true);
   const [selected,        setSelected]        = useState(new Set());
   const [delConfirm,      setDelConfirm]      = useState(null);
+  // Thread message multi-select
+  const [msgSelectMode,   setMsgSelectMode]   = useState(false);
+  const [selectedMsgs,    setSelectedMsgs]    = useState(new Set());
+  const [msgDeleting,     setMsgDeleting]     = useState(false);
   const chatBottomRef     = useRef(null);
   const prevChatIds       = useRef(new Set());
   const chatMounted       = useRef(false);
@@ -50,13 +54,20 @@ export default function LiveChatPanel({ showToast }) {
   // ── Live chat sessions listener ───────────────────────────────────────────
   useEffect(() => {
     setLoading(true);
+    // NOTE: no orderBy here — combining where() + orderBy() requires a composite
+    // Firestore index that may not exist. Sort client-side instead.
     const q = query(
       collection(db, 'contact_messages'),
-      where('type', '==', 'live_chat'),
-      orderBy('lastMsgAt', 'desc')
+      where('type', '==', 'live_chat')
     );
     const unsub = onSnapshot(q, snap => {
-      const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sessions = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const ta = a.lastMsgAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+          const tb = b.lastMsgAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+          return tb - ta;
+        });
       // sound for new chat sessions from users
       if (chatMounted.current) {
         sessions.forEach(s => {
@@ -83,6 +94,9 @@ export default function LiveChatPanel({ showToast }) {
   // ── Live chat thread listener ──────────────────────────────────────────────
   useEffect(() => {
     if (!activeChat) { setChatThread([]); return; }
+    // reset message select state when switching chats
+    setMsgSelectMode(false);
+    setSelectedMsgs(new Set());
     const q = query(
       collection(db, 'contact_messages', activeChat, 'messages'),
       orderBy('createdAt', 'asc')
@@ -179,6 +193,45 @@ export default function LiveChatPanel({ showToast }) {
       showToast?.('❌ Bulk delete failed: ' + e.message);
     }
     setDelConfirm(null);
+  };
+
+  // ── Delete a single thread message ──────────────────────────────────────────
+  const deleteThreadMsg = async (msgId) => {
+    if (!activeChat) return;
+    await deleteDoc(doc(db, 'contact_messages', activeChat, 'messages', msgId)).catch(() => {});
+    setSelectedMsgs(s => { const n = new Set(s); n.delete(msgId); return n; });
+  };
+
+  // ── Delete selected thread messages ─────────────────────────────────────────
+  const deleteSelectedMsgs = async () => {
+    if (!activeChat || selectedMsgs.size === 0) return;
+    setMsgDeleting(true);
+    const batch = writeBatch(db);
+    selectedMsgs.forEach(id => batch.delete(doc(db, 'contact_messages', activeChat, 'messages', id)));
+    await batch.commit().catch(() => {});
+    setSelectedMsgs(new Set());
+    setMsgSelectMode(false);
+    setMsgDeleting(false);
+    showToast?.('🗑 Messages deleted');
+  };
+
+  // ── Clear all messages in active chat ────────────────────────────────────────
+  const clearAllThreadMsgs = async () => {
+    if (!activeChat) return;
+    if (!window.confirm('Clear ALL messages in this chat? This cannot be undone.')) return;
+    setMsgDeleting(true);
+    const snap = await getDocs(collection(db, 'contact_messages', activeChat, 'messages')).catch(() => ({ docs: [] }));
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit().catch(() => {});
+    setMsgSelectMode(false);
+    setSelectedMsgs(new Set());
+    setMsgDeleting(false);
+    showToast?.('🗑 Chat cleared');
+  };
+
+  const toggleMsgSelect = (id) => {
+    setSelectedMsgs(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
   const toggleSelect = (id, e) => {
@@ -354,17 +407,51 @@ export default function LiveChatPanel({ showToast }) {
                     <strong style={{ fontSize: '0.95rem' }}>💬 {s?.name || 'Guest'}</strong>
                     <span style={{ fontSize: '0.75rem', color: 'var(--muted)', marginLeft: 10 }}>{s?.email}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    {s?.status !== 'closed' && (
-                      <button className="btn btn-sm btn-ghost" onClick={() => closeChatSession(activeChat)}>End Chat</button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap:'wrap', alignItems:'center', justifyContent:'flex-end' }}>
+                    {!msgSelectMode ? (
+                      <>
+                        {chatThread.length > 0 && (
+                          <button
+                            onClick={() => { setMsgSelectMode(true); setSelectedMsgs(new Set()); }}
+                            style={{ fontSize:'0.72rem', padding:'4px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit' }}>
+                            ☑ Select
+                          </button>
+                        )}
+                        {chatThread.length > 0 && (
+                          <button
+                            onClick={clearAllThreadMsgs}
+                            disabled={msgDeleting}
+                            style={{ fontSize:'0.72rem', padding:'4px 8px', background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit' }}>
+                            🗑 Clear All
+                          </button>
+                        )}
+                        {s?.status !== 'closed' && (
+                          <button className="btn btn-sm btn-ghost" onClick={() => closeChatSession(activeChat)}>End Chat</button>
+                        )}
+                        <button className="btn btn-sm"
+                          onClick={() => setDelConfirm(activeChat)}
+                          style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)' }}
+                          title="Delete this session permanently">
+                          🗑 Delete
+                        </button>
+                        <button className="adm-close-btn" onClick={() => setActiveChat(null)}>✕</button>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{selectedMsgs.size} selected</span>
+                        <button
+                          disabled={msgDeleting || selectedMsgs.size === 0}
+                          onClick={deleteSelectedMsgs}
+                          style={{ fontSize:'0.72rem', padding:'4px 10px', background:'rgba(231,76,60,0.12)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit', opacity:selectedMsgs.size===0?0.4:1 }}>
+                          {msgDeleting ? '⏳' : `🗑 Delete (${selectedMsgs.size})`}
+                        </button>
+                        <button
+                          onClick={() => { setMsgSelectMode(false); setSelectedMsgs(new Set()); }}
+                          style={{ fontSize:'0.72rem', padding:'4px 8px', background:'rgba(255,255,255,0.06)', border:'1px solid var(--border)', color:'var(--muted)', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit' }}>
+                          Cancel
+                        </button>
+                      </>
                     )}
-                    <button className="btn btn-sm"
-                      onClick={() => setDelConfirm(activeChat)}
-                      style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)' }}
-                      title="Delete this session permanently">
-                      🗑 Delete
-                    </button>
-                    <button className="adm-close-btn" onClick={() => setActiveChat(null)}>✕</button>
                   </div>
                 </div>
               );
@@ -378,20 +465,52 @@ export default function LiveChatPanel({ showToast }) {
               {chatThread.map(msg => {
                 const isAdmin  = msg.sender === 'admin';
                 const isSystem = msg.sender === 'system';
+                const isMsgSel = selectedMsgs.has(msg.id);
                 if (isSystem) return (
                   <div key={msg.id} style={{ textAlign: 'center', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(255,255,255,0.04)', padding: '4px 10px', borderRadius: 20, alignSelf: 'center' }}>
                     {msg.text}
                   </div>
                 );
                 return (
-                  <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start' }}>
-                    <div style={{
-                      maxWidth: '78%', padding: '10px 14px',
-                      borderRadius: isAdmin ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                      background: isAdmin ? 'rgba(201,168,76,0.16)' : 'rgba(74,158,255,0.1)',
-                      border: isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
-                      fontSize: '0.88rem', lineHeight: 1.55, wordBreak: 'break-word', whiteSpace: 'pre-wrap',
-                    }}>{msg.text}</div>
+                  <div key={msg.id}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: isAdmin ? 'flex-end' : 'flex-start', cursor: msgSelectMode ? 'pointer' : 'default' }}
+                    onClick={() => msgSelectMode && toggleMsgSelect(msg.id)}
+                  >
+                    <div style={{ display:'flex', alignItems:'flex-end', gap:6, flexDirection: isAdmin ? 'row-reverse' : 'row' }}>
+                      {/* select checkbox */}
+                      {msgSelectMode && (
+                        <div style={{
+                          width:16, height:16, borderRadius:4, flexShrink:0,
+                          border:`2px solid ${isMsgSel ? 'var(--gold)' : 'rgba(255,255,255,0.25)'}`,
+                          background: isMsgSel ? 'var(--gold)' : 'transparent',
+                          display:'flex', alignItems:'center', justifyContent:'center', marginBottom:4,
+                        }}>
+                          {isMsgSel && <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </div>
+                      )}
+                      <div style={{
+                        maxWidth: '78%', padding: '10px 14px',
+                        borderRadius: isAdmin ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                        background: isMsgSel
+                          ? 'rgba(231,76,60,0.18)'
+                          : isAdmin ? 'rgba(201,168,76,0.16)' : 'rgba(74,158,255,0.1)',
+                        border: isMsgSel
+                          ? '2px solid rgba(231,76,60,0.4)'
+                          : isAdmin ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(74,158,255,0.2)',
+                        fontSize: '0.88rem', lineHeight: 1.55, wordBreak: 'break-word', whiteSpace: 'pre-wrap',
+                        transition:'background 0.1s, border 0.1s',
+                      }}>{msg.text}</div>
+                      {/* per-message delete (non-select mode) */}
+                      {!msgSelectMode && (
+                        <button
+                          onClick={e => { e.stopPropagation(); deleteThreadMsg(msg.id); }}
+                          title="Delete message"
+                          style={{ background:'none', border:'none', color:'rgba(255,255,255,0.18)', cursor:'pointer', padding:'2px 4px', fontSize:'0.72rem', lineHeight:1, flexShrink:0, alignSelf:'center' }}
+                          onMouseEnter={e => e.currentTarget.style.color='rgba(231,76,60,0.85)'}
+                          onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.18)'}
+                        >🗑</button>
+                      )}
+                    </div>
                     <span style={{ fontSize: '0.65rem', color: 'var(--muted)', marginTop: 3, paddingInline: 4 }}>
                       {isAdmin ? '🛡️ You' : `👤 ${msg.senderName || 'User'}`}
                       {msg.createdAt && ' · '}

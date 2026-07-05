@@ -436,7 +436,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
   };
 
   const notifs   = messages.filter(m => m.type === 'notification');
-  const regular  = messages.filter(m => m.type !== 'notification');
+  const regular  = messages.filter(m => m.type !== 'notification' && m.type !== 'live_chat');
   const base     = tab === 'notifications' ? notifs : regular;
   const filtered = base.filter(m => {
     const matchF = filter === 'all' || m.status === filter;

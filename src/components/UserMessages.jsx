@@ -66,7 +66,8 @@ export default function UserMessages({ user }) {
     const unsub = onSnapshot(q, snap => {
       const fresh = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(d => d.type === 'direct' || d.type === 'conv')  // only real conversations
+        // show: direct messages, conv threads, and contact form submissions (no type or type not live_chat/notification)
+        .filter(d => !d.type || d.type === 'direct' || d.type === 'conv')
         .sort((a, b) => {
           const ta = a.lastMsgAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
           const tb = b.lastMsgAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;

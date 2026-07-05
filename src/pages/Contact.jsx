@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, addDoc, collection, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
@@ -53,9 +53,27 @@ export default function Contact() {
     try {
       const id = 'msg_' + Date.now();
       await setDoc(doc(db, 'contact_messages', id), {
-        ...form,
-        status:    'new',
-        createdAt: serverTimestamp(),
+        name:       form.name,
+        email:      form.email.toLowerCase().trim(),
+        subject:    form.subject,
+        message:    form.message,
+        type:       'direct',          // makes it visible in UserMessages + MessagesPanel
+        status:     'new',
+        threadId:   id,                // so thread seeding works immediately
+        createdAt:  serverTimestamp(),
+        lastMsg:    form.message.slice(0, 80),
+        lastMsgAt:  serverTimestamp(),
+        lastSender: 'user',
+        userRead:   true,
+      });
+
+      // seed the first message into the subcollection immediately
+      await addDoc(collection(db, 'contact_messages', id, 'messages'), {
+        text:        form.message,
+        sender:      'user',
+        senderName:  form.name,
+        senderEmail: form.email.toLowerCase().trim(),
+        createdAt:   serverTimestamp(),
       });
       
       // Track activity and notify admins

@@ -65,17 +65,31 @@ function MessageAdminForm({ user, showToast }) {
     if (!subject.trim() || !message.trim()) { showToast('Please fill subject and message', 'err'); return; }
     setSending(true);
     try {
-      const id = 'direct_' + Date.now() + '_' + user.email.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+      const emailLower = user.email.toLowerCase().trim();
+      const id = 'direct_' + Date.now() + '_' + emailLower.replace(/[^a-z0-9]/g,'_');
       await setDoc(doc(db, 'contact_messages', id), {
-        name:    user.name,
-        email:   user.email,
-        subject: subject.trim(),
-        message: message.trim(),
-        type:    'direct',
-        userId:  user.id,
-        status:  'new',
-        createdAt: serverTimestamp(),
-        source:  'user_profile',
+        name:       user.name,
+        email:      emailLower,           // always lowercase so the query matches
+        subject:    subject.trim(),
+        message:    message.trim(),
+        type:       'direct',
+        userId:     user.id || '',
+        status:     'new',
+        threadId:   id,                   // required for thread to load
+        createdAt:  serverTimestamp(),
+        lastMsg:    message.trim().slice(0, 80),
+        lastMsgAt:  serverTimestamp(),
+        lastSender: 'user',
+        userRead:   true,
+        source:     'user_profile',
+      });
+      // seed first message into subcollection so thread loads immediately
+      await addDoc(collection(db, 'contact_messages', id, 'messages'), {
+        text:        message.trim(),
+        sender:      'user',
+        senderName:  user.name,
+        senderEmail: emailLower,
+        createdAt:   serverTimestamp(),
       });
       setSent(true); setSubject(''); setMessage('');
       showToast('✅ Message sent to admin!');

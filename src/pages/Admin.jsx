@@ -2346,13 +2346,19 @@ export default function Admin() {
 
   // Live chat sessions listener — for nav bar badge count
   useEffect(() => {
+    // No orderBy — avoids composite index requirement. Sort client-side.
     const q = query(
       collection(db, 'contact_messages'),
-      where('type', '==', 'live_chat'),
-      orderBy('lastMsgAt', 'desc')
+      where('type', '==', 'live_chat')
     );
     const unsub = onSnapshot(q, snap => {
-      const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sessions = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const ta = a.lastMsgAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+          const tb = b.lastMsgAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+          return tb - ta;
+        });
       setChatSessions(sessions);
     }, () => {});
     return () => unsub();
