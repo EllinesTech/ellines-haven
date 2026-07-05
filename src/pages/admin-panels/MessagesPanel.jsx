@@ -404,7 +404,6 @@ export default function MessagesPanel({ showToast, users = [] }) {
     setMessages(prev => prev.filter(m => !listSelected.has(m.id)));
     if (listSelected.has(selected?.id)) setSelected(null);
     setListSelected(new Set());
-    setListSelectMode(false);
     setListDeleting(false);
     showToast?.(`🗑 Deleted ${listSelected.size} conversation${listSelected.size > 1 ? 's' : ''}`);
   };

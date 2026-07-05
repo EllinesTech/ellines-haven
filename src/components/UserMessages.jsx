@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, onSnapshot,
   doc, setDoc, addDoc, deleteDoc, serverTimestamp, where, writeBatch, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';

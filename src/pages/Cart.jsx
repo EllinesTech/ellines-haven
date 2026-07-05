@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder } from '../firebase';
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
@@ -71,6 +71,10 @@ function StkWaiting({ order, onSuccess, onFailed, onCancel }) {
         setMpesaCode(data.mpesaTransactionId || '');
         setStatus('success');
         clearTimeout(timeoutRef.current);
+        // Notify user in their own feed
+        import('../utils/userNotifier').then(({ notifyBooksUnlocked }) => {
+          notifyBooksUnlocked(order?.userEmail || '', order?.items || [], order?.id || '');
+        }).catch(() => {});
         setTimeout(() => onSuccess(data), 1800);
       } else if (data.status === 'PaymentFailed') {
         setStatus('failed');
@@ -227,6 +231,49 @@ export default function Cart() {
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
+  // ── Promo code ────────────────────────────────────────────────────────────
+  const [promoInput,     setPromoInput]     = useState('');
+  const [promoApplied,   setPromoApplied]   = useState(null); // { code, type, discountValue }
+  const [promoError,     setPromoError]     = useState('');
+  const [promoChecking,  setPromoChecking]  = useState(false);
+
+  const applyPromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
+    setPromoError('');
+    setPromoChecking(true);
+    try {
+      const snap = await getDoc(doc(db, 'site_data', 'promos'));
+      const list  = snap.exists() ? (snap.data().list || []) : [];
+      const found = list.find(p => p.code?.toUpperCase() === code && p.active);
+      if (!found) { setPromoError('Invalid or expired promo code.'); setPromoChecking(false); return; }
+      const today = new Date().toISOString().slice(0, 10);
+      if (found.expires && found.expires < today) { setPromoError('This promo code has expired.'); setPromoChecking(false); return; }
+      if (found.maxUses > 0 && found.uses >= found.maxUses) { setPromoError('This promo code has reached its usage limit.'); setPromoChecking(false); return; }
+
+      // Calculate discount
+      let discountValue = 0;
+      if (found.type === 'Percentage') {
+        const pct = parseFloat(found.discount);
+        discountValue = Math.round((pct / 100) * total);
+      } else {
+        discountValue = parseFloat(found.discount) || 0;
+      }
+      discountValue = Math.min(discountValue, total); // can't discount more than total
+
+      setPromoApplied({ code: found.code, type: found.type, rawDiscount: found.discount, discountValue, promoId: found.id });
+    } catch {
+      setPromoError('Could not verify promo code. Please try again.');
+    }
+    setPromoChecking(false);
+  };
+
+  const removePromo = () => { setPromoApplied(null); setPromoInput(''); setPromoError(''); };
+
+  // Effective total after promo
+  const discountAmount = promoApplied?.discountValue || 0;
+  const effectiveTotal = Math.max(0, total - discountAmount);
+
   // ── Handle Paystack callback redirect (mobile payments) ──────────────────
   // Paystack redirects to /cart?trxref=ORD-xxx_yyy&reference=ORD-xxx_yyy
   // after the customer pays on mobile. We detect those params and auto-verify.
@@ -333,14 +380,14 @@ export default function Cart() {
     setStkError('');
     setBusy(true);
     try {
-      const order = await placeOrder([...cart], 'paystack', '', '');
+      const order = await placeOrder([...cart], 'paystack', '', '', promoApplied);
       setPlacedOrder(order);
       await loadPaystack();
 
       // Calculate gross amount so customer bears the Paystack fee
-      const paystackAmountCents = calcPaystackAmount(total, paystackChannel);
+      const paystackAmountCents = calcPaystackAmount(effectiveTotal, paystackChannel);
       const grossKes = paystackAmountCents / 100;
-      const feeKes   = +(grossKes - total).toFixed(2);
+      const feeKes   = +(grossKes - effectiveTotal).toFixed(2);
 
       // Generate a unique Paystack reference and save it to Firestore BEFORE
       // opening the popup. This ensures the webhook can find the order the
@@ -369,9 +416,11 @@ export default function Cart() {
             userEmail:        user.email,
             userName:         user.name,
             books:            cart.map(b => b.title).join(', '),
-            netPayout:        total,
+            netPayout:        effectiveTotal,
             paystackChannel,
             paystackFeeKes:   feeKes,
+            promoCode:        promoApplied?.code || null,
+            discountAmount:   discountAmount || 0,
           },
           callback: (response) => {
             // Payment successful — verify + unlock
@@ -443,6 +492,11 @@ export default function Cart() {
               // payment flow. Do the unlock directly — it's idempotent.
               try {
                 await doFrontendUnlock(order.id, user.email.toLowerCase(), order.items || []);
+                // Notify user in their own feed
+                try {
+                  const { notifyBooksUnlocked } = await import('../utils/userNotifier');
+                  await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
+                } catch {}
                 clearCart();
                 setStep('done');
               } catch (unlockErr) {
@@ -488,11 +542,17 @@ export default function Cart() {
     e.preventDefault();
     setBusy(true);
     try {
-      const order = await placeOrder([...cart], method, ref, phone);
+      const order = await placeOrder([...cart], method, ref, phone, promoApplied);
       setPlacedOrder(order);
 
       // Auto-confirm: unlock books immediately — no manual admin step needed
       await confirmOrder(order.id);
+
+      // Notify user in their own feed
+      try {
+        const { notifyBooksUnlocked } = await import('../utils/userNotifier');
+        await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
+      } catch {}
 
       clearCart();
       setStep('done');
@@ -509,12 +569,12 @@ export default function Cart() {
     setStkError('');
     setBusy(true);
     try {
-      const order = await placeOrder([...cart], 'paypal', '', '');
+      const order = await placeOrder([...cart], 'paypal', '', '', promoApplied);
       setPlacedOrder(order);
 
       // Convert KES → USD for PayPal (approximate rate; use a live rate API in production)
       const KES_TO_USD = 0.0077;
-      const usdAmount  = (total * KES_TO_USD).toFixed(2);
+      const usdAmount  = (effectiveTotal * KES_TO_USD).toFixed(2);
 
       // Create PayPal order via Cloud Function
       const { data: ppData } = await callCreatePayPalOrder({
@@ -555,6 +615,11 @@ export default function Cart() {
                 orderId: order.id,
                 userEmail: user.email,
               });
+              // Notify user in their own feed
+              try {
+                const { notifyBooksUnlocked } = await import('../utils/userNotifier');
+                await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
+              } catch {}
               clearCart();
               setStep('done');
               resolve();
@@ -597,8 +662,8 @@ export default function Cart() {
           <div style={{ fontSize:'2.5rem', marginBottom:12 }}>🅿</div>
           <h2 style={{ marginBottom:6 }}>Pay with PayPal</h2>
           <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:8 }}>
-            You'll be charged <strong style={{ color:'var(--gold)' }}>USD ~${(total * 0.0077).toFixed(2)}</strong>
-            <span style={{ color:'var(--muted)', fontSize:'0.78rem' }}> (≈ KSh {total.toLocaleString()})</span>
+            You'll be charged <strong style={{ color:'var(--gold)' }}>USD ~${(effectiveTotal * 0.0077).toFixed(2)}</strong>
+            <span style={{ color:'var(--muted)', fontSize:'0.78rem' }}> (≈ KSh {effectiveTotal.toLocaleString()})</span>
           </p>
           <p style={{ color:'var(--muted)', fontSize:'0.78rem', marginBottom:20 }}>Complete your payment securely via PayPal.</p>
           <div id="paypal-button-container" style={{ minHeight:48 }} />
@@ -751,7 +816,7 @@ export default function Cart() {
                       { key:'card',      icon:'💳', label:'Pay with Local Card' },
                       { key:'intl_card', icon:'🌍', label:'Pay with International Card' },
                     ].map(({ key, icon, label }) => {
-                      const totalKes = calcPaystackAmount(total, key) / 100;
+                      const totalKes = calcPaystackAmount(effectiveTotal, key) / 100;
                       const active   = paystackChannel === key;
                       return (
                         <label key={key} style={{
@@ -775,7 +840,7 @@ export default function Cart() {
                             </span>
                           </span>
                           <span style={{ fontWeight: 700, fontSize:'0.95rem', color: active ? 'var(--gold)' : 'var(--muted)' }}>
-                            KSh {(calcPaystackAmount(total, key) / 100).toFixed(2)}
+                            KSh {(calcPaystackAmount(effectiveTotal, key) / 100).toFixed(2)}
                           </span>
                         </label>
                       );
@@ -786,8 +851,15 @@ export default function Cart() {
                 </div>
                 <div className="pay-total">
                   <span>Total</span>
-                  <strong>KSh {(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}</strong>
+                  <strong>KSh {(calcPaystackAmount(effectiveTotal, paystackChannel) / 100).toFixed(2)}</strong>
                 </div>
+                {/* ── Promo code on pay screen ── */}
+                {promoApplied && (
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', marginTop:8, background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderRadius:'var(--r-sm)', fontSize:'0.79rem' }}>
+                    <span style={{ color:'var(--ok)' }}>🎟 <strong>{promoApplied.code}</strong> applied</span>
+                    <span style={{ color:'#2ecc71', fontWeight:700 }}>−KSh {discountAmount.toLocaleString()} saved</span>
+                  </div>
+                )}
                 {/* ── No-refund acknowledgement ── */}
                 <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
                   <input
@@ -812,7 +884,7 @@ export default function Cart() {
                 </div>
 
                 <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy || !refundAcked}>
-                  {busy ? 'Opening payment…' : `⚡ Pay KSh ${(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}`}
+                  {busy ? 'Opening payment…' : `⚡ Pay KSh ${(calcPaystackAmount(effectiveTotal, paystackChannel) / 100).toFixed(2)}`}
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
@@ -825,15 +897,15 @@ export default function Cart() {
                   <div style={{ background:'rgba(0,112,240,0.07)', border:'1px solid rgba(0,112,240,0.2)', borderLeft:'3px solid #0070f0', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
                     🅿 <strong style={{ color:'#0070f0' }}>PayPal</strong> — pay with your PayPal balance, linked bank, Visa, or Mastercard. Globally accepted.
                   </div>
-                  <div className="pay-detail-row"><span>Amount (KES)</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
-                  <div className="pay-detail-row"><span>Amount (USD approx.)</span><strong style={{ color:'#0070f0' }}>~${(total * 0.0077).toFixed(2)}</strong></div>
+                  <div className="pay-detail-row"><span>Amount (KES)</span><strong className="pay-highlight">KSh {effectiveTotal.toLocaleString()}</strong></div>
+                  <div className="pay-detail-row"><span>Amount (USD approx.)</span><strong style={{ color:'#0070f0' }}>~${(effectiveTotal * 0.0077).toFixed(2)}</strong></div>
                   <div className="pay-detail-row"><span>Accepted</span><strong>PayPal · Visa · Mastercard · Bank</strong></div>
                   <p style={{ color:'var(--muted)', fontSize:'0.76rem', marginTop:10 }}>
                     Note: PayPal processes in USD. The USD amount shown is approximate.
                   </p>
                   {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
                 </div>
-                <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
+                <div className="pay-total"><span>Total</span><strong>KSh {effectiveTotal.toLocaleString()}</strong></div>
                 {/* ── No-refund acknowledgement ── */}
                 <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
                   <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }} />
@@ -854,11 +926,11 @@ export default function Cart() {
                 <div className="pay-mpesa-box">
                   <p className="pay-instruction">Send via <strong>Airtel Money</strong></p>
                   <div className="pay-detail-row"><span>Send to</span><strong className="pay-highlight">{settings.airtelNum || 'Contact us for Airtel number'}</strong></div>
-                  <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
+                  <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {effectiveTotal.toLocaleString()}</strong></div>
                   <div className="form-group" style={{ marginTop:16 }}><label>Your Airtel Number</label><input className="field" placeholder="073X XXX XXX" value={phone} onChange={e => setPhone(e.target.value)} required /></div>
                   <div className="form-group" style={{ marginTop:12 }}><label>Transaction Reference *</label><input className="field" placeholder="Airtel transaction code" value={ref} onChange={e => setRef(e.target.value.toUpperCase())} required style={{ textTransform:'uppercase', letterSpacing:2, fontWeight:600 }} /></div>
                 </div>
-                <div className="pay-total"><span>Total</span><strong>KSh {total.toLocaleString()}</strong></div>
+                <div className="pay-total"><span>Total</span><strong>KSh {effectiveTotal.toLocaleString()}</strong></div>
                 {/* ── No-refund acknowledgement ── */}
                 <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
                   <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }} />
@@ -873,9 +945,9 @@ export default function Cart() {
             {method === 'wa' && (
               <div className="pay-mpesa-box">
                 <p className="pay-instruction">Order directly via <strong>WhatsApp</strong></p>
-                <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {total.toLocaleString()}</strong></div>
+                <div className="pay-detail-row"><span>Amount</span><strong className="pay-highlight">KSh {effectiveTotal.toLocaleString()}</strong></div>
                 <p style={{ color:'var(--muted)', fontSize:'0.83rem', marginTop:12 }}>We'll confirm your payment and unlock your books manually — usually within minutes.</p>
-                <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi! I\'d like to order:\n' + cart.map(b => `• ${b.title} — KSh ${b.price}`).join('\n') + `\n\nTotal: KSh ${total}`)}`}
+                <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi! I\'d like to order:\n' + cart.map(b => `• ${b.title} — KSh ${b.price}`).join('\n') + `\n\nTotal: KSh ${effectiveTotal}` + (promoApplied ? `\nPromo: ${promoApplied.code} (−KSh ${discountAmount})` : ''))}`}
                   target="_blank" rel="noopener noreferrer" className="btn btn-wa" style={{ width:'100%', marginTop:16 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                   Order via WhatsApp
@@ -893,7 +965,16 @@ export default function Cart() {
                 <div><strong>{b.title}</strong><span>KSh {b.price}</span></div>
               </div>
             ))}
-            <div className="pay-total"><span>{cart.length} item{cart.length !== 1 ? 's' : ''}</span><strong>KSh {total.toLocaleString()}</strong></div>
+            {discountAmount > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderTop:'1px solid var(--dim)', fontSize:'0.82rem' }}>
+                <span style={{ color:'var(--ok)' }}>🎟 {promoApplied?.code}</span>
+                <strong style={{ color:'#2ecc71' }}>−KSh {discountAmount.toLocaleString()}</strong>
+              </div>
+            )}
+            <div className="pay-total">
+              <span>{cart.length} item{cart.length !== 1 ? 's' : ''}</span>
+              <strong>KSh {effectiveTotal.toLocaleString()}</strong>
+            </div>
             <div className="pay-trust">
               {method === 'paystack'
                 ? <><span>⚡ Books unlock instantly after payment</span><span>M-Pesa · Card · Bank supported</span></>
@@ -995,8 +1076,49 @@ export default function Cart() {
                 </div>
                 <div className="cart-sum__divider" />
                 <div className="cart-sum__total">
-                  <span>Total</span>
+                  <span>Subtotal</span>
                   <strong>KSh {total.toLocaleString()}</strong>
+                </div>
+                {/* ── Promo code entry ── */}
+                <div style={{ marginTop:10, marginBottom:4 }}>
+                  {!promoApplied ? (
+                    <div style={{ display:'flex', gap:6 }}>
+                      <input
+                        className="field"
+                        placeholder="Promo code"
+                        value={promoInput}
+                        onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                        onKeyDown={e => e.key === 'Enter' && applyPromo()}
+                        style={{ flex:1, fontSize:'0.82rem', padding:'7px 10px', textTransform:'uppercase', letterSpacing:1 }}
+                      />
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={applyPromo}
+                        disabled={promoChecking || !promoInput.trim()}
+                        style={{ flexShrink:0, fontSize:'0.78rem' }}
+                      >
+                        {promoChecking ? '⏳' : 'Apply'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', background:'rgba(46,204,113,0.1)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'var(--r-sm)' }}>
+                      <span style={{ fontSize:'0.8rem', color:'var(--ok)', fontWeight:600 }}>
+                        🎟 {promoApplied.code} — <span style={{ color:'#2ecc71' }}>−KSh {discountAmount.toLocaleString()}</span>
+                      </span>
+                      <button onClick={removePromo} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.9rem', padding:0 }}>✕</button>
+                    </div>
+                  )}
+                  {promoError && <p style={{ color:'#e74c3c', fontSize:'0.75rem', marginTop:5 }}>{promoError}</p>}
+                </div>
+                {discountAmount > 0 && (
+                  <div className="cart-sum__total" style={{ marginTop:6 }}>
+                    <span>Discount</span>
+                    <strong style={{ color:'#2ecc71' }}>−KSh {discountAmount.toLocaleString()}</strong>
+                  </div>
+                )}
+                <div className="cart-sum__total" style={{ marginTop: discountAmount > 0 ? 4 : 0 }}>
+                  <span>Total</span>
+                  <strong style={{ color:'var(--gold)' }}>KSh {effectiveTotal.toLocaleString()}</strong>
                 </div>
                 <p className="cart-sum__unlock-note">⚡ Books unlock instantly after payment</p>
                 <div style={{ padding:'10px 12px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.18)', borderRadius:'var(--r-sm)', fontSize:'0.76rem', color:'var(--muted)', lineHeight:1.6, marginBottom:12 }}>

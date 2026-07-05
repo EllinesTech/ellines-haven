@@ -235,6 +235,25 @@ exports.mpesaCallback = onRequest(
         console.log("[mpesaCallback] books unlocked for:", order.userEmail, "order:", orderId);
       }
 
+      // ── Notify the buyer in their user_notifications feed ──────────────────
+      if (order.userEmail) {
+        try {
+          const titles  = (order.items || []).map(i => i.title).join(', ');
+          const single  = (order.items || []).length === 1;
+          const notifId = `un_mpesa_${orderId}_${Date.now()}`;
+          await db.collection("user_notifications").doc(notifId).set({
+            userEmail: order.userEmail.toLowerCase(),
+            title:     `📚 ${single ? 'Book' : 'Books'} Unlocked!`,
+            message:   `Your ${single ? `"${titles}"` : `${(order.items||[]).length} books`} unlocked via M-Pesa. Find them in My Library.`,
+            type:      "book_ready",
+            bookId:    single ? (order.items[0]?.id || null) : null,
+            orderId,
+            read:      false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } catch (ne) { console.warn("[mpesaCallback] user notify failed:", ne.message); }
+      }
+
       // ── Notify admin ────────────────────────────────────────────────────────
       try {
         await db.collection("admin_notifications").doc(orderId + "_confirmed").set({
@@ -410,6 +429,24 @@ exports.paystackWebhook = onRequest(
       // Unlock books
       await unlockBooksForUser(order.userEmail || email, order.items || [], "paystack_auto");
       console.log("[paystackWebhook] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+
+      // ── Notify buyer in their user_notifications feed ─────────────────────
+      try {
+        const buyerEmail = (order.userEmail || email).toLowerCase();
+        const titles     = (order.items || []).map(i => i.title).join(', ');
+        const single     = (order.items || []).length === 1;
+        const notifId    = `un_ps_${orderId}_${Date.now()}`;
+        await db.collection("user_notifications").doc(notifId).set({
+          userEmail: buyerEmail,
+          title:     `📚 ${single ? 'Book' : 'Books'} Unlocked!`,
+          message:   `Your ${single ? `"${titles}"` : `${(order.items||[]).length} books`} unlocked via Paystack. Find them in My Library.`,
+          type:      "book_ready",
+          bookId:    single ? (order.items[0]?.id || null) : null,
+          orderId,
+          read:      false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (ne) { console.warn("[paystackWebhook] user notify failed:", ne.message); }
 
       // Notify admin
       await db.collection("admin_notifications").doc(orderId + "_ps").set({
@@ -692,6 +729,23 @@ exports.capturePayPalOrder = onCall(
       // Unlock books
       await unlockBooksForUser(order.userEmail || userEmail, order.items || [], "paypal_auto");
       console.log("[capturePayPalOrder] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+
+      // ── Notify buyer ──────────────────────────────────────────────────────
+      try {
+        const buyerEmail = (order.userEmail || userEmail).toLowerCase();
+        const titles     = (order.items || []).map(i => i.title).join(', ');
+        const single     = (order.items || []).length === 1;
+        await db.collection("user_notifications").doc(`un_pp_${orderId}_${Date.now()}`).set({
+          userEmail: buyerEmail,
+          title:     `📚 ${single ? 'Book' : 'Books'} Unlocked!`,
+          message:   `Your ${single ? `"${titles}"` : `${(order.items||[]).length} books`} unlocked via PayPal. Find them in My Library.`,
+          type:      "book_ready",
+          bookId:    single ? (order.items[0]?.id || null) : null,
+          orderId,
+          read:      false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (ne) { console.warn("[capturePayPalOrder] user notify failed:", ne.message); }
 
       // Notify admin
       await db.collection("admin_notifications").doc(orderId + "_pp").set({

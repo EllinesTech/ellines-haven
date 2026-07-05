@@ -454,12 +454,18 @@ export function AppProvider({ children }) {
   // ── Orders ────────────────────────────────────────────────────────────────
   const syncOrders = () => {};
 
-  const placeOrder = async (items, method, ref, phone) => {
+  const placeOrder = async (items, method, ref, phone, promoApplied = null) => {
+    const baseTotal = items.reduce((s,b) => s + b.price, 0);
+    const discountAmount = promoApplied?.discountValue || 0;
+    const effectiveTotal = Math.max(0, baseTotal - discountAmount);
     const order = {
       id: 'ORD-' + Date.now(), userId: user?.id || null, userName: user?.name || 'Guest',
       userEmail: user?.email?.toLowerCase() || null,
       items: items.map(b => ({ id:b.id, title:b.title, price:b.price })),
-      total: items.reduce((s,b) => s + b.price, 0),
+      total: effectiveTotal,
+      originalTotal: baseTotal,
+      discountAmount: discountAmount || 0,
+      promoCode: promoApplied?.code || null,
       method, ref: ref || '', phone: phone || '',
       status: 'Pending', date: new Date().toISOString().slice(0,10), createdAt: Date.now(),
     };
@@ -489,6 +495,28 @@ export function AppProvider({ children }) {
         createdAt: serverTimestamp(),
       });
     } catch (e) { console.warn('[placeOrder] admin notification failed:', e.message); }
+
+    // ── Increment promo code usage count ──────────────────────────────────
+    if (promoApplied?.code) {
+      try {
+        const promosSnap = await getDoc(doc(db, 'site_data', 'promos'));
+        if (promosSnap.exists()) {
+          const list = promosSnap.data().list || [];
+          const updated = list.map(p =>
+            p.code === promoApplied.code ? { ...p, uses: (p.uses || 0) + 1 } : p
+          );
+          await setDoc(doc(db, 'site_data', 'promos'), { list: updated }, { merge: true });
+        }
+      } catch (e) { console.warn('[placeOrder] promo usage update failed:', e.message); }
+    }
+
+    // ── Notify the buyer in their own feed ──
+    if (order.userEmail) {
+      try {
+        const { notifyOrderPlaced } = await import('../utils/userNotifier');
+        await notifyOrderPlaced(order.userEmail, order.id, order.total);
+      } catch {}
+    }
 
     return order;
   };

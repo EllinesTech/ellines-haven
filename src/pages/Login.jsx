@@ -533,6 +533,10 @@ async function logLogin(email, userName) {
       },
       priority: 'low',
     });
+
+    // Send welcome-back notification to the user's own feed (once per day)
+    const { notifyLoginWelcome } = await import('../utils/userNotifier');
+    await notifyLoginWelcome(email, userName);
   } catch (err) {
     console.error('[logLogin]', err);
   }
