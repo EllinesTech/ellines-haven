@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
   doc, getDoc, setDoc, addDoc, onSnapshot,
-  collection, query, orderBy, serverTimestamp,
+  collection, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import './EllineaAI.css';
@@ -491,19 +491,29 @@ export default function EllineaAI() {
   // ── Live-chat: messages listener ─────────────────────────────────────────
   useEffect(() => {
     if (!chatId) return;
-    const q = query(collection(db, 'contact_messages', chatId, 'messages'), orderBy('createdAt', 'asc'));
-    const unsub = onSnapshot(q, snap => {
-      const lcMsgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const newAdminMsgs = lcMsgs.filter(m => m.sender === 'admin').length;
-      if (!(open && tab === 'live') && newAdminMsgs > prevLcCount.current) {
-        const added = newAdminMsgs - prevLcCount.current;
-        setLiveUnread(u => u + added);
-        if (lcMsgs.length > prevLcCount.current) playPing();
-      }
-      prevLcCount.current = newAdminMsgs;
-      setChatMessages(lcMsgs);
-      setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
-    }, () => {});
+    // No orderBy — sort client-side to avoid subcollection index requirement
+    const unsub = onSnapshot(
+      collection(db, 'contact_messages', chatId, 'messages'),
+      snap => {
+        const lcMsgs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+            const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+            return ta - tb;
+          });
+        const newAdminMsgs = lcMsgs.filter(m => m.sender === 'admin').length;
+        if (!(open && tab === 'live') && newAdminMsgs > prevLcCount.current) {
+          const added = newAdminMsgs - prevLcCount.current;
+          setLiveUnread(u => u + added);
+          if (lcMsgs.length > prevLcCount.current) playPing();
+        }
+        prevLcCount.current = newAdminMsgs;
+        setChatMessages(lcMsgs);
+        setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      },
+      () => {}
+    );
     return () => unsub();
   }, [chatId, open, tab]);
 

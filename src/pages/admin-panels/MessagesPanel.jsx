@@ -164,10 +164,16 @@ export default function MessagesPanel({ showToast, users = [] }) {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, 'admin_notifications'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, snap => {
-      const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        .filter(n => n.type === 'new_order');
+    // No orderBy — sort client-side to avoid index requirement
+    const unsub = onSnapshot(collection(db, 'admin_notifications'), snap => {
+      const notifs = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(n => n.type === 'new_order')
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() || 0;
+          const tb = b.createdAt?.toMillis?.() || 0;
+          return tb - ta;
+        });
 
       // Find genuinely new unread orders (not seen before)
       if (orderMounted.current) {

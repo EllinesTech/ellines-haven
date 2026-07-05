@@ -1239,20 +1239,14 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
 
   useEffect(() => {
     setFetchErr('');
-    // Read from contact_messages (type='notification') — this collection is
-    // open in Firestore rules. The notifications collection may have restricted
-    // read rules; contact_messages is the reliable fallback that all Notify Me
-    // buttons write to.
-    const q = query(
-      collection(db, 'contact_messages'),
-      orderBy('createdAt', 'desc')
-    );
+    // Read from contact_messages (type='notification') — no orderBy to avoid index requirement
     const unsub = onSnapshot(
-      q,
+      collection(db, 'contact_messages'),
       snap => {
         const docs = snap.docs
           .map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toMillis?.() || 0 }))
-          .filter(d => d.type === 'notification');
+          .filter(d => d.type === 'notification')
+          .sort((a, b) => b.createdAt - a.createdAt);
         setNotifs(docs);
         setLoading(false);
         setFetchErr('');

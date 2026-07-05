@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   collection, doc, setDoc, addDoc, onSnapshot, deleteDoc, writeBatch,
-  serverTimestamp, query, orderBy, getDocs,
+  serverTimestamp, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useApp } from '../context/AppContext';
@@ -120,23 +120,29 @@ export default function LiveChat() {
   /* ── messages listener ── */
   useEffect(() => {
     if (!chatId) return;
-    const q = query(
+    // No orderBy — sort client-side to avoid subcollection index requirement
+    const unsub = onSnapshot(
       collection(db, 'contact_messages', chatId, 'messages'),
-      orderBy('createdAt', 'asc')
+      snap => {
+        const msgs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+            const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+            return ta - tb;
+          });
+        const newAdminMsgs = msgs.filter(m => m.sender === 'admin').length;
+        if (!open && newAdminMsgs > prevMsgCount.current) {
+          const added = newAdminMsgs - prevMsgCount.current;
+          setUnread(u => u + added);
+          if (msgs.length > prevMsgCount.current) playPing();
+        }
+        prevMsgCount.current = newAdminMsgs;
+        setMessages(msgs);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+      },
+      () => {}
     );
-    const unsub = onSnapshot(q, snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // play sound + count unread admin messages when chat is closed
-      const newAdminMsgs = msgs.filter(m => m.sender === 'admin').length;
-      if (!open && newAdminMsgs > prevMsgCount.current) {
-        const added = newAdminMsgs - prevMsgCount.current;
-        setUnread(u => u + added);
-        if (msgs.length > prevMsgCount.current) playPing();
-      }
-      prevMsgCount.current = newAdminMsgs;
-      setMessages(msgs);
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
-    }, () => {});
     return () => unsub();
   }, [chatId, open]);
 
