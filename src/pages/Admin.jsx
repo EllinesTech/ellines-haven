@@ -2911,9 +2911,9 @@ export default function Admin() {
           </div>
         )}
 
-        {/* SMS Broadcast tab — full height, no padding */}
+        {/* SMS Broadcast tab — scrollable */}
         {tab === 'sms' && (
-          <div className="adm-main-messages">
+          <div className="adm-main-scroll">
             <Suspense fallback={<PanelLoader />}>
               <SMSPanel showToast={showToast} users={users} />
             </Suspense>
