@@ -231,7 +231,7 @@ exports.mpesaCallback = onRequest(
 
       // ── Unlock books for the buyer ─────────────────────────────────────────
       if (order.userEmail) {
-        await unlockBooksForUser(order.userEmail, order.items || []);
+        await unlockBooksForUser(order.userEmail, order.items || [], "mpesa_auto");
         console.log("[mpesaCallback] books unlocked for:", order.userEmail, "order:", orderId);
       }
 
@@ -257,22 +257,22 @@ exports.mpesaCallback = onRequest(
 );
 
 // ── Unlock books helper ────────────────────────────────────────────────────────
-async function unlockBooksForUser(userEmail, items) {
+async function unlockBooksForUser(userEmail, items, source = "auto") {
   const ref = db.collection("libraries").doc(libDocId(userEmail));
   const snap = await ref.get();
   const existing = snap.exists ? (snap.data().books || []) : [];
   const map = new Map(existing.map((b) => [b.id, b]));
 
   for (const item of items) {
-    const existing = map.get(item.id) || {};
+    const prev = map.get(item.id) || {};
     map.set(item.id, {
-      ...existing,
+      ...prev,
       id:               item.id,
-      title:            item.title || existing.title || "",
-      price:            item.price || existing.price || 0,
+      title:            item.title || prev.title || "",
+      price:            item.price || prev.price || 0,
       downloadUnlocked: true,
       unlockedAt:       new Date().toISOString(),
-      unlockedBy:       "mpesa_auto",
+      unlockedBy:       source,
     });
   }
 
@@ -408,7 +408,7 @@ exports.paystackWebhook = onRequest(
       });
 
       // Unlock books
-      await unlockBooksForUser(order.userEmail || email, order.items || []);
+      await unlockBooksForUser(order.userEmail || email, order.items || [], "paystack_auto");
       console.log("[paystackWebhook] ✅ books unlocked for:", order.userEmail, "order:", orderId);
 
       // Notify admin
@@ -504,7 +504,7 @@ exports.verifyPaystackPayment = onCall(
             confirmedAt:     admin.firestore.FieldValue.serverTimestamp(),
             paymentMethod:   "paystack",
           });
-          await unlockBooksForUser(userEmail, order.items || []);
+          await unlockBooksForUser(userEmail, order.items || [], "paystack_verify");
           console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderSnap.id);
         }
       } catch (fsErr) {
@@ -659,7 +659,7 @@ exports.capturePayPalOrder = onCall(
       });
 
       // Unlock books
-      await unlockBooksForUser(order.userEmail || userEmail, order.items || []);
+      await unlockBooksForUser(order.userEmail || userEmail, order.items || [], "paypal_auto");
       console.log("[capturePayPalOrder] ✅ books unlocked for:", order.userEmail, "order:", orderId);
 
       // Notify admin

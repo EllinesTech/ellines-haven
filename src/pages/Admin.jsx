@@ -1819,7 +1819,9 @@ function OrdersPanel({
                     {isAuto && <span style={{ display:'block', fontSize:'0.65rem', color:'var(--ok)', marginTop:1 }}>auto</span>}
                   </td>
                   <td>
-                    <span className={'adm-status adm-status--' + (o.status||'unknown').toLowerCase()} style={{ fontSize:'0.73rem' }}>{o.status}</span>
+                    <span className={'adm-status adm-status--' + (o.status||'unknown').toLowerCase()} style={{ fontSize:'0.73rem' }}>
+                      {o.status === 'PaymentFailed' ? '✕ Failed' : o.status}
+                    </span>
                     {isCancelled && o.failReason && <span style={{ display:'block', fontSize:'0.66rem', color:'var(--err)', marginTop:2 }}>{(o.failReason||'').slice(0,36)}</span>}
                     {isRefunded  && o.refundNote && <span style={{ display:'block', fontSize:'0.66rem', color:'#a855f7', marginTop:2 }}>{(o.refundNote||'').slice(0,36)}</span>}
                   </td>
@@ -1827,6 +1829,7 @@ function OrdersPanel({
                   <td className="adm-actions" style={{ whiteSpace:'nowrap', gap:3 }}>
                     {isPending && !isAuto && (<><button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>✅</button><button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>✕</button></>)}
                     {isPending && isAuto  && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.7, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm">⚡</button>)}
+                    {o.status === 'PaymentFailed' && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.8, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm (payment may have succeeded)">⚡ Fix</button>)}
                     {isCompleted && (<button className="adm-act-btn" style={{ background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:'0.72rem' }} onClick={() => setRefundModal(o)}>↩ Refund</button>)}
                     <button className="adm-act-btn adm-act-archive" onClick={() => handleArchiveOrder(o.id)} title="Archive">📦</button>
                     <button className="adm-act-btn adm-act-del"     onClick={() => handleDeleteOrder(o.id)} title="Delete">🗑️</button>

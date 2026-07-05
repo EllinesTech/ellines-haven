@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats } from '../hooks/useReadingProgress';
 import './MyLibrary.css';
 
@@ -404,6 +404,76 @@ function AccountSettings({ user, myPerms }) {
   );
 }
 
+// ── Pending Order Row — shows retry button for Paystack orders ──────────────
+function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
+  const [retrying,   setRetrying]   = useState(false);
+  const [retryMsg,   setRetryMsg]   = useState('');
+  const [retryDone,  setRetryDone]  = useState(false);
+
+  const retryActivation = async () => {
+    if (!o.paystackRef) return;
+    setRetrying(true);
+    setRetryMsg('');
+    try {
+      // First check if the order completed in Firestore while we were on this page
+      const snap = await getDoc(doc(db, 'orders', o.id));
+      if (snap.exists() && snap.data().status === 'Completed') {
+        setRetryMsg('✅ Payment confirmed — your books are now unlocked!');
+        setRetryDone(true);
+        return;
+      }
+      // Call verify function — this will confirm with Paystack and unlock books
+      await callVerifyPaystack({
+        reference: o.paystackRef,
+        orderId:   o.id,
+        userEmail: userEmail,
+      });
+      setRetryMsg('✅ Books unlocked! Refresh the page to read them.');
+      setRetryDone(true);
+    } catch (err) {
+      const msg = err?.message || 'Verification failed';
+      if (msg.includes('Payment status')) {
+        setRetryMsg('Payment not yet confirmed by Paystack. If you completed payment, please contact support.');
+      } else {
+        setRetryMsg('Could not verify — try again in a moment, or contact support.');
+      }
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <div className="mylib-order-pending-row">
+      {retryMsg
+        ? <p style={{ color: retryDone ? '#2ecc71' : '#e8832a' }}>{retryMsg}</p>
+        : <p>⏳ This order is processing. Your books will unlock automatically — usually within seconds. If it takes longer, use the button to retry.</p>
+      }
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap', flexShrink:0 }}>
+        {isPendingPaystack && !retryDone && (
+          <button
+            className="btn btn-sm"
+            style={{ background:'rgba(201,168,76,0.12)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.35)', whiteSpace:'nowrap' }}
+            onClick={retryActivation}
+            disabled={retrying}
+          >
+            {retrying ? '⏳ Checking…' : '🔄 Retry Activation'}
+          </button>
+        )}
+        {retryDone && (
+          <button className="btn btn-sm btn-primary" onClick={() => window.location.reload()}>
+            Refresh Page
+          </button>
+        )}
+        <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please check my payment. Ref: ' + (o.paystackRef||o.ref||'N/A'))}`}
+          target="_blank" rel="noopener noreferrer"
+          className="btn btn-sm" style={{ background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', whiteSpace:'nowrap' }}>
+          💬 Contact Support
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ── Main MyLibrary Page ─────────────────────────────────────────────────────
 export default function MyLibrary() {
   const { user, library, books: catalog, myPerms } = useApp();
@@ -711,6 +781,7 @@ export default function MyLibrary() {
 
                 <div className="mylib-orders-list">
                   {liveOrders.map(o => {
+                    const isPendingPaystack = o.status === 'Pending' && o.method === 'paystack' && o.paystackRef;
                     const statusColor = o.status==='Completed' ? '#2ecc71' : o.status==='Pending' ? '#e8832a' : '#e74c3c';
                     const statusBg    = o.status==='Completed' ? 'rgba(46,204,113,0.1)' : o.status==='Pending' ? 'rgba(232,131,42,0.1)' : 'rgba(231,76,60,0.1)';
                     return (
@@ -731,14 +802,7 @@ export default function MyLibrary() {
                           </div>
                         </div>
                         {o.status === 'Pending' && (
-                          <div className="mylib-order-pending-row">
-                            <p>⏳ This order is processing. Your books will unlock automatically — usually within seconds. If it takes longer, contact support.</p>
-                            <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please check my payment. Ref: ' + (o.ref||'N/A'))}`}
-                              target="_blank" rel="noopener noreferrer"
-                              className="btn btn-sm" style={{ background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', flexShrink:0, whiteSpace:'nowrap' }}>
-                              💬 Contact Support
-                            </a>
-                          </div>
+                          <PendingOrderRow order={o} userEmail={user.email} isPendingPaystack={isPendingPaystack} />
                         )}
                       </div>
                     );

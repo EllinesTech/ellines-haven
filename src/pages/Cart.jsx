@@ -301,19 +301,22 @@ export default function Cart() {
       const grossKes = paystackAmountCents / 100;
       const feeKes   = +(grossKes - total).toFixed(2);
 
-      await new Promise((resolve) => {
-        // Generate a unique Paystack reference and store it on the order
-        // so both the webhook AND the verify function can find the order.
-        const paystackRef = order.id + '_' + Date.now();
-
-        // Save the paystackRef to Firestore immediately so the webhook can
-        // look up the order the moment Paystack fires charge.success
-        updateDoc(doc(db, 'orders', order.id), {
+      // Generate a unique Paystack reference and save it to Firestore BEFORE
+      // opening the popup. This ensures the webhook can find the order the
+      // moment Paystack fires charge.success — eliminating the race condition
+      // where the webhook fires before paystackRef is written to Firestore.
+      const paystackRef = order.id + '_' + Date.now();
+      try {
+        await updateDoc(doc(db, 'orders', order.id), {
           paystackRef,
           paystackChannel,
           updatedAt: serverTimestamp(),
-        }).catch(() => {});
+        });
+      } catch (refErr) {
+        console.warn('[Cart] paystackRef save failed — proceeding anyway:', refErr.message);
+      }
 
+      await new Promise((resolve) => {
         const handler = window.PaystackPop.setup({
           key:      PAYSTACK_PUBLIC_KEY,
           email:    user.email,
