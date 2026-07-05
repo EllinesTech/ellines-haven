@@ -234,8 +234,7 @@ export default function LiveChatPanel({ showToast }) {
     setSelectedMsgs(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
-  const toggleSelect = (id, e) => {
-    e.stopPropagation();
+  const toggleSelect = (id) => {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
   const selectAll  = () => setSelected(new Set(chatSessions.map(s => s.id)));
@@ -279,28 +278,30 @@ export default function LiveChatPanel({ showToast }) {
             </span>
           </span>
         </div>
-        {/* Bulk action toolbar — shown when sessions are selected */}
-        {selected.size > 0 && (
-          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-            <span style={{ fontSize:'0.82rem', color:'var(--gold)', fontWeight:600 }}>
-              {selected.size} selected
-            </span>
-            <button className="btn btn-sm" onClick={clearSel}
-              style={{ background:'rgba(255,255,255,0.06)', color:'var(--muted)', border:'1px solid var(--dim)' }}>
-              ✕ Clear
-            </button>
-            <button className="btn btn-sm" onClick={() => setDelConfirm('bulk')}
-              style={{ background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}>
-              🗑 Delete Selected
-            </button>
-          </div>
-        )}
-        {/* Select all when none selected */}
-        {selected.size === 0 && chatSessions.length > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={selectAll} style={{ fontSize:'0.78rem' }}>
-            ☑ Select All
-          </button>
-        )}
+        {/* Bulk action toolbar */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+          {selected.size === 0 ? (
+            chatSessions.length > 0 && (
+              <button className="btn btn-ghost btn-sm" onClick={selectAll} style={{ fontSize:'0.78rem' }}>
+                ☑ Select All
+              </button>
+            )
+          ) : (
+            <>
+              <span style={{ fontSize:'0.82rem', color:'var(--gold)', fontWeight:600 }}>
+                {selected.size} selected
+              </span>
+              <button className="btn btn-sm" onClick={clearSel}
+                style={{ background:'rgba(255,255,255,0.06)', color:'var(--muted)', border:'1px solid var(--dim)' }}>
+                ✕ Clear
+              </button>
+              <button className="btn btn-sm" onClick={() => setDelConfirm('bulk')}
+                style={{ background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}>
+                🗑 Delete Selected
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Main grid: session list + thread ── */}
@@ -342,21 +343,42 @@ export default function LiveChatPanel({ showToast }) {
               const isActive   = activeChat === s.id;
               const hasNew     = s.lastSender === 'user' && s.status !== 'closed';
               const isSelected = selected.has(s.id);
+              const inSelectMode = selected.size > 0;
               return (
                 <div key={s.id}
                   className={'adm-livechat-session-row' + (isActive ? ' active' : '') + (hasNew ? ' has-new' : '')}
-                  onClick={() => setActiveChat(s.id)}
-                  style={{ outline: isSelected ? '2px solid rgba(201,168,76,0.45)' : undefined, outlineOffset: '-2px' }}
+                  onClick={() => inSelectMode ? toggleSelect(s.id) : setActiveChat(s.id)}
+                  style={{
+                    outline: isSelected ? '2px solid rgba(201,168,76,0.45)' : undefined,
+                    outlineOffset: '-2px',
+                    paddingLeft: inSelectMode ? 42 : undefined,
+                    position: 'relative',
+                    cursor: 'pointer',
+                  }}
                 >
-                  {/* Top row: checkbox + avatar + name + status */}
+                  {/* ── Custom checkbox — only shown when any session is selected ── */}
+                  {inSelectMode && (
+                    <div
+                      onClick={e => { e.stopPropagation(); toggleSelect(s.id); }}
+                      style={{
+                        position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                        width: 20, height: 20, borderRadius: 5, cursor: 'pointer', flexShrink: 0,
+                        border: `2px solid ${isSelected ? 'var(--gold)' : 'rgba(255,255,255,0.3)'}`,
+                        background: isSelected ? 'var(--gold)' : 'rgba(255,255,255,0.04)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'all 0.12s', zIndex: 2,
+                      }}>
+                      {isSelected && (
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                          <polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Top row: avatar + name + status */}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0 }}>
-                      <input
-                        type="checkbox" checked={isSelected}
-                        onChange={e => toggleSelect(s.id, e)}
-                        onClick={e => e.stopPropagation()}
-                        style={{ accentColor:'var(--gold)', width:13, height:13, flexShrink:0, cursor:'pointer' }}
-                      />
                       <div className="adm-livechat-avatar">{(s.name || '?')[0].toUpperCase()}</div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontWeight:600, fontSize:'0.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name || 'Guest'}</div>
@@ -368,11 +390,11 @@ export default function LiveChatPanel({ showToast }) {
                     </span>
                   </div>
                   {/* Preview */}
-                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4, paddingLeft:21 }}>
+                  <div style={{ fontSize:'0.78rem', color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:4 }}>
                     {s.lastMsg || 'Chat started'}
                   </div>
                   {/* Bottom: timestamp + End + Delete */}
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingLeft:21 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <span style={{ fontSize:'0.68rem', color:'var(--muted)' }}>{fmtDate(s.lastMsgAt || s.createdAt)}</span>
                     <div style={{ display:'flex', gap:3 }} onClick={e => e.stopPropagation()}>
                       {s.status !== 'closed' && (
