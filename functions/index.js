@@ -916,22 +916,76 @@ This code is valid for 15 minutes. If you didn't request a password reset, pleas
 https://ellines-haven.web.app
 `.trim();
 
-    // ── Try AT Email API ──────────────────────────────────────────────────────
+    // ── 1. Send SMS via Africa's Talking SMS API (primary channel) ───────────
+    // Sandbox note: do NOT pass a `from` field — AT sandbox ignores custom sender
+    // IDs and rejects requests that include them. Only pass `from` in production.
     if (atApiKey && atUsername) {
+      const rawPhone = phone ? String(phone).replace(/\D/g, "") : "";
+      // Build the recipient list — always send to the account email as SMS if no
+      // phone is provided (AT can't send to an email via SMS, so skip in that case)
+      const targets = [];
+
+      if (rawPhone) {
+        let formattedPhone = rawPhone;
+        if (rawPhone.startsWith("0"))        formattedPhone = "+254" + rawPhone.slice(1);
+        else if (rawPhone.startsWith("254")) formattedPhone = "+"   + rawPhone;
+        else if (!rawPhone.startsWith("+"))  formattedPhone = "+254" + rawPhone;
+        targets.push(formattedPhone);
+      }
+
+      if (targets.length > 0) {
+        const smsText = `Ellines Haven reset code: ${otpCode}. Valid 15 mins. Don't share.`;
+        try {
+          // AT SMS API expects application/x-www-form-urlencoded body
+          const isSandbox = atUsername === "sandbox";
+          const params = new URLSearchParams({
+            username: atUsername,
+            to:       targets.join(","),
+            message:  smsText,
+          });
+          // Only add `from` for production — sandbox rejects it
+          if (!isSandbox && atSenderId) {
+            params.append("from", atSenderId);
+          }
+
+          const smsRes = await axios.post(
+            "https://api.africastalking.com/version1/messaging",
+            params.toString(),
+            {
+              headers: {
+                apiKey:         atApiKey,
+                Accept:         "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+            }
+          );
+          console.log("[sendOtp] SMS response:", JSON.stringify(smsRes.data));
+          const recipients = smsRes.data?.SMSMessageData?.Recipients || [];
+          smsSent.sent = recipients.some(r => r.statusCode === 101 || r.status === "Success");
+        } catch (e) {
+          console.warn("[sendOtp] SMS failed:", e.response?.data || e.message);
+        }
+      }
+    }
+
+    // ── 2. Send email via AT Email API (best-effort, sandbox may not support) ─
+    // AT Email API uses form-encoded params, NOT JSON body
+    if (atApiKey && atUsername && atUsername !== "sandbox") {
       try {
+        const emailParams = new URLSearchParams({
+          username: atUsername,
+          to:       email,
+          from:     smtpUser || "noreply@ellines-haven.web.app",
+          subject:  `Your Ellines Haven reset code: ${otpCode}`,
+          message:  emailBody,
+        });
         await axios.post(
           "https://api.africastalking.com/version1/messaging/email",
-          {
-            username: atUsername,
-            to:       email,
-            from:     smtpUser || "noreply@ellines-haven.web.app",
-            subject:  `Your Ellines Haven reset code: ${otpCode}`,
-            message:  emailBody,
-          },
+          emailParams.toString(),
           {
             headers: {
-              apiKey: atApiKey,
-              Accept: "application/json",
+              apiKey:         atApiKey,
+              Accept:         "application/json",
               "Content-Type": "application/x-www-form-urlencoded",
             },
           }
@@ -942,51 +996,16 @@ https://ellines-haven.web.app
       }
     }
 
-    // ── Try SMTP as fallback (using nodemailer-style raw HTTP to SMTP is complex;
-    //    we skip SMTP if AT email API already worked) ───────────────────────────
-    // For simplicity: log OTP to Firestore for dev purposes when creds are missing
-    if (!emailSent.sent) {
-      console.log(`[sendOtp] OTP for ${email}: ${otpCode} (configure AT_API_KEY + AT_USERNAME to enable delivery)`);
-      // Store in Firestore temporarily so admin can see it in dev mode
+    // ── Fallback: store OTP in Firestore so admin can retrieve it in dev mode ─
+    if (!smsSent.sent && !emailSent.sent) {
+      console.log(`[sendOtp] OTP for ${email}: ${otpCode} — credentials: apiKey=${!!atApiKey} username=${atUsername}`);
       try {
         await db.collection("dev_otps").doc(email.toLowerCase().replace(/[^a-z0-9]/g, "_")).set({
-          email, otp: otpCode, createdAt: admin.firestore.FieldValue.serverTimestamp(), expiresAt: Date.now() + 900000,
+          email, otp: otpCode,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt: Date.now() + 900000,
         });
       } catch {}
-    }
-
-    // ── 2. Send SMS via Africa's Talking SMS API ──────────────────────────────
-    if (phone && atApiKey && atUsername) {
-      const rawPhone = String(phone).replace(/\D/g, "");
-      let formattedPhone = rawPhone;
-      if (rawPhone.startsWith("0"))   formattedPhone = "+254" + rawPhone.slice(1);
-      else if (rawPhone.startsWith("254")) formattedPhone = "+" + rawPhone;
-      else if (!rawPhone.startsWith("+")) formattedPhone = "+254" + rawPhone;
-
-      const smsText = `Your Ellines Haven password reset code is: ${otpCode}. Valid for 15 minutes. Do not share this code.`;
-
-      try {
-        const params = new URLSearchParams({
-          username: atUsername,
-          to:       formattedPhone,
-          message:  smsText,
-          ...(atSenderId ? { from: atSenderId } : {}),
-        });
-        await axios.post(
-          "https://api.africastalking.com/version1/messaging",
-          params.toString(),
-          {
-            headers: {
-              apiKey:         atApiKey,
-              Accept:         "application/json",
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-          }
-        );
-        smsSent.sent = true;
-      } catch (e) {
-        console.warn("[sendOtp] SMS failed:", e.response?.data || e.message);
-      }
     }
 
     return { emailSent: emailSent.sent, smsSent: smsSent.sent };
@@ -1049,12 +1068,16 @@ exports.sendSmsBroadcast = onCall(
     let failCount = 0;
 
     try {
+      const isSandbox = atUsername === "sandbox";
       const params = new URLSearchParams({
         username: atUsername,
         to:       recipients,
         message,
-        ...(atSenderId ? { from: atSenderId } : {}),
       });
+      // Only add `from` for production — AT sandbox rejects custom sender IDs
+      if (!isSandbox && atSenderId) {
+        params.append("from", atSenderId);
+      }
       const res = await axios.post(
         "https://api.africastalking.com/version1/messaging",
         params.toString(),
