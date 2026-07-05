@@ -397,18 +397,60 @@ export default function Cart() {
             };
 
             const doVerify = async () => {
-              // Start polling Firestore in the background immediately —
-              // the webhook may arrive while we're waiting for verify.
+              // ── Helper: unlock books + mark order Completed from the frontend ──
+              // We do this client-side to guarantee Firestore is written — the
+              // Cloud Function's Firestore write was silently failing (caught+swallowed).
+              const doFrontendUnlock = async (orderId, userEmailLow, items) => {
+                const libDocIdLocal = (e) => (e || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const { getDoc: fsGet, setDoc: fsSet, updateDoc: fsUpd, doc: fsDoc, serverTimestamp: fsSvTs } = await import('firebase/firestore');
+                const libRef = fsDoc(db, 'libraries', libDocIdLocal(userEmailLow));
+                const snap   = await fsGet(libRef);
+                const existing = snap.exists() ? (snap.data().books || []) : [];
+                const map = new Map(existing.map(b => [b.id, b]));
+                items.forEach(item => {
+                  const prev = map.get(item.id) || {};
+                  map.set(item.id, {
+                    ...prev,
+                    id:               item.id,
+                    title:            item.title || prev.title || '',
+                    price:            item.price || prev.price || 0,
+                    downloadUnlocked: true,
+                    unlockedAt:       new Date().toISOString(),
+                    unlockedBy:       'paystack_frontend',
+                  });
+                });
+                await fsSet(libRef, { email: userEmailLow, books: Array.from(map.values()) }, { merge: true });
+                await fsUpd(fsDoc(db, 'orders', orderId), {
+                  status:        'Completed',
+                  confirmedAt:   fsSvTs(),
+                  paymentMethod: 'paystack',
+                  activatedBy:   'frontend_verify',
+                  updatedAt:     fsSvTs(),
+                });
+              };
+
+              // Start polling Firestore in background — webhook may already be done
               const pollPromise = pollForCompletion(order.id);
 
               try {
-                // Call verify — the function retries internally for up to ~24 s
-                // on pending M-Pesa transactions before throwing.
+                // Call verify — function retries internally for pending M-Pesa
                 await callVerifyPaystack({
                   reference: response.reference,
                   orderId:   order.id,
                   userEmail: user.email,
                 });
+                // Verify returned success — ALWAYS do the unlock from frontend too
+                // to guarantee the write happens even if the function's write failed
+                try {
+                  const snap = await getDoc(doc(db, 'orders', order.id)); // sync import ok here
+                  const orderData = snap.exists() ? snap.data() : null;
+                  if (!orderData || orderData.status !== 'Completed') {
+                    await doFrontendUnlock(order.id, user.email.toLowerCase(), order.items || []);
+                  }
+                } catch (unlockErr) {
+                  console.warn('[Cart] frontend unlock after verify failed:', unlockErr.message);
+                  // Still proceed — the function may have done it
+                }
                 clearCart();
                 setStep('done');
               } catch (err) {

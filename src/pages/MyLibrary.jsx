@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats } from '../hooks/useReadingProgress';
 import './MyLibrary.css';
@@ -405,38 +405,108 @@ function AccountSettings({ user, myPerms }) {
 }
 
 // ── Pending Order Row — shows retry button for Paystack orders ──────────────
+// NOTE: We do the Firestore unlock directly from the frontend using the
+// client SDK. The Cloud Function (callVerifyPaystack) only checks with
+// Paystack's API to confirm payment — we no longer rely on it to write
+// to Firestore because that write was silently failing (caught + swallowed).
 function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
   const [retrying,   setRetrying]   = useState(false);
   const [retryMsg,   setRetryMsg]   = useState('');
   const [retryDone,  setRetryDone]  = useState(false);
+  const { books: catalog } = useApp();
+
+  const libDocIdFn = (email) => (email || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+  const doFrontendUnlock = async (orderId, userEmailLow, items) => {
+    // Write library entry directly from the client — rules allow write: if true
+    const libRef = doc(db, 'libraries', libDocIdFn(userEmailLow));
+    const snap   = await getDoc(libRef);
+    const existing = snap.exists() ? (snap.data().books || []) : [];
+    const map = new Map(existing.map(b => [b.id, b]));
+    items.forEach(item => {
+      const cat  = catalog.find(b => b.id === item.id) || item;
+      const prev = map.get(item.id) || {};
+      map.set(item.id, {
+        ...prev,
+        id:               item.id,
+        title:            cat.title  || item.title  || prev.title  || '',
+        price:            cat.price  || item.price  || prev.price  || 0,
+        cover:            cat.cover  || item.cover  || prev.cover  || '',
+        coverType:        cat.coverType || prev.coverType || '',
+        author:           cat.author || item.author || prev.author || '',
+        genre:            cat.genre  || item.genre  || prev.genre  || '',
+        downloadUnlocked: true,
+        unlockedAt:       new Date().toISOString(),
+        unlockedBy:       'paystack_frontend',
+      });
+    });
+    await setDoc(libRef, { email: userEmailLow, books: Array.from(map.values()) }, { merge: true });
+
+    // Mark order completed — write directly from client
+    await updateDoc(doc(db, 'orders', orderId), {
+      status:          'Completed',
+      confirmedAt:     serverTimestamp(),
+      paymentMethod:   'paystack',
+      activatedBy:     'frontend_retry',
+      updatedAt:       serverTimestamp(),
+    });
+  };
 
   const retryActivation = async () => {
-    if (!o.paystackRef) return;
     setRetrying(true);
     setRetryMsg('');
     try {
-      // First check if the order completed in Firestore while we were on this page
+      // Step 1: Check if Firestore already shows Completed (webhook may have arrived)
       const snap = await getDoc(doc(db, 'orders', o.id));
-      if (snap.exists() && snap.data().status === 'Completed') {
-        setRetryMsg('✅ Payment confirmed — your books are now unlocked!');
+      const orderData = snap.exists() ? snap.data() : null;
+
+      if (orderData?.status === 'Completed') {
+        // Order is complete but library may not have been updated — ensure unlock
+        await doFrontendUnlock(o.id, userEmail.toLowerCase(), orderData.items || o.items || []);
+        setRetryMsg('✅ Books unlocked! Refreshing…');
         setRetryDone(true);
+        setTimeout(() => window.location.reload(), 1500);
         return;
       }
-      // Call verify function — this will confirm with Paystack and unlock books
-      await callVerifyPaystack({
-        reference: o.paystackRef,
-        orderId:   o.id,
-        userEmail: userEmail,
-      });
-      setRetryMsg('✅ Books unlocked! Refresh the page to read them.');
-      setRetryDone(true);
-    } catch (err) {
-      const msg = err?.message || 'Verification failed';
-      if (msg.includes('Payment status')) {
-        setRetryMsg('Payment not yet confirmed by Paystack. If you completed payment, please contact support.');
-      } else {
-        setRetryMsg('Could not verify — try again in a moment, or contact support.');
+
+      // Step 2: Try calling the verify function to check with Paystack
+      // The function ONLY confirms payment status — we do the Firestore writes here
+      if (o.paystackRef) {
+        let paymentConfirmed = false;
+        try {
+          const result = await callVerifyPaystack({
+            reference: o.paystackRef,
+            orderId:   o.id,
+            userEmail: userEmail,
+          });
+          // If function returns success, Paystack confirmed payment
+          paymentConfirmed = result?.data?.success === true || !!result?.data;
+        } catch (verifyErr) {
+          // Verify function threw — only bail if payment is explicitly not confirmed
+          const msg = verifyErr?.message || '';
+          if (msg.includes('Payment status:') && !msg.includes('pending')) {
+            // Definitive failure (abandoned, reversed, etc.)
+            setRetryMsg('Payment was not completed. If money was deducted, contact support with ref: ' + o.paystackRef);
+            return;
+          }
+          // For network errors or pending status, try the unlock anyway
+          // (if money was taken, the order should be activated)
+        }
+
+        if (paymentConfirmed) {
+          // Payment confirmed — do the unlock directly from frontend
+          await doFrontendUnlock(o.id, userEmail.toLowerCase(), o.items || []);
+          setRetryMsg('✅ Books unlocked! Refreshing…');
+          setRetryDone(true);
+          setTimeout(() => window.location.reload(), 1500);
+          return;
+        }
       }
+
+      setRetryMsg('Payment not yet confirmed by Paystack. If money was deducted, please contact support.');
+    } catch (err) {
+      console.error('[PendingOrderRow] retry error:', err);
+      setRetryMsg('Error: ' + (err?.message || 'Unknown error') + ' — please contact support.');
     } finally {
       setRetrying(false);
     }
@@ -456,12 +526,7 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
             onClick={retryActivation}
             disabled={retrying}
           >
-            {retrying ? '⏳ Checking…' : '🔄 Retry Activation'}
-          </button>
-        )}
-        {retryDone && (
-          <button className="btn btn-sm btn-primary" onClick={() => window.location.reload()}>
-            Refresh Page
+            {retrying ? '⏳ Activating…' : '🔄 Retry Activation'}
           </button>
         )}
         <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please check my payment. Ref: ' + (o.paystackRef||o.ref||'N/A'))}`}
