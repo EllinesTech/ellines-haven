@@ -807,7 +807,7 @@ export default function Cart() {
                   <span>
                     If the book <strong style={{ color:'var(--text)' }}>"Is NOT Activated Automatically"</strong>, visit{' '}
                     <strong style={{ color:'var(--gold)' }}>My Library → Orders</strong> and tap{' '}
-                    <strong style={{ color:'var(--text)' }}>Retry Activation</strong> — your book will unlock instantly once payment is confirmed.
+                    <strong style={{ color:'var(--text)' }}>Retry Activation</strong> — your book will unlock instantly.
                   </span>
                 </div>
 
