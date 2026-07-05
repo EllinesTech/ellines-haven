@@ -5,6 +5,7 @@ import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
+import { GENRES } from '../data/books';
 const PageEditorPanel   = lazy(() => import('./admin-panels/PageEditorPanel'));
 const DesignStudioPanel = lazy(() => import('./admin-panels/DesignStudioPanel'));
 const SecurityPanel     = lazy(() => import('./admin-panels/SecurityPanel'));
@@ -34,12 +35,15 @@ import './Admin.css';
 const EMPTY_BOOK = {
   id: '', title: '', author: 'Elijah Mwangi M', cover: null, coverType: 'styled',
   coverColor: 'linear-gradient(145deg,#0f0f22,#1a1a3a)', coverAccent: '#c9a84c',
-  genre: 'Drama', type: 'novel', price: 250, pages: 0, rating: 5.0, reviews: 0,
+  genre: 'Drama', genres: [], type: 'novel', price: 250, pages: 0, rating: 5.0, reviews: 0,
   inspired: true, inspiredNote: '', excerpt: '', description: '',
   featured: false, isNew: true,
   status: 'complete',
-  chaptersReleased: 0,  // for ongoing: how many chapters are out now
-  totalChapters: 0,     // for ongoing: total planned chapters (0 = unknown)
+  chaptersReleased: 0,
+  totalChapters: 0,
+  chapterCount: 0,
+  setting: '', audienceRating: '',
+  themes: [], ratingQuote: '', authorNote: '', tableOfContents: [],
   date: new Date().toISOString().slice(0, 10), readTime: '5 hrs',
   driveUrl: '', chapters: [],
 };
@@ -53,8 +57,6 @@ const BOOK_STATUSES = [
   { value:'limited',      label:'⏳ Limited Edition', color:'#e74c3c', bg:'rgba(231,76,60,0.12)',   desc:'Available for a limited time only'         },
   { value:'draft',        label:'📝 Draft',           color:'#64748b', bg:'rgba(100,116,139,0.12)', desc:'Work in progress — not shown publicly'     },
 ];
-
-const GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
 
 // buildUserList — pulls from Firestore-synced localStorage + registered users
 // BASE_ACCOUNTS removed — no hardcoded test users
@@ -510,11 +512,57 @@ function BookForm({ initial, onSave, onCancel }) {
               <input className="field" value={form.author} onChange={e=>set('author',e.target.value)}/>
             </div>
 
-            <div className="adm-field-group">
-              <label>Genre</label>
-              <select className="field" value={form.genre} onChange={e=>set('genre',e.target.value)}>
-                {GENRES.map(g=><option key={g}>{g}</option>)}
-              </select>
+            <div className="adm-field-group adm-col-2">
+              <label>Genres <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(select all that apply — first selected becomes primary)</span></label>
+              <div className="adm-genre-grid">
+                {GENRES.map(g => {
+                  const selected = (form.genres || []).includes(g) || form.genre === g;
+                  const isPrimary = form.genre === g;
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      className={'adm-genre-chip' + (selected ? ' adm-genre-chip--on' : '') + (isPrimary ? ' adm-genre-chip--primary' : '')}
+                      onClick={() => {
+                        const current = Array.from(new Set([
+                          ...(form.genre ? [form.genre] : []),
+                          ...(form.genres || []),
+                        ]));
+                        let next;
+                        if (current.includes(g)) {
+                          next = current.filter(x => x !== g);
+                        } else {
+                          next = [...current, g];
+                        }
+                        // First in list is primary genre
+                        setForm(f => ({
+                          ...f,
+                          genre: next[0] || 'Drama',
+                          genres: next.slice(1),
+                        }));
+                      }}
+                    >
+                      {selected && <span className="adm-genre-chip-check">{isPrimary ? '★' : '✓'}</span>}
+                      {g}
+                    </button>
+                  );
+                })}
+              </div>
+              {(form.genres?.length > 0 || form.genre) && (
+                <div style={{ marginTop: 10, fontSize: '0.76rem', color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ color: 'var(--gold)', fontWeight: 600 }}>★ Primary:</span>
+                  <span style={{ color: 'var(--text)' }}>{form.genre}</span>
+                  {(form.genres || []).length > 0 && (
+                    <>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span style={{ color: 'var(--gold)', fontWeight: 600 }}>Also:</span>
+                      {(form.genres || []).map(g => (
+                        <span key={g} style={{ color: 'var(--muted)' }}>{g}</span>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="adm-field-group">
@@ -615,6 +663,58 @@ function BookForm({ initial, onSave, onCancel }) {
             <div className="adm-field-group adm-col-2">
               <label>True Story Note</label>
               <input className="field" value={form.inspiredNote} onChange={e=>set('inspiredNote',e.target.value)} placeholder="What real story inspired this?"/>
+            </div>
+
+            {/* ── Rich Metadata ── */}
+            <div className="adm-field-group adm-col-2" style={{borderTop:'1px solid var(--dim)',paddingTop:18,marginTop:4}}>
+              <label style={{color:'var(--gold)',fontWeight:700,fontSize:'0.82rem',textTransform:'uppercase',letterSpacing:1}}>Book Details &amp; Metadata</label>
+            </div>
+
+            <div className="adm-field-group">
+              <label>Setting / Location</label>
+              <input className="field" value={form.setting||''} onChange={e=>set('setting',e.target.value)} placeholder="e.g. Karen (Nairobi), Nyeri, Kenya"/>
+            </div>
+            <div className="adm-field-group">
+              <label>Audience Rating</label>
+              <select className="field" value={form.audienceRating||''} onChange={e=>set('audienceRating',e.target.value)}>
+                <option value="">— Select —</option>
+                <option value="13+">13+</option>
+                <option value="14+">14+</option>
+                <option value="16+">16+</option>
+                <option value="18+">18+</option>
+              </select>
+            </div>
+            <div className="adm-field-group">
+              <label>Chapter Count</label>
+              <input className="field" type="number" min={0} value={form.chapterCount||0} onChange={e=>set('chapterCount',Number(e.target.value))} placeholder="e.g. 28"/>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Themes <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(comma-separated)</span></label>
+              <input className="field"
+                value={Array.isArray(form.themes) ? form.themes.join(', ') : (form.themes||'')}
+                onChange={e=>set('themes', e.target.value.split(',').map(t=>t.trim()).filter(Boolean))}
+                placeholder="e.g. Love, Betrayal, Family, Redemption"/>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Reader Rating Quote</label>
+              <input className="field" value={form.ratingQuote||''} onChange={e=>set('ratingQuote',e.target.value)} placeholder='"A deeply emotional story about love, loss…"'/>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Author's Note</label>
+              <textarea className="field" rows={4} value={form.authorNote||''} onChange={e=>set('authorNote',e.target.value)} placeholder="Personal reflection from the author about this book..." style={{resize:'vertical'}}/>
+            </div>
+
+            <div className="adm-field-group adm-col-2">
+              <label>Table of Contents <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(one entry per line)</span></label>
+              <textarea className="field" rows={6}
+                value={Array.isArray(form.tableOfContents) ? form.tableOfContents.join('\n') : (form.tableOfContents||'')}
+                onChange={e=>set('tableOfContents', e.target.value.split('\n').map(l=>l.trim()).filter(Boolean))}
+                placeholder={'Chapter 1 — The First Meeting\nChapter 2 — Something Like Love\n...'}
+                style={{resize:'vertical',fontFamily:'monospace',fontSize:'0.82rem'}}/>
+              <small style={{color:'var(--muted)',fontSize:'0.72rem'}}>Each line becomes one entry. You can write it as "Chapter 1 — Title" or just the chapter name.</small>
             </div>
 
             <div className="adm-field-group adm-col-2">

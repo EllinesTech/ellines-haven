@@ -786,6 +786,50 @@
   bottom: 0;
 }
 
+/* ── Multi-genre picker ── */
+.adm-genre-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 4px;
+}
+.adm-genre-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--dim);
+  border-radius: 20px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.adm-genre-chip:hover {
+  border-color: rgba(201,168,76,0.4);
+  color: var(--text);
+  background: rgba(201,168,76,0.05);
+}
+.adm-genre-chip--on {
+  background: rgba(201,168,76,0.1);
+  border-color: rgba(201,168,76,0.45);
+  color: var(--gold);
+  font-weight: 600;
+}
+.adm-genre-chip--primary {
+  background: rgba(201,168,76,0.18);
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 700;
+}
+.adm-genre-chip-check {
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
 /* ── Confirm modal ── */
 .adm-confirm {
   padding: 32px;
