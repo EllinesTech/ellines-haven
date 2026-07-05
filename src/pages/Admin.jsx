@@ -513,54 +513,37 @@ function BookForm({ initial, onSave, onCancel }) {
             </div>
 
             <div className="adm-field-group adm-col-2">
-              <label>Genres <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(select all that apply — first selected becomes primary)</span></label>
+              <div className="adm-section-heading">🎭 Genres <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem',letterSpacing:0,textTransform:'none',marginLeft:8}}>Select presets or add custom — ★ first = primary</span></div>
               <div className="adm-genre-grid">
-                {GENRES.map(g => {
-                  const selected = (form.genres || []).includes(g) || form.genre === g;
+                {[...GENRES,...(Array.isArray(form._customGenres)?form._customGenres:[])].map(g => {
+                  const allSel = Array.from(new Set([...(form.genre?[form.genre]:[]),...(form.genres||[])]));
+                  const selected = allSel.includes(g);
                   const isPrimary = form.genre === g;
+                  const isCustom = !GENRES.includes(g);
                   return (
-                    <button
-                      key={g}
-                      type="button"
-                      className={'adm-genre-chip' + (selected ? ' adm-genre-chip--on' : '') + (isPrimary ? ' adm-genre-chip--primary' : '')}
-                      onClick={() => {
-                        const current = Array.from(new Set([
-                          ...(form.genre ? [form.genre] : []),
-                          ...(form.genres || []),
-                        ]));
-                        let next;
-                        if (current.includes(g)) {
-                          next = current.filter(x => x !== g);
-                        } else {
-                          next = [...current, g];
-                        }
-                        // First in list is primary genre
-                        setForm(f => ({
-                          ...f,
-                          genre: next[0] || 'Drama',
-                          genres: next.slice(1),
-                        }));
-                      }}
-                    >
-                      {selected && <span className="adm-genre-chip-check">{isPrimary ? '★' : '✓'}</span>}
+                    <button key={g} type="button"
+                      className={'adm-genre-chip'+(selected?' adm-genre-chip--on':'')+(isPrimary?' adm-genre-chip--primary':'')+(isCustom?' adm-genre-chip--custom':'')}
+                      onClick={()=>{
+                        const cur=Array.from(new Set([...(form.genre?[form.genre]:[]),...(form.genres||[])]));
+                        const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g];
+                        setForm(f=>({...f,genre:next[0]||'Drama',genres:next.slice(1)}));
+                      }}>
+                      {selected&&<span className="adm-genre-chip-check">{isPrimary?'★':'✓'}</span>}
                       {g}
+                      {isCustom&&!selected&&<span style={{marginLeft:3,opacity:0.5,fontSize:'0.65rem'}} onClick={e=>{e.stopPropagation();setForm(f=>({...f,_customGenres:(f._customGenres||[]).filter(x=>x!==g)}));}}>×</span>}
                     </button>
                   );
                 })}
               </div>
-              {(form.genres?.length > 0 || form.genre) && (
-                <div style={{ marginTop: 10, fontSize: '0.76rem', color: 'var(--muted)', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                  <span style={{ color: 'var(--gold)', fontWeight: 600 }}>★ Primary:</span>
-                  <span style={{ color: 'var(--text)' }}>{form.genre}</span>
-                  {(form.genres || []).length > 0 && (
-                    <>
-                      <span style={{ opacity: 0.4 }}>·</span>
-                      <span style={{ color: 'var(--gold)', fontWeight: 600 }}>Also:</span>
-                      {(form.genres || []).map(g => (
-                        <span key={g} style={{ color: 'var(--muted)' }}>{g}</span>
-                      ))}
-                    </>
-                  )}
+              <div className="adm-tag-add-row" style={{marginTop:10}}>
+                <input id="adm-cg-inp" className="field" style={{flex:1,fontSize:'0.82rem'}} placeholder="Add custom genre… press Enter"
+                  onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.trim();if(!v)return;if(![...GENRES,...(form._customGenres||[])].includes(v))setForm(f=>({...f,_customGenres:[...(f._customGenres||[]),v]}));e.target.value='';}}}/>
+                <button type="button" className="adm-tag-add-btn" onClick={()=>{const inp=document.getElementById('adm-cg-inp');const v=inp.value.trim();if(!v)return;if(![...GENRES,...(form._customGenres||[])].includes(v))setForm(f=>({...f,_customGenres:[...(f._customGenres||[]),v]}));inp.value='';}}>+ Add</button>
+              </div>
+              {(form.genre||(form.genres||[]).length>0)&&(
+                <div className="adm-genre-summary">
+                  <span className="adm-gs-label">★</span><span className="adm-gs-primary">{form.genre}</span>
+                  {(form.genres||[]).length>0&&<><span className="adm-gs-sep">·</span>{(form.genres||[]).map(g=><span key={g} className="adm-gs-tag">{g}</span>)}</>}
                 </div>
               )}
             </div>
@@ -667,7 +650,8 @@ function BookForm({ initial, onSave, onCancel }) {
 
             {/* ── Rich Metadata ── */}
             <div className="adm-field-group adm-col-2" style={{borderTop:'1px solid var(--dim)',paddingTop:18,marginTop:4}}>
-              <label style={{color:'var(--gold)',fontWeight:700,fontSize:'0.82rem',textTransform:'uppercase',letterSpacing:1}}>Book Details &amp; Metadata</label>
+              <div className="adm-section-heading">📋 Book Details &amp; Metadata</div>
+              <p style={{fontSize:'0.76rem',color:'var(--muted)',margin:'4px 0 0'}}>Professional publishing info shown on the public book detail page.</p>
             </div>
 
             <div className="adm-field-group">
@@ -685,36 +669,85 @@ function BookForm({ initial, onSave, onCancel }) {
               </select>
             </div>
             <div className="adm-field-group">
-              <label>Chapter Count</label>
+              <label>Chapter / Story Count</label>
               <input className="field" type="number" min={0} value={form.chapterCount||0} onChange={e=>set('chapterCount',Number(e.target.value))} placeholder="e.g. 28"/>
             </div>
 
+            {/* ── Reader Rating Display ── */}
             <div className="adm-field-group adm-col-2">
-              <label>Themes <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(comma-separated)</span></label>
-              <input className="field"
-                value={Array.isArray(form.themes) ? form.themes.join(', ') : (form.themes||'')}
-                onChange={e=>set('themes', e.target.value.split(',').map(t=>t.trim()).filter(Boolean))}
-                placeholder="e.g. Love, Betrayal, Family, Redemption"/>
+              <label>Reader Rating Display <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— shown as ⭐⭐⭐⭐⭐ 4.8/5 on book detail</span></label>
+              <div className="adm-rating-preview">
+                <div className="adm-rating-stars">
+                  {[1,2,3,4,5].map(n=>(
+                    <span key={n} style={{fontSize:'1.5rem',color:n<=Math.round(Number(form.rating)||0)?'#f5c518':'var(--dim)',cursor:'pointer'}}
+                      onClick={()=>set('rating',n)}>★</span>
+                  ))}
+                  <span className="adm-rating-num">{Number(form.rating||0).toFixed(1)}/5</span>
+                </div>
+                {form.ratingQuote&&<blockquote className="adm-rating-quote-preview">{form.ratingQuote}</blockquote>}
+              </div>
+              <input className="field" style={{marginTop:10}} value={form.ratingQuote||''} onChange={e=>set('ratingQuote',e.target.value)}
+                placeholder='"A deeply emotional story about love, loss, and the hidden battles inside modern marriage."'/>
+              <small style={{color:'var(--muted)',fontSize:'0.7rem'}}>This quote appears directly below the star rating on the public book page</small>
             </div>
 
+            {/* ── Themes Tag Builder ── */}
             <div className="adm-field-group adm-col-2">
-              <label>Reader Rating Quote</label>
-              <input className="field" value={form.ratingQuote||''} onChange={e=>set('ratingQuote',e.target.value)} placeholder='"A deeply emotional story about love, loss…"'/>
+              <div className="adm-section-heading">🏷️ Themes <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem',letterSpacing:0,textTransform:'none',marginLeft:8}}>Click presets or type custom</span></div>
+              <div className="adm-theme-presets">
+                {['Love','Marriage','Betrayal','Trust','Family','Financial Abuse','Infidelity','Redemption','Parenthood','Emotional Survival',
+                  'Grief','Loss','Healing','Identity','Resilience','Trauma','Loneliness','Survival','Ambition','Power',
+                  'Justice','Loyalty','Deception','Courage','Hope','Sacrifice','Community','The Past','Closure','Memory',
+                  'Forgiveness','Legacy','Land','Second Chances','Vulnerability','Distance','Longing','Coming of Age',
+                  'Mythology','Prophecy','Class','Dreams','Friendship','War','Freedom','Race','Politics'].map(t=>{
+                  const active=(form.themes||[]).includes(t);
+                  return(
+                    <button key={t} type="button" className={'adm-theme-chip'+(active?' adm-theme-chip--on':'')}
+                      onClick={()=>{const c=form.themes||[];set('themes',active?c.filter(x=>x!==t):[...c,t]);}}>
+                      {active&&'✓ '}{t}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="adm-tag-add-row" style={{marginTop:10}}>
+                <input id="adm-ct-inp" className="field" style={{flex:1,fontSize:'0.82rem'}} placeholder="Type custom theme… press Enter or comma"
+                  onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.trim();if(!v||(form.themes||[]).includes(v))return;set('themes',[...(form.themes||[]),v]);e.target.value='';}}}/>
+                <button type="button" className="adm-tag-add-btn" onClick={()=>{const i=document.getElementById('adm-ct-inp');const v=i.value.trim();if(!v||(form.themes||[]).includes(v))return;set('themes',[...(form.themes||[]),v]);i.value='';}}>+ Add</button>
+              </div>
+              {(form.themes||[]).length>0&&(
+                <div className="adm-selected-tags">
+                  <span style={{fontSize:'0.7rem',color:'var(--muted)'}}>Selected ({(form.themes||[]).length}):</span>
+                  {(form.themes||[]).map(t=>(
+                    <span key={t} className="adm-selected-tag">{t}<button type="button" onClick={()=>set('themes',(form.themes||[]).filter(x=>x!==t))}>×</button></span>
+                  ))}
+                  <button type="button" className="adm-clear-tags" onClick={()=>set('themes',[])}>Clear all</button>
+                </div>
+              )}
             </div>
 
+            {/* ── Author's Note ── */}
             <div className="adm-field-group adm-col-2">
               <label>Author's Note</label>
-              <textarea className="field" rows={4} value={form.authorNote||''} onChange={e=>set('authorNote',e.target.value)} placeholder="Personal reflection from the author about this book..." style={{resize:'vertical'}}/>
+              <textarea className="field" rows={4} value={form.authorNote||''} onChange={e=>set('authorNote',e.target.value)}
+                placeholder="A personal message from the author about this book's inspiration or writing process…"
+                style={{resize:'vertical'}}/>
+              <small style={{color:'var(--muted)',fontSize:'0.7rem'}}>Shown in a dedicated "Author's Note" section on the public book detail page</small>
             </div>
 
+            {/* ── Table of Contents ── */}
             <div className="adm-field-group adm-col-2">
-              <label>Table of Contents <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(one entry per line)</span></label>
-              <textarea className="field" rows={6}
-                value={Array.isArray(form.tableOfContents) ? form.tableOfContents.join('\n') : (form.tableOfContents||'')}
-                onChange={e=>set('tableOfContents', e.target.value.split('\n').map(l=>l.trim()).filter(Boolean))}
-                placeholder={'Chapter 1 — The First Meeting\nChapter 2 — Something Like Love\n...'}
-                style={{resize:'vertical',fontFamily:'monospace',fontSize:'0.82rem'}}/>
-              <small style={{color:'var(--muted)',fontSize:'0.72rem'}}>Each line becomes one entry. You can write it as "Chapter 1 — Title" or just the chapter name.</small>
+              <label>Table of Contents <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(one chapter per line)</span></label>
+              <textarea className="field" rows={8}
+                value={Array.isArray(form.tableOfContents)?form.tableOfContents.join('\n'):(form.tableOfContents||'')}
+                onChange={e=>set('tableOfContents',e.target.value.split('\n').map(l=>l.trim()).filter(Boolean))}
+                placeholder={'Chapter 1 — The First Meeting\nChapter 2 — Something Like Love\nChapter 3 — The Promise'}
+                style={{resize:'vertical',fontFamily:'monospace',fontSize:'0.82rem',lineHeight:1.7}}/>
+              <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
+                <small style={{color:'var(--muted)',fontSize:'0.7rem'}}>Each line = one entry in the published TOC</small>
+                {Array.isArray(form.tableOfContents)&&form.tableOfContents.length>0&&(
+                  <small style={{color:'var(--gold)',fontSize:'0.7rem'}}>{form.tableOfContents.length} entries</small>
+                )}
+              </div>
             </div>
 
             <div className="adm-field-group adm-col-2">
