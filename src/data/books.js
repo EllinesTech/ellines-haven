@@ -1,4 +1,15 @@
-export const GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
+export const GENRES = [
+  // Primary categories
+  'Romance', 'Mystery', 'Fantasy', 'Sci-Fi', 'Historical', 'Short Stories', 'Drama', 'Adventure',
+  // Sub-genres used across the catalogue
+  'Contemporary Fiction', 'Relationship Drama', 'Literary Fiction', 'African Fiction',
+  'Emotional Drama', 'Psychological Fiction', 'Urban Fiction',
+  'Historical Fiction', 'African Literature', 'Family Saga',
+  'Short Story Collection', 'East African Fiction',
+  'Thriller', 'African Crime Fiction',
+  'Epic Fantasy', 'East African Mythology',
+  'Epistolary Fiction',
+];
 
 // All novels and books written by Elijah Mwangi M
 // Every story is inspired by true events, real life experiences, and the people he has met on his journey.

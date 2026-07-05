@@ -52,9 +52,20 @@ const SORT_OPTIONS = [
 ];
 
 const GENRE_ICONS = {
+  // Primary
   Romance: '💕', Mystery: '🔍', Fantasy: '🌙', 'Sci-Fi': '🚀',
   Historical: '📜', 'Short Stories': '✍️', Drama: '🎭', Adventure: '⚔️',
+  // Sub-genres
+  'Contemporary Fiction': '🏙️', 'Relationship Drama': '💔', 'Literary Fiction': '📖', 'African Fiction': '🌍',
+  'Emotional Drama': '🫀', 'Psychological Fiction': '🧠', 'Urban Fiction': '🌆',
+  'Historical Fiction': '🏛️', 'African Literature': '✊', 'Family Saga': '👨‍👩‍👧‍👦',
+  'Short Story Collection': '📝', 'East African Fiction': '🦁',
+  'Thriller': '⚡', 'African Crime Fiction': '🕵️',
+  'Epic Fantasy': '🐉', 'East African Mythology': '⚡',
+  'Epistolary Fiction': '✉️',
 };
+
+const PRIMARY_GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
 
 export default function Library() {
   const { books: allBooks, myPerms } = useApp();
@@ -98,12 +109,20 @@ export default function Library() {
 
   const books = useMemo(() => {
     let r = allBooks.filter(b => b.active !== false);
-    if (search) r = r.filter(b =>
-      b.title.toLowerCase().includes(search.toLowerCase()) ||
-      b.genre.toLowerCase().includes(search.toLowerCase()) ||
-      (b.author || '').toLowerCase().includes(search.toLowerCase())
+    if (search) {
+      const q = search.toLowerCase();
+      r = r.filter(b =>
+        b.title.toLowerCase().includes(q) ||
+        b.genre.toLowerCase().includes(q) ||
+        (b.genres || []).some(g => g.toLowerCase().includes(q)) ||
+        (b.author || '').toLowerCase().includes(q) ||
+        (b.themes || []).some(t => t.toLowerCase().includes(q))
+      );
+    }
+    if (genre) r = r.filter(b =>
+      b.genre === genre ||
+      (b.genres || []).includes(genre)
     );
-    if (genre)  r = r.filter(b => b.genre === genre);
     if (type)   r = r.filter(b => b.type  === type);
     if (status) r = r.filter(b => (b.status || 'complete') === status);
     if (sort === 'newest')     r.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -190,7 +209,7 @@ export default function Library() {
           {GENRES.map(g => (
             <button
               key={g}
-              className={`lib-genre-chip${genre === g ? ' lib-genre-chip--on' : ''}`}
+              className={`lib-genre-chip${genre === g ? ' lib-genre-chip--on' : ''}${!PRIMARY_GENRES.includes(g) ? ' lib-genre-chip--sub' : ''}`}
               onClick={() => setGenre(g)}
             >
               <span>{GENRE_ICONS[g] || '📚'}</span> {g}

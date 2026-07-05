@@ -181,6 +181,16 @@ export default function BookCard({ book }) {
       </div>
       <div className="bcard__body">
         <span className="bcard__genre">{book.genre}</span>
+        {book.genres && book.genres.length > 0 && (
+          <div className="bcard__genre-tags">
+            {book.genres.slice(0, 2).map(g => (
+              <span key={g} className="bcard__genre-tag">{g}</span>
+            ))}
+            {book.genres.length > 2 && (
+              <span className="bcard__genre-tag bcard__genre-tag--more">+{book.genres.length - 2}</span>
+            )}
+          </div>
+        )}
         <h3 className="bcard__title"><Link to={`/book/${book.id}`}>{book.title}</Link></h3>
         <p className="bcard__author">by {book.author}</p>
         <p className="bcard__excerpt">{book.excerpt}</p>

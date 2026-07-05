@@ -195,3 +195,39 @@
 .bcard:hover .bcard__wishlist-btn .wl-btn:not(.wl-btn--active) {
   opacity: 1;
 }
+
+/* ── Multiple genre tags on card ── */
+.bcard__genre-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+.bcard__genre-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(201,168,76,0.07);
+  border: 1px solid rgba(201,168,76,0.18);
+  border-radius: 20px;
+  color: rgba(200,196,215,0.7);
+  font-size: 0.65rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.bcard__genre-tag--more {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--dim);
+  color: var(--muted);
+}
+
+/* ── Sub-genre chip style in library bar ── */
+.lib-genre-chip--sub {
+  font-size: 0.73rem;
+  opacity: 0.8;
+  border-style: dashed;
+}
+.lib-genre-chip--sub:hover,
+.lib-genre-chip--sub.lib-genre-chip--on {
+  opacity: 1;
+}
