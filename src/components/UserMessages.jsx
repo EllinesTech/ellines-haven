@@ -96,14 +96,22 @@ export default function UserMessages({ user }) {
   // ── Thread listener ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!activeConvo) { setThread([]); return; }
-    const q = query(
+    // No orderBy — sort client-side to avoid index requirements
+    const unsub = onSnapshot(
       collection(db, 'contact_messages', activeConvo, 'messages'),
-      orderBy('createdAt', 'asc')
+      snap => {
+        const msgs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+            const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+            return ta - tb;
+          });
+        setThread(msgs);
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+      },
+      err => console.error('Thread load error:', err.message)
     );
-    const unsub = onSnapshot(q, snap => {
-      setThread(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
-    }, err => console.error('Thread load error:', err.message));
     return () => unsub();
   }, [activeConvo]);
 

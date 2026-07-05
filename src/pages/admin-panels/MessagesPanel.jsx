@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, writeBatch,
-         serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
+         serverTimestamp, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -233,21 +233,28 @@ export default function MessagesPanel({ showToast, users = [] }) {
   // ── Thread listener ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!selected?.threadId) { setThread([]); return; }
-    const q = query(
-      collection(db, 'contact_messages', selected.threadId, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    // No orderBy — sort client-side to avoid subcollection index requirement
     let first = true;
-    const unsub = onSnapshot(q, snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (!first) {
-        const last = msgs[msgs.length - 1];
-        if (last?.sender === 'user') playAdminNotifSound();
-      }
-      first = false;
-      setThread(msgs);
-      setTimeout(() => threadRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    }, () => {});
+    const unsub = onSnapshot(
+      collection(db, 'contact_messages', selected.threadId, 'messages'),
+      snap => {
+        const msgs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+            const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+            return ta - tb;
+          });
+        if (!first) {
+          const last = msgs[msgs.length - 1];
+          if (last?.sender === 'user') playAdminNotifSound();
+        }
+        first = false;
+        setThread(msgs);
+        setTimeout(() => threadRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      },
+      err => console.error('[MessagesPanel] thread error:', err.message)
+    );
     return () => unsub();
   }, [selected?.threadId]);
 

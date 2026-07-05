@@ -805,7 +805,7 @@ export default function Cart() {
                 <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 13px', background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.18)', borderRadius:'var(--r-sm)', marginBottom:12, fontSize:'0.79rem', color:'var(--muted)', lineHeight:1.6 }}>
                   <span style={{ fontSize:'1rem', flexShrink:0, marginTop:1 }}>💡</span>
                   <span>
-                    If M-Pesa shows <strong style={{ color:'var(--text)' }}>"Unable to process"</strong>, try a different payment method or visit{' '}
+                    If the book <strong style={{ color:'var(--text)' }}>"Is Activated Automatically"</strong>, visit{' '}
                     <strong style={{ color:'var(--gold)' }}>My Library → Orders</strong> and tap{' '}
                     <strong style={{ color:'var(--text)' }}>Retry Activation</strong> — your book will unlock instantly once payment is confirmed.
                   </span>
