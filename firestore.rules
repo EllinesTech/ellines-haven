@@ -1,53 +1,67 @@
-﻿rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper functions ─────────────────────────────────────────────────────
-    // NOTE: Ellines Haven uses custom auth (localStorage) not Firebase Auth,
-    // so server-side auth-based rules are not applicable for most collections.
-    // We use IP/rate limiting in Cloud Functions instead.
-    // These rules enforce basic structural security while keeping the app functional.
+    // ── NOTE ─────────────────────────────────────────────────────────────────
+    // Ellines Haven uses custom auth (localStorage tokens), NOT Firebase Auth.
+    // Full server-side auth rules require migrating to Firebase Auth.
+    // Current approach: open reads, controlled writes — prevents the worst
+    // abuse (bulk deletes, arbitrary library unlocks) without breaking the app.
+    // TODO: migrate to Firebase Auth for row-level security.
 
-    // ── Public read-only content ─────────────────────────────────────────────
-    // Books catalogue, covers, and site settings: anyone can read, only server can write
+    // ── Public catalogue — anyone reads, client writes (admin panel) ──────────
     match /site_data/{doc} {
-      allow read:  if true;
-      allow write: if true; // Admin panel writes via client — tighten with Firebase Auth when ready
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;   // no client-side deletes on site config
     }
     match /book_chapters/{doc} {
-      allow read:  if true;
-      allow write: if true;
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
     }
     match /settings/{doc} {
-      allow read:  if true;
-      allow write: if true;
+      allow read:   if true;
+      allow write:  if true;
     }
 
-    // ── User libraries — users can read their own, Cloud Functions write after payment ──
+    // ── User libraries ────────────────────────────────────────────────────────
+    // Allow read + create + update (for unlock and progress).
+    // Deny delete — books can only be removed by Cloud Functions / admin.
     match /libraries/{docId} {
-      allow read:  if true;
-      allow write: if true;
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
     }
 
-    // ── Orders — users create, Cloud Functions update ────────────────────────
+    // ── Orders ────────────────────────────────────────────────────────────────
+    // Users create orders, Cloud Functions update status.
+    // No client-side deletes.
     match /orders/{orderId} {
-      allow read:  if true;
-      allow create: if true;   // frontend creates order before payment
-      allow update: if true;   // Cloud Functions update status after payment
-      allow delete: if false;  // orders are never deleted by the client
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
     }
 
-    // ── Soft-delete buckets ──────────────────────────────────────────────────
-    match /archives/{d} { allow read, write: if true; }
-    match /trash/{d}    { allow read, write: if true; }
+    // ── Users / profiles ──────────────────────────────────────────────────────
+    match /users/{docId} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+    match /user_profiles/{d} {
+      allow read:   if true;
+      allow write:  if true;
+    }
 
-    // ── User profiles ────────────────────────────────────────────────────────
-    match /user_profiles/{d} { allow read, write: if true; }
-    match /users/{d}         { allow read, write: if true; }
-
-    // ── Reviews — anyone can read, authenticated users submit ───────────────
+    // ── Reviews ───────────────────────────────────────────────────────────────
     match /reviews/{bookId} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if true;
       match /entries/{entryId} {
         allow read:  if true;
@@ -55,54 +69,82 @@ service cloud.firestore {
       }
     }
 
-    // ── Newsletter signups ───────────────────────────────────────────────────
-    match /newsletter_signups/{d} { allow read, write: if true; }
+    // ── Notifications (user-facing) ───────────────────────────────────────────
+    match /user_notifications/{d} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;   // mark as read
+      allow delete: if false;
+    }
+    match /notifications/{d} {
+      allow read:  if true;
+      allow write: if true;
+    }
 
-    // ── Newsletter campaigns (sent by admin) ────────────────────────────────
-    match /newsletter_campaigns/{d} { allow read, write: if true; }
+    // ── Admin collections ─────────────────────────────────────────────────────
+    match /admin_notifications/{d} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+    match /admin_logs/{d}       { allow read, write: if true; }
+    match /admin_preferences/{d}{ allow read, write: if true; }
+    match /activity_logs/{d}    { allow read, write: if true; }
 
-    // ── Notifications ────────────────────────────────────────────────────────
-    match /notifications/{d}      { allow read, write: if true; }
-    match /user_notifications/{d} { allow read, write: if true; }
-
-    // ── Admin-only collections — write open for now, restrict when Firebase Auth is added ──
-    match /admin_logs/{d}          { allow read, write: if true; }
-    match /admin_notifications/{d} { allow read, write: if true; }
-    match /admin_preferences/{d}   { allow read, write: if true; }
-    match /activity_logs/{d}       { allow read, write: if true; }
-
-    // ── Visitor tracking — written by Cloud Function server-side ─────────────
-    match /site_visitors/{d} { allow read: if true; allow write: if true; }
-
-    // ── Contact messages (support + notifications) ───────────────────────────
+    // ── Contact / messaging ───────────────────────────────────────────────────
     match /contact_messages/{docId} {
       allow read, write: if true;
       match /messages/{msgId} { allow read, write: if true; }
     }
 
-        // ── SMS campaigns (admin broadcast history) ────────────────────────────
-    match /sms_campaigns/{d} { allow read, write: if true; }
+    // ── Newsletter ────────────────────────────────────────────────────────────
+    match /newsletter_signups/{d}   { allow read, write: if true; }
+    match /newsletter_campaigns/{d} { allow read, write: if true; }
 
-    // ── Dev OTPs (temporary, password reset) ─────────────────────────────────
+    // ── Visitor tracking (written by Cloud Function) ──────────────────────────
+    match /site_visitors/{d} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── SMS campaigns ─────────────────────────────────────────────────────────
+    match /sms_campaigns/{d} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── Dev OTPs (temp, auto-expiring) ────────────────────────────────────────
     match /dev_otps/{d} { allow read, write: if true; }
 
-    // ── Reading progress — per-user subcollection ─────────────────────────────
-    match /reading_progress/{userDocId}/books/{bookId} {
-      allow read, write: if true;
-    }
+    // ── Reading progress (per-user) ───────────────────────────────────────────
     match /reading_progress/{userDocId} {
       allow read, write: if true;
+      match /books/{bookId} {
+        allow read, write: if true;
+      }
     }
 
-    // ── Catch-all: deny anything not explicitly covered ──────────────────────
-    // This prevents accidental exposure of any new collection added without a rule.
+    // ── Soft-delete buckets ───────────────────────────────────────────────────
+    match /archives/{d} { allow read, write: if true; }
+    match /trash/{d}    { allow read, write: if true; }
+
+    // ── Promo codes ───────────────────────────────────────────────────────────
+    match /promos/{d} { allow read, write: if true; }
+
+    // ── Catch-all: READ yes, WRITE no for anything not explicitly covered ─────
+    // This prevents accidental write exposure on new collections.
     match /{collection}/{document} {
       allow read:  if true;
-      allow write: if true;
+      allow write: if false;
     }
     match /{collection}/{document}/{sub}/{subDoc} {
       allow read:  if true;
-      allow write: if true;
+      allow write: if false;
     }
   }
 }

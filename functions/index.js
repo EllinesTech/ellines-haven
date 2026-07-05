@@ -71,6 +71,80 @@ function formatPhone(phone) {
   return digits;
 }
 
+// ── Order Confirmation Email ───────────────────────────────────────────────────
+// Sends a receipt to the buyer after successful payment.
+// Uses Africa's Talking Email API (if AT_API_KEY set) or falls back to AT SMS.
+// secretValues = { atApiKey, atUsername, atSenderId }
+async function sendOrderConfirmationToUser(order, secretValues) {
+  const { atApiKey, atUsername, atSenderId } = secretValues;
+  if (!atApiKey || !atUsername || !order.userEmail) return;
+
+  const itemList  = (order.items || []).map(i => `• ${i.title} — KSh ${i.price}`).join("\n");
+  const promoLine = order.promoCode ? `\nPromo: ${order.promoCode} (−KSh ${order.discountAmount || 0})` : "";
+  const total     = `KSh ${Number(order.total || 0).toLocaleString()}`;
+  const buyerName = order.userName || "Valued Reader";
+
+  // ── SMS confirmation (always works with sandbox) ──────────────────────────
+  const phone = order.phone ? String(order.phone).replace(/\D/g, "") : "";
+  if (phone) {
+    let formattedPhone = phone;
+    if (phone.startsWith("0"))        formattedPhone = "+254" + phone.slice(1);
+    else if (phone.startsWith("254")) formattedPhone = "+"   + phone;
+    else if (!phone.startsWith("+"))  formattedPhone = "+254" + phone;
+
+    const smsText =
+      `Ellines Haven: Payment confirmed! ${total} received.` +
+      ` Your book${(order.items||[]).length !== 1 ? "s are" : " is"} ready in My Library.` +
+      ` Order: ${order.id}. Thank you!`;
+
+    try {
+      const isSandbox = atUsername === "sandbox";
+      const params    = new URLSearchParams({ username: atUsername, to: formattedPhone, message: smsText });
+      if (!isSandbox && atSenderId) params.append("from", atSenderId);
+      await axios.post(
+        "https://api.africastalking.com/version1/messaging",
+        params.toString(),
+        { headers: { apiKey: atApiKey, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+      console.log("[orderConfirm] SMS sent to:", formattedPhone);
+    } catch (e) {
+      console.warn("[orderConfirm] SMS failed:", e.response?.data || e.message);
+    }
+  }
+
+  // ── Email confirmation (production AT accounts only) ─────────────────────
+  if (atUsername !== "sandbox") {
+    const subject = `✅ Order Confirmed — ${total} | Ellines Haven`;
+    const body    =
+      `Hi ${buyerName},\n\n` +
+      `Your payment of ${total} has been confirmed.\n\n` +
+      `Books purchased:\n${itemList}${promoLine}\n\n` +
+      `Order ID: ${order.id}\n\n` +
+      `Your books are ready to read in My Library:\n` +
+      `https://ellines-haven.web.app/my-library\n\n` +
+      `Thank you for supporting Ellines Haven.\n\n` +
+      `— Elijah Mwangi M & The Ellines Haven Team`;
+
+    try {
+      const emailParams = new URLSearchParams({
+        username: atUsername,
+        to:       order.userEmail,
+        from:     "noreply@ellines-haven.web.app",
+        subject,
+        message:  body,
+      });
+      await axios.post(
+        "https://api.africastalking.com/version1/messaging/email",
+        emailParams.toString(),
+        { headers: { apiKey: atApiKey, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" } }
+      );
+      console.log("[orderConfirm] email sent to:", order.userEmail);
+    } catch (e) {
+      console.warn("[orderConfirm] email failed:", e.response?.data || e.message);
+    }
+  }
+}
+
 // ── STK Push (callable from frontend) ────────────────────────────────────────
 exports.stkPush = onCall(
   {
@@ -234,6 +308,14 @@ exports.mpesaCallback = onRequest(
         await unlockBooksForUser(order.userEmail, order.items || [], "mpesa_auto");
         console.log("[mpesaCallback] books unlocked for:", order.userEmail, "order:", orderId);
       }
+
+      // ── Send confirmation SMS/email to buyer ───────────────────────────────
+      try {
+        await sendOrderConfirmationToUser(
+          { ...order, id: orderId, phone: paidPhone || order.phone || "" },
+          { atApiKey: AT_API_KEY.value(), atUsername: AT_USERNAME.value(), atSenderId: AT_SENDER_ID.value() }
+        );
+      } catch (ce) { console.warn("[mpesaCallback] confirm notify failed:", ce.message); }
 
       // ── Notify the buyer in their user_notifications feed ──────────────────
       if (order.userEmail) {
@@ -430,6 +512,14 @@ exports.paystackWebhook = onRequest(
       await unlockBooksForUser(order.userEmail || email, order.items || [], "paystack_auto");
       console.log("[paystackWebhook] ✅ books unlocked for:", order.userEmail, "order:", orderId);
 
+      // ── Send confirmation SMS/email to buyer ───────────────────────────────
+      try {
+        await sendOrderConfirmationToUser(
+          { ...order, id: orderId },
+          { atApiKey: AT_API_KEY.value(), atUsername: AT_USERNAME.value(), atSenderId: AT_SENDER_ID.value() }
+        );
+      } catch (ce) { console.warn("[paystackWebhook] confirm notify failed:", ce.message); }
+
       // ── Notify buyer in their user_notifications feed ─────────────────────
       try {
         const buyerEmail = (order.userEmail || email).toLowerCase();
@@ -574,6 +664,13 @@ exports.verifyPaystackPayment = onCall(
           });
           await unlockBooksForUser(userEmail, order.items || [], "paystack_verify");
           console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderSnap.id);
+          // Send confirmation SMS/email to buyer
+          try {
+            await sendOrderConfirmationToUser(
+              { ...order, id: orderSnap.id },
+              { atApiKey: AT_API_KEY.value(), atUsername: AT_USERNAME.value(), atSenderId: AT_SENDER_ID.value() }
+            );
+          } catch (ce) { console.warn("[verifyPaystack] confirm notify failed:", ce.message); }
         }
       } catch (fsErr) {
         // Firestore write failed (e.g. IAM/permissions issue) — log it but
@@ -729,6 +826,14 @@ exports.capturePayPalOrder = onCall(
       // Unlock books
       await unlockBooksForUser(order.userEmail || userEmail, order.items || [], "paypal_auto");
       console.log("[capturePayPalOrder] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+
+      // Send confirmation SMS/email to buyer
+      try {
+        await sendOrderConfirmationToUser(
+          { ...order, id: orderId },
+          { atApiKey: AT_API_KEY.value(), atUsername: AT_USERNAME.value(), atSenderId: AT_SENDER_ID.value() }
+        );
+      } catch (ce) { console.warn("[capturePayPalOrder] confirm notify failed:", ce.message); }
 
       // ── Notify buyer ──────────────────────────────────────────────────────
       try {
