@@ -458,28 +458,59 @@ exports.verifyPaystackPayment = onCall(
       }
     }
 
-    // ── Step 2: Call Paystack verify API ──────────────────────────────────────
+    // ── Step 2: Call Paystack verify API — retry up to 8x for pending M-Pesa ──
+    // M-Pesa via Paystack can take 10-30 s to confirm. Paystack's callback fires
+    // as soon as the PIN is submitted, but the transaction status stays "pending"
+    // until Safaricom confirms. We retry here so the Cloud Function handles the
+    // wait rather than leaving the browser polling open for 30+ seconds.
     let paystackData;
-    try {
-      console.log("[verifyPaystack] calling Paystack API for ref:", reference);
-      const res = await axios.get(
-        `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-        { headers: { Authorization: `Bearer ${secret}` } }
-      );
+    const MAX_ATTEMPTS = 8;
+    const RETRY_DELAY_MS = 3000; // 3 s between retries → up to ~24 s total
 
-      paystackData = res.data?.data;
-      console.log("[verifyPaystack] Paystack status:", paystackData?.status, "amount:", paystackData?.amount, "channel:", paystackData?.channel);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        console.log(`[verifyPaystack] API attempt ${attempt}/${MAX_ATTEMPTS} for ref:`, reference);
+        const res = await axios.get(
+          `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+          { headers: { Authorization: `Bearer ${secret}` } }
+        );
 
-      if (!paystackData || paystackData.status !== "success") {
-        throw new HttpsError("failed-precondition", `Payment status: ${paystackData?.status || "unknown"}`);
+        paystackData = res.data?.data;
+        const psStatus = paystackData?.status;
+        console.log(`[verifyPaystack] attempt ${attempt} — status: ${psStatus}, amount: ${paystackData?.amount}, channel: ${paystackData?.channel}`);
+
+        if (psStatus === "success") {
+          // Confirmed — proceed to unlock
+          break;
+        } else if (psStatus === "pending" || psStatus === "processing") {
+          // M-Pesa is still processing — wait and retry
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+            continue;
+          } else {
+            // Exhausted retries — throw so frontend can fall back to Firestore polling
+            throw new HttpsError("failed-precondition", `Payment still pending after ${MAX_ATTEMPTS} attempts. Webhook will complete it.`);
+          }
+        } else {
+          // Failed / abandoned / reversed — do not retry
+          throw new HttpsError("failed-precondition", `Payment status: ${psStatus || "unknown"}`);
+        }
+      } catch (err) {
+        if (err instanceof HttpsError) throw err;
+        const status = err.response?.status;
+        const psMsg  = err.response?.data?.message;
+        const msg    = psMsg || err.message;
+        console.error(`[verifyPaystack] Paystack API error on attempt ${attempt} — HTTP ${status}:`, msg);
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+          continue;
+        }
+        throw new HttpsError("internal", msg);
       }
-    } catch (err) {
-      const status = err.response?.status;
-      const psMsg  = err.response?.data?.message;
-      const msg    = psMsg || err.message;
-      console.error("[verifyPaystack] Paystack API error — HTTP", status, ":", msg);
-      if (err instanceof HttpsError) throw err;
-      throw new HttpsError("internal", msg);
+    }
+
+    if (!paystackData || paystackData.status !== "success") {
+      throw new HttpsError("failed-precondition", `Payment not confirmed: ${paystackData?.status || "unknown"}`);
     }
 
     // ── Step 3: Unlock books and mark order Completed ─────────────────────────

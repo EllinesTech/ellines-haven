@@ -169,6 +169,47 @@ async function notifyAdminPaymentIssue(order, reason, paystackRef) {
   } catch {}
 }
 
+// ── VerifyingScreen — listens to Firestore in real-time, completes instantly ──
+// Uses onSnapshot instead of polling so as soon as the webhook marks the
+// order Completed, the user sees success with zero lag.
+function VerifyingScreen({ orderId, onDone }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!orderId) return;
+    // Real-time listener — fires the instant Firestore changes
+    const unsub = onSnapshot(doc(db, 'orders', orderId), (snap) => {
+      if (!snap.exists()) return;
+      if (snap.data().status === 'Completed') {
+        onDone();
+      }
+    });
+    // Tick a counter so user sees something is happening
+    const timer = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => { unsub(); clearInterval(timer); };
+  }, [orderId, onDone]); // eslint-disable-line
+
+  const dots = '.'.repeat((elapsed % 3) + 1);
+
+  return (
+    <main className="cart-page">
+      <div className="container" style={{ maxWidth:480, margin:'80px auto', textAlign:'center' }}>
+        <div style={{ fontSize:'3.5rem', marginBottom:16, animation:'pulse 1.2s infinite' }}>🔄</div>
+        <h2>Confirming Payment{dots}</h2>
+        <p style={{ color:'var(--muted)', maxWidth:380, margin:'0 auto', lineHeight:1.7 }}>
+          Your payment is being processed. For M-Pesa this can take up to 30 seconds after entering your PIN.
+        </p>
+        <p style={{ color:'var(--gold)', fontSize:'0.82rem', marginTop:16 }}>
+          {elapsed < 10 ? 'Waiting for confirmation…' :
+           elapsed < 20 ? 'Still waiting — M-Pesa is processing…' :
+           elapsed < 35 ? 'Almost there — confirming with Paystack…' :
+           'This is taking a bit longer than usual. Your books will unlock automatically.'}
+        </p>
+      </div>
+    </main>
+  );
+}
+
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
   const { cart, removeFromCart, clearCart, user, placeOrder, confirmOrder, settings, myPerms, siteControls } = useApp();
@@ -336,23 +377,33 @@ export default function Cart() {
             // Payment successful — verify + unlock
             setStep('verifying');
 
-            // Poll Firestore for up to 15 s to see if the webhook already
-            // confirmed the order (webhook often fires before our verify call).
-            const pollForCompletion = async (orderId, maxAttempts = 10, delayMs = 1500) => {
+            // Poll Firestore — webhook fires charge.success and marks Completed.
+            // We poll for up to 40 s (M-Pesa can take 20-30 s after PIN entry).
+            const pollForCompletion = async (orderId, maxAttempts = 20, delayMs = 2000) => {
               const { getDoc, doc: fsDoc } = await import('firebase/firestore');
               for (let i = 0; i < maxAttempts; i++) {
                 await new Promise(r => setTimeout(r, delayMs));
                 try {
                   const snap = await getDoc(fsDoc(db, 'orders', orderId));
-                  if (snap.exists() && snap.data().status === 'Completed') return true;
+                  if (snap.exists()) {
+                    const status = snap.data().status;
+                    if (status === 'Completed') return 'completed';
+                    // If the verify function already marked it failed/cancelled, stop polling
+                    if (status === 'PaymentFailed') return 'failed';
+                  }
                 } catch { /* keep polling */ }
               }
-              return false;
+              return 'timeout';
             };
 
-            // Try verify function first; if it fails, fall back to webhook poll.
             const doVerify = async () => {
+              // Start polling Firestore in the background immediately —
+              // the webhook may arrive while we're waiting for verify.
+              const pollPromise = pollForCompletion(order.id);
+
               try {
+                // Call verify — the function retries internally for up to ~24 s
+                // on pending M-Pesa transactions before throwing.
                 await callVerifyPaystack({
                   reference: response.reference,
                   orderId:   order.id,
@@ -361,33 +412,24 @@ export default function Cart() {
                 clearCart();
                 setStep('done');
               } catch (err) {
-                // Verify function failed — check if webhook already handled it
-                try {
-                  const { getDoc, doc: fsDoc } = await import('firebase/firestore');
-                  const snap = await getDoc(fsDoc(db, 'orders', order.id));
-                  if (snap.exists() && snap.data().status === 'Completed') {
-                    clearCart();
-                    setStep('done');
-                    return;
-                  }
-                } catch { /* fall through to polling */ }
+                // Verify threw (timed out waiting for M-Pesa, or network error).
+                // Do NOT mark the order PaymentFailed — the webhook can still
+                // complete it. Instead, wait for the Firestore poll to resolve.
+                console.warn('[Cart] verify threw, falling back to webhook poll:', err.message);
 
-                // Poll for up to 15 s — webhook may still be in flight
-                const confirmed = await pollForCompletion(order.id);
-                if (confirmed) {
+                const pollResult = await pollPromise;
+                if (pollResult === 'completed') {
                   clearCart();
                   setStep('done');
                   return;
                 }
-
-                // Still not confirmed — mark as failed and show helpful message
-                updateDoc(doc(db, 'orders', order.id), {
-                  status:     'PaymentFailed',
-                  failReason: err.message || 'Verification failed',
-                  updatedAt:  serverTimestamp(),
-                }).catch(() => {});
-                notifyAdminPaymentIssue(order, 'Verification failed: ' + (err.message || 'unknown error'), response.reference);
-                setStkError('Payment received but verification failed. Contact support with ref: ' + response.reference);
+                // Poll timed out or got a failed status — show message but keep
+                // the order as Pending so the webhook can still complete it later.
+                setStkError(
+                  'Payment sent but confirmation is taking longer than usual. ' +
+                  'Your books will unlock automatically once confirmed — check your library in a few minutes. ' +
+                  'Ref: ' + response.reference
+                );
                 setStep('pay');
               }
             };
@@ -562,13 +604,7 @@ export default function Cart() {
 
   // ── Verifying screen ──────────────────────────────────────────────────────
   if (step === 'verifying') return (
-    <main className="cart-page">
-      <div className="container" style={{ maxWidth:480, margin:'80px auto', textAlign:'center' }}>
-        <div style={{ fontSize:'3rem', marginBottom:16 }}>🔄</div>
-        <h2>Verifying Payment…</h2>
-        <p style={{ color:'var(--muted)' }}>Just a moment while we confirm your payment.</p>
-      </div>
-    </main>
+    <VerifyingScreen orderId={placedOrder?.id} onDone={() => { clearCart(); setStep('done'); }} />
   );
 
   // ── Done screen ───────────────────────────────────────────────────────────
