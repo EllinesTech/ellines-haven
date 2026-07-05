@@ -331,6 +331,12 @@ export default function Cart() {
   const submitPaystack = async e => {
     e.preventDefault();
     setStkError('');
+    // Guard: Paystack M-Pesa STK push requires a minimum of KSh 10.
+    // Amounts below this will show Paystack's "Unable to process" error.
+    if (total < 10) {
+      setStkError('Minimum transaction amount is KSh 10. Please add more items or contact support.');
+      return;
+    }
     setBusy(true);
     try {
       const order = await placeOrder([...cart], 'paystack', '', '');
