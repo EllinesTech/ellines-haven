@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
-import { getAllReadingStats } from '../hooks/useReadingProgress';
+import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
 import './MyLibrary.css';
 
 // Helper: get a map of bookId -> progress for current user
@@ -550,6 +550,9 @@ export default function MyLibrary() {
       setLiveOrders([]); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
+    // Pull reading progress from Firestore → localStorage so stats are cross-device
+    hydrateReadingStats(user.email).catch(() => {});
+
     const q = query(collection(db, 'orders'), where('userEmail', '==', user.email.toLowerCase()));
     const unsub = onSnapshot(q,
       snap => {
@@ -857,9 +860,20 @@ export default function MyLibrary() {
                             <strong>{o.items?.map(i => i.title).join(', ') || 'Order'}</strong>
                             <span className="mylib-order-meta">{o.id} · {o.date} · {o.method}</span>
                             {o.ref && <span className="mylib-order-ref">Ref: {o.ref}</span>}
+                            {o.promoCode && (
+                              <span style={{ fontSize:'0.72rem', color:'var(--ok)', fontWeight:600 }}>
+                                🎟 {o.promoCode}
+                                {o.discountAmount > 0 && ` (−KSh ${o.discountAmount.toLocaleString()})`}
+                              </span>
+                            )}
                           </div>
                           <div className="mylib-order-right">
                             <strong className="mylib-order-amount">KSh {(o.total||0).toLocaleString()}</strong>
+                            {o.originalTotal && o.originalTotal !== o.total && (
+                              <span style={{ fontSize:'0.72rem', color:'var(--muted)', textDecoration:'line-through' }}>
+                                KSh {o.originalTotal.toLocaleString()}
+                              </span>
+                            )}
                             <span className="mylib-order-status-badge"
                               style={{ background: statusBg, color: statusColor, border:`1px solid ${statusColor}40` }}>
                               {o.status === 'Completed' ? '✅' : o.status === 'Pending' ? '⏳' : '✕'} {o.status}

@@ -86,6 +86,14 @@ service cloud.firestore {
     // ── Dev OTPs (temporary, password reset) ─────────────────────────────────
     match /dev_otps/{d} { allow read, write: if true; }
 
+    // ── Reading progress — per-user subcollection ─────────────────────────────
+    match /reading_progress/{userDocId}/books/{bookId} {
+      allow read, write: if true;
+    }
+    match /reading_progress/{userDocId} {
+      allow read, write: if true;
+    }
+
     // ── Catch-all: deny anything not explicitly covered ──────────────────────
     // This prevents accidental exposure of any new collection added without a rule.
     match /{collection}/{document} {

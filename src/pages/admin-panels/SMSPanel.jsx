@@ -128,18 +128,31 @@ export default function SMSPanel({ showToast, users = [] }) {
         borderRadius: 'var(--r)', padding: '14px 18px', display: 'flex', gap: 14, alignItems: 'flex-start',
       }}>
         <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>📱</span>
-        <div>
-          <div style={{ fontWeight: 700, color: '#4a9eff', marginBottom: 4 }}>SMS Broadcast via Africa's Talking</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, color: '#4a9eff', marginBottom: 4 }}>SMS via Africa's Talking — Free Sandbox Available</div>
           <div style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: 1.7 }}>
-            Send promotional SMS, order updates, or announcements to your users' mobile phones.
-            Requires <strong style={{ color: 'var(--text)' }}>AT_API_KEY</strong>,{' '}
-            <strong style={{ color: 'var(--text)' }}>AT_USERNAME</strong>, and{' '}
-            <strong style={{ color: 'var(--text)' }}>AT_SENDER_ID</strong> secrets set on the Cloud Function.
-            <br />
-            Users with no phone number on file will be skipped.
-            Register at{' '}
-            <a href="https://africastalking.com" target="_blank" rel="noopener noreferrer"
-              style={{ color: '#4a9eff' }}>africastalking.com</a>.
+            Africa's Talking offers a <strong style={{ color: 'var(--ok)' }}>free sandbox</strong> — no credit card needed. Use it to test SMS delivery before going live.
+          </div>
+          <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>
+            {[
+              { step: '1', label: 'Sign up free', desc: 'africastalking.com → create account → get sandbox credentials instantly', link: 'https://africastalking.com/sign_up', linkLabel: 'Sign up →' },
+              { step: '2', label: 'Set AT_USERNAME = "sandbox"', desc: 'In Firebase Console → Functions → Secrets, set AT_USERNAME to "sandbox" and AT_API_KEY to your sandbox API key' },
+              { step: '3', label: 'Test SMS (free, no charge)', desc: 'Sandbox sends to any number you add in the AT Sandbox simulator. No real SMS charges until you go live.' },
+              { step: '4', label: 'Go live', desc: 'Add credit to AT account → change AT_USERNAME to your live username → switch AT_ENV to production' },
+            ].map(s => (
+              <div key={s.step} style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(74,158,255,0.15)', borderRadius: 'var(--r-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(74,158,255,0.2)', color: '#4a9eff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 800, flexShrink: 0 }}>{s.step}</span>
+                  <strong style={{ fontSize: '0.78rem', color: 'var(--text)' }}>{s.label}</strong>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--muted)', lineHeight: 1.5 }}>{s.desc}</p>
+                {s.link && <a href={s.link} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 5, fontSize: '0.72rem', color: '#4a9eff', fontWeight: 600 }}>{s.linkLabel}</a>}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(46,204,113,0.07)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: 'var(--r-sm)', fontSize: '0.76rem', color: 'var(--muted)' }}>
+            💡 <strong style={{ color: 'var(--ok)' }}>Cost:</strong> Sandbox is completely free. Live SMS via Africa's Talking costs roughly <strong>KSh 1–2 per SMS</strong> in Kenya — one of the cheapest options available.
+            Set secrets in the Integrations panel or via Firebase CLI: <code style={{ color: 'var(--gold)', fontSize: '0.72rem' }}>firebase functions:secrets:set AT_API_KEY</code>
           </div>
         </div>
       </div>

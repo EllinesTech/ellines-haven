@@ -9,6 +9,7 @@ import NewsletterSignup from '../components/NewsletterSignup';
 import { GENRES } from '../data/books';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getAllReadingStats } from '../hooks/useReadingProgress';
 import './Home.css';
 
 /* ── Firestore-backed site content (editable via Page Editor) ── */
@@ -164,8 +165,169 @@ function BookStack({ books }) {
   );
 }
 
+/* ── Personalised section — shown only to logged-in users with books ─────── */
+function PersonalisedSection({ user, library, books }) {
+  const stats = getAllReadingStats(user.email);
+
+  // Find in-progress books (chapter > 0)
+  const inProgress = library
+    .map(lb => {
+      const cat      = books.find(b => b.id === lb.id);
+      const progress = stats[lb.id] || null;
+      return cat ? { ...lb, ...cat, progress } : null;
+    })
+    .filter(b => b && b.progress && b.progress.chapter > 0)
+    .sort((a, b) => (b.progress.lastRead || 0) - (a.progress.lastRead || 0))
+    .slice(0, 3);
+
+  // Books in library not yet started
+  const notStarted = library
+    .filter(lb => !stats[lb.id])
+    .map(lb => books.find(b => b.id === lb.id))
+    .filter(Boolean)
+    .slice(0, 3);
+
+  // Books user doesn't own yet — recommended by genre of owned books
+  const ownedIds    = new Set(library.map(b => b.id));
+  const ownedGenres = [...new Set(
+    library.map(lb => books.find(b => b.id === lb.id)?.genre).filter(Boolean)
+  )];
+  const recommended = books
+    .filter(b => !ownedIds.has(b.id) && ownedGenres.includes(b.genre) && b.active !== false && b.status !== 'coming-soon')
+    .slice(0, 4);
+
+  const firstName = user.name?.split(' ')[0] || 'Reader';
+
+  return (
+    <section className="section" style={{ paddingTop:32, paddingBottom:0 }}>
+      <div className="container">
+        {/* Welcome banner */}
+        <div style={{
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          flexWrap:'wrap', gap:12, marginBottom:24,
+          padding:'18px 24px',
+          background:'linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.04))',
+          border:'1px solid rgba(201,168,76,0.2)', borderRadius:'var(--r)',
+        }}>
+          <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+            <div style={{
+              width:44, height:44, borderRadius:'50%', flexShrink:0,
+              background:'rgba(201,168,76,0.18)', border:'2px solid rgba(201,168,76,0.4)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:'1.1rem', fontWeight:700, color:'var(--gold)',
+            }}>
+              {firstName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p style={{ margin:0, fontSize:'0.78rem', color:'var(--muted)', letterSpacing:0.5 }}>WELCOME BACK</p>
+              <h3 style={{ margin:0, fontSize:'1.05rem', color:'var(--text)' }}>
+                {firstName} · <span style={{ color:'var(--gold)' }}>{library.length} book{library.length !== 1 ? 's' : ''}</span> in your library
+              </h3>
+            </div>
+          </div>
+          <Link to="/my-library" className="btn btn-outline btn-sm">My Library →</Link>
+        </div>
+
+        {/* Continue reading */}
+        {inProgress.length > 0 && (
+          <div style={{ marginBottom:28 }}>
+            <h3 style={{ fontSize:'0.92rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.2, marginBottom:14 }}>
+              📖 Continue Reading
+            </h3>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
+              {inProgress.map(b => (
+                <Link key={b.id} to={`/read/${b.id}`} style={{
+                  display:'flex', alignItems:'center', gap:14, flex:'1 1 260px', maxWidth:400,
+                  padding:'12px 16px', borderRadius:'var(--r-sm)',
+                  background:'rgba(255,255,255,0.03)', border:'1px solid rgba(201,168,76,0.2)',
+                  textDecoration:'none', transition:'border-color 0.15s, background 0.15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.5)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.2)'}
+                >
+                  {/* Cover */}
+                  {b.coverType === 'photo' && b.cover
+                    ? <img src={b.cover} alt={b.title} style={{ width:44, height:60, objectFit:'cover', borderRadius:4, flexShrink:0 }} />
+                    : <div style={{ width:44, height:60, borderRadius:4, flexShrink:0, background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem' }}>📖</div>
+                  }
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <p style={{ margin:'0 0 4px', fontWeight:700, fontSize:'0.85rem', color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</p>
+                    <p style={{ margin:'0 0 6px', fontSize:'0.75rem', color:'var(--muted)' }}>{b.genre}</p>
+                    {/* Progress bar */}
+                    {b.chapters && b.chapters.length > 1 && (
+                      <div style={{ height:3, background:'rgba(255,255,255,0.1)', borderRadius:2 }}>
+                        <div style={{
+                          height:'100%', borderRadius:2, background:'var(--gold)',
+                          width:`${Math.min(100, Math.round(((b.progress.chapter + 1) / b.chapters.length) * 100))}%`,
+                        }} />
+                      </div>
+                    )}
+                    <p style={{ margin:'4px 0 0', fontSize:'0.7rem', color:'var(--gold)', fontWeight:600 }}>
+                      {b.chapters && b.chapters.length > 1
+                        ? `Ch ${b.progress.chapter + 1} / ${b.chapters.length}`
+                        : '📖 In progress'
+                      } · Resume →
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Unread owned books */}
+        {notStarted.length > 0 && (
+          <div style={{ marginBottom:28 }}>
+            <h3 style={{ fontSize:'0.92rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.2, marginBottom:14 }}>
+              📚 Ready to Read
+            </h3>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+              {notStarted.map(b => (
+                <Link key={b.id} to={`/read/${b.id}`} style={{
+                  display:'flex', alignItems:'center', gap:12,
+                  padding:'10px 14px', borderRadius:'var(--r-sm)',
+                  background:'rgba(255,255,255,0.02)', border:'1px solid var(--dim)',
+                  textDecoration:'none', flex:'1 1 220px', maxWidth:340,
+                  transition:'border-color 0.15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.35)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dim)'}
+                >
+                  {b.coverType === 'photo' && b.cover
+                    ? <img src={b.cover} alt={b.title} style={{ width:36, height:50, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
+                    : <div style={{ width:36, height:50, borderRadius:3, flexShrink:0, background: b.coverColor || '#1a1a3a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem' }}>📖</div>
+                  }
+                  <div style={{ minWidth:0 }}>
+                    <p style={{ margin:0, fontWeight:600, fontSize:'0.83rem', color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</p>
+                    <p style={{ margin:'2px 0 0', fontSize:'0.72rem', color:'var(--gold)' }}>Start Reading →</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recommended based on genres */}
+        {recommended.length > 0 && (
+          <div style={{ marginBottom:8 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
+              <h3 style={{ fontSize:'0.92rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.2, margin:0 }}>
+                ✨ Recommended For You
+              </h3>
+              <Link to="/library" style={{ fontSize:'0.78rem', color:'var(--gold)', textDecoration:'none' }}>See all →</Link>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12 }}>
+              {recommended.map(b => <BookCard key={b.id} book={b} />)}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
-  const { books } = useApp();
+  const { books, user, library } = useApp();
   const editCtx = useEditMode();
   const c = useHomeContent();
 
@@ -304,6 +466,13 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* ══════════════════════════════════════
+          PERSONALISED FEED — logged-in users only
+      ══════════════════════════════════════ */}
+      {user && library.length > 0 && (
+        <PersonalisedSection user={user} library={library} books={activeBooks} />
+      )}
 
       {/* ══════════════════════════════════════
           COMING SOON & IN PROGRESS
