@@ -820,6 +820,17 @@ export default function Cart() {
                     I understand that <strong style={{ color:'var(--text)' }}>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Read refund policy →</Link>
                   </span>
                 </label>
+
+                {/* ── M-Pesa heads-up ── */}
+                <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 13px', background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.18)', borderRadius:'var(--r-sm)', marginBottom:12, fontSize:'0.79rem', color:'var(--muted)', lineHeight:1.6 }}>
+                  <span style={{ fontSize:'1rem', flexShrink:0, marginTop:1 }}>💡</span>
+                  <span>
+                    If M-Pesa shows <strong style={{ color:'var(--text)' }}>"Unable to process"</strong>, try a different payment method or visit{' '}
+                    <strong style={{ color:'var(--gold)' }}>My Library → Orders</strong> and tap{' '}
+                    <strong style={{ color:'var(--text)' }}>Retry Activation</strong> — your book will unlock instantly once payment is confirmed.
+                  </span>
+                </div>
+
                 <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy || !refundAcked}>
                   {busy ? 'Opening payment…' : `⚡ Pay KSh ${(calcPaystackAmount(total, paystackChannel) / 100).toFixed(2)}`}
                 </button>
