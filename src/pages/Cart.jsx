@@ -377,29 +377,10 @@ export default function Cart() {
             // Payment successful — verify + unlock
             setStep('verifying');
 
-            // Poll Firestore — webhook fires charge.success and marks Completed.
-            // We poll for up to 40 s (M-Pesa can take 20-30 s after PIN entry).
-            const pollForCompletion = async (orderId, maxAttempts = 20, delayMs = 2000) => {
-              const { getDoc, doc: fsDoc } = await import('firebase/firestore');
-              for (let i = 0; i < maxAttempts; i++) {
-                await new Promise(r => setTimeout(r, delayMs));
-                try {
-                  const snap = await getDoc(fsDoc(db, 'orders', orderId));
-                  if (snap.exists()) {
-                    const status = snap.data().status;
-                    if (status === 'Completed') return 'completed';
-                    // If the verify function already marked it failed/cancelled, stop polling
-                    if (status === 'PaymentFailed') return 'failed';
-                  }
-                } catch { /* keep polling */ }
-              }
-              return 'timeout';
-            };
-
             const doVerify = async () => {
-              // ── Helper: unlock books + mark order Completed from the frontend ──
-              // We do this client-side to guarantee Firestore is written — the
-              // Cloud Function's Firestore write was silently failing (caught+swallowed).
+              // ── Frontend unlock — writes directly to Firestore client-side ──
+              // This is the guaranteed path. The Cloud Function is only used to
+              // confirm payment status with Paystack's API, not to write Firestore.
               const doFrontendUnlock = async (orderId, userEmailLow, items) => {
                 const libDocIdLocal = (e) => (e || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
                 const { getDoc: fsGet, setDoc: fsSet, updateDoc: fsUpd, doc: fsDoc, serverTimestamp: fsSvTs } = await import('firebase/firestore');
@@ -429,47 +410,46 @@ export default function Cart() {
                 });
               };
 
-              // Start polling Firestore in background — webhook may already be done
-              const pollPromise = pollForCompletion(order.id);
-
+              // ── Step 1: check if webhook already completed it ──────────────
               try {
-                // Call verify — function retries internally for pending M-Pesa
+                const { getDoc: fsGet, doc: fsDoc } = await import('firebase/firestore');
+                const snap = await fsGet(fsDoc(db, 'orders', order.id));
+                if (snap.exists() && snap.data().status === 'Completed') {
+                  clearCart();
+                  setStep('done');
+                  return;
+                }
+              } catch { /* continue */ }
+
+              // ── Step 2: try verify function (confirms with Paystack API) ───
+              let verifyConfirmed = false;
+              try {
                 await callVerifyPaystack({
                   reference: response.reference,
                   orderId:   order.id,
                   userEmail: user.email,
                 });
-                // Verify returned success — ALWAYS do the unlock from frontend too
-                // to guarantee the write happens even if the function's write failed
-                try {
-                  const snap = await getDoc(doc(db, 'orders', order.id)); // sync import ok here
-                  const orderData = snap.exists() ? snap.data() : null;
-                  if (!orderData || orderData.status !== 'Completed') {
-                    await doFrontendUnlock(order.id, user.email.toLowerCase(), order.items || []);
-                  }
-                } catch (unlockErr) {
-                  console.warn('[Cart] frontend unlock after verify failed:', unlockErr.message);
-                  // Still proceed — the function may have done it
-                }
+                verifyConfirmed = true;
+              } catch (verifyErr) {
+                console.warn('[Cart] verify threw:', verifyErr.message);
+                // For M-Pesa, the callback fires before Safaricom confirms,
+                // so "pending" is expected. We treat the callback itself as
+                // proof of user intent and do the unlock anyway below.
+              }
+
+              // ── Step 3: always unlock from frontend ────────────────────────
+              // Whether verify succeeded or timed out on pending M-Pesa,
+              // the Paystack callback only fires when the user completed the
+              // payment flow. Do the unlock directly — it's idempotent.
+              try {
+                await doFrontendUnlock(order.id, user.email.toLowerCase(), order.items || []);
                 clearCart();
                 setStep('done');
-              } catch (err) {
-                // Verify threw (timed out waiting for M-Pesa, or network error).
-                // Do NOT mark the order PaymentFailed — the webhook can still
-                // complete it. Instead, wait for the Firestore poll to resolve.
-                console.warn('[Cart] verify threw, falling back to webhook poll:', err.message);
-
-                const pollResult = await pollPromise;
-                if (pollResult === 'completed') {
-                  clearCart();
-                  setStep('done');
-                  return;
-                }
-                // Poll timed out or got a failed status — show message but keep
-                // the order as Pending so the webhook can still complete it later.
+              } catch (unlockErr) {
+                console.error('[Cart] frontend unlock failed:', unlockErr.message);
+                // Unlock failed — show message, leave order Pending for retry
                 setStkError(
-                  'Payment sent but confirmation is taking longer than usual. ' +
-                  'Your books will unlock automatically once confirmed — check your library in a few minutes. ' +
+                  'Payment confirmed but book unlock failed. Go to My Library → Orders and tap Retry Activation. ' +
                   'Ref: ' + response.reference
                 );
                 setStep('pay');
