@@ -2644,9 +2644,9 @@ export default function Admin() {
   const setSetting = (k, v) => setSForm(s => ({ ...s, [k]: v }));
   const saveSettings = section => { updateSettings(sForm); showToast(section + ' saved'); };
 
-  const handleSaveBook = book => {
+  const handleSaveBook = async (book) => {
     try {
-      saveBook(book);
+      await saveBook(book);
       setEditing(null);
       showToast(book.id ? '✅ Book updated successfully' : '✅ New book added');
       addLog('book', (book.id ? 'Book updated: ' : 'Book added: ') + book.title);

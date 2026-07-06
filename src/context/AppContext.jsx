@@ -441,11 +441,37 @@ export function AppProvider({ children }) {
   };
 
   // ── Books admin ───────────────────────────────────────────────────────────
-  const saveBook   = b  => {
-    // Bust the chapter cache so the next page load always re-fetches chapters
-    // from Firestore instead of serving stale localStorage data.
-    save('eh_books_savedAt', 0);
-    setBooks(p => { const i = p.findIndex(x => x.id === b.id); return i >= 0 ? p.map(x => x.id === b.id ? b : x) : [...p, b]; });
+  const saveBook = async (b) => {
+    // Compute the updated books list synchronously so we can await the Firestore write
+    const prev = JSON.parse(localStorage.getItem('eh_books') || '[]');
+    const next = (() => {
+      const i = (prev || []).findIndex(x => x.id === b.id);
+      return i >= 0 ? prev.map(x => x.id === b.id ? b : x) : [...(prev || []), b];
+    })();
+
+    // Update React state + localStorage immediately (optimistic)
+    setBooksState(next);
+    try {
+      save('eh_books', next);
+      save('eh_books_savedAt', Date.now());
+    } catch (e) {
+      console.warn('[Books] localStorage write failed:', e.message);
+    }
+
+    // Await the Firestore write so callers can confirm success
+    const { stripped, coversMap, chaptersMap } = stripLargeFields(next);
+    try {
+      await setDoc(BOOKS_DOC(), { books: stripped, updatedAt: serverTimestamp() });
+    } catch (e) {
+      console.warn('[Books] catalogue write failed:', e.message);
+      throw e; // re-throw so the admin panel can show an error
+    }
+    if (Object.keys(coversMap).length > 0) {
+      setDoc(COVERS_DOC(), { covers: coversMap, updatedAt: serverTimestamp() }).catch(() => {});
+    }
+    Object.entries(chaptersMap).forEach(([bookId, chapters]) =>
+      setDoc(CHAPTER_DOC(bookId), { bookId, chapters, updatedAt: serverTimestamp() }).catch(() => {})
+    );
   };
   const deleteBook = id => {
     setBooks(p => p.filter(b => b.id !== id));
