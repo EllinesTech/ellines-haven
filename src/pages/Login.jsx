@@ -519,19 +519,10 @@ async function logLogin(email, userName) {
     const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
     await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
     
-    // Track activity and notify admins
-    const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
-    await trackActivity({
-      category: NOTIFICATION_CATEGORIES.USER_LOGIN,
-      title: 'User Login',
-      message: `${userName || email} logged in`,
-      userEmail: email,
-      userName: userName || email,
-      metadata: {
-        loginTime: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-      },
-      priority: 'low',
+    // ── SERVER-SIDE LOGGING (Reliable, with retry) ──
+    const { logUserLoginReliable } = await import('../utils/reliableActivityLogger');
+    await logUserLoginReliable(email, userName, {
+      device: await getDeviceTypeForLog(),
     });
 
     // Send welcome-back notification to the user's own feed (once per day)
@@ -540,4 +531,14 @@ async function logLogin(email, userName) {
   } catch (err) {
     console.error('[logLogin]', err);
   }
+}
+
+// Helper: determine device type for logging
+async function getDeviceTypeForLog() {
+  const ua = navigator.userAgent.toLowerCase();
+  if (/mobile|android|iphone/.test(ua)) return /ipad|tablet/.test(ua) ? 'Tablet' : 'Mobile';
+  if (/windows|win32/.test(ua)) return 'Windows';
+  if (/macintosh|mac os/.test(ua)) return 'Mac';
+  if (/linux/.test(ua)) return 'Linux';
+  return 'Desktop';
 }

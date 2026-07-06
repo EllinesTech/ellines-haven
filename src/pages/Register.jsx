@@ -13,6 +13,16 @@ function EyeIcon({ open }) {
     : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
 }
 
+// Helper: determine device type for logging
+function getDeviceTypeForReg() {
+  const ua = navigator.userAgent.toLowerCase();
+  if (/mobile|android|iphone/.test(ua)) return /ipad|tablet/.test(ua) ? 'Tablet' : 'Mobile';
+  if (/windows|win32/.test(ua)) return 'Windows';
+  if (/macintosh|mac os/.test(ua)) return 'Mac';
+  if (/linux/.test(ua)) return 'Linux';
+  return 'Desktop';
+}
+
 export default function Register() {
   const { setUser, siteControls } = useApp();
   const navigate = useNavigate();
@@ -165,23 +175,14 @@ export default function Register() {
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       
-      // Track registration activity and notify admins
+      // ── SERVER-SIDE LOGGING (Reliable, with retry) ──
       try {
-        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
-        await trackActivity({
-          category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
-          title: 'New User Registration',
-          message: `${form.name.trim()} (${emailKey}) created an account`,
-          userEmail: emailKey,
-          userName: form.name.trim(),
-          metadata: {
-            registrationTime: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-          },
-          priority: 'normal',
+        const { logUserRegistrationReliable } = await import('../utils/reliableActivityLogger');
+        await logUserRegistrationReliable(emailKey, form.name.trim(), {
+          device: getDeviceTypeForReg(),
         });
       } catch (err) {
-        console.error('[trackActivity]', err);
+        console.error('[logUserRegistrationReliable]', err);
       }
       
       setSuccessMsg(`Welcome to Ellines Haven, ${form.name.trim()}! Your account has been created. Redirecting…`);
@@ -196,23 +197,14 @@ export default function Register() {
       localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, userEntry]));
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       
-      // Track registration activity and notify admins
+      // ── SERVER-SIDE LOGGING (Reliable, with retry) ──
       try {
-        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
-        await trackActivity({
-          category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
-          title: 'New User Registration',
-          message: `${form.name.trim()} (${emailKey}) created an account`,
-          userEmail: emailKey,
-          userName: form.name.trim(),
-          metadata: {
-            registrationTime: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-          },
-          priority: 'normal',
+        const { logUserRegistrationReliable } = await import('../utils/reliableActivityLogger');
+        await logUserRegistrationReliable(emailKey, form.name.trim(), {
+          device: getDeviceTypeForReg(),
         });
       } catch (err) {
-        console.error('[trackActivity]', err);
+        console.error('[logUserRegistrationReliable]', err);
       }
       
       setSuccessMsg(`Welcome to Ellines Haven, ${form.name.trim()}! Your account has been created. Redirecting…`);

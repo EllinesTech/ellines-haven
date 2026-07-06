@@ -6,6 +6,7 @@ import BookReviews from '../components/BookReviews';
 import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
 import './BookDetail.css';
 
 // Statuses that block purchase entirely — only Notify Me
@@ -218,7 +219,7 @@ function CoverLightbox({ book, onClose }) {
 /* ── Share Book Button ── */
 function ShareBookButton({ book }) {
   const [copied, setCopied] = useState(false);
-  const url = `${window.location.origin}/book/${book.id}`;
+  const url = `${window.location.origin}${bookPath(book)}`;
   const text = `Check out "${book.title}" by ${book.author} on Ellines Haven!`;
 
   const handleShare = async () => {
@@ -309,7 +310,7 @@ export default function BookDetail() {
   const { addToCart, cart, books, user, isOwned, myPerms, siteControls } = useApp();
   const [lightbox, setLightbox] = useState(false);
 
-  const book = books.find(b => b.id === id);
+  const book = findBookBySlugOrId(books, id);
 
   // ── Dynamic page title & OG meta for sharing ──────────────────────────────
   useEffect(() => {
@@ -332,7 +333,7 @@ export default function BookDetail() {
     setMeta('og:title',       `${book.title} by ${book.author}`);
     setMeta('og:description', book.description?.slice(0, 160) || `A ${book.genre} story by ${book.author} — available on Ellines Haven`);
     setMeta('og:type',        'book');
-    setMeta('og:url',         `${window.location.origin}/book/${book.id}`);
+    setMeta('og:url',         `${window.location.origin}${bookPath(book)}`);
     if (book.coverType === 'photo' && book.cover) {
       setMeta('og:image', book.cover);
     }
@@ -534,7 +535,7 @@ export default function BookDetail() {
                 <div className="bd-actions">
                   {owned
                     ? <>
-                        <Link to={`/read/${book.id}`} className="btn btn-primary">Read Now</Link>
+                        <Link to={readPath(book)} className="btn btn-primary">Read Now</Link>
                         {book.driveUrl
                           ? <a href={book.driveUrl.replace('/view', '/export?format=pdf').replace('/preview', '/export?format=pdf')} target="_blank" rel="noopener noreferrer" className="btn btn-outline">Download PDF</a>
                           : <button className="btn btn-outline" disabled title="PDF not yet uploaded">PDF Coming Soon</button>
@@ -618,7 +619,7 @@ export default function BookDetail() {
                     return (
                       <li key={i} className="bd-toc-item bd-toc-item--link">
                         <Link
-                          to={`/read/${book.id}`}
+                          to={readPath(book)}
                           state={{ chapter: i }}
                           className="bd-toc-row"
                         >
@@ -646,7 +647,7 @@ export default function BookDetail() {
               </ol>
               {!owned && !NO_PURCHASE_STATUSES.has(book.status) && (
                 <div className="bd-toc-cta">
-                  <Link to={`/book/${book.id}`} className="btn btn-primary" onClick={() => {
+                  <Link to={bookPath(book)} className="btn btn-primary" onClick={() => {
                     document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
                   }}>
                     Buy to Unlock All Chapters — KSh {book.price}

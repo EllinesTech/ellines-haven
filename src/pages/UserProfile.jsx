@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection, query, where,
 import { db } from '../firebase';
 import UserMessages from '../components/UserMessages';
 import { UserNotificationsPanel } from '../components/UserNotifications';
+import { readPath } from '../utils/slugify';
 import './UserProfile.css';
 
 const WA = '254748255466';
@@ -501,7 +502,7 @@ export default function UserProfile() {
               ) : (
                 <div className="up-books-grid">
                   {library.map(b => (
-                    <Link key={b.id} to={`/read/${b.id}`} className="up-book-card">
+                    <Link key={b.id} to={b.title ? readPath(b) : `/read/${b.id}`} className="up-book-card">
                       {b.cover && b.coverType==='photo'
                         ? <img src={b.cover} alt={b.title} className="up-book-card__img" />
                         : <div className="up-book-card__img up-book-card__img--styled" style={{background:b.coverColor||'linear-gradient(145deg,#0f0f22,#1a1a3a)'}} />

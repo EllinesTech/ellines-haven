@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 import WelcomePrompt from './components/WelcomePrompt';
 import EllineaAI from './components/EllineaAI';
 import EditToolbar from './components/EditToolbar';
+import { initializeActivityLogger } from './utils/reliableActivityLogger';
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -353,6 +354,11 @@ function AutoRefresh() {
 
 /* ── Root App ── */
 export default function App() {
+  // Initialize activity logger on app load
+  useEffect(() => {
+    initializeActivityLogger();
+  }, []);
+
   return (
     <AppProvider>
       <LanguageProvider>

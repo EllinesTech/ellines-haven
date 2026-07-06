@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
+import { bookPath, readPath } from '../utils/slugify';
 import './MyLibrary.css';
 
 // Helper: get a map of bookId -> progress for current user
@@ -167,7 +168,7 @@ function ReadingStats({ user, library, catalog, orders }) {
             <strong>Last Read</strong>
             <p>{lastReadBook.title} <span style={{ color:'var(--muted)', fontSize:'0.8rem' }}>— {lastReadDate}</span></p>
           </div>
-          <Link to={`/read/${lastReadBook.id}`} className="btn btn-outline btn-sm" style={{ flexShrink:0 }}>
+          <Link to={readPath(lastReadBook)} className="btn btn-outline btn-sm" style={{ flexShrink:0 }}>
             Continue →
           </Link>
         </div>
@@ -784,7 +785,7 @@ export default function MyLibrary() {
 
                         <div className="mylib-card__actions">
                           {canRead
-                            ? <Link to={`/read/${b.id}`} className="btn btn-primary btn-sm">📖 Read Now</Link>
+                            ? <Link to={readPath(b)} className="btn btn-primary btn-sm">📖 Read Now</Link>
                             : <span className="btn btn-primary btn-sm mylib-disabled" title={reason}>📖 Read Now</span>
                           }
                           {b.downloadUnlocked && canDl && b.driveUrl
@@ -795,7 +796,7 @@ export default function MyLibrary() {
                                 ? <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
                                 : null
                           }
-                          <Link to={`/book/${b.id}`} className="btn btn-ghost btn-sm">Details</Link>
+                          <Link to={bookPath(b)} className="btn btn-ghost btn-sm">Details</Link>
                           {removingBook === b.id ? (
                             <span className="mylib-remove-confirm">
                               Remove?{' '}

@@ -10,6 +10,7 @@ import { GENRES } from '../data/books';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAllReadingStats } from '../hooks/useReadingProgress';
+import { bookPath, readPath } from '../utils/slugify';
 import './Home.css';
 
 /* ── Firestore-backed site content (editable via Page Editor) ── */
@@ -236,7 +237,7 @@ function PersonalisedSection({ user, library, books }) {
             </h3>
             <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
               {inProgress.map(b => (
-                <Link key={b.id} to={`/read/${b.id}`} style={{
+                <Link key={b.id} to={readPath(b)} style={{
                   display:'flex', alignItems:'center', gap:14, flex:'1 1 260px', maxWidth:400,
                   padding:'12px 16px', borderRadius:'var(--r-sm)',
                   background:'rgba(255,255,255,0.03)', border:'1px solid rgba(201,168,76,0.2)',
@@ -283,7 +284,7 @@ function PersonalisedSection({ user, library, books }) {
             </h3>
             <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
               {notStarted.map(b => (
-                <Link key={b.id} to={`/read/${b.id}`} style={{
+                <Link key={b.id} to={readPath(b)} style={{
                   display:'flex', alignItems:'center', gap:12,
                   padding:'10px 14px', borderRadius:'var(--r-sm)',
                   background:'rgba(255,255,255,0.02)', border:'1px solid var(--dim)',
@@ -430,7 +431,7 @@ export default function Home() {
               <div className="hero__poster-shine" />
             </div>
             {spotlight && (
-              <Link to={`/book/${spotlight.id}`} className="hero__float-card">
+              <Link to={bookPath(spotlight)} className="hero__float-card">
                 <img src={spotlight.cover} alt={spotlight.title} className="hero__float-cover" />
                 <div className="hero__float-info">
                   <span className="badge badge-gold" style={{fontSize:'.6rem'}}>New Release</span>
@@ -489,7 +490,7 @@ export default function Home() {
             </div>
             <div className="cs-grid">
               {comingSoon.map((b, i) => (
-                <Link key={b.id} to={`/book/${b.id}`} className={`cs-card${i === 0 ? ' cs-card--hero' : ''}`}>
+                <Link key={b.id} to={bookPath(b)} className={`cs-card${i === 0 ? ' cs-card--hero' : ''}`}>
                   {/* cover / art */}
                   <div className="cs-card__art">
                     {b.coverType === 'photo' && b.cover
@@ -544,7 +545,7 @@ export default function Home() {
             </div>
             <div className="new-releases-row">
               {newReleases.map(b => (
-                <Link key={b.id} to={`/book/${b.id}`} className="new-release-card card">
+                <Link key={b.id} to={bookPath(b)} className="new-release-card card">
                   <div className="new-release-card__img-wrap">
                     {b.coverType === 'photo' && b.cover
                       ? <img src={b.cover} alt={b.title} className="new-release-card__img" />

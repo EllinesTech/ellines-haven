@@ -1217,3 +1217,196 @@ exports.sendSmsBroadcast = onCall(
     return { success: true, sent: sentCount, failed: failCount };
   }
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Server-Side Activity Tracking (Reliable, Cross-Device) ───────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Track user login server-side (called after auth verification)
+ * This ensures logins are ALWAYS recorded, even if client-side tracking fails
+ */
+exports.logUserLoginServer = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { userEmail, userName, metadata = {} } = request.data;
+    
+    if (!userEmail) {
+      throw new HttpsError("invalid-argument", "userEmail is required");
+    }
+
+    try {
+      // Extract real IP from request headers (same as trackVisitor)
+      const xForwardedFor = request.rawRequest?.headers["x-forwarded-for"] || "";
+      const xRealIp       = request.rawRequest?.headers["x-real-ip"]       || "";
+      const cfConnecting  = request.rawRequest?.headers["cf-connecting-ip"] || "";
+      const fastlyClient  = request.rawRequest?.headers["fastly-client-ip"]|| "";
+      
+      const rawIp = cfConnecting || fastlyClient || xRealIp || xForwardedFor.split(",")[0].trim() || "unknown";
+      const clientIp = rawIp.replace(/^::ffff:/, "").trim();
+
+      // Create activity record
+      const activityId = "act_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      const activityData = {
+        id: activityId,
+        category: "user_login",
+        userEmail: userEmail.toLowerCase(),
+        userName: userName || userEmail,
+        title: "User Login",
+        message: `${userName || userEmail} logged in`,
+        icon: "🔐",
+        clientIp,
+        userAgent: metadata.userAgent || request.rawRequest?.headers["user-agent"] || "",
+        device: metadata.device || "Unknown",
+        metadata: {
+          ...metadata,
+          loginTime: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
+        },
+        priority: "low",
+        read: false,
+        readBy: [],
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAtMs: Date.now(),
+      };
+
+      // Write to admin notifications (for admin dashboard)
+      await db.collection("admin_notifications").doc(activityId).set(activityData);
+
+      // Write to activity logs (for historical tracking)
+      const logId = "log_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      await db.collection("activity_logs").doc(logId).set({
+        id: logId,
+        ...activityData,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Create a user session record for cross-device tracking
+      const sessionId = "session_" + userEmail.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Date.now();
+      await db.collection("user_sessions").doc(sessionId).set({
+        userEmail: userEmail.toLowerCase(),
+        sessionId,
+        loginTime: admin.firestore.FieldValue.serverTimestamp(),
+        ip: clientIp,
+        device: metadata.device || "Unknown",
+        userAgent: metadata.userAgent || "",
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      });
+
+      console.log("[logUserLoginServer] Login recorded for", userEmail, "from IP:", clientIp);
+      return { success: true, activityId, sessionId };
+    } catch (err) {
+      console.error("[logUserLoginServer] error:", err.message);
+      throw new HttpsError("internal", "Failed to log login activity");
+    }
+  }
+);
+
+/**
+ * Track user registration server-side
+ */
+exports.logUserRegistrationServer = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { userEmail, userName, metadata = {} } = request.data;
+    
+    if (!userEmail) {
+      throw new HttpsError("invalid-argument", "userEmail is required");
+    }
+
+    try {
+      const xForwardedFor = request.rawRequest?.headers["x-forwarded-for"] || "";
+      const xRealIp       = request.rawRequest?.headers["x-real-ip"]       || "";
+      const cfConnecting  = request.rawRequest?.headers["cf-connecting-ip"] || "";
+      const fastlyClient  = request.rawRequest?.headers["fastly-client-ip"]|| "";
+      
+      const rawIp = cfConnecting || fastlyClient || xRealIp || xForwardedFor.split(",")[0].trim() || "unknown";
+      const clientIp = rawIp.replace(/^::ffff:/, "").trim();
+
+      const activityId = "act_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      const activityData = {
+        id: activityId,
+        category: "user_registration",
+        userEmail: userEmail.toLowerCase(),
+        userName: userName || userEmail,
+        title: "User Registration",
+        message: `New user registered: ${userName || userEmail}`,
+        icon: "👤",
+        clientIp,
+        userAgent: metadata.userAgent || "",
+        device: metadata.device || "Unknown",
+        metadata: {
+          ...metadata,
+          registrationTime: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
+        },
+        priority: "normal",
+        read: false,
+        readBy: [],
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAtMs: Date.now(),
+      };
+
+      await db.collection("admin_notifications").doc(activityId).set(activityData);
+      
+      const logId = "log_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      await db.collection("activity_logs").doc(logId).set({
+        id: logId,
+        ...activityData,
+      });
+
+      console.log("[logUserRegistrationServer] Registration recorded for", userEmail);
+      return { success: true, activityId };
+    } catch (err) {
+      console.error("[logUserRegistrationServer] error:", err.message);
+      throw new HttpsError("internal", "Failed to log registration activity");
+    }
+  }
+);
+
+/**
+ * Get user's cross-device login history
+ */
+exports.getUserLoginHistory = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { userEmail } = request.data;
+    
+    if (!userEmail) {
+      throw new HttpsError("invalid-argument", "userEmail is required");
+    }
+
+    try {
+      const sessions = await db
+        .collection("user_sessions")
+        .where("userEmail", "==", userEmail.toLowerCase())
+        .orderBy("loginTime", "desc")
+        .limit(50)
+        .get();
+
+      return {
+        success: true,
+        sessions: sessions.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          loginTime: doc.data().loginTime?.toDate?.() || new Date(doc.data().loginTime),
+        })),
+      };
+    } catch (err) {
+      console.error("[getUserLoginHistory] error:", err.message);
+      throw new HttpsError("internal", "Failed to fetch login history");
+    }
+  }
+);

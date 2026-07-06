@@ -5,6 +5,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useReadingProgress } from '../hooks/useReadingProgress';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { findBookBySlugOrId, bookPath } from '../utils/slugify';
 import './Reader.css';
 
 /* ─────────────────────────────────────────────
@@ -431,7 +432,7 @@ export default function Reader() {
   const { id } = useParams();
   const location = useLocation();
   const { books, user, isOwned, library, myPerms, libLoaded } = useApp();
-  const book = books.find(b => b.id === id);
+  const book = findBookBySlugOrId(books, id);
   const readerRef = useRef(null);
 
   // Support deep-linking to a specific chapter from BookDetail TOC
@@ -448,18 +449,18 @@ export default function Reader() {
   //    immediately visible to readers without waiting for cache expiry ────────
   const [liveChapters, setLiveChapters] = useState(null);
   useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, 'book_chapters', String(id)))
+    if (!book?.id) return;
+    getDoc(doc(db, 'book_chapters', String(book.id)))
       .then(snap => {
         if (snap.exists() && snap.data().chapters?.length > 0) {
           setLiveChapters(snap.data().chapters);
         }
       })
       .catch(() => {}); // silently fall back to context chapters
-  }, [id]);
+  }, [book?.id]); // eslint-disable-line
 
   // ── Reading progress ──────────────────────────────────────────────────────
-  const { getProgress, saveProgress } = useReadingProgress(user?.email, id);
+  const { getProgress, saveProgress } = useReadingProgress(user?.email, book?.id);
 
   // Support deep-linking to a specific chapter — switch to text mode automatically
   useEffect(() => {
@@ -496,14 +497,14 @@ export default function Reader() {
   // Ownership check — uses Firestore-backed library state from AppContext
   const checkOwned = useCallback(() => {
     if (!user) return false;
-    return isOwned(id);
-  }, [user, isOwned, id]);
+    return isOwned(book?.id ?? id);
+  }, [user, isOwned, book?.id, id]);
 
   // Get the owned book entry (includes driveUrl set at unlock time)
   const getOwnedBook = useCallback(() => {
     if (!user) return null;
-    return library.find(x => x.id === id) || null;
-  }, [user, library, id]);
+    return library.find(x => x.id === (book?.id ?? id)) || null;
+  }, [user, library, book?.id, id]);
 
   /* ── DRM: block right-click, copy, print on the reader element ── */
   useEffect(() => {
@@ -567,7 +568,7 @@ export default function Reader() {
         <div className="reader-error__icon">🛒</div>
         <h2>Purchase required</h2>
         <p>Buy this book to unlock reading and download access.</p>
-        <Link to={`/book/${book.id}`} className="btn btn-primary">Buy — KSh {book.price}</Link>
+        <Link to={bookPath(book)} className="btn btn-primary">Buy — KSh {book.price}</Link>
       </div>
     );
   }
@@ -582,7 +583,7 @@ export default function Reader() {
   );
 
   // Per-book deactivation check
-  const ownedEntry = library.find(x => x.id === id);
+  const ownedEntry = library.find(x => x.id === (book?.id ?? id));
   if (ownedEntry?.active === false || ownedEntry?.readDeactivated === true) {
     const reason = ownedEntry?.deactivationReason || 'Access to this book has been restricted by the administrator.';
     return (

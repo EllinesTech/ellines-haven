@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import WishlistButton from './WishlistButton';
+import { bookPath, readPath } from '../utils/slugify';
 import './BookCard.css';
 
 // Statuses where buying is not applicable
@@ -158,7 +159,7 @@ export default function BookCard({ book }) {
       <div className="bcard__img-wrap">
         <BookCover book={book} />
         <div className="bcard__overlay">
-          <Link to={`/book/${book.id}`} className="btn btn-primary btn-sm">View Book</Link>
+          <Link to={bookPath(book)} className="btn btn-primary btn-sm">View Book</Link>
         </div>
         {/* Wishlist button — top right corner, always visible */}
         <div className="bcard__wishlist-btn" onClick={e => e.stopPropagation()}>
@@ -168,7 +169,7 @@ export default function BookCard({ book }) {
         {NO_PURCHASE_STATUSES.has(book.status) && (
           <div style={{ position:'absolute', inset:0, background:'rgba(10,10,20,0.55)', backdropFilter:'blur(2px)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', zIndex:4, gap:8 }}>
             <BookStatusBadge status={book.status} />
-            <Link to={`/book/${book.id}`} className="btn btn-sm" style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)', fontSize:'0.72rem' }}>
+            <Link to={bookPath(book)} className="btn btn-sm" style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)', fontSize:'0.72rem' }}>
               Preview →
             </Link>
           </div>
@@ -191,7 +192,7 @@ export default function BookCard({ book }) {
             )}
           </div>
         )}
-        <h3 className="bcard__title"><Link to={`/book/${book.id}`}>{book.title}</Link></h3>
+        <h3 className="bcard__title"><Link to={bookPath(book)}>{book.title}</Link></h3>
         <p className="bcard__author">by {book.author}</p>
         <p className="bcard__excerpt">{book.excerpt}</p>
         {book.inspired && book.inspiredNote && (
@@ -216,7 +217,7 @@ export default function BookCard({ book }) {
           }
           <div style={{ display:'flex', gap:6, alignItems:'center' }}>
             {owned
-              ? <Link to={`/read/${book.id}`} className="btn btn-outline btn-sm">Read</Link>
+              ? <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>
               : NO_PURCHASE_STATUSES.has(book.status)
                 ? <NotifyMeBtn book={book} user={user} />
                 : NOTIFY_STATUSES.has(book.status)

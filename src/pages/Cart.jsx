@@ -5,6 +5,7 @@ import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'fir
 import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder } from '../firebase';
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
+import { bookPath } from '../utils/slugify';
 import './Cart.css';
 
 // Paystack public key — live key
@@ -1034,7 +1035,7 @@ export default function Cart() {
 
                 {cart.map(b => (
                   <div key={b.id} className="cart-item card">
-                    <Link to={`/book/${b.id}`} className="cart-item__img-wrap">
+                    <Link to={bookPath(b)} className="cart-item__img-wrap">
                       <img
                         src={b.cover || '/logo-icon.png'}
                         alt={b.title}
@@ -1044,7 +1045,7 @@ export default function Cart() {
                     </Link>
                     <div className="cart-item__info">
                       <span className="cart-item__genre">{b.genre}</span>
-                      <h3><Link to={`/book/${b.id}`}>{b.title}</Link></h3>
+                      <h3><Link to={bookPath(b)}>{b.title}</Link></h3>
                       <p className="cart-item__author">by {b.author}</p>
                       <p className="cart-item__meta">{b.pages} pages · {b.readTime}</p>
                       <div className="cart-item__actions">
@@ -1052,7 +1053,7 @@ export default function Cart() {
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                           Remove
                         </button>
-                        <Link to={`/book/${b.id}`} className="cart-item__view">View details</Link>
+                        <Link to={bookPath(b)} className="cart-item__view">View details</Link>
                       </div>
                     </div>
                     <div className="cart-item__right">
