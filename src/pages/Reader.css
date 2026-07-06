@@ -345,6 +345,35 @@
   font-weight: 600;
 }
 
+/* Part label divider inside the chapter tabs navigation */
+.reader__ch-part-divider {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c9a84c;
+  padding: 10px 14px 4px;
+  opacity: 0.85;
+}
+
+/* Part header — shown before the first chapter of each new part */
+.reader__part {
+  text-align: center;
+  margin: 2.4em 0 1.2em;
+  padding: 1.2em 0;
+  border-top: 1px solid rgba(201,168,76,0.4);
+  border-bottom: 1px solid rgba(201,168,76,0.4);
+}
+.reader__part-label {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #c9a84c;
+}
+
 /* Chapter heading */
 .reader__chapter {
   font-family: 'Playfair Display', Georgia, serif;
@@ -455,14 +484,44 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .reader { --reader-nav-h: 56px; --reader-wm-h: 32px; }
-  .reader__nav { padding: 0 14px; }
+  .reader__nav { padding: 0 10px; gap: 8px; }
   .reader__info { display: none; }
-  .reader__page { padding: 32px 20px; }
-  .reader__body { padding: 20px 10px 60px; }
+  .reader__page { padding: 28px 16px; }
+  .reader__body { padding: 16px 8px 60px; }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - 100px); }
-  .reader__mode-btn { padding: 5px 8px; font-size: 0.7rem; }
+  .reader__mode-btn { padding: 5px 7px; font-size: 0.68rem; }
   .reader__text p:first-child::first-letter { font-size: 2.4em; }
+
+  /* Download button: icon only on mobile */
+  .reader__nav-right a[title="Download PDF"] {
+    padding: 4px 8px;
+    font-size: 0;          /* hide text */
+  }
+  .reader__nav-right a[title="Download PDF"]::after {
+    content: '⬇';
+    font-size: 1rem;
+  }
+
+  /* Zoom group — compact */
+  .reader__zoom-group {
+    padding: 2px 4px;
+    gap: 2px;
+  }
+  .reader__zoom-label { min-width: 30px; font-size: 0.68rem; }
+  .reader__font-btn   { padding: 4px 6px; font-size: 0.72rem; }
+
+  /* Nav right: tighter */
+  .reader__nav-right { gap: 5px; }
+}
+
+/* ── Very small phones ── */
+@media (max-width: 380px) {
+  .reader__back { font-size: 0.75rem; }
+  .reader__mode-btn { padding: 4px 5px; font-size: 0.64rem; }
+
+  /* Hide zoom group on very small phones to save space */
+  .reader__zoom-group { display: none; }
 }
 
 /* ══════════════════════════════════════════
@@ -616,6 +675,10 @@
   position: relative;
   cursor: pointer;
   transition: height 0.15s;
+  /* Larger touch target */
+  padding: 10px 0;
+  margin: -10px 0;
+  box-sizing: content-box;
 }
 .audio-player__track:hover { height: 6px; }
 .audio-player__fill {
@@ -861,44 +924,46 @@
 
 /* ── Tablet responsive ── */
 @media (max-width: 768px) {
-  /* Stack the three-column player into a vertical layout */
+  /* Switch to full-width stacked layout */
   .audio-player {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     padding: 14px 14px 12px;
     gap: 10px;
+    align-items: flex-start;
   }
 
-  /* Top row: info + gear side-by-side */
+  /* Info takes most of the top row */
   .audio-player__info {
     min-width: 0;
     flex: 1;
-    width: 100%;
+    order: 0;
   }
 
-  /* Centre takes full width */
-  .audio-player__centre {
-    min-width: 0;
-    width: 100%;
-    order: 2;
-  }
-
-  /* Right: speed pills + gear on one row under info */
+  /* Gear button moves to top-right corner */
   .audio-player__right {
-    width: 100%;
-    justify-content: space-between;
     order: 1;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: flex-end;
     gap: 6px;
   }
 
-  /* Speed pills wrap nicely */
-  .audio-speed-pills {
-    flex-wrap: wrap;
-    gap: 4px;
-    flex: 1;
+  /* Hide speed pills from the right section on mobile — shown in settings panel */
+  .audio-player__right .audio-speed-pills {
+    display: none;
   }
 
-  /* Settings panel goes last */
+  /* Centre (controls + progress) spans full width below info */
+  .audio-player__centre {
+    flex: 0 0 100%;
+    min-width: 0;
+    order: 2;
+  }
+
+  /* Settings panel spans full width at the bottom */
   .audio-settings {
+    flex: 0 0 100%;
     order: 3;
   }
 
@@ -923,15 +988,20 @@
     gap: 5px;
   }
 
+  /* Speed pills in settings wrap and fill space */
+  .audio-settings .audio-speed-pills {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Show speed pills in settings since we hid them from the right section */
+  /* The speed row in settings already shows them */
+
   /* Pitch slider full width */
   .audio-slider {
     width: 100%;
     min-width: 0;
-  }
-
-  /* Speed pills in settings panel */
-  .audio-settings .audio-speed-pills {
-    width: 100%;
   }
 
   /* Dropdown list: don't overflow viewport */
@@ -939,8 +1009,8 @@
     max-height: 200px;
   }
 
-  .audio-btn { width: 32px; height: 32px; font-size: 0.9rem; }
-  .audio-btn--play { width: 44px; height: 44px; font-size: 1.1rem; }
+  .audio-btn { width: 34px; height: 34px; font-size: 0.9rem; }
+  .audio-btn--play { width: 46px; height: 46px; font-size: 1.1rem; }
 }
 
 /* ── Small phones ── */
@@ -951,29 +1021,39 @@
   }
 
   .audio-player__icon { font-size: 1.4rem; }
+  .audio-player__title { font-size: 0.78rem; }
+  .audio-player__sub { font-size: 0.64rem; }
 
   .audio-speed-pill {
     padding: 4px 8px;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
   }
 
   .audio-filter-btn {
-    font-size: 0.7rem;
-    padding: 4px 10px;
+    font-size: 0.68rem;
+    padding: 4px 9px;
   }
 
   .audio-settings__row label {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
   }
 
-  /* Progress bar area */
+  /* Progress bar time labels */
   .audio-player__time {
-    font-size: 0.62rem;
-    min-width: 28px;
+    font-size: 0.6rem;
+    min-width: 26px;
   }
 
-  /* Gear button stays right-aligned */
+  /* Gear button compact */
   .audio-btn--gear {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
     flex-shrink: 0;
+  }
+
+  /* Neural badges smaller on tiny screens */
+  .audio-neural-badge {
+    display: none;
   }
 }

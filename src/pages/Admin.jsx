@@ -2877,14 +2877,26 @@ export default function Admin() {
 
   return (
     <div className={`adm${sidebarCollapsed ? ' adm--collapsed' : ''}${mobileSidebarOpen ? ' adm--mobile-open' : ''}`}>
-      {/* ── Sidebar toggle — works as hamburger on mobile, collapse on desktop ── */}
+      {/* ── Sidebar toggle — hamburger on mobile, collapse arrow on desktop ── */}
       <button
         className="adm-sidebar-toggle"
         onClick={toggleSidebar}
         title={mobileSidebarOpen ? 'Close menu' : sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         aria-label="Toggle sidebar"
       >
-        {mobileSidebarOpen ? '✕' : sidebarCollapsed ? '→' : '☰'}
+        <span>{mobileSidebarOpen ? '✕' : '☰'}</span>
+        {/* Show current section name in the mobile top bar */}
+        {!mobileSidebarOpen && (
+          <span className="adm-sidebar-toggle__title" style={{
+            fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            flex: 1,
+          }}>
+          {navItems.find(n => n.k === tab)?.label || 'Admin'}</span>
+        )}
+        {!mobileSidebarOpen && (
+          <img src="/logo-nobg3.png" alt="" style={{ width: 30, height: 30, objectFit: 'contain', marginLeft: 'auto', opacity: 0.85 }} />
+        )}
       </button>
 
       {/* ── Mobile backdrop — tap to close sidebar ── */}
