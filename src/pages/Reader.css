@@ -350,10 +350,21 @@
   font-family: 'Playfair Display', Georgia, serif;
   font-size: 1.35rem;
   color: #2c1f10;
-  margin: 0 0 1.8em;
+  margin: 0 0 0.5em;
   padding-bottom: 0.6em;
   border-bottom: 1px solid rgba(201,168,76,0.3);
   font-weight: 700;
+}
+
+/* Chapter subtitle — the scene/setting line below chapter title */
+.reader__chapter-sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.92rem;
+  color: #c9a84c;
+  font-style: italic;
+  margin: 0 0 1.8em;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
 }
 
 /* Body text — the reading experience */
