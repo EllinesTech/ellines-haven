@@ -1,32 +1,66 @@
-// Convert a book title to a URL slug
-// "19 Days" → "19-days"
-// "Marriage Is a Scam" → "marriage-is-a-scam"
-export function slugify(title = '') {
+/**
+ * Convert a book title to a URL-friendly slug
+ * Examples: "Marriage Is a Scam" → "marriage-is-a-scam", "19 Days" → "19-days"
+ */
+export function titleToSlug(title) {
+  if (!title) return '';
+  
   return title
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '')   // remove special chars except spaces and hyphens
-    .replace(/\s+/g, '-')            // spaces → hyphens
-    .replace(/-+/g, '-')             // collapse multiple hyphens
-    .replace(/^-|-$/g, '');          // trim leading/trailing hyphens
+    .replace(/[àáâäæ]/g, 'a')
+    .replace(/[èéêë]/g, 'e')
+    .replace(/[ìíîï]/g, 'i')
+    .replace(/[òóôöœ]/g, 'o')
+    .replace(/[ùúûü]/g, 'u')
+    .replace(/[ýÿ]/g, 'y')
+    .replace(/[ñ]/g, 'n')
+    .replace(/[ç]/g, 'c')
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 }
 
-// Find a book from the books array by either its numeric id OR its title slug
-// Returns undefined if not found
-export function findBookBySlugOrId(books, slugOrId) {
-  if (!books || !slugOrId) return undefined;
-  // Try exact id match first
-  const byId = books.find(b => String(b.id) === String(slugOrId));
-  if (byId) return byId;
-  // Try slug match
-  return books.find(b => slugify(b.title) === slugOrId);
+/**
+ * Get the slug for a book object
+ */
+export function getBookSlug(book) {
+  return titleToSlug(book?.title || '');
 }
 
-// Get the slug URL for a book
+/**
+ * Generate book detail URL using book slug
+ * Falls back to numeric ID if book has no title
+ */
 export function bookPath(book) {
-  return `/book/${slugify(book.title)}`;
+  if (!book) return '/book/unknown';
+  const slug = getBookSlug(book);
+  return slug ? `/book/${slug}` : `/book/${book.id}`;
 }
 
+/**
+ * Generate reader URL using book slug
+ * Falls back to numeric ID if book has no title
+ */
 export function readPath(book) {
-  return `/read/${slugify(book.title)}`;
+  if (!book) return '/read/unknown';
+  const slug = getBookSlug(book);
+  return slug ? `/read/${slug}` : `/read/${book.id}`;
+}
+
+/**
+ * Find a book by slug or numeric ID
+ * Used by Reader and BookDetail components to resolve URL params
+ */
+export function findBookBySlugOrId(books, slugOrId) {
+  if (!slugOrId || !books) return null;
+  
+  // Try numeric ID first (fast exact match)
+  let book = books.find(b => b.id === slugOrId);
+  if (book) return book;
+  
+  // Try slug match
+  book = books.find(b => getBookSlug(b) === slugOrId);
+  return book || null;
 }

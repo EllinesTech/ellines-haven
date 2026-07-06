@@ -397,16 +397,16 @@ function toDriveEmbed(url) {
 ───────────────────────────────────────────── */
 const FALLBACK_CONTENT = {
   '1': [
-    { title:'Chapter 1 — The Agreement', text:`The lobola negotiations had gone on for three days. By the end of the third evening, when the men shook hands across the low table in the sitting room, everyone agreed it had been handled well.\n\nExcept Zawadi.\n\nShe stood in the kitchen doorway and watched her father pour a second round of muratina, and she thought about the word "handled." Like she was a transaction. Like her whole life was a column of figures that balanced to someone's satisfaction.\n\n"You should be proud," her aunt told her later, helping to clear the cups. "A man who negotiates like that loves you properly."\n\nZawadi smiled. She had learned that smile many years ago — the one that kept the peace, the one that closed conversations, the one that looked like agreement from the outside while everything inside continued at its own pace.`},
-    { title:'Chapter 2 — Six Months In', text:`Marriage, Zawadi discovered, was a series of small negotiations no one had prepared her for.\n\nNot the big ones — who paid which bill, whose family came for Christmas, whether to have children now or later. Those she had anticipated. She had answers ready, positions prepared, compromises pre-calculated.\n\nIt was the small ones that undid her.\n\nWho slept on which side of the bed. Whether the lights stayed on or off when they talked late. How long a silence could last before it became an argument.\n\nSix months in, she was still learning the grammar of this new country she lived in. The country called marriage.`},
+    { title:'Chapter 1 — The Agreement', subtitle:'A Young Man With Big Dreams · Karen, Nairobi — 2013', text:`The lobola negotiations had gone on for three days. By the end of the third evening, when the men shook hands across the low table in the sitting room, everyone agreed it had been handled well.\n\nExcept Zawadi.\n\nShe stood in the kitchen doorway and watched her father pour a second round of muratina, and she thought about the word "handled." Like she was a transaction. Like her whole life was a column of figures that balanced to someone's satisfaction.\n\n"You should be proud," her aunt told her later, helping to clear the cups. "A man who negotiates like that loves you properly."\n\nZawadi smiled. She had learned that smile many years ago — the one that kept the peace, the one that closed conversations, the one that looked like agreement from the outside while everything inside continued at its own pace.`},
+    { title:'Chapter 2 — Six Months In', subtitle:'When the Honeymoon Ends', text:`Marriage, Zawadi discovered, was a series of small negotiations no one had prepared her for.\n\nNot the big ones — who paid which bill, whose family came for Christmas, whether to have children now or later. Those she had anticipated. She had answers ready, positions prepared, compromises pre-calculated.\n\nIt was the small ones that undid her.\n\nWho slept on which side of the bed. Whether the lights stayed on or off when they talked late. How long a silence could last before it became an argument.\n\nSix months in, she was still learning the grammar of this new country she lived in. The country called marriage.`},
   ],
   '2': [
-    { title:'Chapter 1 — The Weight', text:`Pain is not dramatic. That is the first lie they tell you.\n\nIn films, pain arrives with music — low strings, a single piano note, rain against a window. In real life, it arrives in the middle of an ordinary Tuesday. While you are making tea. While you are answering an email.\n\nKamau's Tuesday was a Wednesday, actually. The ninth of August. He had been up since five, the way he always was, because the body remembers its own rhythms even when everything else forgets them.\n\nHe had made the tea. He had opened the curtains. He had sat down at the table with the intention of working.\n\nThen the phone rang.`},
+    { title:'Chapter 1 — The Weight', subtitle:'Nairobi, an Ordinary Wednesday', text:`Pain is not dramatic. That is the first lie they tell you.\n\nIn films, pain arrives with music — low strings, a single piano note, rain against a window. In real life, it arrives in the middle of an ordinary Tuesday. While you are making tea. While you are answering an email.\n\nKamau's Tuesday was a Wednesday, actually. The ninth of August. He had been up since five, the way he always was, because the body remembers its own rhythms even when everything else forgets them.\n\nHe had made the tea. He had opened the curtains. He had sat down at the table with the intention of working.\n\nThen the phone rang.`},
   ],
   '11': [
-    { title:'Day 1 — The Call', text:`Nineteen days. That is all it took.\n\nKe did not know, on the morning of the first day, that everything was about to change. He was standing at the window of his apartment, watching the early Nairobi traffic crawl below, coffee cup in hand, the same Tuesday routine he had maintained for three years.\n\nThen his phone rang.\n\nHe did not recognise the number. He almost did not answer. Later, he would think about that — how close he came to letting it ring out, to going on with his ordinary Tuesday, to never knowing.\n\nBut he answered.`},
-    { title:'Day 3 — The Decision', text:`By the third day, Ke understood that there was no going back.\n\nThe choice that had been placed before him was not the kind you could unmake. It was the kind that sat in your chest and rearranged things — quietly, permanently, without asking permission.\n\nHe had not slept. He had walked the city instead. Seven hours through streets he had known his whole life, seeing them differently, as if the news had changed the light.\n\nNairobi had never looked so much like itself. Raw and complicated and full of a beauty that only showed up when you were paying the kind of attention that came with loss.`},
-    { title:'Day 7 — The Truth', text:`On the seventh day, the truth arrived in the form of a letter.\n\nNot a message. Not an email. An actual letter, handwritten, slid under his door at some point between midnight and six in the morning.\n\nKe read it three times. The first time for facts. The second time for meaning. The third time because he could not believe what the first two times had told him.\n\nSomeone had known. Someone had always known. And they had chosen, for seven years, to say nothing.\n\nThe question was no longer what had happened. The question was why.`},
+    { title:'Day 1 — The Call', subtitle:'Nairobi · A Tuesday Morning', text:`Nineteen days. That is all it took.\n\nKe did not know, on the morning of the first day, that everything was about to change. He was standing at the window of his apartment, watching the early Nairobi traffic crawl below, coffee cup in hand, the same Tuesday routine he had maintained for three years.\n\nThen his phone rang.\n\nHe did not recognise the number. He almost did not answer. Later, he would think about that — how close he came to letting it ring out, to going on with his ordinary Tuesday, to never knowing.\n\nBut he answered.`},
+    { title:'Day 3 — The Decision', subtitle:'The Point of No Return', text:`By the third day, Ke understood that there was no going back.\n\nThe choice that had been placed before him was not the kind you could unmake. It was the kind that sat in your chest and rearranged things — quietly, permanently, without asking permission.\n\nHe had not slept. He had walked the city instead. Seven hours through streets he had known his whole life, seeing them differently, as if the news had changed the light.\n\nNairobi had never looked so much like itself. Raw and complicated and full of a beauty that only showed up when you were paying the kind of attention that came with loss.`},
+    { title:'Day 7 — The Truth', subtitle:'What the Letter Said', text:`On the seventh day, the truth arrived in the form of a letter.\n\nNot a message. Not an email. An actual letter, handwritten, slid under his door at some point between midnight and six in the morning.\n\nKe read it three times. The first time for facts. The second time for meaning. The third time because he could not believe what the first two times had told him.\n\nSomeone had known. Someone had always known. And they had chosen, for seven years, to say nothing.\n\nThe question was no longer what had happened. The question was why.`},
   ],
 };
 
@@ -728,7 +728,7 @@ export default function Reader() {
 
       {/* ── Watermark strip ── */}
       <div className="reader__watermark">
-        🔒 Licensed to <strong>{user.name}</strong> ({user.email}) — Personal use only. Sharing or redistribution is prohibited.
+        🔒 Licensed to{' '}<strong>{user.name}</strong>{' '}({user.email}) — Personal use only. Sharing or redistribution is prohibited.
       </div>
 
       {/* ══════════════════════════════
@@ -810,6 +810,9 @@ export default function Reader() {
             )}
 
             <h2 className="reader__chapter">{chapters[chapter]?.title}</h2>
+            {chapters[chapter]?.subtitle && (
+              <p className="reader__chapter-sub">{chapters[chapter].subtitle}</p>
+            )}
 
             <div className="reader__text" style={{ fontSize: fontSize + 'px' }}>
               {(chapters[chapter]?.text || '').split('\n\n').map((p, i) => (
@@ -897,6 +900,9 @@ export default function Reader() {
             )}
 
             <h2 className="reader__chapter">{chapters[chapter]?.title}</h2>
+            {chapters[chapter]?.subtitle && (
+              <p className="reader__chapter-sub">{chapters[chapter].subtitle}</p>
+            )}
 
             {/* Follow-along text */}
             <div className="reader__text reader__text--listen" style={{ fontSize: fontSize + 'px' }}>

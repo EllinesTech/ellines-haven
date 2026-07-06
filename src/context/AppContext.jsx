@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { BOOKS as INITIAL_BOOKS } from '../data/books';
+import { titleToSlug } from '../utils/slugify';
 import {
   doc, getDoc, setDoc, updateDoc,
   collection, onSnapshot, serverTimestamp,
@@ -598,6 +599,17 @@ export function AppProvider({ children }) {
 
   const logout = () => setUser(null);
 
+  // ── Book lookup by slug or ID ─────────────────────────────────────────────
+  const getBookBySlugOrId = (slugOrId) => {
+    if (!slugOrId) return null;
+    // Try numeric ID first (fast exact match)
+    let book = books.find(b => b.id === slugOrId);
+    if (book) return book;
+    // Try slug match
+    book = books.find(b => titleToSlug(b.title) === slugOrId);
+    return book || null;
+  };
+
   return (
     <Ctx.Provider value={{
       user, setUser, logout,
@@ -616,6 +628,8 @@ export function AppProvider({ children }) {
       siteControls, saveSiteControls,
       // Wishlist
       wishlist, toggleWishlist, isWishlisted,
+      // Book lookup by slug or ID
+      getBookBySlugOrId,
     }}>
       {children}
     </Ctx.Provider>

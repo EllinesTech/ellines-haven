@@ -835,6 +835,11 @@ function BookForm({ initial, onSave, onCancel }) {
                       <input className="field" value={ch.title||''} placeholder="e.g. Chapter 1 — The Beginning"
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,title:e.target.value}:c))}/>
                     </div>
+                    <div className="adm-field-group" style={{marginBottom:10}}>
+                      <label>Chapter Subtitle <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional — appears below chapter title in reader)</span></label>
+                      <input className="field" value={ch.subtitle||''} placeholder="e.g. A Young Man With Big Dreams · Karen, Nairobi — 2013"
+                        onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,subtitle:e.target.value}:c))}/>
+                    </div>
                     <div className="adm-field-group" style={{marginBottom:0}}>
                       <label>Chapter Text <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(paste from Word / Google Docs)</span></label>
                       <textarea className="field" rows={20} value={ch.text||''} placeholder="Paste full chapter text here...&#10;&#10;Paragraphs separated by blank lines will display correctly in the reader."
