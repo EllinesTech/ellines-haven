@@ -441,12 +441,9 @@ export function AppProvider({ children }) {
 
   // ── Books admin ───────────────────────────────────────────────────────────
   const saveBook   = b  => {
-    // Clear local cache so Firestore is re-fetched fresh on next load
-    localStorage.removeItem('eh_books');
     setBooks(p => { const i = p.findIndex(x => x.id === b.id); return i >= 0 ? p.map(x => x.id === b.id ? b : x) : [...p, b]; });
   };
   const deleteBook = id => {
-    localStorage.removeItem('eh_books');
     setBooks(p => p.filter(b => b.id !== id));
   };
   const resetBooks = () => setBooks(INITIAL_BOOKS);

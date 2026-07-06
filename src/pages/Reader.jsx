@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -73,11 +73,15 @@ function getFallbackChapters(book) {
 ───────────────────────────────────────────── */
 export default function Reader() {
   const { id } = useParams();
+  const location = useLocation();
   const { books, user, isOwned, library, myPerms, libLoaded } = useApp();
   const book = books.find(b => b.id === id);
   const readerRef = useRef(null);
 
-  const [chapter,   setChapter]   = useState(0);
+  // Support deep-linking to a specific chapter from BookDetail TOC
+  const initialChapter = location.state?.chapter ?? 0;
+
+  const [chapter,   setChapter]   = useState(initialChapter);
   const [fontSize,  setFontSize]  = useState(17);
   const [zoom,      setZoom]      = useState(100);
   const [mode,      setMode]      = useState('pdf');
@@ -86,6 +90,14 @@ export default function Reader() {
 
   // ── Reading progress ──────────────────────────────────────────────────────
   const { getProgress, saveProgress } = useReadingProgress(user?.email, id);
+
+  // Support deep-linking to a specific chapter — switch to text mode automatically
+  useEffect(() => {
+    if (location.state?.chapter !== undefined) {
+      setMode('text');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // On mount, check for saved progress and offer to resume
   useEffect(() => {
@@ -413,6 +425,7 @@ export default function Reader() {
             {/* Chapter tabs */}
             {chapters.length > 1 && (
               <div className="reader__ch-tabs">
+                <div className="reader__ch-tabs-label">📖 Chapters</div>
                 {chapters.map((ch, i) => (
                   <button key={i} className={'reader__ch-btn' + (i === chapter ? ' on' : '')}
                     onClick={() => { setChapter(i); window.scrollTo(0, 0); }}>

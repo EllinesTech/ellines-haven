@@ -526,7 +526,7 @@ export default function BookDetail() {
                   <NotifyMeDetailBtn book={book} />
                 </div>
               ) : (
-              <div className="bd-purchase">
+              <div className="bd-purchase" id="bd-purchase-section">
                 <div className="bd-price">
                   <small>Price</small>
                   <div><span className="bd-curr">KSh</span><span className="bd-amt">{book.price}</span></div>
@@ -606,14 +606,53 @@ export default function BookDetail() {
                 <h2>Table of Contents</h2>
                 <span className="bd-toc-count">{book.tableOfContents.length} {book.type === 'short-story' ? 'stories' : 'chapters'}</span>
               </div>
+              {!owned && !NO_PURCHASE_STATUSES.has(book.status) && (
+                <div className="bd-toc-gate-note">
+                  🔒 Purchase this book to unlock all chapters and read online
+                </div>
+              )}
               <ol className="bd-toc-list">
-                {book.tableOfContents.map((item, i) => (
-                  <li key={i} className="bd-toc-item">
-                    <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="bd-toc-title">{item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '')}</span>
-                  </li>
-                ))}
+                {book.tableOfContents.map((item, i) => {
+                  const title = item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '');
+                  if (owned) {
+                    return (
+                      <li key={i} className="bd-toc-item bd-toc-item--link">
+                        <Link
+                          to={`/read/${book.id}`}
+                          state={{ chapter: i }}
+                          className="bd-toc-row"
+                        >
+                          <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                          <span className="bd-toc-title">{title}</span>
+                          <span className="bd-toc-arrow">→</span>
+                        </Link>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={i} className="bd-toc-item bd-toc-item--locked">
+                      <span className="bd-toc-row" onClick={() => {
+                        if (!NO_PURCHASE_STATUSES.has(book.status)) {
+                          document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }}>
+                        <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                        <span className="bd-toc-title">{title}</span>
+                        <span className="bd-toc-lock">🔒</span>
+                      </span>
+                    </li>
+                  );
+                })}
               </ol>
+              {!owned && !NO_PURCHASE_STATUSES.has(book.status) && (
+                <div className="bd-toc-cta">
+                  <Link to={`/book/${book.id}`} className="btn btn-primary" onClick={() => {
+                    document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }}>
+                    Buy to Unlock All Chapters — KSh {book.price}
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </section>
