@@ -27,12 +27,15 @@
   display: flex;
   flex-direction: column;
   color: #2c2218;
+  padding-top: 88px; /* space for fixed nav (54px) + watermark strip (34px) */
 }
 
 /* ── Top nav bar ── */
 .reader__nav {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 200;
   background: #2a1f15;
   border-bottom: 2px solid #c9a84c;
@@ -123,10 +126,12 @@
   user-select: none;
 }
 
-/* ── Watermark strip — sticky below nav ── */
+/* ── Watermark strip — fixed below nav ── */
 .reader__watermark {
-  position: sticky;
+  position: fixed;
   top: 54px; /* sits just below the nav bar */
+  left: 0;
+  right: 0;
   z-index: 190;
   background: rgba(44, 33, 20, 0.97);
   backdrop-filter: blur(6px);
