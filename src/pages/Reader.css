@@ -22,12 +22,15 @@
 
 /* ── Base shell ── */
 .reader {
+  --reader-nav-h: 68px;       /* fixed nav bar height */
+  --reader-wm-h: 36px;        /* fixed watermark strip height */
+  --reader-offset: calc(var(--reader-nav-h) + var(--reader-wm-h)); /* 104px total */
   min-height: 100vh;
-  background: #f5f0e8;   /* warm parchment — easy on the eyes */
+  background: #f5f0e8;
   display: flex;
   flex-direction: column;
   color: #2c2218;
-  padding-top: 88px; /* space for fixed nav (54px) + watermark strip (34px) */
+  padding-top: var(--reader-offset);
 }
 
 /* ── Top nav bar ── */
@@ -36,10 +39,11 @@
   top: 0;
   left: 0;
   right: 0;
+  height: var(--reader-nav-h, 68px);
   z-index: 200;
   background: #2a1f15;
   border-bottom: 2px solid #c9a84c;
-  padding: 10px 28px;
+  padding: 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -129,9 +133,10 @@
 /* ── Watermark strip — fixed below nav ── */
 .reader__watermark {
   position: fixed;
-  top: 54px; /* sits just below the nav bar */
+  top: var(--reader-nav-h, 68px);
   left: 0;
   right: 0;
+  height: var(--reader-wm-h, 36px);
   z-index: 190;
   background: rgba(44, 33, 20, 0.97);
   backdrop-filter: blur(6px);
@@ -140,9 +145,14 @@
   color: #7a6a55;
   font-size: 0.72rem;
   text-align: center;
-  padding: 6px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
   letter-spacing: 0.02em;
-  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .reader__watermark strong { color: #c9a84c; }
 
@@ -433,7 +443,8 @@
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .reader__nav { padding: 10px 14px; }
+  .reader { --reader-nav-h: 56px; --reader-wm-h: 32px; }
+  .reader__nav { padding: 0 14px; }
   .reader__info { display: none; }
   .reader__page { padding: 32px 20px; }
   .reader__body { padding: 20px 10px 60px; }
