@@ -33,7 +33,7 @@ const PanelLoader = () => (
 import './Admin.css';
 
 const EMPTY_BOOK = {
-  id: '', title: '', author: 'Elijah Mwangi M', cover: null, coverType: 'styled',
+  id: '', title: '', subtitle: '', author: 'Elijah Mwangi M', cover: null, coverType: 'styled',
   coverColor: 'linear-gradient(145deg,#0f0f22,#1a1a3a)', coverAccent: '#c9a84c',
   genre: 'Drama', genres: [], type: 'novel', price: 250, pages: 0, rating: 5.0, reviews: 0,
   inspired: true, inspiredNote: '', excerpt: '', description: '',
@@ -45,6 +45,7 @@ const EMPTY_BOOK = {
   setting: '', audienceRating: '',
   themes: [], ratingQuote: '', authorNote: '', tableOfContents: [],
   date: new Date().toISOString().slice(0, 10), readTime: '5 hrs',
+  expectedDate: '',
   driveUrl: '', chapters: [],
 };
 
@@ -312,7 +313,7 @@ function CoversTab({books,saveBook,showToast}) {
 
   const removeOne = async p=>{ const next=photos.filter(x=>x.path!==p.path); try{await persist(next);}catch{setPhotos(next);} setSelected(s=>s.filter(x=>x!==p.path)); showToast('Cover removed'); setDelOne(null); };
   const removeBulk= async ()=>{ const next=photos.filter(p=>!selected.includes(p.path)); try{await persist(next);}catch{setPhotos(next);} showToast(selected.length+' deleted'); setSelected([]); setBulkDel(false); };
-  const assign    = b=>{ saveBook({...b,cover:assignTo.url,coverType:'photo'}); showToast('Cover set for "'+b.title+'"'); setAssignTo(null); };
+  const assign    = async b=>{ try { await saveBook({...b,cover:assignTo.url,coverType:'photo'}); showToast('Cover set for "'+b.title+'"'); } catch { showToast('❌ Save failed'); } setAssignTo(null); };
   const toggle    = p=>setSelected(s=>s.includes(p)?s.filter(x=>x!==p):[...s,p]);
   const onSaved   = list=>setPhotos(sorted(list));
 
@@ -508,6 +509,11 @@ function BookForm({ initial, onSave, onCancel }) {
             </div>
 
             <div className="adm-field-group">
+              <label>Subtitle <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional — shown under title on book detail)</span></label>
+              <input className="field" value={form.subtitle||''} onChange={e=>set('subtitle',e.target.value)} placeholder="e.g. By Elijah M. M."/>
+            </div>
+
+            <div className="adm-field-group">
               <label>Author</label>
               <input className="field" value={form.author} onChange={e=>set('author',e.target.value)}/>
             </div>
@@ -671,6 +677,19 @@ function BookForm({ initial, onSave, onCancel }) {
             <div className="adm-field-group">
               <label>Chapter / Story Count</label>
               <input className="field" type="number" min={0} value={form.chapterCount||0} onChange={e=>set('chapterCount',Number(e.target.value))} placeholder="e.g. 28"/>
+            </div>
+
+            <div className="adm-field-group">
+              <label>Release Date <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— shown as "Released: Aug 2024"</span></label>
+              <input className="field" type="date" value={form.date||''} onChange={e=>set('date',e.target.value)}/>
+            </div>
+            <div className="adm-field-group">
+              <label>Review Count <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— shown next to ★ rating</span></label>
+              <input className="field" type="number" min={0} value={form.reviews||0} onChange={e=>set('reviews',Number(e.target.value))} placeholder="e.g. 187"/>
+            </div>
+            <div className="adm-field-group">
+              <label>Expected Date <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— coming-soon cards only (e.g. "September 2025")</span></label>
+              <input className="field" value={form.expectedDate||''} onChange={e=>set('expectedDate',e.target.value)} placeholder="e.g. September 2025"/>
             </div>
 
             {/* ── Reader Rating Display ── */}
@@ -3535,9 +3554,9 @@ export default function Admin() {
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:8,background:"rgba(201,168,76,0.08)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:"var(--r)",flexWrap:"wrap"}}>
                 <span style={{fontWeight:700,color:"var(--gold)",fontSize:"0.88rem"}}>{selectedIds.size} book{selectedIds.size!==1?"s":""} selected</span>
                 <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" book(s)?")){selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)deleteBook(id)});clearSelected();showToast("Deleted "+selectedIds.size+" books")}}}>🗑️ Delete</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:false})});clearSelected();showToast("Deactivated")}}>📴 Deactivate</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:true})});clearSelected();showToast("Activated")}}>✅ Activate</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,featured:true})});clearSelected();showToast("Featured")}}>⭐ Feature</button>
+                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:false})});clearSelected();showToast("Deactivated")}}>📴 Deactivate</button>
+                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:true})});clearSelected();showToast("Activated")}}>✅ Activate</button>
+                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,featured:true})});clearSelected();showToast("Featured")}}>⭐ Feature</button>
                 <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>✕ Clear</button>
               </div>
             )}
@@ -3571,7 +3590,7 @@ export default function Admin() {
                           className="field"
                           style={{ padding:'3px 6px', fontSize:'0.72rem', width:'auto', color: statusMeta.color, background:'rgba(0,0,0,0.3)', border:`1px solid ${statusMeta.color}40` }}
                           value={b.status || 'complete'}
-                          onChange={e => { saveBook({ ...b, status: e.target.value }); addLog('book', `"${b.title}" status → ${e.target.value}`); showToast(`Status updated: ${e.target.value}`); }}>
+                          onChange={async e => { const v=e.target.value; try { await saveBook({ ...b, status: v }); addLog('book', `"${b.title}" status → ${v}`); showToast(`Status updated`); } catch { showToast('❌ Save failed'); } }}>
                           {BOOK_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </td>
@@ -3580,25 +3599,28 @@ export default function Admin() {
                           className={'adm-flag-btn' + (b.active!==false ? ' on' : '')}
                           style={b.active===false?{borderColor:'var(--err)',color:'var(--err)'}:{}}
                           title={b.active===false?'Hidden from users - click to reactivate':'Live - click to deactivate'}
-                          onClick={() => {
+                          onClick={async () => {
                             const msg = b.active!==false
                               ? 'Deactivate "'+b.title+'"? It will be hidden from the public library.'
                               : 'Reactivate "'+b.title+'"? It will appear in the public library again.';
                             if(window.confirm(msg)) {
-                              saveBook({ ...b, active: b.active===false ? true : false });
-                              addLog('book', `"${b.title}" ${b.active!==false?'deactivated':'reactivated'}`, b.active!==false?'warning':'success');
+                              try {
+                                await saveBook({ ...b, active: b.active===false ? true : false });
+                                addLog('book', `"${b.title}" ${b.active!==false?'deactivated':'reactivated'}`, b.active!==false?'warning':'success');
+                                showToast(b.active!==false ? '📴 Deactivated' : '✅ Reactivated');
+                              } catch { showToast('❌ Save failed'); }
                             }
                           }}>
                           {b.active!==false ? 'Live' : 'Off'}
                         </button>
                       </td>
                       <td>
-                        <button className={'adm-flag-btn' + (b.featured ? ' on' : '')} onClick={() => { saveBook({ ...b, featured:!b.featured }); }}>
+                        <button className={'adm-flag-btn' + (b.featured ? ' on' : '')} onClick={async () => { try { await saveBook({ ...b, featured:!b.featured }); } catch { showToast('❌ Save failed'); } }}>
                           {b.featured ? 'Yes' : 'No'}
                         </button>
                       </td>
                       <td>
-                        <button className={'adm-flag-btn' + (b.isNew ? ' on' : '')} onClick={() => saveBook({ ...b, isNew:!b.isNew })}>
+                        <button className={'adm-flag-btn' + (b.isNew ? ' on' : '')} onClick={async () => { try { await saveBook({ ...b, isNew:!b.isNew }); } catch { showToast('❌ Save failed'); } }}>
                           {b.isNew ? 'New' : '-'}
                         </button>
                       </td>

@@ -728,7 +728,7 @@ export default function Reader() {
 
       {/* ── Watermark strip ── */}
       <div className="reader__watermark">
-        🔒 Licensed to <strong>{user.name}</strong> &bull; {user.email} — Personal use only. Sharing or redistribution is prohibited.
+        🔒 Licensed to &bull;<strong>{user.name}</strong> &bull; {user.email} — Personal use only. Sharing or redistribution is prohibited.
       </div>
 
       {/* ══════════════════════════════
@@ -822,7 +822,7 @@ export default function Reader() {
 
             {/* Inline licence watermark */}
             <p className="reader__inline-mark" aria-hidden="true">
-              © Ellines Haven · Licensed to {user.name} · {user.email} · {new Date().toLocaleDateString('en-KE')}
+              🔒 Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
             </p>
 
             {/* Chapter navigation */}
@@ -912,7 +912,7 @@ export default function Reader() {
             </div>
 
             <p className="reader__inline-mark" aria-hidden="true">
-              © Ellines Haven · Licensed to {user.name} · {user.email} · {new Date().toLocaleDateString('en-KE')}
+              🔒 Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
             </p>
 
             <div className="reader__page-nav">

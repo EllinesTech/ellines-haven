@@ -483,7 +483,7 @@ export default function BookDetail() {
                       {book.chapterCount > 0 && (
                         <div><small>Chapters</small><strong>{book.chapterCount}</strong></div>
                       )}
-                      <div><small>Published</small><strong>{new Date(book.date).toLocaleDateString('en-KE',{year:'numeric',month:'short'})}</strong></div>
+                      <div><small>Released</small><strong>{new Date(book.date).toLocaleDateString('en-KE',{year:'numeric',month:'short'})}</strong></div>
                     </>
                 }
               </div>

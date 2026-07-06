@@ -859,16 +859,121 @@
   border-color: rgba(66,133,244,0.3);
 }
 
-/* ── Responsive ── */
-@media (max-width: 600px) {
+/* ── Tablet responsive ── */
+@media (max-width: 768px) {
+  /* Stack the three-column player into a vertical layout */
   .audio-player {
+    flex-direction: column;
     padding: 14px 14px 12px;
-    gap: 12px;
+    gap: 10px;
   }
-  .audio-player__info { min-width: 0; }
-  .audio-player__centre { min-width: 0; }
+
+  /* Top row: info + gear side-by-side */
+  .audio-player__info {
+    min-width: 0;
+    flex: 1;
+    width: 100%;
+  }
+
+  /* Centre takes full width */
+  .audio-player__centre {
+    min-width: 0;
+    width: 100%;
+    order: 2;
+  }
+
+  /* Right: speed pills + gear on one row under info */
+  .audio-player__right {
+    width: 100%;
+    justify-content: space-between;
+    order: 1;
+    gap: 6px;
+  }
+
+  /* Speed pills wrap nicely */
+  .audio-speed-pills {
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1;
+  }
+
+  /* Settings panel goes last */
+  .audio-settings {
+    order: 3;
+  }
+
+  /* Settings rows stack on mobile */
+  .audio-settings__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .audio-settings__row label {
+    min-width: 0;
+  }
+
+  /* Voice dropdown full width on mobile */
+  .audio-custom-dd {
+    width: 100%;
+  }
+
+  /* Filter buttons wrap */
+  .audio-filter-group {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  /* Pitch slider full width */
+  .audio-slider {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Speed pills in settings panel */
+  .audio-settings .audio-speed-pills {
+    width: 100%;
+  }
+
+  /* Dropdown list: don't overflow viewport */
+  .audio-custom-dd__list {
+    max-height: 200px;
+  }
+
   .audio-btn { width: 32px; height: 32px; font-size: 0.9rem; }
-  .audio-btn--play { width: 42px; height: 42px; font-size: 1.1rem; }
-  .audio-settings__row { flex-direction: column; align-items: flex-start; }
-  .audio-settings__row label { min-width: 0; }
+  .audio-btn--play { width: 44px; height: 44px; font-size: 1.1rem; }
+}
+
+/* ── Small phones ── */
+@media (max-width: 480px) {
+  .audio-player {
+    padding: 12px 12px 10px;
+    gap: 8px;
+  }
+
+  .audio-player__icon { font-size: 1.4rem; }
+
+  .audio-speed-pill {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+
+  .audio-filter-btn {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+  }
+
+  .audio-settings__row label {
+    font-size: 0.7rem;
+  }
+
+  /* Progress bar area */
+  .audio-player__time {
+    font-size: 0.62rem;
+    min-width: 28px;
+  }
+
+  /* Gear button stays right-aligned */
+  .audio-btn--gear {
+    flex-shrink: 0;
+  }
 }
