@@ -675,11 +675,67 @@ export default function Reader() {
 
   const viewMode   = hasPdf ? mode : (mode === 'listen' ? 'listen' : 'text');
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   return (
     <div className="reader reader--drm" ref={readerRef}>
 
+      {/* ── Sidebar overlay (mobile) ── */}
+      {sidebarOpen && (
+        <div className="reader__sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* ══════════════════════════════
+          LEFT SIDEBAR — book info + TOC
+      ══════════════════════════════ */}
+      <aside className={'reader__sidebar' + (sidebarOpen ? ' open' : '')}>
+        {/* Close button (mobile) */}
+        <button className="reader__sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
+
+        {/* Book cover */}
+        {book.cover && (
+          <div className="reader__sidebar-cover">
+            <img src={book.cover} alt={book.title} />
+          </div>
+        )}
+
+        {/* Title + author */}
+        <div className="reader__sidebar-meta">
+          <strong className="reader__sidebar-title">{book.title}</strong>
+          <span className="reader__sidebar-author">{book.author}</span>
+        </div>
+
+        <div className="reader__sidebar-divider" />
+
+        {/* Chapter list */}
+        <nav className="reader__sidebar-nav">
+          <div className="reader__sidebar-nav-label">{book.title.toLowerCase()}</div>
+          {chapters.map((ch, i) => (
+            <React.Fragment key={i}>
+              {ch.part && (
+                <div className="reader__sidebar-part">{ch.part}</div>
+              )}
+              <button
+                className={'reader__sidebar-ch' + (i === chapter ? ' on' : '')}
+                onClick={() => { setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false); }}
+              >
+                {ch.title}
+              </button>
+            </React.Fragment>
+          ))}
+        </nav>
+      </aside>
+
+      {/* ── Main content wrapper (shifts right when sidebar open on desktop) ── */}
+      <div className={'reader__main' + (sidebarOpen ? ' sidebar-open' : '')}>
+
       {/* ── Top navigation bar ── */}
       <div className="reader__nav">
+        {/* Sidebar toggle */}
+        <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
+          <span /><span /><span />
+        </button>
+
         <Link to="/my-library" className="reader__back">← My Library</Link>
 
         <div className="reader__info">
@@ -830,27 +886,6 @@ export default function Reader() {
               ))}
             </div>
 
-            <h1 className="reader__title">{book.title}</h1>
-            <p className="reader__by">by {book.author} · Ellines Haven</p>
-            <div className="reader__divider" />
-
-            {/* Chapter tabs */}
-            {chapters.length > 1 && (
-              <div className="reader__ch-tabs">
-                <div className="reader__ch-tabs-label">📖 Chapters</div>
-                {chapters.map((ch, i) => (
-                  <React.Fragment key={i}>
-                    {ch.part && (
-                      <div className="reader__ch-part-divider">{ch.part}</div>
-                    )}
-                    <button className={'reader__ch-btn' + (i === chapter ? ' on' : '')}
-                      onClick={() => { setChapter(i); window.scrollTo(0, 0); }}>
-                      {ch.title}
-                    </button>
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
             {chapters[chapter]?.part && (
               <div className="reader__part">
                 <span className="reader__part-label">{chapters[chapter].part}</span>
@@ -922,34 +957,12 @@ export default function Reader() {
               ))}
             </div>
 
-            <h1 className="reader__title">{book.title}</h1>
-            <p className="reader__by">by {book.author} · Ellines Haven</p>
-            <div className="reader__divider" />
-
             {/* Audio player */}
             <AudioPlayer
               chapters={chapters}
               currentChapter={chapter}
               onChapterChange={ch => { setChapter(ch); window.scrollTo(0, 0); }}
             />
-
-            {/* Chapter tabs */}
-            {chapters.length > 1 && (
-              <div className="reader__ch-tabs" style={{ marginTop: 24 }}>
-                <div className="reader__ch-tabs-label">📖 Chapters</div>
-                {chapters.map((ch, i) => (
-                  <React.Fragment key={i}>
-                    {ch.part && (
-                      <div className="reader__ch-part-divider">{ch.part}</div>
-                    )}
-                    <button className={'reader__ch-btn' + (i === chapter ? ' on' : '')}
-                      onClick={() => { setChapter(i); window.scrollTo(0, 0); }}>
-                      {ch.title}
-                    </button>
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
 
             {chapters[chapter]?.part && (
               <div className="reader__part">
@@ -1004,6 +1017,7 @@ export default function Reader() {
           </div>
         </div>
       )}
+      </div>{/* end reader__main */}
     </div>
   );
 }
