@@ -3,6 +3,8 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useReadingProgress } from '../hooks/useReadingProgress';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import './Reader.css';
 
 /* ─────────────────────────────────────────────
@@ -87,6 +89,20 @@ export default function Reader() {
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
   const [resumeBanner, setResumeBanner] = useState(false);
+
+  // ── Always fetch the latest chapters from Firestore so admin edits are
+  //    immediately visible to readers without waiting for cache expiry ────────
+  const [liveChapters, setLiveChapters] = useState(null);
+  useEffect(() => {
+    if (!id) return;
+    getDoc(doc(db, 'book_chapters', String(id)))
+      .then(snap => {
+        if (snap.exists() && snap.data().chapters?.length > 0) {
+          setLiveChapters(snap.data().chapters);
+        }
+      })
+      .catch(() => {}); // silently fall back to context chapters
+  }, [id]);
 
   // ── Reading progress ──────────────────────────────────────────────────────
   const { getProgress, saveProgress } = useReadingProgress(user?.email, id);
@@ -251,7 +267,7 @@ export default function Reader() {
   const rawUrl     = ownedBook?.driveUrl || book.driveUrl || '';
   const embedUrl   = toDriveEmbed(rawUrl);
   const hasPdf     = !!embedUrl;
-  const chapters   = getFallbackChapters(book);
+  const chapters   = liveChapters || getFallbackChapters(book);
 
   // Download URL — uses Google Drive's export endpoint for direct PDF download
   const downloadUrl = rawUrl ? (() => {
