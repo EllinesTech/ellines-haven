@@ -841,6 +841,12 @@ function BookForm({ initial, onSave, onCancel }) {
                         style={{resize:'vertical',fontFamily:'Georgia,serif',lineHeight:1.9,fontSize:'0.9rem',minHeight:320}}
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,text:e.target.value}:c))}/>
                     </div>
+                    <div className="adm-field-group" style={{marginBottom:0,marginTop:10}}>
+                      <label>End-of-Chapter Message <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(shown to reader at the bottom of this chapter)</span></label>
+                      <input className="field" value={ch.endMessage||''} placeholder={`— End of Chapter ${i+1} —`}
+                        onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,endMessage:e.target.value}:c))}/>
+                      <span style={{fontSize:'0.68rem',color:'var(--muted)',marginTop:3,display:'block'}}>Leave blank to auto-generate: "— End of Chapter {i+1} —"</span>
+                    </div>
                   </div>
                 );
               })}

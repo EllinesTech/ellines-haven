@@ -811,6 +811,27 @@
   text-align: center;
 }
 
+/* Neural voice badge */
+.audio-neural-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.6rem;
+  background: rgba(74,158,255,0.18);
+  color: #4a9eff;
+  border: 1px solid rgba(74,158,255,0.35);
+  border-radius: 10px;
+  padding: 1px 6px;
+  vertical-align: middle;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.audio-neural-badge--google {
+  background: rgba(66,133,244,0.15);
+  color: #7baaf7;
+  border-color: rgba(66,133,244,0.3);
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .audio-player {

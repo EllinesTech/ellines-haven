@@ -34,11 +34,33 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
   const chapterText = chapters[currentChapter]?.text || '';
 
-  // Load available voices
+  // Load available voices — auto-select best neural English voice
   useEffect(() => {
     const load = () => {
       const v = synth.getVoices();
-      if (v.length) setVoices(v);
+      if (!v.length) return;
+      setVoices(v);
+
+      // Priority: Microsoft Neural voices > Google voices > any en-US > fallback
+      const NEURAL_PRIORITY = [
+        // Microsoft neural (Edge/Chrome Windows — genuinely human quality)
+        'Microsoft Jenny', 'Microsoft Aria', 'Microsoft Guy', 'Microsoft Davis',
+        'Microsoft Emma', 'Microsoft Brian', 'Microsoft Ana', 'Microsoft Andrew',
+        // Google neural
+        'Google UK English Female', 'Google UK English Male',
+        'Google US English',
+      ];
+      let bestIdx = 0;
+      for (const name of NEURAL_PRIORITY) {
+        const idx = v.findIndex(x => x.name.startsWith(name));
+        if (idx >= 0) { bestIdx = idx; break; }
+      }
+      // Fallback: first en-US or en-GB voice
+      if (bestIdx === 0) {
+        const enIdx = v.findIndex(x => x.lang?.startsWith('en'));
+        if (enIdx >= 0) bestIdx = enIdx;
+      }
+      setVoiceIdx(bestIdx);
     };
     load();
     window.speechSynthesis.onvoiceschanged = load;
@@ -266,7 +288,16 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                 onClick={() => setVoiceDdOpen(o => !o)}
                 type="button"
               >
-                <span>{dispVoices[safeIdx]?.name || 'Select voice'} <small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small></span>
+                <span>
+                  {dispVoices[safeIdx]?.name || 'Select voice'}
+                  {dispVoices[safeIdx] && /microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi)/i.test(dispVoices[safeIdx].name) && (
+                    <span className="audio-neural-badge">✨ Neural</span>
+                  )}
+                  {dispVoices[safeIdx] && /google/i.test(dispVoices[safeIdx].name) && (
+                    <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                  )}
+                  {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
+                </span>
                 <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
               </button>
               {voiceDdOpen && (
@@ -285,7 +316,15 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                         if (playing) speak(charRef.current);
                       }}
                     >
-                      <span className="audio-custom-dd__name">{v.name}</span>
+                      <span className="audio-custom-dd__name">
+                        {v.name}
+                        {/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi)/i.test(v.name) && (
+                          <span className="audio-neural-badge">✨ Neural</span>
+                        )}
+                        {/google/i.test(v.name) && (
+                          <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                        )}
+                      </span>
                       <span className="audio-custom-dd__lang">{v.lang}</span>
                     </button>
                   ))}
@@ -797,14 +836,21 @@ export default function Reader() {
               )}
             </div>
 
-            {chapter === chapters.length - 1 && !hasPdf && (
-              <div className="reader__end">
-                <p>— End of Preview —</p>
-                <p style={{ marginTop:8, fontSize:'.82rem', color:'var(--muted)' }}>
+            {/* End-of-chapter marker — auto-generates from chapter data, admin-editable */}
+            <div className="reader__end">
+              <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
+              {chapter < chapters.length - 1 && (
+                <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
+                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  Continue to Chapter {chapter + 2} →
+                </button>
+              )}
+              {chapter === chapters.length - 1 && !hasPdf && (
+                <p style={{ marginTop: 8, fontSize: '.82rem', color: 'var(--muted)' }}>
                   Full PDF will be available here once uploaded by the author.
                 </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -873,6 +919,22 @@ export default function Reader() {
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
                   Next →
                 </button>
+              )}
+            </div>
+
+            {/* End-of-chapter marker for listen mode */}
+            <div className="reader__end">
+              <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
+              {chapter < chapters.length - 1 && (
+                <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
+                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  Continue to Chapter {chapter + 2} →
+                </button>
+              )}
+              {chapter === chapters.length - 1 && !hasPdf && (
+                <p style={{ marginTop: 8, fontSize: '.82rem', color: 'var(--muted)' }}>
+                  Full PDF will be available here once uploaded by the author.
+                </p>
               )}
             </div>
           </div>
