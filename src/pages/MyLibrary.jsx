@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -541,9 +541,10 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
 
 // ── Main MyLibrary Page ─────────────────────────────────────────────────────
 export default function MyLibrary() {
-  const { user, library, books: catalog, myPerms } = useApp();
+  const { user, library, books: catalog, myPerms, removeFromMyLibrary } = useApp();
   const [liveOrders, setLiveOrders] = useState([]);
   const [activeTab,  setActiveTab]  = useState('library');
+  const [removingBook, setRemovingBook] = useState(null); // bookId being confirmed for removal
 
   useEffect(() => {
     if (!user?.email) {
@@ -795,6 +796,19 @@ export default function MyLibrary() {
                                 : null
                           }
                           <Link to={`/book/${b.id}`} className="btn btn-ghost btn-sm">Details</Link>
+                          {removingBook === b.id ? (
+                            <span className="mylib-remove-confirm">
+                              Remove?{' '}
+                              <button className="btn btn-sm mylib-remove-yes" onClick={async () => { await removeFromMyLibrary(b.id); setRemovingBook(null); }}>Yes</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => setRemovingBook(null)}>No</button>
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-ghost btn-sm mylib-remove-btn"
+                              title="Remove from library"
+                              onClick={() => setRemovingBook(b.id)}
+                            >🗑</button>
+                          )}
                         </div>
 
                         {b.downloadUnlocked && (

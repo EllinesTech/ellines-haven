@@ -441,6 +441,9 @@ export function AppProvider({ children }) {
 
   // ── Books admin ───────────────────────────────────────────────────────────
   const saveBook   = b  => {
+    // Bust the chapter cache so the next page load always re-fetches chapters
+    // from Firestore instead of serving stale localStorage data.
+    save('eh_books_savedAt', 0);
     setBooks(p => { const i = p.findIndex(x => x.id === b.id); return i >= 0 ? p.map(x => x.id === b.id ? b : x) : [...p, b]; });
   };
   const deleteBook = id => {
@@ -580,6 +583,19 @@ export function AppProvider({ children }) {
     } catch (e) { console.error('removeFromUserLibrary failed:', e); }
   };
 
+  // Reader: remove one of their own books from their library
+  const removeFromMyLibrary = async (bookId) => {
+    if (!user?.email) return;
+    const ref = doc(db, 'libraries', libDocId(user.email));
+    try {
+      const snap = await getDoc(ref);
+      const existing = snap.exists() ? (snap.data().books || []) : [];
+      const updated = existing.filter(b => b.id !== bookId);
+      await setDoc(ref, { email: user.email.toLowerCase(), books: updated }, { merge: true });
+      setLibState(updated);
+    } catch (e) { console.error('removeFromMyLibrary failed:', e); }
+  };
+
   const logout = () => setUser(null);
 
   return (
@@ -590,7 +606,7 @@ export function AppProvider({ children }) {
       books, saveBook, deleteBook, resetBooks,
       orders, setOrdersState, placeOrder, confirmOrder, rejectOrder,
       syncOrders, manualUnlock, unlockBooksForBuyer,
-      updateUserLibraryBook, removeFromUserLibrary,
+      updateUserLibraryBook, removeFromUserLibrary, removeFromMyLibrary,
       settings, updateSettings,
       // Permissions API
       userPerms, getUserPerms, setPermField, saveUserPerms, myPerms,

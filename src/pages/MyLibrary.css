@@ -846,3 +846,37 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* ── Remove book from library ──────────────────────────────────────────────── */
+.mylib-remove-btn {
+  color: var(--muted);
+  opacity: 0.6;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 4px 7px;
+  font-size: 0.8rem;
+}
+.mylib-remove-btn:hover {
+  opacity: 1;
+  color: #e74c3c;
+}
+.mylib-remove-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #e74c3c;
+  white-space: nowrap;
+}
+.mylib-remove-yes {
+  background: rgba(231,76,60,0.12);
+  color: #e74c3c;
+  border: 1px solid rgba(231,76,60,0.35);
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.15s;
+}
+.mylib-remove-yes:hover {
+  background: rgba(231,76,60,0.25);
+}
