@@ -20,10 +20,11 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   const [rate,      setRate]      = useState(1.0);
   const [pitch,     setPitch]     = useState(1.0);
   const [showCfg,   setShowCfg]   = useState(false);
-  const [progress,  setProgress]  = useState(0);   // 0-100
-  const [elapsed,   setElapsed]   = useState(0);   // seconds
+  const [progress,  setProgress]  = useState(0);
+  const [elapsed,   setElapsed]   = useState(0);
   const [total,     setTotal]     = useState(0);
-  const [filter,    setFilter]    = useState('all'); // all | female | male | other
+  const [filter,    setFilter]    = useState('all');
+  const [voiceDdOpen, setVoiceDdOpen] = useState(false);
 
   const uttRef     = useRef(null);
   const charRef    = useRef(0);   // char offset into full text
@@ -226,18 +227,20 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         </div>
       </div>
 
-      {/* Right: speed + settings gear */}
+      {/* Right: speed pills + settings gear */}
       <div className="audio-player__right">
-        <select
-          className="audio-select"
-          value={rate}
-          onChange={e => { setRate(parseFloat(e.target.value)); if (playing) { speak(charRef.current); } }}
-          title="Playback speed"
-        >
-          {[0.5,0.75,1.0,1.25,1.5,1.75,2.0].map(r => (
-            <option key={r} value={r}>{r}×</option>
+        <div className="audio-speed-pills">
+          {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
+            <button
+              key={r}
+              className={'audio-speed-pill' + (rate === r ? ' on' : '')}
+              onClick={() => { setRate(r); if (playing) { speak(charRef.current); } }}
+              title={`${r}× speed`}
+            >
+              {r === 1.0 ? '1×' : `${r}×`}
+            </button>
           ))}
-        </select>
+        </div>
         <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">⚙️</button>
       </div>
 
@@ -257,20 +260,52 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
           </div>
           <div className="audio-settings__row">
             <label>Voice</label>
-            <select className="audio-select audio-select--wide"
-              value={safeIdx}
-              onChange={e => { setVoiceIdx(parseInt(e.target.value)); if (playing) speak(charRef.current); }}>
-              {dispVoices.map((v, i) => (
-                <option key={i} value={i}>{v.name} ({v.lang})</option>
-              ))}
-              {dispVoices.length === 0 && <option value={0}>No voices available</option>}
-            </select>
+            <div className="audio-custom-dd" style={{ flex: 1 }}>
+              <button
+                className="audio-custom-dd__trigger"
+                onClick={() => setVoiceDdOpen(o => !o)}
+                type="button"
+              >
+                <span>{dispVoices[safeIdx]?.name || 'Select voice'} <small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small></span>
+                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
+              </button>
+              {voiceDdOpen && (
+                <div className="audio-custom-dd__list">
+                  {dispVoices.length === 0 && (
+                    <div className="audio-custom-dd__empty">No voices found</div>
+                  )}
+                  {dispVoices.map((v, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={'audio-custom-dd__item' + (i === safeIdx ? ' on' : '')}
+                      onClick={() => {
+                        setVoiceIdx(i);
+                        setVoiceDdOpen(false);
+                        if (playing) speak(charRef.current);
+                      }}
+                    >
+                      <span className="audio-custom-dd__name">{v.name}</span>
+                      <span className="audio-custom-dd__lang">{v.lang}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="audio-settings__row">
             <label>Speed — {rate}×</label>
-            <input type="range" min="0.5" max="2" step="0.25" value={rate}
-              className="audio-slider"
-              onChange={e => { setRate(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
+            <div className="audio-speed-pills">
+              {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
+                <button
+                  key={r}
+                  className={'audio-speed-pill' + (rate === r ? ' on' : '')}
+                  onClick={() => { setRate(r); if (playing) speak(charRef.current); }}
+                >
+                  {r}×
+                </button>
+              ))}
+            </div>
           </div>
           <div className="audio-settings__row">
             <label>Pitch — {pitch.toFixed(1)}</label>
