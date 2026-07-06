@@ -8,6 +8,286 @@ import { db } from '../firebase';
 import './Reader.css';
 
 /* ─────────────────────────────────────────────
+   Audio Book Player — Web Speech API
+   Reads chapter text aloud with voice settings
+───────────────────────────────────────────── */
+function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
+  const synth = window.speechSynthesis;
+
+  const [playing,   setPlaying]   = useState(false);
+  const [voices,    setVoices]    = useState([]);
+  const [voiceIdx,  setVoiceIdx]  = useState(0);
+  const [rate,      setRate]      = useState(1.0);
+  const [pitch,     setPitch]     = useState(1.0);
+  const [showCfg,   setShowCfg]   = useState(false);
+  const [progress,  setProgress]  = useState(0);   // 0-100
+  const [elapsed,   setElapsed]   = useState(0);   // seconds
+  const [total,     setTotal]     = useState(0);
+  const [filter,    setFilter]    = useState('all'); // all | female | male | other
+
+  const uttRef     = useRef(null);
+  const charRef    = useRef(0);   // char offset into full text
+  const timerRef   = useRef(null);
+  const startedAt  = useRef(0);
+  const pausedAt   = useRef(0);
+
+  const chapterText = chapters[currentChapter]?.text || '';
+
+  // Load available voices
+  useEffect(() => {
+    const load = () => {
+      const v = synth.getVoices();
+      if (v.length) setVoices(v);
+    };
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
+    return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []); // eslint-disable-line
+
+  // Stop speech when chapter changes
+  useEffect(() => {
+    stopSpeech();
+    charRef.current = 0;
+    setProgress(0);
+    setElapsed(0);
+    // estimate total reading time: avg 180 words/min at rate 1.0
+    const words = (chapterText || '').split(/\s+/).filter(Boolean).length;
+    setTotal(Math.round((words / 180) * 60));
+  }, [currentChapter, chapterText]); // eslint-disable-line
+
+  // Cleanup on unmount
+  useEffect(() => () => stopSpeech(), []); // eslint-disable-line
+
+  function stopSpeech() {
+    synth.cancel();
+    clearInterval(timerRef.current);
+    setPlaying(false);
+    pausedAt.current = 0;
+  }
+
+  function getSelectedVoice() {
+    const filtered = filteredVoices();
+    return filtered[voiceIdx] || voices[0] || null;
+  }
+
+  function filteredVoices() {
+    if (!voices.length) return [];
+    if (filter === 'all') return voices;
+    return voices.filter(v => {
+      const n = v.name.toLowerCase();
+      if (filter === 'female') return n.includes('female') || n.includes('woman') || /zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|neerja|heera|raveena|manjari|lekha|kalpana|asha|zuzana|paulina|lucia|almudena|marta|zosia|ewa|ioana|afrikaans|hessa|leila|naayf|laila|fatima|tamar|joana|mariana|linh/.test(n);
+      if (filter === 'male')   return n.includes('male') || /david|mark|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|andrés|enrique/.test(n);
+      return true;
+    });
+  }
+
+  function speak(fromChar = 0) {
+    synth.cancel();
+    clearInterval(timerRef.current);
+
+    const text = chapterText.slice(fromChar);
+    if (!text.trim()) return;
+
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.voice  = getSelectedVoice();
+    utt.rate   = rate;
+    utt.pitch  = pitch;
+    utt.lang   = utt.voice?.lang || 'en-US';
+
+    utt.onboundary = e => {
+      if (e.name === 'word') {
+        charRef.current = fromChar + e.charIndex;
+        const pct = Math.min(100, Math.round(((fromChar + e.charIndex) / chapterText.length) * 100));
+        setProgress(pct);
+      }
+    };
+
+    utt.onend = () => {
+      clearInterval(timerRef.current);
+      setPlaying(false);
+      setProgress(100);
+      charRef.current = 0;
+      // Auto-advance to next chapter
+      if (currentChapter < chapters.length - 1) {
+        onChapterChange(currentChapter + 1);
+      }
+    };
+
+    utt.onerror = () => { clearInterval(timerRef.current); setPlaying(false); };
+
+    uttRef.current = utt;
+    synth.speak(utt);
+    setPlaying(true);
+    startedAt.current = Date.now() - pausedAt.current * 1000;
+
+    // Update elapsed timer
+    timerRef.current = setInterval(() => {
+      setElapsed(Math.round((Date.now() - startedAt.current) / 1000));
+    }, 1000);
+  }
+
+  const handlePlay = () => {
+    if (playing) {
+      synth.pause();
+      clearInterval(timerRef.current);
+      pausedAt.current = elapsed;
+      setPlaying(false);
+    } else {
+      if (synth.paused) {
+        synth.resume();
+        startedAt.current = Date.now() - pausedAt.current * 1000;
+        timerRef.current = setInterval(() => setElapsed(Math.round((Date.now() - startedAt.current) / 1000)), 1000);
+        setPlaying(true);
+      } else {
+        speak(charRef.current);
+      }
+    }
+  };
+
+  const handleStop = () => {
+    stopSpeech();
+    charRef.current = 0;
+    setProgress(0);
+    setElapsed(0);
+    pausedAt.current = 0;
+  };
+
+  const handleRewind = () => {
+    // Rewind ~15 seconds worth of text (approx 45 words at rate 1.0)
+    const words = Math.round(15 * (180 * rate) / 60);
+    const textBefore = chapterText.slice(0, charRef.current);
+    const wordArr = textBefore.split(/\s+/);
+    const newWords = wordArr.slice(0, Math.max(0, wordArr.length - words));
+    const newChar = newWords.join(' ').length;
+    charRef.current = newChar;
+    pausedAt.current = 0;
+    if (playing) speak(newChar);
+    else setProgress(Math.round((newChar / chapterText.length) * 100));
+  };
+
+  const handleSkip = () => {
+    if (currentChapter < chapters.length - 1) {
+      onChapterChange(currentChapter + 1);
+    }
+  };
+
+  const fmtTime = s => {
+    if (!s || isNaN(s)) return '0:00';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return `${m}:${sec.toString().padStart(2,'0')}`;
+  };
+
+  const available = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  if (!available) return (
+    <div className="audio-player audio-player--unsupported">
+      🔇 Text-to-speech is not supported in this browser. Try Chrome or Edge.
+    </div>
+  );
+
+  const dispVoices = filteredVoices();
+  const safeIdx    = Math.min(voiceIdx, Math.max(0, dispVoices.length - 1));
+
+  return (
+    <div className="audio-player">
+      {/* Left: chapter info */}
+      <div className="audio-player__info">
+        <span className="audio-player__icon">🎧</span>
+        <div>
+          <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
+          <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
+        </div>
+      </div>
+
+      {/* Centre: controls + progress */}
+      <div className="audio-player__centre">
+        <div className="audio-player__controls">
+          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}>⏮</button>
+          <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay}>
+            {playing ? '⏸' : '▶'}
+          </button>
+          <button className="audio-btn" title="Stop" onClick={handleStop}>⏹</button>
+          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}>⏭</button>
+        </div>
+        <div className="audio-player__progress-row">
+          <span className="audio-player__time">{fmtTime(elapsed)}</span>
+          <div className="audio-player__track" onClick={e => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            const newChar = Math.round(pct * chapterText.length);
+            charRef.current = newChar;
+            setProgress(Math.round(pct * 100));
+            pausedAt.current = 0;
+            if (playing) speak(newChar);
+          }}>
+            <div className="audio-player__fill" style={{ width: `${progress}%` }} />
+            <div className="audio-player__thumb" style={{ left: `${progress}%` }} />
+          </div>
+          <span className="audio-player__time">{fmtTime(total)}</span>
+        </div>
+      </div>
+
+      {/* Right: speed + settings gear */}
+      <div className="audio-player__right">
+        <select
+          className="audio-select"
+          value={rate}
+          onChange={e => { setRate(parseFloat(e.target.value)); if (playing) { speak(charRef.current); } }}
+          title="Playback speed"
+        >
+          {[0.5,0.75,1.0,1.25,1.5,1.75,2.0].map(r => (
+            <option key={r} value={r}>{r}×</option>
+          ))}
+        </select>
+        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">⚙️</button>
+      </div>
+
+      {/* Settings panel */}
+      {showCfg && (
+        <div className="audio-settings">
+          <div className="audio-settings__row">
+            <label>Voice filter</label>
+            <div className="audio-filter-group">
+              {['all','female','male'].map(f => (
+                <button key={f} className={'audio-filter-btn' + (filter === f ? ' on' : '')}
+                  onClick={() => { setFilter(f); setVoiceIdx(0); }}>
+                  {f === 'female' ? '♀ Female' : f === 'male' ? '♂ Male' : '🌐 All'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="audio-settings__row">
+            <label>Voice</label>
+            <select className="audio-select audio-select--wide"
+              value={safeIdx}
+              onChange={e => { setVoiceIdx(parseInt(e.target.value)); if (playing) speak(charRef.current); }}>
+              {dispVoices.map((v, i) => (
+                <option key={i} value={i}>{v.name} ({v.lang})</option>
+              ))}
+              {dispVoices.length === 0 && <option value={0}>No voices available</option>}
+            </select>
+          </div>
+          <div className="audio-settings__row">
+            <label>Speed — {rate}×</label>
+            <input type="range" min="0.5" max="2" step="0.25" value={rate}
+              className="audio-slider"
+              onChange={e => { setRate(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
+          </div>
+          <div className="audio-settings__row">
+            <label>Pitch — {pitch.toFixed(1)}</label>
+            <input type="range" min="0.5" max="2" step="0.1" value={pitch}
+              className="audio-slider"
+              onChange={e => { setPitch(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
+          </div>
+          <p className="audio-settings__note">
+            Available voices depend on your device and browser. Chrome / Edge on Windows or Android give the most choices.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    Google Drive URL converter
    Accepts any of these formats from the admin:
      https://drive.google.com/file/d/FILE_ID/view
@@ -280,7 +560,7 @@ export default function Reader() {
     return null;
   })() : null;
 
-  const viewMode   = hasPdf ? mode : 'text';
+  const viewMode   = hasPdf ? mode : (mode === 'listen' ? 'listen' : 'text');
 
   return (
     <div className="reader reader--drm" ref={readerRef}>
@@ -308,17 +588,20 @@ export default function Reader() {
               Download PDF
             </a>
           )}
-          {/* Mode toggle — only show if PDF exists */}
-          {hasPdf && (
-            <div className="reader__mode-toggle">
+          {/* Mode toggle — PDF + Text + Listen */}
+          <div className="reader__mode-toggle">
+            {hasPdf && (
               <button className={'reader__mode-btn' + (viewMode === 'pdf'  ? ' on' : '')} onClick={() => setMode('pdf')}>
-                📄 PDF View
+                📄 PDF
               </button>
-              <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>
-                📖 Text View
-              </button>
-            </div>
-          )}
+            )}
+            <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>
+              📖 Read
+            </button>
+            <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>
+              🎧 Listen
+            </button>
+          </div>
 
           {/* Zoom controls — PDF mode */}
           {viewMode === 'pdf' && hasPdf && (
@@ -330,8 +613,8 @@ export default function Reader() {
             </div>
           )}
 
-          {/* Font size — text mode */}
-          {viewMode === 'text' && (
+          {/* Font size — text/listen mode */}
+          {(viewMode === 'text' || viewMode === 'listen') && (
             <div className="reader__zoom-group">
               <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A−</button>
               <span className="reader__zoom-label">{fontSize}px</span>
@@ -487,6 +770,76 @@ export default function Reader() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════
+          LISTEN MODE
+          Text-to-speech audio player
+          + text display for follow-along
+      ══════════════════════════════ */}
+      {viewMode === 'listen' && (
+        <div className="reader__body">
+          <div className="reader__page reader__page--drm">
+
+            {/* Ghost watermark */}
+            <div className="reader__ghost-wm" aria-hidden="true">
+              {Array.from({ length: 24 }).map((_, i) => (
+                <span key={i}>{user.name} · Ellines Haven · {user.email}</span>
+              ))}
+            </div>
+
+            <h1 className="reader__title">{book.title}</h1>
+            <p className="reader__by">by {book.author} · Ellines Haven</p>
+            <div className="reader__divider" />
+
+            {/* Audio player */}
+            <AudioPlayer
+              chapters={chapters}
+              currentChapter={chapter}
+              onChapterChange={ch => { setChapter(ch); window.scrollTo(0, 0); }}
+            />
+
+            {/* Chapter tabs */}
+            {chapters.length > 1 && (
+              <div className="reader__ch-tabs" style={{ marginTop: 24 }}>
+                <div className="reader__ch-tabs-label">📖 Chapters</div>
+                {chapters.map((ch, i) => (
+                  <button key={i} className={'reader__ch-btn' + (i === chapter ? ' on' : '')}
+                    onClick={() => { setChapter(i); window.scrollTo(0, 0); }}>
+                    {ch.title}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <h2 className="reader__chapter">{chapters[chapter]?.title}</h2>
+
+            {/* Follow-along text */}
+            <div className="reader__text reader__text--listen" style={{ fontSize: fontSize + 'px' }}>
+              {(chapters[chapter]?.text || '').split('\n\n').map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+            </div>
+
+            <p className="reader__inline-mark" aria-hidden="true">
+              © Ellines Haven · Licensed to {user.name} · {user.email} · {new Date().toLocaleDateString('en-KE')}
+            </p>
+
+            <div className="reader__page-nav">
+              {chapter > 0 && (
+                <button className="btn btn-ghost btn-sm" onClick={() => { setChapter(c => c - 1); window.scrollTo(0, 0); }}>
+                  ← Previous
+                </button>
+              )}
+              {chapter < chapters.length - 1 && (
+                <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}
+                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  Next →
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
