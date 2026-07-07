@@ -5,7 +5,7 @@
  * Completely separate from admin_notifications.
  */
 
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -59,28 +59,41 @@ export async function notifyBooksUnlocked(userEmail, items, orderId) {
 }
 
 /**
- * Send a welcome-back notification when a user logs in on a new device.
- * Deduped in Firestore using a date-keyed doc ID so it fires only once per day
- * regardless of browser, device, or incognito session.
+ * Send a welcome-back notification when a user logs in.
+ * Deduped using a date-keyed doc ID — fires at most once per day per user,
+ * from any device or browser.
+ *
+ * Uses runTransaction for atomic read-then-write, eliminating the race
+ * condition where two concurrent logins could both pass the existence check
+ * and create duplicate notifications.
+ *
  * @param {string} userEmail
  * @param {string} userName
  */
 export async function notifyLoginWelcome(userEmail, userName) {
   if (!userEmail) return;
-  const dayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  // Use a deterministic doc ID — fires only once per day regardless of device
+  const dayKey  = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const dedupId = `welcome_${userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${dayKey}`;
   try {
-    const existing = await getDoc(doc(db, 'user_notifications', dedupId));
-    if (existing.exists()) return; // already sent today from any device
-    await notifyUser({
-      userEmail,
-      title:   `👋 Welcome back, ${userName || 'Reader'}!`,
-      message: `You're now signed in. Your library and orders are ready.`,
-      type:    'info',
-      _id: dedupId,
+    const ref = doc(db, 'user_notifications', dedupId);
+    // runTransaction gives us an atomic check-then-write — no race condition
+    await runTransaction(db, async tx => {
+      const snap = await tx.get(ref);
+      if (snap.exists()) return; // already sent today from any device — abort
+      tx.set(ref, {
+        userEmail: userEmail.toLowerCase(),
+        title:     `👋 Welcome back, ${userName || 'Reader'}!`,
+        message:   `You're now signed in. Your library and orders are ready.`,
+        type:      'info',
+        bookId:    null,
+        orderId:   null,
+        read:      false,
+        // Use a JS Date here — serverTimestamp() is not allowed inside tx.set
+        createdAt: serverTimestamp(),
+      });
     });
   } catch (e) {
+    // Silently swallow contention/already-exists — notification was already written
     console.warn('[notifyLoginWelcome]', e.message);
   }
 }

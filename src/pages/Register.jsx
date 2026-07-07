@@ -175,15 +175,24 @@ export default function Register() {
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       
-      // ── SERVER-SIDE LOGGING (Reliable, with retry) ──
+      // ── Track registration in admin activity panel (direct + cloud function) ──
+      const regDevice = getDeviceTypeForReg();
       try {
-        const { logUserRegistrationReliable } = await import('../utils/reliableActivityLogger');
-        await logUserRegistrationReliable(emailKey, form.name.trim(), {
-          device: getDeviceTypeForReg(),
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        await trackActivity({
+          category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
+          title:    'New User Registration',
+          message:  `${form.name.trim()} (${emailKey}) joined Ellines Haven`,
+          userEmail: emailKey,
+          userName:  form.name.trim(),
+          metadata:  { device: regDevice, joinedAt: new Date().toISOString() },
+          priority: 'normal',
         });
-      } catch (err) {
-        console.error('[logUserRegistrationReliable]', err);
-      }
+      } catch (e) { console.warn('[Register] trackActivity failed:', e.message); }
+      // Cloud Function for IP/geolocation (best-effort, non-blocking)
+      import('../utils/reliableActivityLogger').then(({ logUserRegistrationReliable }) =>
+        logUserRegistrationReliable(emailKey, form.name.trim(), { device: regDevice })
+      ).catch(() => {});
       
       setSuccessMsg(`Welcome to Ellines Haven, ${form.name.trim()}! Your account has been created. Redirecting…`);
       setTimeout(() => navigate('/'), 1800);
@@ -197,15 +206,21 @@ export default function Register() {
       localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, userEntry]));
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
       
-      // ── SERVER-SIDE LOGGING (Reliable, with retry) ──
-      try {
-        const { logUserRegistrationReliable } = await import('../utils/reliableActivityLogger');
-        await logUserRegistrationReliable(emailKey, form.name.trim(), {
-          device: getDeviceTypeForReg(),
-        });
-      } catch (err) {
-        console.error('[logUserRegistrationReliable]', err);
-      }
+      // ── Track registration even in fallback path ──
+      const regDeviceFb = getDeviceTypeForReg();
+      import('../utils/adminActivityTracker').then(({ trackActivity, NOTIFICATION_CATEGORIES }) =>
+        trackActivity({
+          category: NOTIFICATION_CATEGORIES.USER_REGISTRATION,
+          title:    'New User Registration',
+          message:  `${form.name.trim()} (${emailKey}) joined Ellines Haven`,
+          userEmail: emailKey, userName: form.name.trim(),
+          metadata:  { device: regDeviceFb, joinedAt: new Date().toISOString() },
+          priority: 'normal',
+        })
+      ).catch(() => {});
+      import('../utils/reliableActivityLogger').then(({ logUserRegistrationReliable }) =>
+        logUserRegistrationReliable(emailKey, form.name.trim(), { device: regDeviceFb })
+      ).catch(() => {});
       
       setSuccessMsg(`Welcome to Ellines Haven, ${form.name.trim()}! Your account has been created. Redirecting…`);
       setTimeout(() => navigate('/'), 1800);

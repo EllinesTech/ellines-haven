@@ -65,7 +65,12 @@ export default function EditToolbar() {
   const pageKey    = builtInKey || customPageInfo?.key || null;
   const pageLabel  = ROUTE_LABELS[pathname] || customPageInfo?.label || null;
 
+  // Don't render the toolbar at all on pages with no editable content
+  // (profile, my-library, book detail, order pages, etc.)
+  // — avoids the confusing "No editable content here" floating pill.
+  // We still render if editMode is active so Save/Exit controls stay visible.
   const { editMode, dirty, saving, toast, enterEdit, exitEdit, saveAll } = ctx;
+  if (!pageKey && !editMode) return null;
 
   const handleEdit = async () => {
     if (!pageKey) return;
@@ -128,15 +133,9 @@ export default function EditToolbar() {
       <div style={toolbarStyle}>
         {!editMode ? (
           <>
-            {pageKey ? (
-              <button onClick={handleEdit} style={btn('var(--gold,#c9a84c)', '#000')}>
-                ✏️ Edit {pageLabel || 'Page'}
-              </button>
-            ) : (
-              <span style={{ color:'rgba(255,255,255,0.35)', fontSize:'0.75rem', padding:'0 6px' }}>
-                No editable content here
-              </span>
-            )}
+            <button onClick={handleEdit} style={btn('var(--gold,#c9a84c)', '#000')}>
+              ✏️ Edit {pageLabel || 'Page'}
+            </button>
             <a href="/admin" style={btn('rgba(255,255,255,0.07)', 'rgba(255,255,255,0.6)')}>
               ⚙️ Admin
             </a>

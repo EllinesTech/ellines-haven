@@ -131,9 +131,17 @@ function VisitorTracker() {
     // Skip admin and reader pages — don't track admin browsing as site visitors
     if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
-    // One visit per browser session — prevents double-counting SPA navigation
-    if (sessionStorage.getItem(VISITOR_SESSION_KEY)) return;
+    // One anonymous visit per browser session (prevents double-counting SPA navigation)
+    // But if a user logs in mid-session, re-track once to attach their info
+    const alreadyTracked = sessionStorage.getItem(VISITOR_SESSION_KEY);
+    const trackedEmail   = sessionStorage.getItem(VISITOR_SESSION_KEY + '_user') || '';
+    const currentEmail   = user?.email || '';
+
+    // Skip if: already tracked as this user (or already tracked anonymously with no user)
+    if (alreadyTracked && trackedEmail === currentEmail) return;
+
     sessionStorage.setItem(VISITOR_SESSION_KEY, '1');
+    sessionStorage.setItem(VISITOR_SESSION_KEY + '_user', currentEmail);
 
     (async () => {
       try {
@@ -159,7 +167,7 @@ function VisitorTracker() {
         });
       } catch { /* silent — never block the page */ }
     })();
-  }, [pathname]); // re-evaluate on each route change, but sessionStorage prevents double-fires
+  }, [pathname, user?.email]); // re-run when route or logged-in user changes
 
   return null;
 }

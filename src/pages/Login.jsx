@@ -518,22 +518,47 @@ export default function Login() {
 
 async function logLogin(email, userName) {
   try {
-    // Log to system logs
-    const logsDoc = doc(db, 'site_data', 'system_logs');
-    const snap = await getDoc(logsDoc);
-    const existing = snap.exists() ? (snap.data().logs || []) : [];
-    const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
-    await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
-    
-    // ── SERVER-SIDE LOGGING (Reliable, with retry) ──
-    const { logUserLoginReliable } = await import('../utils/reliableActivityLogger');
-    await logUserLoginReliable(email, userName, {
-      device: await getDeviceTypeForLog(),
-    });
+    const device = await getDeviceTypeForLog();
 
-    // Send welcome-back notification to the user's own feed (once per day)
+    // ── 1. Write to admin_notifications directly (guaranteed, cross-device) ──
+    // This is the primary source for the admin Activity panel.
+    // The Cloud Function below adds IP/geolocation but is not required.
+    try {
+      const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+      await trackActivity({
+        category: NOTIFICATION_CATEGORIES.USER_LOGIN,
+        title:    'User Login',
+        message:  `${userName || email} logged in`,
+        userEmail: email.toLowerCase(),
+        userName:  userName || email,
+        metadata:  { device, loginTime: new Date().toISOString() },
+        priority: 'low',
+      });
+    } catch (e) {
+      console.warn('[logLogin] trackActivity failed:', e.message);
+    }
+
+    // ── 2. Log to system_logs (admin raw log) ──
+    try {
+      const logsDoc = doc(db, 'site_data', 'system_logs');
+      const snap    = await getDoc(logsDoc);
+      const existing = snap.exists() ? (snap.data().logs || []) : [];
+      const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
+      await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+      console.warn('[logLogin] system_logs failed:', e.message);
+    }
+
+    // ── 3. Cloud Function (adds real IP + geolocation to user_sessions) ──
+    // Best-effort — failure does NOT block or duplicate the activity above
+    import('../utils/reliableActivityLogger').then(({ logUserLoginReliable }) =>
+      logUserLoginReliable(email, userName, { device })
+    ).catch(() => {});
+
+    // ── 4. Welcome-back notification to user's own bell feed (once per day) ──
     const { notifyLoginWelcome } = await import('../utils/userNotifier');
     await notifyLoginWelcome(email, userName);
+
   } catch (err) {
     console.error('[logLogin]', err);
   }
