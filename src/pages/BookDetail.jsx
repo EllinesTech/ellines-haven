@@ -315,22 +315,39 @@ function TocSection({ book, owned, libLoaded, user }) {
   const [editing, setEditing] = useState(false);
   const [draft,   setDraft]   = useState('');
   const [saving,  setSaving]  = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
 
-  const toc   = book.tableOfContents || [];
+  const toc = book.tableOfContents || [];
 
   const startEdit = () => {
     setDraft(toc.join('\n'));
     setEditing(true);
+    setSaveMsg('');
   };
-  const cancel = () => setEditing(false);
+  const cancel = () => { setEditing(false); setSaveMsg(''); };
 
   const save = async () => {
     setSaving(true);
     const updated = draft.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // 1. Update local app state immediately so the UI reflects changes at once
     const newBooks = books.map(b => b.id === book.id ? { ...b, tableOfContents: updated } : b);
     setBooks(newBooks);
-    setEditing(false);
+
+    // 2. Persist to Firestore site_data/books_catalogue so ALL users see the update
+    try {
+      await setDoc(
+        doc(db, 'site_data', 'books_catalogue'),
+        { books: newBooks, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      setSaveMsg('✅ Saved — all users will see the updated TOC');
+    } catch (e) {
+      setSaveMsg('⚠️ Saved locally. Firestore sync failed: ' + e.message);
+    }
+
     setSaving(false);
+    setEditing(false);
   };
 
   return (
@@ -339,7 +356,10 @@ function TocSection({ book, owned, libLoaded, user }) {
         <div className="bd-toc">
           <div className="bd-toc-header">
             <h2>Table of Contents</h2>
-            <span className="bd-toc-count">{toc.length} {book.type === 'short-story' ? 'stories' : 'chapters'}</span>
+            <span className="bd-toc-count">
+              {toc.filter(item => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(item)).length}{' '}
+              {book.type === 'short-story' ? 'stories' : 'chapters'}
+            </span>
           </div>
 
           {/* Admin edit bar */}
@@ -350,6 +370,9 @@ function TocSection({ book, owned, libLoaded, user }) {
                   ✏️ Edit TOC
                 </button>
               ) : null}
+              {saveMsg && !editing && (
+                <span style={{ fontSize:'0.78rem', color: saveMsg.startsWith('✅') ? 'var(--ok)' : '#e8832a', marginLeft:8 }}>{saveMsg}</span>
+              )}
             </div>
           )}
 
@@ -359,9 +382,12 @@ function TocSection({ book, owned, libLoaded, user }) {
               <textarea
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
-                placeholder={'Chapter 1 — The First Meeting\nChapter 2 — Something Like Love'}
+                rows={Math.max(10, draft.split('\n').length + 2)}
+                placeholder={'PART ONE — BEFORE LOVE\nChapter 1 — The First Meeting\nChapter 2 — Something Like Love\nPART TWO — FINDING EACH OTHER\nChapter 3 — Years Later'}
               />
-              <span className="bd-toc-editor-hint">One chapter per line. Numbers are auto-generated.</span>
+              <span className="bd-toc-editor-hint">
+                One entry per line. Part dividers: start with <strong>PART</strong>, <strong>ACT</strong>, <strong>BOOK</strong>, or <strong>SECTION</strong> (e.g. <em>PART ONE — BEFORE LOVE</em>) — they appear as roman-numeral section headers, not numbered chapters. Everything else is treated as a chapter.
+              </span>
               <div className="bd-toc-editor-actions">
                 <button className="bd-toc-editor-save" onClick={save} disabled={saving}>
                   {saving ? 'Saving…' : '💾 Save Changes'}
@@ -379,43 +405,68 @@ function TocSection({ book, owned, libLoaded, user }) {
 
           {/* Chapter list — flows top-to-bottom per column */}
           <ol className="bd-toc-list">
-            {toc.map((item, i) => {
-              const title = item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '');
-              if (owned) {
+            {(() => {
+              // Detect whether an entry is a "part" divider
+              const isPart = (s) => /^PART\s/i.test(s) || /^ACT\s/i.test(s) || /^BOOK\s/i.test(s) || /^SECTION\s/i.test(s) || /^VOLUME\s/i.test(s);
+              // Roman numeral helper (up to 20)
+              const ROMANS = ['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'];
+              let chapterNum  = 0; // counts only real chapters
+              let partNum     = 0; // counts part dividers
+
+              return toc.map((item, i) => {
+                if (isPart(item)) {
+                  partNum++;
+                  const roman = ROMANS[partNum] || String(partNum);
+                  return (
+                    <li key={i} className="bd-toc-item bd-toc-part-row">
+                      <span className="bd-toc-part-divider">
+                        <span className="bd-toc-part-num">{roman}</span>
+                        <span className="bd-toc-part-label">{item}</span>
+                      </span>
+                    </li>
+                  );
+                }
+
+                chapterNum++;
+                const title = item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '');
+                const numStr = String(chapterNum).padStart(2, '0');
+
+                if (owned) {
+                  return (
+                    <li key={i} className="bd-toc-item bd-toc-item--link">
+                      <Link to={readPath(book)} state={{ chapter: i }} className="bd-toc-row">
+                        <span className="bd-toc-num">{numStr}</span>
+                        <span className="bd-toc-title">{title}</span>
+                        <span className="bd-toc-arrow">→</span>
+                      </Link>
+                    </li>
+                  );
+                }
+                if (user && !libLoaded) {
+                  return (
+                    <li key={i} className="bd-toc-item">
+                      <span className="bd-toc-row">
+                        <span className="bd-toc-num">{numStr}</span>
+                        <span className="bd-toc-title">{title}</span>
+                      </span>
+                    </li>
+                  );
+                }
                 return (
-                  <li key={i} className="bd-toc-item bd-toc-item--link">
-                    <Link to={readPath(book)} state={{ chapter: i }} className="bd-toc-row">
-                      <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                  <li key={i} className="bd-toc-item bd-toc-item--locked">
+                    <span className="bd-toc-row" onClick={() => {
+                      if (!NO_PURCHASE_STATUSES.has(book.status)) {
+                        document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}>
+                      <span className="bd-toc-num">{numStr}</span>
                       <span className="bd-toc-title">{title}</span>
-                      <span className="bd-toc-arrow">→</span>
-                    </Link>
-                  </li>
-                );
-              }
-              if (user && !libLoaded) {
-                return (
-                  <li key={i} className="bd-toc-item">
-                    <span className="bd-toc-row">
-                      <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
-                      <span className="bd-toc-title">{title}</span>
+                      <span className="bd-toc-lock">🔒</span>
                     </span>
                   </li>
                 );
-              }
-              return (
-                <li key={i} className="bd-toc-item bd-toc-item--locked">
-                  <span className="bd-toc-row" onClick={() => {
-                    if (!NO_PURCHASE_STATUSES.has(book.status)) {
-                      document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}>
-                    <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="bd-toc-title">{title}</span>
-                    <span className="bd-toc-lock">🔒</span>
-                  </span>
-                </li>
-              );
-            })}
+              });
+            })()}
           </ol>
 
           {!owned && libLoaded && !NO_PURCHASE_STATUSES.has(book.status) && (

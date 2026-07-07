@@ -728,19 +728,30 @@ export default function Reader() {
         {/* Chapter list */}
         <nav className="reader__sidebar-nav">
           <div className="reader__sidebar-nav-label">{book.title.toLowerCase()}</div>
-          {chapters.map((ch, i) => (
-            <React.Fragment key={i}>
-              {ch.part && (
-                <div className="reader__sidebar-part">{ch.part}</div>
-              )}
-              <button
-                className={'reader__sidebar-ch' + (i === chapter ? ' on' : '')}
-                onClick={() => { setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false); }}
-              >
-                {ch.title}
-              </button>
-            </React.Fragment>
-          ))}
+          {(() => {
+            const ROMANS = ['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'];
+            let partCount = 0;
+            return chapters.map((ch, i) => (
+              <React.Fragment key={i}>
+                {ch.part && (() => {
+                  partCount++;
+                  const roman = ROMANS[partCount] || String(partCount);
+                  return (
+                    <div className="reader__sidebar-part">
+                      <span className="reader__sidebar-part-num">{roman}</span>
+                      <span className="reader__sidebar-part-text">{ch.part}</span>
+                    </div>
+                  );
+                })()}
+                <button
+                  className={'reader__sidebar-ch' + (i === chapter ? ' on' : '')}
+                  onClick={() => { setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false); }}
+                >
+                  {ch.title}
+                </button>
+              </React.Fragment>
+            ));
+          })()}
         </nav>
       </aside>
 

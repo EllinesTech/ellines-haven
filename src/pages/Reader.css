@@ -154,6 +154,29 @@
   color: rgba(255,255,255,0.35);
   padding: 14px 20px 6px;
   font-family: Georgia, serif;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reader__sidebar-part-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  background: rgba(201,168,76,0.18);
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 3px;
+  color: #c9a84c;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.reader__sidebar-part-text {
+  flex: 1;
+  color: rgba(255,255,255,0.35);
+  font-size: 0.66rem;
 }
 .reader__sidebar-ch {
   background: none;

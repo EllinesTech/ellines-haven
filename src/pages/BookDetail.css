@@ -568,6 +568,59 @@
 }
 .bd-toc-item--locked:hover .bd-toc-lock { opacity: 1; }
 
+/* ── Part / Section divider row ── */
+.bd-toc-part-row {
+  /* spans all columns so it acts as a section break */
+  column-span: all;
+  display: block;
+  padding: 18px 10px 6px;
+  cursor: default;
+}
+.bd-toc-part-row:first-child { padding-top: 4px; }
+
+.bd-toc-part-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid rgba(201,168,76,0.25);
+  padding-top: 14px;
+}
+.bd-toc-part-row:first-child .bd-toc-part-divider {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* Roman numeral badge */
+.bd-toc-part-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(201,168,76,0.15);
+  border: 1px solid rgba(201,168,76,0.35);
+  color: var(--gold);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-family: Georgia, serif;
+  flex-shrink: 0;
+}
+
+/* Part label text */
+.bd-toc-part-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-family: Georgia, 'Playfair Display', serif;
+  opacity: 0.9;
+  line-height: 1.2;
+}
+
+
 /* Gate note + CTA */
 .bd-toc-gate-note {
   font-size: 0.8rem;
