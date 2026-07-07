@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   NOTIFICATION_CATEGORIES,
@@ -56,16 +56,20 @@ export default function ActivityPanel({ user, showToast }) {
   // Listen to notifications
   useEffect(() => {
     setLoading(true);
+    // Simple query with no composite-index requirement.
+    // We filter out soft-deleted docs client-side to avoid needing
+    // a (deleted ASC + createdAt DESC) composite index in Firestore.
     const q = query(
       collection(db, 'admin_notifications'),
-      where('deleted', '!=', true),
-      orderBy('deleted', 'asc'),
       orderBy('createdAt', 'desc'),
       limit(500)
     );
 
     const unsub = onSnapshot(q, snap => {
-      const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Filter out soft-deleted notifications client-side
+      const fresh = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(n => n.deleted !== true);
       setNotifs(fresh);
       
       // Calculate stats

@@ -926,7 +926,7 @@ exports.trackVisitor = onRequest(
       if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
         try {
           const geoRes = await axios.get(
-            `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
+            `https://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
             { timeout: 4000 }
           );
           if (geoRes.data?.status === "success") {

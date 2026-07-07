@@ -68,16 +68,18 @@ function ScrollToTop() {
 }
 
 /* ── Visitor Tracker — server-side real IP via Cloud Function ── */
-let _visitorLogged = false;
 const TRACK_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitor';
+const VISITOR_SESSION_KEY = 'eh_visitor_logged';
 
 function VisitorTracker() {
   const { pathname } = useLocation();
   const { user } = useApp();
 
   useEffect(() => {
-    if (_visitorLogged) return;
-    _visitorLogged = true;
+    // Use sessionStorage so each new browser session is tracked,
+    // but HMR re-renders and in-page navigation don't double-count.
+    if (sessionStorage.getItem(VISITOR_SESSION_KEY)) return;
+    sessionStorage.setItem(VISITOR_SESSION_KEY, '1');
     (async () => {
       try {
         const ua = navigator.userAgent || '';
