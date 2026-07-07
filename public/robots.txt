@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Block private/account pages from indexing
+Disallow: /admin
+Disallow: /my-library
+Disallow: /profile
+Disallow: /admin-profile
+Disallow: /cart
+Disallow: /login
+Disallow: /register
+Disallow: /read/
+
+# Sitemap location
+Sitemap: https://haven.ellines.co.ke/sitemap.xml
