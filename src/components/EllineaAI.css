@@ -405,6 +405,74 @@
   }
 }
 
+/* ── Live-chat closed banner ── */
+.ellinea-lc-closed-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 16px 16px;
+  gap: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 6px;
+}
+.ellinea-lc-closed-icon {
+  font-size: 2rem;
+  margin-bottom: 4px;
+}
+.ellinea-lc-closed-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.75);
+  margin: 0;
+}
+.ellinea-lc-closed-sub {
+  font-size: 0.76rem;
+  color: rgba(255,255,255,0.4);
+  margin: 0;
+  line-height: 1.5;
+}
+.ellinea-lc-closed-btn {
+  margin-top: 8px;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #6c63ff, #4a9eff);
+  border: none;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.ellinea-lc-closed-btn:hover {
+  opacity: 0.88;
+  transform: scale(1.03);
+}
+
+/* ── Live-chat message wrapper + delete button ── */
+.ellinea-lc-msg-wrap { display: contents; }
+.ellinea-lc-del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.0);
+  padding: 1px 3px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ellinea-lc-msg-wrap--user:hover .ellinea-lc-del-btn,
+.ellinea-lc-del-btn:focus {
+  color: rgba(231,76,60,0.7);
+}
+.ellinea-lc-del-btn:hover {
+  color: #e74c3c !important;
+  background: rgba(231,76,60,0.1);
+}
+
 /* ── Links in chat bubbles ── */
 .ellinea-link {
   color: var(--gold) !important;

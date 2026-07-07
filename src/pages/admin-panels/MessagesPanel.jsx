@@ -106,6 +106,7 @@ const SC = {
   read:         { bg:'rgba(74,158,255,0.1)',  color:'#4a9eff',    border:'rgba(74,158,255,0.25)'  },
   replied:      { bg:'rgba(46,204,113,0.1)',  color:'var(--ok)',  border:'rgba(46,204,113,0.25)'  },
   spam:         { bg:'rgba(100,116,139,0.1)', color:'#64748b',    border:'rgba(100,116,139,0.25)' },
+  closed:       { bg:'rgba(148,144,160,0.1)', color:'#9490a0',    border:'rgba(148,144,160,0.25)' },
   notification: { bg:'rgba(201,168,76,0.1)',  color:'var(--gold)',border:'rgba(201,168,76,0.25)'  },
 };
 
@@ -375,10 +376,15 @@ export default function MessagesPanel({ showToast, users = [] }) {
   };
 
   const markStatus = async (id, status) => {
+    const extra = status === 'closed'
+      ? { closedBy: 'admin', closedAt: serverTimestamp() }
+      : status === 'read' || status === 'replied' || status === 'new'
+        ? { closedBy: null, closedAt: null }
+        : {};
     await setDoc(doc(db, 'contact_messages', id),
-      { status, updatedAt: serverTimestamp() }, { merge: true });
-    setMessages(prev => prev.map(m => m.id === id ? { ...m, status } : m));
-    if (selected?.id === id) setSelected(s => ({ ...s, status }));
+      { status, updatedAt: serverTimestamp(), ...extra }, { merge: true });
+    setMessages(prev => prev.map(m => m.id === id ? { ...m, status, ...extra } : m));
+    if (selected?.id === id) setSelected(s => ({ ...s, status, ...extra }));
     showToast?.('✅ Marked as ' + status);
   };
 
@@ -486,6 +492,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
     new: base.filter(m => m.status==='new'||!m.status).length,
     read: base.filter(m => m.status==='read').length,
     replied: base.filter(m => m.status==='replied').length,
+    closed: base.filter(m => m.status==='closed').length,
     spam: base.filter(m => m.status==='spam').length,
   };
   const newCount = messages.filter(m => (m.status==='new'||!m.status) && m.type !== 'live_chat' && m.type !== 'notification').length;
@@ -612,7 +619,7 @@ export default function MessagesPanel({ showToast, users = [] }) {
           </button>
         ))}
         <span style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '0 6px' }} />
-        {['all', 'new', 'read', 'replied', 'spam'].map(f => (
+        {['all', 'new', 'read', 'replied', 'closed', 'spam'].map(f => (
           <button key={f} className={'adm-filter-btn' + (filter === f ? ' active' : '')}
             onClick={() => { setFilter(f); setSelected(null); }}
             style={{ textTransform: 'capitalize', fontSize: '0.78rem' }}>
@@ -750,11 +757,20 @@ export default function MessagesPanel({ showToast, users = [] }) {
 
             {/* Action bar */}
             <div className="adm-msg-thread-actions">
-              {['new','read','replied','spam'].map(s => (
+              {['new','read','replied','closed','spam'].map(s => (
                 <button key={s} className={'adm-filter-btn'+(selected.status===s?' active':'')}
-                  style={{ fontSize:'0.74rem', padding:'4px 10px', textTransform:'capitalize' }}
+                  style={{ fontSize:'0.74rem', padding:'4px 10px', textTransform:'capitalize',
+                    ...(s === 'closed' && selected.status === s ? { color:'#9490a0', background:'rgba(148,144,160,0.1)', borderColor:'rgba(148,144,160,0.3)' } : {}) }}
                   onClick={() => markStatus(selected.id, s)}>{s}</button>
               ))}
+              {/* Reopen button — shown prominently when closed */}
+              {selected.status === 'closed' && (
+                <button
+                  onClick={() => markStatus(selected.id, 'read')}
+                  style={{ marginLeft:4, fontSize:'0.74rem', padding:'4px 10px', background:'rgba(74,158,255,0.12)', color:'#4a9eff', border:'1px solid rgba(74,158,255,0.3)', borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
+                  ↩ Reopen
+                </button>
+              )}
               {selected.email && (
                 <a href={`https://wa.me/${WA_ADMIN}?text=${encodeURIComponent('Hi '+selected.name+', ')}`}
                   target="_blank" rel="noopener noreferrer"
@@ -763,6 +779,26 @@ export default function MessagesPanel({ showToast, users = [] }) {
                 </a>
               )}
             </div>
+
+            {/* Closed by user notice */}
+            {selected.status === 'closed' && (
+              <div style={{
+                margin:'0 0 0 0', padding:'9px 18px',
+                background:'rgba(148,144,160,0.08)',
+                borderBottom:'1px solid rgba(148,144,160,0.15)',
+                fontSize:'0.78rem', color:'#9490a0',
+                display:'flex', alignItems:'center', gap:8, flexShrink:0,
+              }}>
+                🔒 {selected.closedBy === 'user'
+                  ? 'This conversation was closed by the user.'
+                  : 'This conversation has been closed.'}
+                <button
+                  onClick={() => markStatus(selected.id, 'read')}
+                  style={{ marginLeft:'auto', fontSize:'0.72rem', padding:'3px 10px', background:'rgba(74,158,255,0.1)', color:'#4a9eff', border:'1px solid rgba(74,158,255,0.3)', borderRadius:20, cursor:'pointer', fontFamily:'inherit', fontWeight:700 }}>
+                  ↩ Reopen
+                </button>
+              </div>
+            )}
 
             {/* THE CHAT BODY — fills all remaining space */}
             <div className="adm-msg-thread-body">

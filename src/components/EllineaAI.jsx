@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
   doc, getDoc, setDoc, addDoc, onSnapshot,
-  collection, serverTimestamp,
+  collection, serverTimestamp, deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import './EllineaAI.css';
@@ -499,6 +499,22 @@ export default function EllineaAI() {
     return () => unsub();
   }, [open]);
 
+  // ── Live-chat: conversation status (closed/open) ─────────────────────────
+  const [convClosed, setConvClosed] = useState(false);
+  const [convClosedBy, setConvClosedBy] = useState(null); // 'admin' | 'user'
+  useEffect(() => {
+    if (!chatId) { setConvClosed(false); setConvClosedBy(null); return; }
+    const unsub = onSnapshot(doc(db, 'contact_messages', chatId), snap => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const isClosed = data.status === 'closed';
+        setConvClosed(isClosed);
+        setConvClosedBy(isClosed ? (data.closedBy || 'admin') : null);
+      }
+    }, () => {});
+    return () => unsub();
+  }, [chatId]);
+
   // ── Live-chat: messages listener ─────────────────────────────────────────
   useEffect(() => {
     if (!chatId) return;
@@ -664,7 +680,35 @@ Rules:
     setChatId(null);
     setChatMessages([]);
     setChatDraft('');
+    setConvClosed(false);
+    setConvClosedBy(null);
     prevLcCount.current = 0;
+  };
+
+  // ── User closes the conversation ──────────────────────────────────────────
+  const closeConversation = async () => {
+    if (!chatId) return;
+    await setDoc(doc(db, 'contact_messages', chatId), {
+      status: 'closed',
+      closedBy: 'user',
+      closedAt: serverTimestamp(),
+    }, { merge: true });
+    await addDoc(collection(db, 'contact_messages', chatId, 'messages'), {
+      text: 'User closed this conversation.',
+      sender: 'system',
+      senderName: 'System',
+      createdAt: serverTimestamp(),
+    });
+  };
+
+  // ── User deletes their own message ────────────────────────────────────────
+  const deleteUserMessage = async (msgId) => {
+    if (!chatId || convClosed) return;
+    try {
+      await deleteDoc(doc(db, 'contact_messages', chatId, 'messages', msgId));
+    } catch (e) {
+      console.warn('[deleteUserMessage]', e.message);
+    }
   };
 
   const renderText = (text) => {
@@ -818,15 +862,25 @@ Rules:
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:700, color:'#fff', fontSize:'0.9rem' }}>Ellines Haven Support</div>
                   <div style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.75)', display:'flex', alignItems:'center', gap:5 }}>
-                    <span style={{ width:6, height:6, borderRadius:'50%', background: agentOnline ? '#2ecc71' : 'rgba(255,255,255,0.35)', flexShrink:0, display:'inline-block' }}/>
-                    {agentOnline ? liveOnlineMsg : liveOfflineMsg}
+                    <span style={{ width:6, height:6, borderRadius:'50%', background: convClosed ? 'rgba(255,255,255,0.35)' : agentOnline ? '#2ecc71' : 'rgba(255,255,255,0.35)', flexShrink:0, display:'inline-block' }}/>
+                    {convClosed ? 'Conversation closed' : agentOnline ? liveOnlineMsg : liveOfflineMsg}
                   </div>
                 </div>
+                {/* Close conversation button — only when open and has messages */}
+                {!convClosed && chatMessages.length > 0 && (
+                  <button
+                    onClick={closeConversation}
+                    title="Close conversation"
+                    style={{ background:'rgba(255,255,255,0.12)', border:'none', color:'rgba(255,255,255,0.7)', borderRadius:6, padding:'3px 8px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit', whiteSpace:'nowrap' }}
+                  >
+                    ✕ Close
+                  </button>
+                )}
                 <button onClick={resetLiveChat} title="New chat" style={{ background:'rgba(255,255,255,0.15)', border:'none', color:'#fff', borderRadius:6, padding:'3px 8px', cursor:'pointer', fontSize:'0.68rem', fontFamily:'inherit' }}>New</button>
                 <button onClick={() => setOpen(false)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.7)', cursor:'pointer', fontSize:'1.1rem', padding:'0 2px', lineHeight:1 }}>✕</button>
               </div>
               <div className="ellinea-lc-messages">
-                {chatMessages.length === 0 && (
+                {chatMessages.length === 0 && !convClosed && (
                   <div style={{ textAlign:'center', padding:'24px 12px', color:'rgba(255,255,255,0.45)', fontSize:'0.8rem' }}>
                     <div style={{ fontSize:'1.8rem', marginBottom:8 }}>👋</div>
                     <p style={{ marginBottom:6 }}>Hi{user?.name ? ` ${user.name.split(' ')[0]}` : ''}! How can we help you today?</p>
@@ -840,20 +894,58 @@ Rules:
                     <div key={msg.id} style={{ textAlign:'center', fontSize:'0.7rem', color:'rgba(255,255,255,0.4)', padding:'3px 8px', background:'rgba(255,255,255,0.04)', borderRadius:20, margin:'0 auto', maxWidth:'80%' }}>{msg.text}</div>
                   );
                   return (
-                    <div key={msg.id} style={{ display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth:'80%', padding:'8px 12px', borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: isUser ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)', color:'#fff', fontSize:'0.85rem', lineHeight:1.5, wordBreak:'break-word', whiteSpace:'pre-wrap' }}>{msg.text}</div>
-                      <span style={{ fontSize:'0.63rem', color:'rgba(255,255,255,0.35)', marginTop:2, paddingInline:4 }}>{isUser ? 'You' : '🛡️ Agent'} · {fmtLcTime(msg.createdAt)}</span>
+                    <div key={msg.id} className={`ellinea-lc-msg-wrap${isUser ? ' ellinea-lc-msg-wrap--user' : ''}`}>
+                      <div style={{ display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ maxWidth:'80%', padding:'8px 12px', borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: isUser ? 'linear-gradient(135deg,#6c63ff,#4a9eff)' : 'rgba(255,255,255,0.08)', color:'#fff', fontSize:'0.85rem', lineHeight:1.5, wordBreak:'break-word', whiteSpace:'pre-wrap' }}>{msg.text}</div>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:2, paddingInline:4, flexDirection: isUser ? 'row-reverse' : 'row' }}>
+                          <span style={{ fontSize:'0.63rem', color:'rgba(255,255,255,0.35)' }}>{isUser ? 'You' : '🛡️ Agent'} · {fmtLcTime(msg.createdAt)}</span>
+                          {/* Delete own message button */}
+                          {isUser && !convClosed && (
+                            <button
+                              onClick={() => deleteUserMessage(msg.id)}
+                              title="Delete message"
+                              className="ellinea-lc-del-btn"
+                              aria-label="Delete message"
+                            >🗑</button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
+                {/* ── Conversation closed banner ── */}
+                {convClosed && (
+                  <div className="ellinea-lc-closed-banner">
+                    <div className="ellinea-lc-closed-icon">🔒</div>
+                    <p className="ellinea-lc-closed-title">Conversation closed</p>
+                    <p className="ellinea-lc-closed-sub">
+                      {convClosedBy === 'user'
+                        ? 'You closed this conversation.'
+                        : 'This conversation was closed by the support team.'}
+                    </p>
+                    <button
+                      onClick={resetLiveChat}
+                      className="ellinea-lc-closed-btn"
+                    >
+                      💬 Start a new conversation
+                    </button>
+                  </div>
+                )}
                 <div ref={chatBottomRef} />
               </div>
-              <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', padding:'8px 10px', display:'flex', gap:7, flexShrink:0, background:'rgba(0,0,0,0.15)' }}>
-                <textarea ref={chatInputRef} rows={1} value={chatDraft} onChange={e => setChatDraft(e.target.value)} onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();} }} placeholder="Type a message…" style={{ flex:1, resize:'none', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', padding:'7px 11px', fontSize:'0.85rem', fontFamily:'inherit', outline:'none', maxHeight:70, overflowY:'auto' }} />
-                <button onClick={sendChat} disabled={chatSending||!chatDraft.trim()} style={{ flexShrink:0, width:36, height:36, borderRadius:'50%', background:chatDraft.trim()?'linear-gradient(135deg,#6c63ff,#4a9eff)':'rgba(255,255,255,0.08)', border:'none', color:'#fff', cursor:chatDraft.trim()?'pointer':'default', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.2s', alignSelf:'flex-end' }} aria-label="Send">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                </button>
-              </div>
+              {/* Input bar — hidden when closed */}
+              {!convClosed ? (
+                <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', padding:'8px 10px', display:'flex', gap:7, flexShrink:0, background:'rgba(0,0,0,0.15)' }}>
+                  <textarea ref={chatInputRef} rows={1} value={chatDraft} onChange={e => setChatDraft(e.target.value)} onKeyDown={e => { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();} }} placeholder="Type a message…" style={{ flex:1, resize:'none', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#fff', padding:'7px 11px', fontSize:'0.85rem', fontFamily:'inherit', outline:'none', maxHeight:70, overflowY:'auto' }} />
+                  <button onClick={sendChat} disabled={chatSending||!chatDraft.trim()} style={{ flexShrink:0, width:36, height:36, borderRadius:'50%', background:chatDraft.trim()?'linear-gradient(135deg,#6c63ff,#4a9eff)':'rgba(255,255,255,0.08)', border:'none', color:'#fff', cursor:chatDraft.trim()?'pointer':'default', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.2s', alignSelf:'flex-end' }} aria-label="Send">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </div>
+              ) : (
+                <div style={{ borderTop:'1px solid rgba(255,255,255,0.08)', padding:'8px 10px', flexShrink:0, background:'rgba(0,0,0,0.15)', textAlign:'center' }}>
+                  <span style={{ fontSize:'0.72rem', color:'rgba(255,255,255,0.3)' }}>This conversation is closed</span>
+                </div>
+              )}
               <div style={{ textAlign:'center', fontSize:'0.6rem', color:'rgba(255,255,255,0.25)', padding:'4px 8px 6px', flexShrink:0, background:'rgba(0,0,0,0.1)' }}>Ellines Haven · Mon–Sat 8am–8pm EAT</div>
             </>
           )}
