@@ -76,10 +76,13 @@ function VisitorTracker() {
   const { user } = useApp();
 
   useEffect(() => {
-    // Use sessionStorage so each new browser session is tracked,
-    // but HMR re-renders and in-page navigation don't double-count.
+    // Skip admin pages — don't track admin browsing as site visitors
+    if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
+
+    // One visit per browser session — prevents double-counting SPA navigation
     if (sessionStorage.getItem(VISITOR_SESSION_KEY)) return;
     sessionStorage.setItem(VISITOR_SESSION_KEY, '1');
+
     (async () => {
       try {
         const ua = navigator.userAgent || '';
@@ -93,15 +96,18 @@ function VisitorTracker() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            page: pathname, referrer, userAgent: ua.slice(0, 300), device,
+            page: pathname,
+            referrer,
+            userAgent: ua.slice(0, 300),
+            device,
             userEmail: user?.email || null,
             userName:  user?.name  || null,
           }),
           keepalive: true,
         });
-      } catch { /* silent */ }
+      } catch { /* silent — never block the page */ }
     })();
-  }, []); // eslint-disable-line
+  }, [pathname]); // re-evaluate on each route change, but sessionStorage prevents double-fires
 
   return null;
 }
