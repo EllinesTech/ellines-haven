@@ -458,7 +458,19 @@ export default function About() {
                   onUpload={url => patch('founderPhoto', url)}
                 />
               ) : (
-                <img src={content.founderPhoto || '/mwangi.png'} alt="Elijah Mwangi M — Founder" className="about-founder-photo" />
+                <picture>
+                  <source
+                    srcSet={(content.founderPhoto || '/mwangi.png').replace(/\.png$/i, '.webp')}
+                    type="image/webp"
+                  />
+                  <img
+                    src={content.founderPhoto || '/mwangi.png'}
+                    alt="Elijah Mwangi M — Founder"
+                    className="about-founder-photo"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </picture>
               )}
             </div>
             <div className="about-founder-text">

@@ -42,15 +42,25 @@ export function BookStatusBadge({ status, style = {} }) {
   );
 }
 
-function BookCover({ book }) {
+// Derive WebP path from a PNG cover path (e.g. /cover-pain.png → /cover-pain.webp)
+function webpSrc(src) {
+  if (!src) return null;
+  return src.replace(/\.png$/i, '.webp');
+}
+
+function BookCover({ book, priority = false }) {
   if (book.coverType === 'photo' && book.cover) {
     return (
-      <img
-        src={book.cover}
-        alt={book.title}
-        loading="lazy"
-        className="bcard__cover-photo"
-      />
+      <picture>
+        <source srcSet={webpSrc(book.cover)} type="image/webp" />
+        <img
+          src={book.cover}
+          alt={book.title}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          className="bcard__cover-photo"
+        />
+      </picture>
     );
   }
 
@@ -66,7 +76,7 @@ function BookCover({ book }) {
       <div className="bcard__cover-line bcard__cover-line--2" style={{ borderColor: accent }} />
 
       {/* logo watermark */}
-      <img src="/logo-icon.png" alt="" className="bcard__cover-logo" aria-hidden="true" />
+      <img src="/logo-icon.png" alt="" className="bcard__cover-logo" aria-hidden="true" loading="lazy" decoding="async" />
 
       {/* title */}
       <div className="bcard__cover-text">

@@ -196,11 +196,19 @@ export default function Founder() {
                   onUpload={url => patch('founderPhoto', url)}
                 />
               ) : (
-                <img
-                  src={content.founderPhoto || HERO_PHOTOS[activePhoto].src}
-                  alt={HERO_PHOTOS[activePhoto].alt}
-                  className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
-                />
+                <picture>
+                  <source
+                    srcSet={(content.founderPhoto || HERO_PHOTOS[activePhoto].src).replace(/\.png$/i, '.webp')}
+                    type="image/webp"
+                  />
+                  <img
+                    src={content.founderPhoto || HERO_PHOTOS[activePhoto].src}
+                    alt={HERO_PHOTOS[activePhoto].alt}
+                    className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
+                    loading="eager"
+                    decoding="async"
+                  />
+                </picture>
               )}
               <span className="founder-badge-float">{HERO_PHOTOS[activePhoto].caption}</span>
             </div>

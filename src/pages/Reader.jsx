@@ -695,7 +695,10 @@ export default function Reader() {
         {/* Book cover */}
         {book.cover && (
           <div className="reader__sidebar-cover">
-            <img src={book.cover} alt={book.title} />
+            <picture>
+              <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
+              <img src={book.cover} alt={book.title} loading="lazy" decoding="async" />
+            </picture>
           </div>
         )}
 

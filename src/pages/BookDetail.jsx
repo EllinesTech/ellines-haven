@@ -194,7 +194,10 @@ function CoverLightbox({ book, onClose }) {
           style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
         >
           {book.coverType === 'photo' && book.cover
-            ? <img src={book.cover} alt={book.title} className="lb-img" draggable="false" />
+            ? <picture>
+                <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
+                <img src={book.cover} alt={book.title} className="lb-img" draggable="false" decoding="async" />
+              </picture>
             : <div className="lb-styled-cover"
                 style={{ background: book.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
                 <div className="bd-cover-inner">
@@ -551,13 +554,18 @@ export default function BookDetail() {
           <div className="bd-grid">
             <div className="bd-left">
               {book.coverType === 'photo' && book.cover
-                ? <img
-                    src={book.cover}
-                    alt={book.title}
-                    className="bd-cover bd-cover--zoomable"
-                    onClick={() => setLightbox(true)}
-                    title="Click to zoom cover"
-                  />
+                ? <picture>
+                    <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
+                    <img
+                      src={book.cover}
+                      alt={book.title}
+                      className="bd-cover bd-cover--zoomable"
+                      loading="eager"
+                      decoding="async"
+                      onClick={() => setLightbox(true)}
+                      title="Click to zoom cover"
+                    />
+                  </picture>
                 : <div
                     className="bd-cover bd-cover-styled bd-cover--zoomable"
                     style={{ background: book.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}
