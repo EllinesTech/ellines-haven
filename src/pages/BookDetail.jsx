@@ -305,6 +305,131 @@ function FreeSample({ book }) {
   );
 }
 
+/* ── Table of Contents section — with admin inline editor ── */
+function TocSection({ book, owned, libLoaded, user }) {
+  const { setBooks, books } = useApp();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const [editing, setEditing] = useState(false);
+  const [draft,   setDraft]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+
+  const toc   = book.tableOfContents || [];
+
+  const startEdit = () => {
+    setDraft(toc.join('\n'));
+    setEditing(true);
+  };
+  const cancel = () => setEditing(false);
+
+  const save = async () => {
+    setSaving(true);
+    const updated = draft.split('\n').map(l => l.trim()).filter(Boolean);
+    const newBooks = books.map(b => b.id === book.id ? { ...b, tableOfContents: updated } : b);
+    setBooks(newBooks);
+    setEditing(false);
+    setSaving(false);
+  };
+
+  return (
+    <section className="section bd-toc-section">
+      <div className="container">
+        <div className="bd-toc">
+          <div className="bd-toc-header">
+            <h2>Table of Contents</h2>
+            <span className="bd-toc-count">{toc.length} {book.type === 'short-story' ? 'stories' : 'chapters'}</span>
+          </div>
+
+          {/* Admin edit bar */}
+          {isAdmin && (
+            <div className="bd-toc-admin-bar">
+              {!editing ? (
+                <button className="bd-toc-edit-btn" onClick={startEdit}>
+                  ✏️ Edit TOC
+                </button>
+              ) : null}
+            </div>
+          )}
+
+          {/* Inline editor */}
+          {editing && (
+            <div className="bd-toc-editor">
+              <textarea
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                placeholder={'Chapter 1 — The First Meeting\nChapter 2 — Something Like Love'}
+              />
+              <span className="bd-toc-editor-hint">One chapter per line. Numbers are auto-generated.</span>
+              <div className="bd-toc-editor-actions">
+                <button className="bd-toc-editor-save" onClick={save} disabled={saving}>
+                  {saving ? 'Saving…' : '💾 Save Changes'}
+                </button>
+                <button className="bd-toc-editor-cancel" onClick={cancel}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {!owned && libLoaded && !NO_PURCHASE_STATUSES.has(book.status) && (
+            <div className="bd-toc-gate-note">
+              🔒 Purchase this book to unlock all chapters and read online
+            </div>
+          )}
+
+          {/* Chapter list — flows top-to-bottom per column */}
+          <ol className="bd-toc-list">
+            {toc.map((item, i) => {
+              const title = item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '');
+              if (owned) {
+                return (
+                  <li key={i} className="bd-toc-item bd-toc-item--link">
+                    <Link to={readPath(book)} state={{ chapter: i }} className="bd-toc-row">
+                      <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="bd-toc-title">{title}</span>
+                      <span className="bd-toc-arrow">→</span>
+                    </Link>
+                  </li>
+                );
+              }
+              if (user && !libLoaded) {
+                return (
+                  <li key={i} className="bd-toc-item">
+                    <span className="bd-toc-row">
+                      <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                      <span className="bd-toc-title">{title}</span>
+                    </span>
+                  </li>
+                );
+              }
+              return (
+                <li key={i} className="bd-toc-item bd-toc-item--locked">
+                  <span className="bd-toc-row" onClick={() => {
+                    if (!NO_PURCHASE_STATUSES.has(book.status)) {
+                      document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}>
+                    <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="bd-toc-title">{title}</span>
+                    <span className="bd-toc-lock">🔒</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
+          {!owned && libLoaded && !NO_PURCHASE_STATUSES.has(book.status) && (
+            <div className="bd-toc-cta">
+              <Link to={bookPath(book)} className="btn btn-primary" onClick={() => {
+                document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                Buy to Unlock All Chapters — KSh {book.price}
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function BookDetail() {
   const { id } = useParams();
   const { addToCart, cart, books, user, isOwned, myPerms, siteControls, libLoaded } = useApp();
@@ -604,80 +729,13 @@ export default function BookDetail() {
 
       {/* ── Table of Contents ── */}
       {book.tableOfContents && book.tableOfContents.length > 0 && (
-        <section className="section bd-toc-section">
-          <div className="container">
-            <div className="bd-toc">
-              <div className="bd-toc-header">
-                <h2>Table of Contents</h2>
-                <span className="bd-toc-count">{book.tableOfContents.length} {book.type === 'short-story' ? 'stories' : 'chapters'}</span>
-              </div>
-              {!owned && libLoaded && !NO_PURCHASE_STATUSES.has(book.status) && (
-                <div className="bd-toc-gate-note">
-                  🔒 Purchase this book to unlock all chapters and read online
-                </div>
-              )}
-              <ol className="bd-toc-list">
-                {book.tableOfContents.map((item, i) => {
-                  const title = item.replace(/^(Chapter \d+|Story \d+|Day \d+) — /, '');
-                  if (owned) {
-                    return (
-                      <li key={i} className="bd-toc-item bd-toc-item--link">
-                        <Link
-                          to={readPath(book)}
-                          state={{ chapter: i }}
-                          className="bd-toc-row"
-                        >
-                          <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
-                          <span className="bd-toc-title">{title}</span>
-                          <span className="bd-toc-arrow">→</span>
-                        </Link>
-                      </li>
-                    );
-                  }
-                  // While waiting for library to load, show neutral state (no lock)
-                  if (user && !libLoaded) {
-                    return (
-                      <li key={i} className="bd-toc-item">
-                        <span className="bd-toc-row">
-                          <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
-                          <span className="bd-toc-title">{title}</span>
-                        </span>
-                      </li>
-                    );
-                  }
-                  return (
-                    <li key={i} className="bd-toc-item bd-toc-item--locked">
-                      <span className="bd-toc-row" onClick={() => {
-                        if (!NO_PURCHASE_STATUSES.has(book.status)) {
-                          document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
-                        }
-                      }}>
-                        <span className="bd-toc-num">{String(i + 1).padStart(2, '0')}</span>
-                        <span className="bd-toc-title">{title}</span>
-                        <span className="bd-toc-lock">🔒</span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-              {!owned && libLoaded && !NO_PURCHASE_STATUSES.has(book.status) && (
-                <div className="bd-toc-cta">
-                  <Link to={bookPath(book)} className="btn btn-primary" onClick={() => {
-                    document.getElementById('bd-purchase-section')?.scrollIntoView({ behavior: 'smooth' });
-                  }}>
-                    Buy to Unlock All Chapters — KSh {book.price}
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
+        <TocSection book={book} owned={owned} libLoaded={libLoaded} user={user} />
       )}
       {related.length > 0 && (
         <section className="section">
           <div className="container">
             <h2 className="bd-related-title">You Might Also <span className="gold-text">Like</span></h2>
-            <div className="books-grid" style={{marginTop:'28px'}}>{related.map(b => <BookCard key={b.id} book={b} />)}</div>
+            <div className="bd-related-grid" style={{marginTop:'28px'}}>{related.map(b => <BookCard key={b.id} book={b} />)}</div>
           </div>
         </section>
       )}

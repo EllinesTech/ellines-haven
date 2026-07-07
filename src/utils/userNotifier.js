@@ -5,7 +5,7 @@
  * Completely separate from admin_notifications.
  */
 
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -18,10 +18,10 @@ import { db } from '../firebase';
  * @param {string} [opts.bookId]   - link to a book page (optional)
  * @param {string} [opts.orderId]  - reference order id (optional)
  */
-export async function notifyUser({ userEmail, title, message, type = 'info', bookId = null, orderId = null }) {
+export async function notifyUser({ userEmail, title, message, type = 'info', bookId = null, orderId = null, _id = null }) {
   if (!userEmail) return;
   try {
-    const id = `un_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = _id || `un_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     await setDoc(doc(db, 'user_notifications', id), {
       userEmail: userEmail.toLowerCase(),
       title,
@@ -60,22 +60,29 @@ export async function notifyBooksUnlocked(userEmail, items, orderId) {
 
 /**
  * Send a welcome-back notification when a user logs in on a new device.
- * Uses a daily key so it only fires once per day per user.
+ * Deduped in Firestore using a date-keyed doc ID so it fires only once per day
+ * regardless of browser, device, or incognito session.
  * @param {string} userEmail
  * @param {string} userName
  */
 export async function notifyLoginWelcome(userEmail, userName) {
   if (!userEmail) return;
   const dayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const lsKey  = `eh_login_notif_${userEmail.toLowerCase()}_${dayKey}`;
-  if (localStorage.getItem(lsKey)) return; // already sent today
-  localStorage.setItem(lsKey, '1');
-  await notifyUser({
-    userEmail,
-    title:   `👋 Welcome back, ${userName || 'Reader'}!`,
-    message: `You're now signed in. Your library and orders are ready.`,
-    type:    'info',
-  });
+  // Use a deterministic doc ID — fires only once per day regardless of device
+  const dedupId = `welcome_${userEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${dayKey}`;
+  try {
+    const existing = await getDoc(doc(db, 'user_notifications', dedupId));
+    if (existing.exists()) return; // already sent today from any device
+    await notifyUser({
+      userEmail,
+      title:   `👋 Welcome back, ${userName || 'Reader'}!`,
+      message: `You're now signed in. Your library and orders are ready.`,
+      type:    'info',
+      _id: dedupId,
+    });
+  } catch (e) {
+    console.warn('[notifyLoginWelcome]', e.message);
+  }
 }
 
 /**

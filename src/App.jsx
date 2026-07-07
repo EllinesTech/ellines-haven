@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState, lazy, Suspense, Component } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { EditModeProvider, useEditMode } from './context/EditModeContext';
@@ -13,6 +13,59 @@ import { initializeActivityLogger } from './utils/reliableActivityLogger';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import './App.css';
+
+/* ── Chunk error boundary — auto-reloads on stale deploy cache ── */
+class ChunkErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(err) {
+    const isChunkError =
+      err?.name === 'ChunkLoadError' ||
+      (err?.message || '').includes('Failed to fetch dynamically imported module') ||
+      (err?.message || '').includes('Importing a module script failed') ||
+      (err?.message || '').includes('error loading dynamically imported module');
+    if (isChunkError) {
+      // Reload once to pick up fresh chunks — guard against reload loops
+      const reloadKey = 'eh_chunk_reload';
+      const last = parseInt(sessionStorage.getItem(reloadKey) || '0', 10);
+      if (Date.now() - last > 10_000) {
+        sessionStorage.setItem(reloadKey, String(Date.now()));
+        window.location.reload();
+      }
+    }
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16,
+          padding: 40, textAlign: 'center', background: 'var(--bg, #0d0d1a)',
+        }}>
+          <div style={{ fontSize: '2.5rem' }}>⚡</div>
+          <h2 style={{ color: '#c9a84c', margin: 0 }}>Update Available</h2>
+          <p style={{ color: 'rgba(255,255,255,0.55)', maxWidth: 340, margin: 0 }}>
+            A new version of Ellines Haven is available. Refreshing to load the latest…
+          </p>
+          <button
+            style={{
+              marginTop: 8, padding: '10px 28px', background: '#c9a84c',
+              color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer',
+              fontWeight: 700, fontSize: '0.9rem',
+            }}
+            onClick={() => { sessionStorage.removeItem('eh_chunk_reload'); window.location.reload(); }}
+          >
+            Refresh Now
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /* ── Page loading indicator ── */
 function PageLoader() {
@@ -383,6 +436,7 @@ export default function App() {
             <EditToolbar />
             <MaintenanceGate>
               <SuspensionGate>
+                <ChunkErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     {/* Full-screen routes — no Navbar/Footer */}
@@ -416,6 +470,7 @@ export default function App() {
                     } />
                   </Routes>
                 </Suspense>
+                </ChunkErrorBoundary>
               </SuspensionGate>
             </MaintenanceGate>
           </BrowserRouter>

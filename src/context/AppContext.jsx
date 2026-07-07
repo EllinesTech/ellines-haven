@@ -155,6 +155,18 @@ export function AppProvider({ children }) {
       }
       if (data.roleOverrides) {
         localStorage.setItem('eh_role_overrides', JSON.stringify(data.roleOverrides));
+        // Apply role override to the active session if user is logged in
+        setUserState(prev => {
+          if (!prev?.email) return prev;
+          const emailKey = prev.email.toLowerCase();
+          const override = data.roleOverrides[emailKey];
+          if (override && override !== prev.role) {
+            const updated = { ...prev, role: override };
+            localStorage.setItem('eh_user', JSON.stringify(updated));
+            return updated;
+          }
+          return prev;
+        });
       }
     }).catch(() => {});
   }, []); // eslint-disable-line

@@ -443,15 +443,15 @@
 ════════════════════════════════════════ */
 .bd-toc-section { background: var(--bg); }
 .bd-toc {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
 }
 .bd-toc-header {
   display: flex;
   align-items: baseline;
   gap: 16px;
-  margin-bottom: 28px;
-  padding-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
 .bd-toc-header h2 {
@@ -468,43 +468,52 @@
   border-radius: 20px;
   color: var(--gold);
 }
+/* 3-column layout — flows top-to-bottom per column, no empty gaps */
 .bd-toc-list {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  columns: 3;
+  column-gap: 8px;
+}
+.bd-toc-list li {
+  break-inside: avoid;
+}
+@media (max-width: 900px) {
+  .bd-toc-list { columns: 2; }
+}
+@media (max-width: 540px) {
+  .bd-toc-list { columns: 1; }
 }
 .bd-toc-item {
   display: flex;
   align-items: baseline;
-  gap: 16px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 5px 10px;
   border-radius: var(--r-sm);
   transition: background 0.15s;
   cursor: default;
 }
 .bd-toc-item:hover { background: rgba(255,255,255,0.03); }
 .bd-toc-num {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--gold);
   opacity: 0.7;
-  min-width: 24px;
+  min-width: 22px;
   font-family: monospace;
   flex-shrink: 0;
 }
 .bd-toc-title {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   color: var(--muted);
-  line-height: 1.4;
+  line-height: 1.35;
 }
 .bd-toc-item:hover .bd-toc-title { color: var(--text); }
 
 @media (max-width: 768px) {
   .bd-authornote { padding: 28px 0; }
-  .bd-toc-item { padding: 10px 10px; gap: 12px; }
+  .bd-toc-item { padding: 5px 8px; gap: 8px; }
   .bd-themes { flex-direction: column; gap: 6px; }
 }
 
@@ -512,8 +521,8 @@
 .bd-toc-row {
   display: flex;
   align-items: baseline;
-  gap: 16px;
-  padding: 11px 16px;
+  gap: 8px;
+  padding: 4px 10px;
   border-radius: var(--r-sm);
   text-decoration: none;
   color: inherit;
@@ -575,3 +584,94 @@
   border-top: 1px solid var(--border);
   text-align: center;
 }
+
+/* ── Related books grid — capped width so cards don't stretch ── */
+.bd-related-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 260px));
+  gap: 24px;
+}
+
+/* ── Admin inline TOC editor ── */
+.bd-toc-admin-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.bd-toc-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 5px;
+  border: 1px solid rgba(201,168,76,0.35);
+  background: rgba(201,168,76,0.08);
+  color: var(--gold);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bd-toc-edit-btn:hover {
+  background: rgba(201,168,76,0.18);
+  border-color: var(--gold);
+}
+.bd-toc-editor {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.bd-toc-editor textarea {
+  width: 100%;
+  min-height: 200px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  padding: 10px 12px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.bd-toc-editor textarea:focus {
+  outline: none;
+  border-color: rgba(201,168,76,0.5);
+}
+.bd-toc-editor-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 6px;
+  display: block;
+}
+.bd-toc-editor-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.bd-toc-editor-save {
+  padding: 6px 18px;
+  background: var(--gold);
+  color: #000;
+  font-weight: 700;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.bd-toc-editor-save:disabled { opacity: 0.6; cursor: not-allowed; }
+.bd-toc-editor-cancel {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.bd-toc-editor-cancel:hover { color: var(--text); }

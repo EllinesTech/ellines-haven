@@ -340,7 +340,9 @@ export default function Login() {
           setBusy(false); return;
         }
         clearAttempts(emailKey);
-        const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: fsUser.role || 'user' };
+        const roleOverrides1 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+        const effectiveRole1 = roleOverrides1[emailKey] || fsUser.role || 'user';
+        const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: effectiveRole1 };
         setUser(sessionUser);
         await logLogin(fsUser.email, fsUser.name);
         showLoginSuccess(fsUser.name);
@@ -395,9 +397,11 @@ export default function Login() {
             
             const uid = regUser.id || ('u_' + Date.now());
             const joined = regUser.joined || new Date().toISOString().slice(0, 10);
+            const roleOverrides3 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+            const effectiveRole3 = roleOverrides3[emailKey] || regData.roleOverrides?.[emailKey] || regUser.role || 'user';
             await setDoc(doc(db, 'users', uid), {
               id: uid, name: regUser.name, email: emailKey,
-              role: regUser.role || 'user', passwordHash: fsPw,
+              role: effectiveRole3, passwordHash: fsPw,
               joined, migratedAt: serverTimestamp(), status: 'active',
             }, { merge: true }).catch((e) => {
               console.warn('[Login] Auto-migration to users collection failed:', e.message);
@@ -408,7 +412,7 @@ export default function Login() {
             localPwOverrides[emailKey] = fsPw;
             localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
             
-            const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: regUser.role || 'user' };
+            const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: effectiveRole3 };
             setUser(sessionUser);
             await logLogin(emailKey, regUser.name);
             showLoginSuccess(regUser.name);
@@ -439,7 +443,9 @@ export default function Login() {
           setBusy(false); return;
         }
         clearAttempts(emailKey);
-        const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: legacyAccount.role || 'user' };
+        const roleOverrides4 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+        const effectiveRole4 = roleOverrides4[emailKey] || legacyAccount.role || 'user';
+        const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: effectiveRole4 };
         setUser(sessionUser);
         await logLogin(legacyAccount.email, legacyAccount.name);
         showLoginSuccess(legacyAccount.name);

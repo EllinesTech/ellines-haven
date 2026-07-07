@@ -26,10 +26,15 @@ export function BookStatusBadge({ status, style = {} }) {
   return (
     <span style={{
       display:'inline-flex', alignItems:'center', gap:4,
-      fontSize:'0.65rem', fontWeight:700, letterSpacing:0.8,
-      padding:'3px 9px', borderRadius:20,
-      background: meta.bg, color: meta.color,
-      border:`1px solid ${meta.color}40`,
+      fontSize:'0.65rem', fontWeight:800, letterSpacing:0.8,
+      padding:'4px 10px', borderRadius:20,
+      background: meta.bg.replace(/[\d.]+\)$/, '0.55)'),
+      color: meta.color,
+      border:`1px solid ${meta.color}cc`,
+      backdropFilter:'blur(4px)',
+      WebkitBackdropFilter:'blur(4px)',
+      textShadow:'0 1px 4px rgba(0,0,0,0.7)',
+      boxShadow:`0 2px 8px rgba(0,0,0,0.4)`,
       ...style,
     }}>
       {meta.icon} {meta.label.toUpperCase()}
