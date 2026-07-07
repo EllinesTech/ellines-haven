@@ -361,7 +361,7 @@ export function AppProvider({ children }) {
         const local        = load('eh_books', []);
         const savedAt      = load('eh_books_savedAt', 0);
         const cacheAge     = Date.now() - savedAt;
-        const CACHE_TTL    = 5 * 60 * 1000; // 5 minutes — use local cache if fresh
+        const CACHE_TTL    = 30 * 60 * 1000; // 30 minutes — use local cache if fresh
 
         const [booksSnap, coversSnap] = await Promise.all([getDoc(BOOKS_DOC()), getDoc(COVERS_DOC())]);
         if (!booksSnap.exists()) return;

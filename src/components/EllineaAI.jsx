@@ -390,14 +390,17 @@ export default function EllineaAI() {
   const { user, books } = useApp();
   const location = useLocation();
 
-  // ── Chat settings from Firestore (admin-controlled) ──────────────────────
+  // ── Chat settings from Firestore — defer until widget is opened ─────────
   const [chatSettings, setChatSettings] = useState(null);
+  const chatSettingsLoadedRef = useRef(false);
   useEffect(() => {
+    if (!open || chatSettingsLoadedRef.current) return;
+    chatSettingsLoadedRef.current = true;
     const unsub = onSnapshot(doc(db, 'site_data', 'chat_settings'), snap => {
       if (snap.exists()) setChatSettings(snap.data());
     }, () => {});
     return () => unsub();
-  }, []);
+  }, [open]);
 
   // Derived settings with fallbacks
   const widgetEnabled  = chatSettings ? chatSettings.widgetEnabled  !== false : true;
@@ -452,15 +455,18 @@ export default function EllineaAI() {
   const prevLcCount     = useRef(0);
   const chatInputRef    = useRef(null);
 
-  // Load OpenAI config from Firestore
+  // Load OpenAI config from Firestore — defer until widget opens
+  const aiConfigLoadedRef = useRef(false);
   useEffect(() => {
+    if (!open || aiConfigLoadedRef.current) return;
+    aiConfigLoadedRef.current = true;
     getDoc(doc(db, 'site_data', 'integrations')).then(snap => {
       if (snap.exists()) {
         const d = snap.data();
         if (d.openai?.apiKey) setAiConfig(d.openai);
       }
     }).catch(() => {});
-  }, []);
+  }, [open]);
 
   // Auto-scroll AI tab
   useEffect(() => {
@@ -480,13 +486,16 @@ export default function EllineaAI() {
     return () => window.removeEventListener('ellines-open-livechat', handler);
   }, []);
 
-  // ── Live-chat: agent online status ───────────────────────────────────────
+  // ── Live-chat: agent online status — only listen once widget opens ────────
+  const agentStatusLoadedRef = useRef(false);
   useEffect(() => {
+    if (!open || agentStatusLoadedRef.current) return;
+    agentStatusLoadedRef.current = true;
     const unsub = onSnapshot(doc(db, 'site_data', 'agent_status'), snap => {
       setAgentOnline(snap.exists() ? !!snap.data()?.online : false);
     }, () => {});
     return () => unsub();
-  }, []);
+  }, [open]);
 
   // ── Live-chat: messages listener ─────────────────────────────────────────
   useEffect(() => {
