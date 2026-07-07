@@ -16,13 +16,20 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Enable IndexedDB offline persistence with multi-tab support.
-// This means Firestore data is cached locally — pages load instantly
-// on repeat visits even before the network responds, and work offline.
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
-});
+// Falls back to memory cache if IndexedDB is unavailable (private browsing, etc.)
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (e) {
+  // Fallback: default Firestore (no offline persistence) — prevents white-screen crash
+  console.warn('[Firebase] Offline persistence unavailable, using default cache:', e.message);
+  db = getFirestore(app);
+}
+export { db };
 
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'us-central1');

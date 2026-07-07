@@ -2,9 +2,13 @@
  * Ellines Haven Service Worker
  * Strategy: Cache-first for static assets, network-first for HTML/API.
  * This makes repeat visits load instantly from cache.
+ *
+ * IMPORTANT: Bump CACHE_NAME version string on every production deploy.
+ * This forces browsers to drop the old cache and fetch the new JS/CSS chunks.
+ * White screen on deploy = stale SW cache. Fix = bump this version.
  */
 
-const CACHE_NAME = 'ellines-haven-v1';
+const CACHE_NAME = 'ellines-haven-20260707';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
