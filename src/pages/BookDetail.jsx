@@ -467,8 +467,55 @@ export default function BookDetail() {
     setMetaName('twitter:title',       `${book.title} by ${book.author}`);
     setMetaName('twitter:description', book.description?.slice(0, 160) || '');
 
+    // ── Book JSON-LD structured data (no price — may change) ──────────────
+    const schemaId = 'eh-book-schema';
+    let schemaEl = document.getElementById(schemaId);
+    if (!schemaEl) {
+      schemaEl = document.createElement('script');
+      schemaEl.type = 'application/ld+json';
+      schemaEl.id   = schemaId;
+      document.head.appendChild(schemaEl);
+    }
+
+    const schema = {
+      '@context':    'https://schema.org',
+      '@type':       'Book',
+      name:          book.title,
+      author: {
+        '@type': 'Person',
+        name:    book.author,
+      },
+      url:           `${window.location.origin}${bookPath(book)}`,
+      description:   book.description?.slice(0, 300) || '',
+      genre:         book.genres ? book.genres.join(', ') : book.genre,
+      inLanguage:    'en',
+      ...(book.pages > 0 && { numberOfPages: book.pages }),
+      ...(book.coverType === 'photo' && book.cover && {
+        image: `${window.location.origin}${book.cover}`,
+      }),
+      ...(book.date && { datePublished: book.date }),
+      ...(book.reviews > 0 && {
+        aggregateRating: {
+          '@type':       'AggregateRating',
+          ratingValue:   book.rating,
+          reviewCount:   book.reviews,
+          bestRating:    5,
+          worstRating:   1,
+        },
+      }),
+      publisher: {
+        '@type': 'Organization',
+        name:    'Ellines Haven',
+        url:     window.location.origin,
+      },
+    };
+
+    schemaEl.textContent = JSON.stringify(schema);
+
     return () => {
       document.title = 'Ellines Haven';
+      const s = document.getElementById(schemaId);
+      if (s) s.remove();
     };
   }, [book]);
 
