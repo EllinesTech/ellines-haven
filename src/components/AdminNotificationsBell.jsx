@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Link } from 'react-router-dom';
 import {
@@ -90,20 +90,22 @@ export default function AdminNotificationsBell({ user }) {
     });
   }, [isAdmin, adminEmail]);
 
-  // Listen to notifications
+  // Listen to notifications — simple query, no composite index required
+  // Filter deleted docs client-side to avoid needing a compound index
   useEffect(() => {
     if (!isAdmin) return;
     
     const q = query(
       collection(db, 'admin_notifications'),
-      where('deleted', '!=', true),
-      orderBy('deleted', 'asc'),
       orderBy('createdAt', 'desc'),
       limit(100)
     );
     
     const unsub = onSnapshot(q, snap => {
-      const fresh = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Filter out soft-deleted notifications client-side
+      const fresh = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(n => n.deleted !== true);
       
       // Play sound for new unread notifications (if sound enabled and category not muted)
       if (mountedRef.current && preferences) {
