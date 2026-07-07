@@ -15,6 +15,7 @@ const IntegrationsPanel = lazy(() => import('./admin-panels/IntegrationsPanel'))
 const MessagesPanel     = lazy(() => import('./admin-panels/MessagesPanel'));
 const LiveChatPanel     = lazy(() => import('./admin-panels/LiveChatPanel'));
 const ReportsPanel      = lazy(() => import('./admin-panels/ReportsPanel'));
+const AnalyticsPanel    = lazy(() => import('./admin-panels/AnalyticsPanel'));
 const ReviewsPanel      = lazy(() => import('./admin-panels/ReviewsPanel'));
 const EmailPanel        = lazy(() => import('./admin-panels/EmailPanel'));
 const NewsletterPanel   = lazy(() => import('./admin-panels/NewsletterPanel'));
@@ -4004,12 +4005,13 @@ export default function Admin() {
             </div>
           </div>
         )}
-        {/* ANALYTICS / REPORTS */}
+        {/* ANALYTICS */}
         {tab === 'analytics' && (
           <Suspense fallback={<PanelLoader />}>
-            <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
+            <AnalyticsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
           </Suspense>
         )}
+        {/* REPORTS */}
         {tab === 'reports' && (
           <Suspense fallback={<PanelLoader />}>
             <ReportsPanel orders={allOrders} books={books} users={users} showToast={showToast} />
