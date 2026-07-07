@@ -730,19 +730,20 @@ export default function Reader() {
           <div className="reader__sidebar-nav-label">{book.title.toLowerCase()}</div>
           {(() => {
             const ROMANS = ['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX'];
+            // Pre-compute roman numeral for each chapter index so render is pure
             let partCount = 0;
+            const partNums = chapters.map(ch => {
+              if (ch.part) { partCount++; return ROMANS[partCount] || String(partCount); }
+              return null;
+            });
             return chapters.map((ch, i) => (
               <React.Fragment key={i}>
-                {ch.part && (() => {
-                  partCount++;
-                  const roman = ROMANS[partCount] || String(partCount);
-                  return (
-                    <div className="reader__sidebar-part">
-                      <span className="reader__sidebar-part-num">{roman}</span>
-                      <span className="reader__sidebar-part-text">{ch.part}</span>
-                    </div>
-                  );
-                })()}
+                {ch.part && (
+                  <div className="reader__sidebar-part">
+                    <span className="reader__sidebar-part-num">{partNums[i]}</span>
+                    <span className="reader__sidebar-part-text">{ch.part}</span>
+                  </div>
+                )}
                 <button
                   className={'reader__sidebar-ch' + (i === chapter ? ' on' : '')}
                   onClick={() => { setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false); }}
