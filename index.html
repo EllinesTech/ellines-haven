@@ -74,7 +74,7 @@
       "paymentAccepted": "M-Pesa, Paystack, PayPal, Airtel Money, Visa, Mastercard",
       "currenciesAccepted": "KES, USD",
       "openingHours": "Mo-Sa 08:00-20:00",
-      "sameAs": ["https://ellinestech.co.ke", "https://ellines-haven.pages.dev"]
+      "sameAs": ["https://ellinestech.co.ke"]
     }
     </script>
     <!-- Person schema — Author -->
@@ -93,6 +93,15 @@
       "description": "Kenyan author of original novels and short stories inspired by real East African life. Founder of Ellines Haven.",
       "sameAs": ["https://haven.ellines.co.ke"]
     }
+    </script>
+    <!-- Block crawlers on non-production domains (e.g. pages.dev preview URLs) -->
+    <script>
+      if (location.hostname.includes('pages.dev')) {
+        var m = document.createElement('meta');
+        m.name = 'robots';
+        m.content = 'noindex, nofollow';
+        document.head.appendChild(m);
+      }
     </script>
   </head>
   <body>
