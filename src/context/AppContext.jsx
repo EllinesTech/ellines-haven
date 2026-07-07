@@ -422,12 +422,22 @@ export function AppProvider({ children }) {
   // ── Library from Firestore (real-time) ───────────────────────────────────
   useEffect(() => {
     if (!user?.email) { setLibState([]); setLibLoaded(false); return; }
-    const ref   = doc(db, 'libraries', libDocId(user.email));
+    const ref = doc(db, 'libraries', libDocId(user.email));
+
+    // Timeout fallback: if Firestore snapshot takes > 4 s, mark as loaded anyway
+    // so Reader / MyLibrary never show an infinite spinner
+    const timeout = setTimeout(() => setLibLoaded(true), 4000);
+
     const unsub = onSnapshot(ref, snap => {
+      clearTimeout(timeout);
       setLibState(snap.exists() ? (snap.data().books || []) : []);
       setLibLoaded(true);
+    }, () => {
+      // Firestore error — still mark loaded so UI unblocks
+      clearTimeout(timeout);
+      setLibLoaded(true);
     });
-    return () => unsub();
+    return () => { clearTimeout(timeout); unsub(); };
   }, [user?.email]);
 
   // ── Cart ──────────────────────────────────────────────────────────────────

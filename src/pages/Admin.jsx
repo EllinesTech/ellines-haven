@@ -840,6 +840,7 @@ function BookForm({ initial, onSave, onCancel }) {
               </div>
               {(form.chapters||[]).map((ch,i)=>{
                 const words = (ch.text||'').trim().split(/\s+/).filter(Boolean).length;
+                // Auto-number display: count only actual chapters (not parts) up to this index
                 return (
                   <div key={i} style={{background:'rgba(255,255,255,0.02)',border:'1px solid var(--dim)',borderRadius:'var(--r-sm)',padding:14,marginBottom:12}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
@@ -849,6 +850,13 @@ function BookForm({ initial, onSave, onCancel }) {
                         <button type="button" className="adm-act-btn adm-act-del" style={{fontSize:'0.7rem',padding:'2px 8px'}}
                           onClick={()=>set('chapters',form.chapters.filter((_,j)=>j!==i))}>Remove</button>
                       </div>
+                    </div>
+                    {/* Part / Section heading — optional, shown in TOC as a divider above this chapter */}
+                    <div className="adm-field-group" style={{marginBottom:10}}>
+                      <label>Part / Section Heading <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional — e.g. "PART 1" or "PART ONE — BEFORE LOVE". Shown as a divider above this chapter in the TOC)</span></label>
+                      <input className="field" value={ch.part||''} placeholder="e.g. PART 1 · PART TWO — FINDING EACH OTHER · ACT I (leave blank if none)"
+                        style={{borderColor: ch.part ? 'rgba(201,168,76,0.5)' : undefined}}
+                        onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,part:e.target.value}:c))}/>
                     </div>
                     <div className="adm-field-group" style={{marginBottom:10}}>
                       <label>Chapter Title</label>
@@ -876,7 +884,7 @@ function BookForm({ initial, onSave, onCancel }) {
                 );
               })}
               <button type="button" className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:4}}
-                onClick={()=>set('chapters',[...(form.chapters||[]),{title:'Chapter '+((form.chapters||[]).length+1),text:''}])}>
+                onClick={()=>set('chapters',[...(form.chapters||[]),{part:'',title:'Chapter '+((form.chapters||[]).length+1),subtitle:'',text:''}])}>
                 + Add Chapter
               </button>
             </div>

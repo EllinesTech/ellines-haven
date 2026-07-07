@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useReadingProgress } from '../hooks/useReadingProgress';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDocFromCache, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findBookBySlugOrId, bookPath } from '../utils/slugify';
 import './Reader.css';
@@ -483,18 +483,31 @@ export default function Reader() {
   const [drmBlock,  setDrmBlock]  = useState(false);
   const [resumeBanner, setResumeBanner] = useState(false);
 
-  // ── Always fetch the latest chapters from Firestore so admin edits are
-  //    immediately visible to readers without waiting for cache expiry ────────
+  // ── Chapters: serve from IndexedDB cache instantly, then live-update ──────
+  // Phase 1: getDocFromCache → zero network latency, renders immediately
+  // Phase 2: onSnapshot → picks up admin edits in real-time, no page refresh needed
   const [liveChapters, setLiveChapters] = useState(null);
   useEffect(() => {
     if (!book?.id) return;
-    getDoc(doc(db, 'book_chapters', String(book.id)))
+    const ref = doc(db, 'book_chapters', String(book.id));
+
+    // Serve from IndexedDB cache first (instant — no network)
+    getDocFromCache(ref)
       .then(snap => {
         if (snap.exists() && snap.data().chapters?.length > 0) {
           setLiveChapters(snap.data().chapters);
         }
       })
-      .catch(() => {}); // silently fall back to context chapters
+      .catch(() => {}); // cache miss is normal on first visit
+
+    // Then subscribe for live updates (admin edits show immediately)
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists() && snap.data().chapters?.length > 0) {
+        setLiveChapters(snap.data().chapters);
+      }
+    }, () => {}); // silently fall back to getFallbackChapters on error
+
+    return () => unsub();
   }, [book?.id]); // eslint-disable-line
 
   // ── Reading progress ──────────────────────────────────────────────────────
@@ -594,7 +607,9 @@ export default function Reader() {
   );
 
   if (!checkOwned()) {
-    // Still waiting for Firestore library snapshot — show loading briefly
+    // Still waiting for Firestore library snapshot — show loading briefly.
+    // Only block if we genuinely don't have any library data yet.
+    // If library is empty AND libLoaded is false, wait up to 4 s (AppContext timeout handles that).
     if (!libLoaded) return (
       <div className="reader-error">
         <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
