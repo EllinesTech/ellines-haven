@@ -330,22 +330,12 @@ function TocSection({ book, owned, libLoaded, user }) {
     setSaving(true);
     const updated = draft.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // 1. Update local app state immediately so the UI reflects changes at once
+    // Update via AppContext.setBooks — this handles stripping large fields,
+    // saving to localStorage AND persisting to Firestore for ALL users
     const newBooks = books.map(b => b.id === book.id ? { ...b, tableOfContents: updated } : b);
-    setBooks(newBooks);
+    setBooks(newBooks); // ← AppContext writes to Firestore automatically
 
-    // 2. Persist to Firestore site_data/books_catalogue so ALL users see the update
-    try {
-      await setDoc(
-        doc(db, 'site_data', 'books_catalogue'),
-        { books: newBooks, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-      setSaveMsg('✅ Saved — all users will see the updated TOC');
-    } catch (e) {
-      setSaveMsg('⚠️ Saved locally. Firestore sync failed: ' + e.message);
-    }
-
+    setSaveMsg('✅ Saved — all users will see the updated TOC');
     setSaving(false);
     setEditing(false);
   };
