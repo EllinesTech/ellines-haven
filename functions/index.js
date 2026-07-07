@@ -338,15 +338,24 @@ exports.mpesaCallback = onRequest(
 
       // ── Notify admin ────────────────────────────────────────────────────────
       try {
-        await db.collection("admin_notifications").doc(orderId + "_confirmed").set({
-          type: "order_confirmed_auto",
+        const adminNotifId = orderId + "_confirmed";
+        await db.collection("admin_notifications").doc(adminNotifId).set({
+          id:       adminNotifId,
+          category: "book_purchase",
+          type:     "order_confirmed_auto",
+          title:    "M-Pesa Payment Confirmed",
+          message:  `Order #${orderId} paid KES ${paidAmount} via M-Pesa by ${order.userName || order.userEmail || "customer"}`,
+          icon:     "💳",
           orderId,
-          userName: order.userName,
-          userEmail: order.userEmail,
-          total: paidAmount,
+          userName:            order.userName,
+          userEmail:           order.userEmail,
+          total:               paidAmount,
           mpesaTransactionId,
-          status: "unread",
+          priority:  "high",
+          read:      false,
+          readBy:    [],
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAtMs: Date.now(),
         });
       } catch (e) {
         console.warn("[mpesaCallback] admin notification failed:", e.message);
@@ -539,16 +548,25 @@ exports.paystackWebhook = onRequest(
       } catch (ne) { console.warn("[paystackWebhook] user notify failed:", ne.message); }
 
       // Notify admin
-      await db.collection("admin_notifications").doc(orderId + "_ps").set({
-        type:        "order_confirmed_auto",
+      const psNotifId = orderId + "_ps";
+      await db.collection("admin_notifications").doc(psNotifId).set({
+        id:         psNotifId,
+        category:   "book_purchase",
+        type:       "order_confirmed_auto",
+        title:      "Paystack Payment Confirmed",
+        message:    `Order #${orderId} paid KES ${paidKobo / 100} via Paystack (${data.channel || "card"}) by ${order.userName || order.userEmail || "customer"}`,
+        icon:       "💳",
         orderId,
         userName:    order.userName,
         userEmail:   order.userEmail,
         total:       paidKobo / 100,
         paystackRef: reference,
         channel:     data.channel,
-        status:      "unread",
+        priority:    "high",
+        read:        false,
+        readBy:      [],
         createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+        createdAtMs: Date.now(),
       }).catch(() => {});
 
     } catch (err) {
@@ -853,16 +871,25 @@ exports.capturePayPalOrder = onCall(
       } catch (ne) { console.warn("[capturePayPalOrder] user notify failed:", ne.message); }
 
       // Notify admin
-      await db.collection("admin_notifications").doc(orderId + "_pp").set({
-        type:           "order_confirmed_auto",
+      const ppNotifId = orderId + "_pp";
+      await db.collection("admin_notifications").doc(ppNotifId).set({
+        id:              ppNotifId,
+        category:        "book_purchase",
+        type:            "order_confirmed_auto",
+        title:           "PayPal Payment Confirmed",
+        message:         `Order #${orderId} paid ${currency} ${paidAmt} via PayPal by ${order.userName || order.userEmail || "customer"}`,
+        icon:            "💳",
         orderId,
-        userName:       order.userName,
-        userEmail:      order.userEmail,
-        total:          paidAmt,
+        userName:        order.userName,
+        userEmail:       order.userEmail,
+        total:           paidAmt,
         paypalCaptureId: captureId,
         currency,
-        status:         "unread",
-        createdAt:      admin.firestore.FieldValue.serverTimestamp(),
+        priority:        "high",
+        read:            false,
+        readBy:          [],
+        createdAt:       admin.firestore.FieldValue.serverTimestamp(),
+        createdAtMs:     Date.now(),
       }).catch(() => {});
 
       return { success: true, captureId };
@@ -876,30 +903,26 @@ exports.capturePayPalOrder = onCall(
 );
 
 // ── Visitor Tracker — server-side IP + geolocation ────────────────────────────
-// Called by the frontend on every first load.
-// Server reads the REAL client IP from HTTP headers (cannot be faked by client JS).
+// Called by the frontend on every first page load via Firebase callable SDK.
+// The callable SDK automatically resolves the correct v2 Cloud Run URL, so no
+// hardcoded URL is needed on the client side.
+// Server reads the REAL client IP from the rawRequest headers (cannot be faked by client JS).
 // Then fetches geolocation from ip-api.com (free, no key, 45 req/min per IP, JSON).
-exports.trackVisitor = onRequest(
+exports.trackVisitor = onCall(
   {
     region: "us-central1",
-    cors: true,
+    allowInvalidAppCheckToken: true,
     invoker: "public",
   },
-  async (req, res) => {
-    // ── CORS — allow the Ellines Haven frontend ──
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
-    if (req.method !== "POST")   { res.status(405).send("Method Not Allowed"); return; }
-
+  async (request) => {
     try {
       // ── Extract the true public IP from reverse-proxy headers ──
       // Cloud Run / Firebase Hosting sets x-forwarded-for with the original client IP first.
-      const xForwardedFor = req.headers["x-forwarded-for"] || "";
-      const xRealIp       = req.headers["x-real-ip"]       || "";
-      const cfConnecting  = req.headers["cf-connecting-ip"] || ""; // Cloudflare
-      const fastlyClient  = req.headers["fastly-client-ip"]|| ""; // Fastly CDN
+      const headers       = request.rawRequest?.headers || {};
+      const xForwardedFor = headers["x-forwarded-for"] || "";
+      const xRealIp       = headers["x-real-ip"]       || "";
+      const cfConnecting  = headers["cf-connecting-ip"] || ""; // Cloudflare
+      const fastlyClient  = headers["fastly-client-ip"]|| ""; // Fastly CDN
 
       // Pick the first real IP: CF > Fastly > x-real-ip > first of x-forwarded-for > socket
       const rawIp =
@@ -907,12 +930,12 @@ exports.trackVisitor = onRequest(
         fastlyClient ||
         xRealIp      ||
         xForwardedFor.split(",")[0].trim() ||
-        req.socket?.remoteAddress || "";
+        request.rawRequest?.socket?.remoteAddress || "";
 
       // Strip IPv6-mapped IPv4 prefix (::ffff:1.2.3.4 → 1.2.3.4)
       const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
 
-      const body = req.body || {};
+      const body      = request.data || {};
       const page      = (body.page      || "/").slice(0, 200);
       const referrer  = (body.referrer  || "direct").slice(0, 200);
       const userAgent = (body.userAgent || "").slice(0, 300);
@@ -963,11 +986,12 @@ exports.trackVisitor = onRequest(
         visitedAtMs: Date.now(),
       });
 
-      res.status(200).json({ ok: true, ip: geo.query || clientIp });
+      console.log("[trackVisitor] recorded visit from", clientIp, geo.country || "unknown country");
+      return { ok: true, ip: geo.query || clientIp };
     } catch (err) {
       console.error("[trackVisitor] error:", err.message);
-      // Still return 200 so the frontend doesn't retry / show errors
-      res.status(200).json({ ok: false });
+      // Return ok:false but don't throw — client silently ignores this
+      return { ok: false };
     }
   }
 );

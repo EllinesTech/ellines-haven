@@ -68,7 +68,30 @@ export default function ActivityPanel({ user, showToast }) {
     const unsub = onSnapshot(q, snap => {
       // Filter out soft-deleted notifications client-side
       const fresh = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
+        .map(d => {
+          const data = d.data();
+          // Normalize schema: older Cloud Function notifications use `type` instead of `category`
+          // and `status: "unread"` instead of `readBy: []`. Normalize them here.
+          const normalized = { id: d.id, ...data };
+          if (!normalized.category && normalized.type) {
+            // Map known legacy types to proper categories
+            const typeToCategory = {
+              order_confirmed_auto: 'book_purchase',
+            };
+            normalized.category = typeToCategory[normalized.type] || 'system';
+          }
+          if (!normalized.readBy) {
+            // Legacy: status:"unread" → readBy:[], status:"read" → readBy:["*"]
+            normalized.readBy = normalized.status === 'read' ? ['*'] : [];
+          }
+          if (!normalized.title && normalized.type) {
+            normalized.title = normalized.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          }
+          if (!normalized.message && normalized.orderId) {
+            normalized.message = `Order #${normalized.orderId} — KES ${normalized.total || 0}`;
+          }
+          return normalized;
+        })
         .filter(n => n.deleted !== true);
       setNotifs(fresh);
       

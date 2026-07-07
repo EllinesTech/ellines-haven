@@ -58,23 +58,25 @@ export default function VisitorsPanel({ showToast }) {
   };
 
   const filtered = visitors.filter(v => {
-    const now = Date.now();
-    const ts  = typeof v.visitedAt === 'number' ? v.visitedAt : v.visitedAt?.toMillis?.() || 0;
-    if (filter === 'today') return now - ts < 86400000;
-    if (filter === 'week')  return now - ts < 7 * 86400000;
-    const q = search.toLowerCase();
-    if (q) return (
-      v.ip?.includes(q) || v.city?.toLowerCase().includes(q) ||
-      v.country?.toLowerCase().includes(q) || v.page?.toLowerCase().includes(q) ||
-      v.userAgent?.toLowerCase().includes(q)
-    );
+    // Time-range filter
+    if (filter === 'today' || filter === 'week') {
+      const now = Date.now();
+      const ts  = typeof v.visitedAt === 'number' ? v.visitedAt : v.visitedAt?.toMillis?.() || 0;
+      if (filter === 'today') return now - ts < 86400000;
+      if (filter === 'week')  return now - ts < 7 * 86400000;
+    }
     return true;
   }).filter(v => {
+    // Search filter (applied after time-range)
     if (!search) return true;
     const q = search.toLowerCase();
     return (
-      v.ip?.includes(q) || v.city?.toLowerCase().includes(q) ||
-      v.country?.toLowerCase().includes(q) || v.page?.toLowerCase().includes(q)
+      v.ip?.includes(q) ||
+      v.city?.toLowerCase().includes(q) ||
+      v.country?.toLowerCase().includes(q) ||
+      v.page?.toLowerCase().includes(q) ||
+      v.userAgent?.toLowerCase().includes(q) ||
+      v.userEmail?.toLowerCase().includes(q)
     );
   });
 

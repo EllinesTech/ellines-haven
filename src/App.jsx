@@ -120,8 +120,7 @@ function ScrollToTop() {
   return null;
 }
 
-/* ── Visitor Tracker — server-side real IP via Cloud Function ── */
-const TRACK_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitor';
+/* ── Visitor Tracker — server-side real IP via Cloud Function (callable) ── */
 const VISITOR_SESSION_KEY = 'eh_visitor_logged';
 
 function VisitorTracker() {
@@ -129,7 +128,7 @@ function VisitorTracker() {
   const { user } = useApp();
 
   useEffect(() => {
-    // Skip admin pages — don't track admin browsing as site visitors
+    // Skip admin and reader pages — don't track admin browsing as site visitors
     if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
     // One visit per browser session — prevents double-counting SPA navigation
@@ -138,6 +137,10 @@ function VisitorTracker() {
 
     (async () => {
       try {
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const fns = getFunctions(undefined, 'us-central1');
+        const trackFn = httpsCallable(fns, 'trackVisitor');
+
         const ua = navigator.userAgent || '';
         let device = 'Desktop';
         if (/Mobi|Android|iPhone|iPad/i.test(ua)) device = 'Mobile';
@@ -145,18 +148,14 @@ function VisitorTracker() {
         const referrer = document.referrer
           ? (() => { try { return new URL(document.referrer).hostname; } catch { return document.referrer.slice(0, 100); } })()
           : 'direct';
-        await fetch(TRACK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            page: pathname,
-            referrer,
-            userAgent: ua.slice(0, 300),
-            device,
-            userEmail: user?.email || null,
-            userName:  user?.name  || null,
-          }),
-          keepalive: true,
+
+        await trackFn({
+          page: pathname,
+          referrer,
+          userAgent: ua.slice(0, 300),
+          device,
+          userEmail: user?.email || null,
+          userName:  user?.name  || null,
         });
       } catch { /* silent — never block the page */ }
     })();
