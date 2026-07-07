@@ -390,6 +390,9 @@ export default function EllineaAI() {
   const { user, books } = useApp();
   const location = useLocation();
 
+  // ── open must be declared FIRST — referenced in the chat settings useEffect below ──
+  const [open, setOpen] = useState(false);
+
   // ── Chat settings from Firestore — defer until widget is opened ─────────
   const [chatSettings, setChatSettings] = useState(null);
   const chatSettingsLoadedRef = useRef(false);
@@ -423,7 +426,6 @@ export default function EllineaAI() {
   const liveOfflineMsg = chatSettings?.liveOfflineMessage || 'Leave a message — reply within 24 hrs';
 
   // ── AI tab state ──────────────────────────────────────────────────────────
-  const [open,     setOpen]     = useState(false);
   const [tab,      setTab]      = useState('ai'); // 'ai' | 'live' | 'wa'
   // msgs initialized with a static fallback; updated once when aiWelcome loads from Firestore
   const [msgs,        setMsgs]     = useState([
