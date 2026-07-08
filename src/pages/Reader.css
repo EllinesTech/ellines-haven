@@ -692,7 +692,7 @@
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .reader { --reader-nav-h: 52px; --reader-wm-h: 28px; }
-  .reader__nav { padding: 0 10px; gap: 8px; }
+  .reader__nav { padding: 0 10px; gap: 6px; }
   .reader__info { display: none; }
   .reader__page { padding: 24px 16px; }
   .reader__body { padding: 16px 8px 60px; }
@@ -701,14 +701,15 @@
   .reader__mode-btn { padding: 5px 7px; font-size: 0.68rem; }
   .reader__text p:first-child::first-letter { font-size: 2.4em; }
 
-  /* Download button: icon only on mobile */
-  .reader__nav-right a[title="Download PDF"] {
-    padding: 4px 8px;
-    font-size: 0;
+  /* Offline badge: shorter on mobile */
+  .reader__offline-badge {
+    font-size: 0.68rem;
+    padding: 2px 7px;
   }
-  .reader__nav-right a[title="Download PDF"]::after {
-    content: '⬇';
-    font-size: 1rem;
+
+  /* Save offline / offline feedback text — hide long text, keep icon */
+  .reader__nav-right span[style*="var(--muted)"] {
+    display: none;
   }
 
   /* Zoom group — compact */
@@ -720,14 +721,27 @@
   .reader__font-btn   { padding: 4px 6px; font-size: 0.72rem; }
 
   /* Nav right: tighter */
-  .reader__nav-right { gap: 5px; }
+  .reader__nav-right { gap: 4px; }
+}
+
+/* ── Tablet (769–1024px) ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .reader__page { padding: 40px 36px; }
+  .reader__body { padding: 28px 16px 80px; }
+  .reader__nav  { padding: 0 14px; }
+  .reader__sidebar { width: 240px; }
+  .reader {
+    --reader-sidebar-w: 240px;
+  }
+  .reader__pdf-frame,
+  .reader__pdf-zoom-wrap iframe { height: calc(100vh - 100px); }
 }
 
 /* ── Very small phones ── */
 @media (max-width: 380px) {
   .reader__back { font-size: 0.75rem; }
   .reader__mode-btn { padding: 4px 5px; font-size: 0.64rem; }
-
+  .reader__offline-badge { display: none; }
   /* Hide zoom group on very small phones to save space */
   .reader__zoom-group { display: none; }
 }
@@ -1264,4 +1278,53 @@
   .audio-neural-badge {
     display: none;
   }
+}
+
+/* ── Offline badge ── */
+.reader__offline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  border-radius: var(--r-sm, 6px);
+  background: rgba(231,76,60,0.14);
+  border: 1px solid rgba(231,76,60,0.35);
+  color: #e74c3c;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Screenshot deterrent overlay ── */
+.reader--screenshot-overlay .reader__body::after,
+.reader--screenshot-overlay .reader__pdf-wrap::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(201,168,76,0.04) 0px,
+    rgba(201,168,76,0.04) 1px,
+    transparent 1px,
+    transparent 20px
+  ),
+  repeating-linear-gradient(
+    -45deg,
+    rgba(201,168,76,0.04) 0px,
+    rgba(201,168,76,0.04) 1px,
+    transparent 1px,
+    transparent 20px
+  );
+}
+
+/* ── Allow text selection when admin disables the block ── */
+.reader--select-enabled,
+.reader--select-enabled * {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  user-select: text !important;
 }

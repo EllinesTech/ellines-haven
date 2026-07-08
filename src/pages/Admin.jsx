@@ -24,6 +24,7 @@ const ActivityPanel     = lazy(() => import('./admin-panels/ActivityPanel'));
 const SMSPanel          = lazy(() => import('./admin-panels/SMSPanel'));
 const ChatSettingsPanel = lazy(() => import('./admin-panels/ChatSettingsPanel'));
 const PaymentFeesPanel  = lazy(() => import('./admin-panels/PaymentFeesPanel'));
+const ContentProtectionPanel = lazy(() => import('./admin-panels/ContentProtectionPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -2875,6 +2876,7 @@ export default function Admin() {
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
     { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
     { k:'security',      label:'Security',          icon:'🔒', group:'power' },
+    { k:'contentprotect', label:'Content Protection', icon:'🛡️', group:'power' },
     { k:'plugins',       label:'Plugins & Tools',   icon:'🧩', group:'power' },
     { k:'integrations',  label:'Integrations',      icon:'🔌', group:'power' },
     { k:'logs',          label:'System Logs',       icon:'📋', group:'power' },
@@ -4942,6 +4944,13 @@ export default function Admin() {
         {tab === 'security' && (
           <Suspense fallback={<PanelLoader />}>
             <SecurityPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- CONTENT PROTECTION (DRM) -- */}
+        {tab === 'contentprotect' && (
+          <Suspense fallback={<PanelLoader />}>
+            <ContentProtectionPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} />
           </Suspense>
         )}
 

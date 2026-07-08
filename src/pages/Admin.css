@@ -1902,3 +1902,212 @@
   .adm-dash-grid { grid-template-columns: 1fr; }
   .adm-settings-grid { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   MOBILE & TABLET RESPONSIVE — Admin Dashboard
+   Breakpoints:
+     ≤ 900px  — tablet (sidebar becomes drawer)
+     ≤ 600px  — phone  (full-screen sidebar, compact panels)
+══════════════════════════════════════════════════════════ */
+
+/* ── Mobile sidebar toggle — always visible on small screens ── */
+@media (max-width: 900px) {
+  /* The toggle button becomes a fixed top-bar on mobile */
+  .adm-sidebar-toggle {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 50px;
+    border-radius: 0;
+    transform: none;
+    z-index: 600;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    justify-content: flex-start;
+  }
+
+  /* Sidebar becomes an off-canvas drawer */
+  .adm-sidebar {
+    position: fixed;
+    top: 0;
+    left: -260px;
+    width: 260px;
+    height: 100vh;
+    z-index: 700;
+    transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.45);
+  }
+
+  /* Open state — slide in */
+  .adm--mobile-open .adm-sidebar {
+    left: 0;
+  }
+
+  /* Main shifts down to clear the top bar */
+  .adm-main {
+    margin-left: 0 !important;
+    padding-top: 50px;
+    height: 100vh;
+  }
+
+  /* Collapse arrow — hidden on mobile (handled by hamburger) */
+  .adm--collapsed .adm-sidebar-toggle {
+    left: 0;
+  }
+
+  /* Keep sidebar full-size on mobile (not collapsed) */
+  .adm--collapsed .adm-sidebar {
+    width: 260px !important;
+  }
+  .adm--collapsed .adm-nav-label       { display: block !important; }
+  .adm--collapsed .adm-sidebar-logo-text,
+  .adm--collapsed .adm-super-tag,
+  .adm--collapsed .adm-nav-section,
+  .adm--collapsed .adm-nav-divider,
+  .adm--collapsed .adm-admin-info > div { display: flex !important; }
+  .adm--collapsed .adm-sidebar-logo    { padding: 20px 20px 18px !important; justify-content: flex-start !important; }
+  .adm--collapsed .adm-sidebar-logo-img { width: 44px !important; height: 44px !important; }
+  .adm--collapsed .adm-sidebar-footer  { padding: 16px 12px !important; }
+  .adm--collapsed .adm-back-btn        { display: block !important; }
+  .adm--collapsed .adm-admin-info      { justify-content: flex-start !important; }
+  .adm--collapsed .adm-nav-btn {
+    padding: 11px 14px !important;
+    justify-content: flex-start !important;
+  }
+  .adm--collapsed .adm-nav-btn .adm-nav-icon-emoji {
+    font-size: inherit !important;
+    width: auto !important;
+  }
+
+  /* Main scroll area */
+  .adm-main-scroll {
+    padding: 14px 12px;
+  }
+
+  /* Panels: reduce padding on tablets */
+  .adm-page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* Stats grid: 2 columns on tablet */
+  .adm-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Photo grid: 2 columns */
+  .adm-photo-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Book form overlay — full width */
+  .adm-bookform {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .adm-bookform-body { padding: 16px !important; }
+  .adm-form-grid { grid-template-columns: 1fr !important; }
+  .adm-col-2, .adm-col-full { grid-column: 1 !important; }
+
+  /* Confirm dialog */
+  .adm-confirm { width: 90vw !important; }
+
+  /* Messages panel: stack list + thread vertically */
+  .adm-messages-grid--split {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr;
+  }
+  .adm-livechat-shell {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+/* ── Phone ── */
+@media (max-width: 600px) {
+  .adm-main-scroll { padding: 10px 8px; }
+
+  /* Stats: single column */
+  .adm-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .adm-stat-card {
+    padding: 12px 10px !important;
+  }
+  .adm-stat-card strong {
+    font-size: 1.4rem !important;
+  }
+
+  /* Photo grid: 2 columns even on small phone */
+  .adm-photo-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Page heading */
+  .adm-page-head h1, .adm-page-head h2 {
+    font-size: 1.1rem !important;
+  }
+
+  /* Action buttons row */
+  .adm-page-head > div:last-child {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Book card grid */
+  .adm-books-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Users list */
+  .adm-user-table th:nth-child(n+4),
+  .adm-user-table td:nth-child(n+4) {
+    display: none;
+  }
+
+  /* GodMode / tabs */
+  .adm-god-tabs, [style*="display:flex"][style*="gap:4"] {
+    flex-wrap: wrap;
+  }
+
+  /* Top sidebar toggle bar height */
+  .adm-sidebar-toggle {
+    height: 48px;
+  }
+  .adm-main {
+    padding-top: 48px;
+  }
+
+  /* Overlay panel — full screen */
+  .adm-bookform {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    border-radius: 0 !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+  }
+
+  /* Content protection panel toggles */
+  .adm-page .card {
+    padding: 12px 14px !important;
+  }
+}
+
+/* ── Tablet landscape — keep 2-column forms ── */
+@media (min-width: 601px) and (max-width: 900px) {
+  .adm-form-grid { grid-template-columns: 1fr 1fr !important; }
+  .adm-col-2     { grid-column: 1 / -1 !important; }
+}

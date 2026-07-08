@@ -6,6 +6,12 @@ import { useReadingProgress } from '../hooks/useReadingProgress';
 import { doc, getDocFromCache, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findBookBySlugOrId, bookPath } from '../utils/slugify';
+import {
+  isBookSavedOffline,
+  getOfflineBook,
+  saveBookOffline,
+  removeOfflineBook,
+} from '../hooks/useOfflineBook';
 import './Reader.css';
 
 /* ─────────────────────────────────────────────
@@ -469,7 +475,7 @@ function getFallbackChapters(book) {
 export default function Reader() {
   const { id } = useParams();
   const location = useLocation();
-  const { books, user, isOwned, library, myPerms, libLoaded } = useApp();
+  const { books, user, isOwned, library, myPerms, libLoaded, siteControls } = useApp();
   const book = findBookBySlugOrId(books, id);
   const readerRef = useRef(null);
 
@@ -482,6 +488,36 @@ export default function Reader() {
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
   const [resumeBanner, setResumeBanner] = useState(false);
+
+  // ── Offline reading state ─────────────────────────────────────────────────
+  const [isOffline,       setIsOffline]       = useState(!navigator.onLine);
+  const [offlineSaved,    setOfflineSaved]     = useState(false);
+  const [offlineSaving,   setOfflineSaving]    = useState(false);
+  const [offlineSaveMsg,  setOfflineSaveMsg]   = useState('');
+  const [offlineChapters, setOfflineChapters]  = useState(null);
+
+  // Listen for network changes
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline  = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online',  goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online',  goOnline);
+    };
+  }, []);
+
+  // On mount, check if this book is already saved offline and load cached chapters
+  useEffect(() => {
+    if (!user?.email || !book?.id) return;
+    const saved = isBookSavedOffline(user.email, book.id);
+    setOfflineSaved(saved);
+    if (saved) {
+      const cached = getOfflineBook(user.email, book.id);
+      if (cached?.chapters?.length) setOfflineChapters(cached.chapters);
+    }
+  }, [user?.email, book?.id]); // eslint-disable-line
 
   // ── Chapters: serve from IndexedDB cache instantly, then live-update ──────
   // Phase 1: getDocFromCache → zero network latency, renders immediately
@@ -561,17 +597,25 @@ export default function Reader() {
   useEffect(() => {
     const el = readerRef.current;
     if (!el || !user) return;
+
+    const sc = siteControls || {};
+    // Default all protections ON unless admin has explicitly disabled them
+    const blockRC  = sc.disableRightClick          !== false;
+    const blockCopy = sc.disableCopy               !== false;
+    const blockKeys = sc.disableKeyboardShortcuts  !== false;
+
     const block = e => e.preventDefault();
     const blockKey = e => {
+      if (!blockKeys) return;
       if (e.ctrlKey && ['c','a','s','p','u'].includes(e.key.toLowerCase())) e.preventDefault();
-      if (e.key === 'F12') e.preventDefault();
-      if (e.ctrlKey && e.shiftKey && ['i','j'].includes(e.key.toLowerCase())) e.preventDefault();
+      if (e.key === 'F12' && sc.disableInspect !== false) e.preventDefault();
+      if (e.ctrlKey && e.shiftKey && ['i','j'].includes(e.key.toLowerCase()) && sc.disableInspect !== false) e.preventDefault();
     };
-    el.addEventListener('contextmenu', block);
-    el.addEventListener('copy',        block);
-    el.addEventListener('cut',         block);
-    el.addEventListener('dragstart',   block);
+
+    if (blockRC)   el.addEventListener('contextmenu', block);
+    if (blockCopy) { el.addEventListener('copy', block); el.addEventListener('cut', block); el.addEventListener('dragstart', block); }
     document.addEventListener('keydown', blockKey);
+
     return () => {
       el.removeEventListener('contextmenu', block);
       el.removeEventListener('copy',        block);
@@ -579,14 +623,15 @@ export default function Reader() {
       el.removeEventListener('dragstart',   block);
       document.removeEventListener('keydown', blockKey);
     };
-  }, [user?.id]);
+  }, [user?.id, siteControls]); // eslint-disable-line
 
   /* ── DRM: block print ── */
   useEffect(() => {
+    if ((siteControls || {}).disablePrint === false) return; // admin disabled this protection
     const before = () => { setDrmBlock(true); };
     window.addEventListener('beforeprint', before);
     return () => window.removeEventListener('beforeprint', before);
-  }, []);
+  }, [siteControls]);
 
   /* ── Gates ── */
   if (!book) return (
@@ -675,7 +720,34 @@ export default function Reader() {
   const rawUrl     = ownedBook?.driveUrl || book.driveUrl || '';
   const embedUrl   = toDriveEmbed(rawUrl);
   const hasPdf     = !!embedUrl;
-  const chapters   = liveChapters || getFallbackChapters(book);
+  // Chapters: prefer live Firestore → offline cache → fallback static content
+  const chapters   = liveChapters || offlineChapters || getFallbackChapters(book);
+
+  // ── Save for offline handler ──────────────────────────────────────────────
+  const handleSaveOffline = async () => {
+    if (!user?.email || !book?.id) return;
+    setOfflineSaving(true);
+    setOfflineSaveMsg('');
+    const ok = saveBookOffline(user.email, book.id, book, chapters);
+    setOfflineSaving(false);
+    if (ok) {
+      setOfflineSaved(true);
+      setOfflineChapters(chapters);
+      setOfflineSaveMsg('✅ Saved for offline reading');
+    } else {
+      setOfflineSaveMsg('❌ Could not save — storage may be full');
+    }
+    setTimeout(() => setOfflineSaveMsg(''), 3500);
+  };
+
+  const handleRemoveOffline = () => {
+    if (!user?.email || !book?.id) return;
+    removeOfflineBook(user.email, book.id);
+    setOfflineSaved(false);
+    setOfflineChapters(null);
+    setOfflineSaveMsg('🗑 Removed from offline library');
+    setTimeout(() => setOfflineSaveMsg(''), 3000);
+  };
 
   // Download URL — uses Google Drive's export endpoint for direct PDF download
   const downloadUrl = rawUrl ? (() => {
@@ -693,7 +765,10 @@ export default function Reader() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="reader reader--drm" ref={readerRef}>
+    <div
+      className={`reader reader--drm${(siteControls?.screenshotOverlay) ? ' reader--screenshot-overlay' : ''}${(siteControls?.disableSelect === false) ? ' reader--select-enabled' : ''}`}
+      ref={readerRef}
+    >
 
       {/* ── Sidebar overlay (mobile) ── */}
       {sidebarOpen && (
@@ -774,18 +849,40 @@ export default function Reader() {
         </div>
 
         <div className="reader__nav-right">
-          {/* Download button — only shows when PDF is available */}
-          {downloadUrl && (
-            <a
-              href={downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="reader__font-btn"
-              style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)',textDecoration:'none'}}
-              title="Download PDF"
-            >
-              Download PDF
-            </a>
+          {/* ── Offline indicator ── */}
+          {isOffline && (
+            <span className="reader__offline-badge" title="You are offline — reading from local cache">
+              📵 Offline
+            </span>
+          )}
+
+          {/* ── Offline save / remove button — only when admin allows it ── */}
+          {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
+            offlineSaved ? (
+              <button
+                className="reader__font-btn"
+                style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71'}}
+                title="Remove from offline library"
+                onClick={handleRemoveOffline}
+              >
+                ✅ Saved Offline
+              </button>
+            ) : (
+              <button
+                className="reader__font-btn"
+                style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)'}}
+                title="Save book for offline reading (stored in your browser)"
+                onClick={handleSaveOffline}
+                disabled={offlineSaving}
+              >
+                {offlineSaving ? '⏳ Saving…' : '📥 Save Offline'}
+              </button>
+            )
+          )}
+
+          {/* Offline save feedback message */}
+          {offlineSaveMsg && (
+            <span style={{fontSize:'0.75rem',color:'var(--muted)',flexShrink:0}}>{offlineSaveMsg}</span>
           )}
           {/* Mode toggle — PDF + Text + Listen */}
           <div className="reader__mode-toggle">
@@ -822,6 +919,32 @@ export default function Reader() {
           )}
         </div>
       </div>
+
+      {/* ── Offline reading banner ── */}
+      {isOffline && offlineSaved && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '8px 18px',
+          background: 'rgba(46,204,113,0.10)',
+          borderBottom: '1px solid rgba(46,204,113,0.2)',
+          fontSize: '0.82rem', color: '#2ecc71',
+        }}>
+          <span>📵</span>
+          <span>Reading from offline cache — no internet required.</span>
+        </div>
+      )}
+      {isOffline && !offlineSaved && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '8px 18px',
+          background: 'rgba(231,76,60,0.10)',
+          borderBottom: '1px solid rgba(231,76,60,0.2)',
+          fontSize: '0.82rem', color: '#e74c3c',
+        }}>
+          <span>⚠️</span>
+          <span>You are offline. This book was not saved for offline reading. Connect to the internet to continue.</span>
+        </div>
+      )}
 
       {/* ── Resume reading banner ── */}
       {resumeBanner && (

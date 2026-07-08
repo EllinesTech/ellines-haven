@@ -686,11 +686,17 @@ export default function BookDetail() {
                   ? <>
                       <div>
                         <small>Chapters Out</small>
-                        <strong style={{ color:'#4a9eff' }}>{book.chaptersReleased > 0 ? book.chaptersReleased : (book.chapters?.length || '—')}</strong>
+                        <strong style={{ color:'#4a9eff' }}>
+                          {book.chaptersReleased > 0
+                            ? book.chaptersReleased
+                            : book.chapterCount > 0
+                              ? book.chapterCount
+                              : (book.tableOfContents?.length || book.chapters?.length || '—')}
+                        </strong>
                       </div>
                       <div>
                         <small>Total Planned</small>
-                        <strong>{book.totalChapters > 0 ? book.totalChapters : 'TBA'}</strong>
+                        <strong>{book.totalChapters > 0 ? book.totalChapters : book.chapterCount > 0 ? book.chapterCount : 'TBA'}</strong>
                       </div>
                       <div>
                         <small>Status</small>
@@ -701,8 +707,11 @@ export default function BookDetail() {
                   : <>
                       <div><small>Pages</small><strong>{book.pages > 0 ? book.pages : '—'}</strong></div>
                       <div><small>Read Time</small><strong>{book.readTime}</strong></div>
-                      {book.chapterCount > 0 && (
-                        <div><small>Chapters</small><strong>{book.chapterCount}</strong></div>
+                      {(book.chapterCount > 0 || book.tableOfContents?.length > 0) && (
+                        <div>
+                          <small>Chapters</small>
+                          <strong>{book.chapterCount > 0 ? book.chapterCount : book.tableOfContents.length}</strong>
+                        </div>
                       )}
                       <div><small>Released</small><strong>{new Date(book.date).toLocaleDateString('en-KE',{year:'numeric',month:'short'})}</strong></div>
                     </>

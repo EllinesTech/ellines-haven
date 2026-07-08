@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
+import { isBookSavedOffline, saveBookOffline, removeOfflineBook } from '../hooks/useOfflineBook';
 import { bookPath, readPath } from '../utils/slugify';
 import './MyLibrary.css';
 
@@ -542,10 +543,12 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
 
 // ── Main MyLibrary Page ─────────────────────────────────────────────────────
 export default function MyLibrary() {
-  const { user, library, books: catalog, myPerms, removeFromMyLibrary } = useApp();
+  const { user, library, books: catalog, myPerms, removeFromMyLibrary, siteControls } = useApp();
   const [liveOrders, setLiveOrders] = useState([]);
   const [activeTab,  setActiveTab]  = useState('library');
   const [removingBook, setRemovingBook] = useState(null); // bookId being confirmed for removal
+  // Track offline save state per-book: { [bookId]: 'saved' | 'saving' | false }
+  const [offlineState, setOfflineState] = useState({});
 
   useEffect(() => {
     if (!user?.email) {
@@ -566,6 +569,14 @@ export default function MyLibrary() {
     );
     return () => unsub();
   }, [user?.email]);
+
+  // Check which books are already saved offline
+  useEffect(() => {
+    if (!user?.email || !library?.length) return;
+    const map = {};
+    library.forEach(b => { map[b.id] = isBookSavedOffline(user.email, b.id) ? 'saved' : false; });
+    setOfflineState(map);
+  }, [user?.email, library?.length]); // eslint-disable-line
 
   if (!user) return (
     <main className="mylib-page">
@@ -811,6 +822,42 @@ export default function MyLibrary() {
                             >🗑</button>
                           )}
                         </div>
+
+                        {/* ── Offline save row ── */}
+                        {siteControls?.offlineEnabled !== false && !anyOff && (
+                          <div className="mylib-offline-row">
+                            {offlineState[b.id] === 'saved' ? (
+                              <>
+                                <span className="mylib-offline-badge">📵 Saved Offline</span>
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ fontSize:'0.72rem', padding:'2px 8px' }}
+                                  title="Remove offline cache for this book"
+                                  onClick={() => {
+                                    removeOfflineBook(user.email, b.id);
+                                    setOfflineState(s => ({ ...s, [b.id]: false }));
+                                  }}
+                                >Remove</button>
+                              </>
+                            ) : (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ fontSize:'0.75rem', padding:'3px 10px', color:'var(--muted)', border:'1px solid rgba(255,255,255,0.1)' }}
+                                disabled={offlineState[b.id] === 'saving'}
+                                title="Save this book's chapters to your browser for offline reading"
+                                onClick={async () => {
+                                  setOfflineState(s => ({ ...s, [b.id]: 'saving' }));
+                                  // We can only save the chapter data we have locally
+                                  // The full chapters are fetched in the reader; here we save minimal meta
+                                  const ok = saveBookOffline(user.email, b.id, b, b.chapters || [{ title:'Open in reader to cache full content', text:'' }]);
+                                  setOfflineState(s => ({ ...s, [b.id]: ok ? 'saved' : false }));
+                                }}
+                              >
+                                {offlineState[b.id] === 'saving' ? '⏳ Saving…' : '📥 Save Offline'}
+                              </button>
+                            )}
+                          </div>
+                        )}
 
                         {b.downloadUnlocked && (
                           <p className="mylib-license-note">Licensed to {user.name} only</p>
