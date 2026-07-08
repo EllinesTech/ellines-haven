@@ -132,6 +132,8 @@ function getLockoutMessage(data) {
 }
 
 /* ── Forgot Password Modal ── */
+const OTP_VALID_SECS = 15 * 60; // 15 minutes
+
 function ForgotPasswordModal({ onClose }) {
   const [email,       setEmail]       = useState('');
   const [step,        setStep]        = useState('email');
@@ -144,10 +146,51 @@ function ForgotPasswordModal({ onClose }) {
   const [showPw,      setShowPw]      = useState(false);
   const [sending,     setSending]     = useState(false);
   const [deliveredTo, setDeliveredTo] = useState([]); // ['email','sms']
+  const [codeExpiry,  setCodeExpiry]  = useState(null); // timestamp when code expires
+  const [countdown,   setCountdown]   = useState(OTP_VALID_SECS);
+  const [resendCooldown, setResendCooldown] = useState(0); // seconds until resend is allowed
+  const [userInfo,    setUserInfo]    = useState(null); // { name, phone } for resend
+
+  // ── Countdown timer ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (step !== 'sent' || !codeExpiry) return;
+    const tick = setInterval(() => {
+      const remaining = Math.max(0, Math.round((codeExpiry - Date.now()) / 1000));
+      setCountdown(remaining);
+      if (remaining <= 0) clearInterval(tick);
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [step, codeExpiry]);
+
+  // ── Resend cooldown ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const tick = setInterval(() => setResendCooldown(v => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(tick);
+  }, [resendCooldown]);
+
+  const fmtCountdown = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  const doSend = async (targetEmail, targetPhone, targetName) => {
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    setCode(otp);
+    setCodeExpiry(Date.now() + OTP_VALID_SECS * 1000);
+    setCountdown(OTP_VALID_SECS);
+
+    const delivered = [];
+    const fn = httpsCallable(getFunctions(), 'sendPasswordResetOtp');
+    const result = await fn({ email: targetEmail, phone: targetPhone, otp, name: targetName });
+    if (result.data?.emailSent) delivered.push('email');
+    if (result.data?.smsSent)  delivered.push('SMS');
+    return { otp, delivered };
+  };
 
   const handleSendCode = async e => {
     e.preventDefault(); setErr(''); setSending(true);
-    // Check Firestore users first, then legacy localStorage
     const fsUser = await findUserInFirestore(email).catch(() => null);
     const legacyUsers = getAccounts();
     const found = fsUser || legacyUsers.find(a => a.email?.toLowerCase() === email.toLowerCase());
@@ -156,29 +199,39 @@ function ForgotPasswordModal({ onClose }) {
       setErr('No account found with that email address. Please check and try again.');
       setSending(false); return;
     }
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
-    setCode(otp);
-
-    // Send via Cloud Function — SMTP email + AT SMS
+    const name  = fsUser?.name || found?.name || 'Valued Reader';
     const phone = fsUser?.phone || found?.phone || '';
-    const delivered = [];
+    setUserInfo({ name, phone });
+
     try {
-      const fn = httpsCallable(getFunctions(), 'sendPasswordResetOtp');
-      const result = await fn({ email, phone, otp, name: fsUser?.name || found?.name || 'Valued Reader' });
-      if (result.data?.emailSent) delivered.push('email');
-      if (result.data?.smsSent)  delivered.push('SMS');
+      const { delivered } = await doSend(email, phone, name);
+      setDeliveredTo(delivered);
+      setResendCooldown(60); // 60-second cooldown before allowing resend
+      setSending(false);
+      setStep('sent');
     } catch (fnErr) {
-      // The cloud function throws when all delivery channels fail
       setErr('We could not send the reset code. Please check your email address or contact support at ellines.haven@gmail.com.');
-      setSending(false); return;
+      setSending(false);
     }
-    setDeliveredTo(delivered);
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || sending) return;
+    setSending(true); setErr('');
+    try {
+      const { delivered } = await doSend(email, userInfo?.phone || '', userInfo?.name || 'Valued Reader');
+      setDeliveredTo(delivered);
+      setResendCooldown(60);
+      setEnteredCode('');
+    } catch {
+      setErr('Could not resend the code. Please try again.');
+    }
     setSending(false);
-    setStep('sent');
   };
 
   const handleVerifyCode = e => {
     e.preventDefault(); setErr('');
+    if (countdown <= 0) { setErr('This code has expired. Please request a new one.'); return; }
     if (enteredCode !== code) { setErr('That code is incorrect. Please check and try again.'); return; }
     setStep('reset');
   };
@@ -210,7 +263,7 @@ function ForgotPasswordModal({ onClose }) {
         </div>
         {step === 'email' && (
           <form onSubmit={handleSendCode} className="reset-body">
-            <p>Enter your account email and we'll send a 6-digit reset code to your email and mobile phone.</p>
+            <p>Enter your account email and we'll send a 6-digit reset code to your email{userInfo?.phone ? ' and mobile phone' : ''}.</p>
             {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>Email Address</label>
               <input className="field" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="your@email.com" required autoFocus /></div>
@@ -221,23 +274,50 @@ function ForgotPasswordModal({ onClose }) {
         )}
         {step === 'sent' && (
           <form onSubmit={handleVerifyCode} className="reset-body">
-            {deliveredTo.length > 0 ? (
-              <p>
-                A 6-digit reset code was sent to{' '}
-                {deliveredTo.includes('email') && <><strong style={{color:'var(--gold)'}}>{email}</strong> (email)</>}
-                {deliveredTo.includes('email') && deliveredTo.includes('SMS') && ' and '}
-                {deliveredTo.includes('SMS') && <strong style={{color:'var(--gold)'}}>your mobile phone</strong>}.
-                {' '}Check your inbox (and spam folder).
-              </p>
-            ) : (
-              <p>
-                A 6-digit reset code was sent to <strong style={{color:'var(--gold)'}}>{email}</strong>. Check your inbox and spam folder.
-              </p>
-            )}
+            <p>
+              A 6-digit reset code was sent to{' '}
+              <strong style={{color:'var(--gold)'}}>{email}</strong>
+              {deliveredTo.includes('SMS') && ' and your mobile phone'}.
+              {' '}Check your inbox and spam folder.
+            </p>
+
+            {/* Countdown timer */}
+            <div style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              background: countdown > 60 ? 'rgba(201,168,76,0.08)' : 'rgba(231,76,60,0.08)',
+              border: `1px solid ${countdown > 60 ? 'rgba(201,168,76,0.25)' : 'rgba(231,76,60,0.3)'}`,
+              borderRadius:8, padding:'10px 14px', marginBottom:14, fontSize:'0.84rem',
+            }}>
+              <span style={{color: countdown > 60 ? 'var(--gold)' : '#e74c3c'}}>
+                {countdown > 0
+                  ? <>⏱ Code expires in <strong>{fmtCountdown(countdown)}</strong></>
+                  : <span style={{color:'#e74c3c'}}>⛔ Code expired</span>
+                }
+              </span>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendCooldown > 0 || sending || countdown > 0 && resendCooldown > 0}
+                style={{
+                  background:'none', border:'none', padding:0,
+                  color: resendCooldown > 0 ? 'var(--muted)' : 'var(--gold)',
+                  fontSize:'0.82rem', cursor: resendCooldown > 0 ? 'default' : 'pointer',
+                  textDecoration: resendCooldown > 0 ? 'none' : 'underline', fontWeight:600,
+                }}
+              >
+                {sending ? '⏳' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : '🔄 Resend'}
+              </button>
+            </div>
+
             {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>Enter 6-Digit Code</label>
-              <input className="field" type="text" maxLength="6" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="123456" required autoFocus style={{letterSpacing:4,fontSize:'1.2rem',textAlign:'center'}} /></div>
-            <button type="submit" className="btn btn-primary" style={{width:'100%'}}>Verify Code</button>
+              <input className="field" type="text" inputMode="numeric" pattern="[0-9]*" maxLength="6"
+                value={enteredCode} onChange={e=>setEnteredCode(e.target.value.replace(/\D/g,''))}
+                placeholder="123456" required autoFocus
+                style={{letterSpacing:4,fontSize:'1.2rem',textAlign:'center'}} /></div>
+            <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={countdown <= 0}>
+              {countdown <= 0 ? 'Code Expired — Resend' : 'Verify Code'}
+            </button>
             <button type="button" className="btn btn-ghost" style={{width:'100%',marginTop:8}} onClick={()=>setStep('email')}>← Back</button>
           </form>
         )}
@@ -278,7 +358,15 @@ export default function Login() {
   const [successMsg,setSuccessMsg]= useState('');
   const [busy,      setBusy]      = useState(false);
   const [showReset, setShowReset] = useState(false);
+  // Remember Me — default to what was last saved; pre-fill email if remembered
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('eh_remembered_email'));
   const [lc,        setLc]        = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
+
+  // Pre-fill email from remembered credential
+  useEffect(() => {
+    const remembered = localStorage.getItem('eh_remembered_email');
+    if (remembered) setForm(f => ({ ...f, email: remembered }));
+  }, []);
 
   const showLoginSuccess = (name) => {
     setSuccessMsg(`Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`);
@@ -299,6 +387,26 @@ export default function Login() {
     setErr(''); setBusy(true);
 
     const emailKey = form.email.trim().toLowerCase();
+
+    // ── Remember Me — save or clear the email ───────────────────────────────
+    if (rememberMe) {
+      localStorage.setItem('eh_remembered_email', form.email.trim());
+    } else {
+      localStorage.removeItem('eh_remembered_email');
+    }
+
+    // ── Helper: set user session; if !rememberMe also write to sessionStorage
+    //    so AppContext localStorage persists only when chosen ─────────────────
+    const finalizeSession = (sessionUser) => {
+      setUser(sessionUser); // AppContext always writes to localStorage
+      if (!rememberMe) {
+        // Mark this session as "session-only" — on next app load AppContext
+        // will check this flag and clear if the sessionStorage token is gone
+        sessionStorage.setItem('eh_session_only', '1');
+      } else {
+        sessionStorage.removeItem('eh_session_only');
+      }
+    };
 
     // ── Lockout check ───────────────────────────────────────────────────────
     const attemptData = getAttemptData(emailKey);
@@ -341,7 +449,7 @@ export default function Login() {
         const roleOverrides1 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
         const effectiveRole1 = roleOverrides1[emailKey] || fsUser.role || 'user';
         const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: effectiveRole1, mustChangePassword: !!fsUser.mustChangePassword };
-        setUser(sessionUser);
+        finalizeSession(sessionUser);
         await logLogin(fsUser.email, fsUser.name);
         showLoginSuccess(fsUser.name);
         if (fsUser.mustChangePassword) {
@@ -355,7 +463,7 @@ export default function Login() {
       if (adminAccount) {
         clearAttempts(emailKey);
         const sessionUser = { id: adminAccount.id || 'admin01', name: adminAccount.name || 'Admin', email: adminAccount.email, role: adminAccount.role };
-        setUser(sessionUser);
+        finalizeSession(sessionUser);
         await logLogin(adminAccount.email, adminAccount.name);
         showLoginSuccess(adminAccount.name || 'Admin');
         navigate(from, { replace: true }); setBusy(false); return;
@@ -414,7 +522,7 @@ export default function Login() {
             localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
             
             const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: effectiveRole3 };
-            setUser(sessionUser);
+            finalizeSession(sessionUser);
             await logLogin(emailKey, regUser.name);
             showLoginSuccess(regUser.name);
             navigate(from, { replace: true }); setBusy(false); return;
@@ -447,7 +555,7 @@ export default function Login() {
         const roleOverrides4 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
         const effectiveRole4 = roleOverrides4[emailKey] || legacyAccount.role || 'user';
         const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: effectiveRole4 };
-        setUser(sessionUser);
+        finalizeSession(sessionUser);
         await logLogin(legacyAccount.email, legacyAccount.name);
         showLoginSuccess(legacyAccount.name);
         navigate(from, { replace: true }); setBusy(false); return;
@@ -497,7 +605,16 @@ export default function Login() {
                 </button>
               </div>
             </div>
-            <div style={{textAlign:'right',marginBottom:'22px'}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'22px'}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:'0.85rem',color:'var(--text)',userSelect:'none'}}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{width:15,height:15,accentColor:'var(--gold)',cursor:'pointer'}}
+                />
+                Remember me
+              </label>
               <button type="button" onClick={()=>setShowReset(true)}
                 style={{background:'none',border:'none',color:'var(--gold)',fontSize:'0.82rem',cursor:'pointer',padding:0,textDecoration:'underline'}}>
                 Forgot password?

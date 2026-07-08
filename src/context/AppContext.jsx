@@ -91,6 +91,19 @@ export function AppProvider({ children }) {
   const [user,     setUserState]     = useState(() => {
     const u = load('eh_user', null);
     if (u && (u.id === 'u1' || u.id === 'a1')) { localStorage.removeItem('eh_user'); return null; }
+    // If the session was marked as "session-only" and sessionStorage is gone
+    // (new tab opened or browser restarted), treat as logged out
+    const isSessionOnly = sessionStorage.getItem('eh_session_only');
+    const sessionAlive  = sessionStorage.getItem('eh_session_alive');
+    if (u && !isSessionOnly && localStorage.getItem('eh_remembered_email') === null) {
+      // No remembered email and no session-only flag → could be a fresh start after close
+      // Be conservative: keep the user (old behaviour)
+    }
+    if (u && isSessionOnly && !sessionAlive) {
+      // Session-only flag set but no alive marker → session was closed, auto-logout
+      localStorage.removeItem('eh_user');
+      return null;
+    }
     return u;
   });
   const [cart,     setCartState]     = useState(() => {
@@ -291,7 +304,15 @@ export function AppProvider({ children }) {
 
   const setUser = v => {
     setUserState(v);
-    if (v) save('eh_user', v); else localStorage.removeItem('eh_user');
+    if (v) {
+      save('eh_user', v);
+      // Mark session as alive in sessionStorage — clears automatically on tab/browser close
+      sessionStorage.setItem('eh_session_alive', '1');
+    } else {
+      localStorage.removeItem('eh_user');
+      sessionStorage.removeItem('eh_session_only');
+      sessionStorage.removeItem('eh_session_alive');
+    }
     if (!v) {
       setLibState([]);
       setWishlistState([]);
