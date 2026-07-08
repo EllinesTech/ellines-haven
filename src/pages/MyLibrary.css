@@ -184,16 +184,19 @@
 /* ── Library grid ── */
 .mylib-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  /* 2 columns on wide, 1 on narrow — each card at least 280px */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
   margin-bottom: 28px;
 }
 
 /* ── Book card ── */
 .mylib-card {
   display: flex;
+  flex-direction: row;
   overflow: hidden;
   transition: transform 0.18s, box-shadow 0.18s;
+  align-items: stretch;
   min-height: 0;
 }
 .mylib-card:hover {
@@ -206,18 +209,27 @@
 .mylib-card__cover-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 120px;
+  width: 130px;
+  min-width: 130px;
+  /* Let the card's flex stretch control height — no aspect-ratio so it doesn't fight flex */
+  overflow: hidden;
+  /* Minimum so short cards don't squash the cover */
+  min-height: 190px;
 }
 .mylib-card__cover {
-  width: 120px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  min-height: 165px;
   object-fit: cover;
+  object-position: center top;
   display: block;
 }
 .mylib-card__cover--styled {
-  width: 120px;
-  min-height: 165px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,7 +264,7 @@
 
 /* ── Body column ── */
 .mylib-card__body {
-  padding: 16px 18px 14px;
+  padding: 14px 16px 14px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -260,17 +272,17 @@
   gap: 0;
 }
 .mylib-card__genre {
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   color: var(--gold);
   text-transform: uppercase;
   letter-spacing: 1.2px;
   font-weight: 700;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 .mylib-card__title {
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 700;
-  margin: 0 0 4px;
+  margin: 0 0 3px;
   line-height: 1.3;
   overflow: hidden;
   display: -webkit-box;
@@ -278,24 +290,38 @@
   -webkit-box-orient: vertical;
 }
 .mylib-card__author {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--muted);
-  margin: 0 0 5px;
+  margin: 0 0 4px;
 }
 .mylib-card__meta {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: var(--muted);
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 
 /* ── Action buttons ── */
 .mylib-card__actions {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: wrap;         /* wrap on small screens — no more overflow */
   align-items: center;
   margin-top: auto;
   padding-top: 10px;
+}
+.mylib-card__actions .btn-primary {
+  /* Read Now gets priority but doesn't eat all space on tiny screens */
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+.mylib-card__actions .btn-ghost,
+.mylib-card__actions .btn-outline {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .mylib-disabled {
   opacity: 0.4;
@@ -526,7 +552,7 @@
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .mylib-orders-summary { grid-template-columns: repeat(2, 1fr); }
-  .mylib-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  /* Grid stays auto-fill — single column happens naturally below 640px */
 }
 @media (max-width: 640px) {
   .mylib-hero-inner    { gap: 14px; }
@@ -534,27 +560,45 @@
   .mylib-hero-stat     { padding: 8px 12px; }
   .mylib-hero-text h1  { font-size: 1.3rem; }
   /* On mobile: single column, card is full width */
-  .mylib-grid          { grid-template-columns: 1fr; gap: 14px; }
-  /* Slightly smaller cover on mobile to leave more room for text */
-  .mylib-card__cover-wrap { width: 105px; }
-  .mylib-card__cover,
-  .mylib-card__cover--styled { width: 105px; }
-  .mylib-card__body    { padding: 12px 14px 12px; }
-  .mylib-card__title   { font-size: 0.92rem; }
+  .mylib-grid          { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Cover: slightly narrower on mobile to leave more room for text */
+  .mylib-card__cover-wrap {
+    width: 100px;
+    min-width: 100px;
+    min-height: 160px;
+  }
+  .mylib-card__body    { padding: 12px 12px 12px; }
+  .mylib-card__title   { font-size: 0.9rem; }
+  .mylib-card__genre   { font-size: 0.58rem; }
+
+  /* Actions: allow PDF + Details to sit on second row if needed */
+  .mylib-card__actions {
+    gap: 5px;
+    padding-top: 8px;
+  }
+  .mylib-card__actions .btn-sm {
+    font-size: 0.72rem;
+    padding: 5px 9px;
+  }
+
   .mylib-orders-summary { grid-template-columns: 1fr 1fr; }
-  .mylib-tab           { padding: 12px 14px; font-size: 0.82rem; }
+  .mylib-tab           { padding: 12px 12px; font-size: 0.8rem; }
   .mylib-settings      { padding: 8px 0 60px; }
   .mylib-hero          { padding-top: 82px; }
   .mylib-tabbar        { top: 72px; }
-  /* Offline row: allow wrap on very small screens if needed */
   .mylib-offline-row   { flex-wrap: wrap; }
 }
 @media (max-width: 420px) {
   .mylib-hero-stats    { display: none; }
   .mylib-orders-summary{ grid-template-columns: 1fr 1fr; }
-  .mylib-card__cover-wrap { width: 95px; }
-  .mylib-card__cover,
-  .mylib-card__cover--styled { width: 95px; }
+  .mylib-card__cover-wrap {
+    width: 88px;
+    min-width: 88px;
+    min-height: 140px;
+  }
+  /* Tab labels: icon only on very small screens */
+  .mylib-tab { padding: 11px 10px; font-size: 0.75rem; }
 }
 
 /* ─────────────────────────────────────────────
@@ -910,8 +954,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid rgba(255,255,255,0.06);
   flex-wrap: nowrap;   /* keep badge + remove on one line */
 }

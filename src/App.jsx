@@ -349,6 +349,71 @@ function CookieConsent() {
 }
 
 
+/* ── Service Worker Update Banner ──────────────────────────────────────────
+   Listens for SW_UPDATED message from sw.js.
+   Shows a slim bottom banner: "New version available — tap Refresh"
+   Reloads to the SAME URL so the user lands back on their current page.
+────────────────────────────────────────────────────────────────────────── */
+function SWUpdateBanner() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handler = (event) => {
+      if (event.data?.type === 'SW_UPDATED') setShow(true);
+    };
+
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
+
+  if (!show) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 0, left: 0, right: 0,
+      zIndex: 99999,
+      background: 'linear-gradient(90deg, #1a1a0f, #2a2508)',
+      borderTop: '2px solid #c9a84c',
+      padding: '10px 20px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      flexWrap: 'wrap',
+      boxShadow: '0 -4px 24px rgba(0,0,0,0.5)',
+    }}>
+      <span style={{ color: '#f0ece2', fontSize: '0.85rem', flex: 1, minWidth: 200 }}>
+        ✨ <strong style={{ color: '#c9a84c' }}>New version available</strong> — refresh to get the latest updates.
+      </span>
+      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <button
+          onClick={() => setShow(false)}
+          style={{
+            padding: '6px 14px', borderRadius: 5,
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: 'transparent', color: 'rgba(255,255,255,0.45)',
+            fontSize: '0.8rem', cursor: 'pointer',
+          }}>
+          Later
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '6px 18px', borderRadius: 5,
+            border: 'none', background: '#c9a84c',
+            color: '#0d0d1a', fontWeight: 700,
+            fontSize: '0.82rem', cursor: 'pointer',
+          }}>
+          🔄 Refresh Now
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Maintenance gate ── */
 function MaintenanceGate({ children }) {
   const { siteControls, user } = useApp();
@@ -437,6 +502,7 @@ export default function App() {
             <AutoRefresh />
             <SiteControls />
             <WatermarkOverlay />
+            <SWUpdateBanner />
             <CookieConsent />
             <WelcomePrompt />
             <EllineaAI />

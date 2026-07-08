@@ -35,6 +35,20 @@ export default function NewsletterSignup({ compact = false }) {
       // Also track locally so we don't show the widget again
       localStorage.setItem('eh_newsletter_' + key, '1');
       setState('done');
+
+      // Track newsletter signup in admin activity feed
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        trackActivity({
+          category: NOTIFICATION_CATEGORIES.NEWSLETTER_SIGNUP,
+          title: 'Newsletter Signup',
+          message: `${name.trim() || email} subscribed to the newsletter`,
+          userEmail: email.toLowerCase(),
+          userName: name.trim() || email,
+          metadata: { source: 'website' },
+          priority: 'low',
+        }).catch(() => {});
+      } catch {}
     } catch {
       setState('error');
       setMsg('Something went wrong. Please try again.');

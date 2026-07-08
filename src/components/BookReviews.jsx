@@ -105,6 +105,20 @@ export default function BookReviews({ book }) {
       setSubmitted(true);
       setForm({ rating: 0, text: '' });
       setShowForm(false);
+
+      // Track review submission in admin activity feed
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        trackActivity({
+          category: NOTIFICATION_CATEGORIES.REVIEW_SUBMITTED,
+          title: 'Review Submitted',
+          message: `${user.name} reviewed "${book.title}" — ${form.rating}★`,
+          userEmail: user.email,
+          userName: user.name,
+          metadata: { bookId: book.id, bookTitle: book.title, rating: form.rating },
+          priority: 'low',
+        }).catch(() => {});
+      } catch {}
     } catch (err) {
       setError('Could not submit review. Please try again.');
       console.error(err);

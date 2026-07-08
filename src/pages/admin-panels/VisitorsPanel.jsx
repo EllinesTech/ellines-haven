@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const fmtDate = ts => {
@@ -33,16 +33,76 @@ export default function VisitorsPanel({ showToast }) {
   const [view,     setView]       = useState('table'); // table | map
   const [selected, setSelected]   = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+
+  // Simulate a visitor by calling the Cloud Function directly
+  const simulateVisit = async () => {
+    setSimulating(true);
+    try {
+      const { getFunctions, httpsCallable } = await import('firebase/functions');
+      const fns = getFunctions(undefined, 'us-central1');
+      const trackFn = httpsCallable(fns, 'trackVisitor');
+      await trackFn({
+        page: '/library',
+        referrer: 'admin-test',
+        userAgent: navigator.userAgent,
+        device: 'Desktop',
+        userEmail: null,
+        userName: null,
+      });
+      showToast?.('✅ Test visit recorded — should appear below shortly');
+    } catch (err) {
+      // Fallback: write directly to Firestore with dummy data
+      try {
+        const visitId = 'v_test_' + Date.now();
+        const { serverTimestamp } = await import('firebase/firestore');
+        await setDoc(doc(db, 'site_visitors', visitId), {
+          ip: '0.0.0.0',
+          city: 'Test City',
+          region: 'Test Region',
+          country: 'Kenya',
+          countryCode: 'ke',
+          lat: -1.286389, lon: 36.817223,
+          isp: 'Test ISP',
+          org: '',
+          timezone: 'Africa/Nairobi',
+          page: '/library',
+          referrer: 'admin-test',
+          userAgent: navigator.userAgent.slice(0, 200),
+          device: 'Desktop',
+          rawIp: '0.0.0.0',
+          visitedAt: serverTimestamp(),
+          visitedAtMs: Date.now(),
+        });
+        showToast?.('✅ Test visit written directly — Cloud Function unavailable');
+      } catch (e2) {
+        showToast?.('❌ Test failed: ' + (err.message || e2.message));
+      }
+    }
+    setSimulating(false);
+  };
 
   useEffect(() => {
     setLoading(true);
-    const q = query(collection(db, 'site_visitors'), orderBy('visitedAt', 'desc'), limit(500));
+    // No orderBy — sort client-side so docs without visitedAt are still included.
+    // Firestore silently excludes documents that lack the ordered field.
+    const q = query(collection(db, 'site_visitors'), limit(500));
     const unsub = onSnapshot(q, snap => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        // Sort newest-first client-side; handle Timestamp, ms number, or missing
+        .sort((a, b) => {
+          const ta = a.visitedAt?.toMillis?.() ?? (typeof a.visitedAt === 'number' ? a.visitedAt : a.visitedAtMs || 0);
+          const tb = b.visitedAt?.toMillis?.() ?? (typeof b.visitedAt === 'number' ? b.visitedAt : b.visitedAtMs || 0);
+          return tb - ta;
+        });
       setVisitors(data);
       calcStats(data);
       setLoading(false);
-    }, () => setLoading(false));
+    }, err => {
+      console.error('[VisitorsPanel]', err);
+      setLoading(false);
+    });
     return () => unsub();
   }, []);
 
@@ -137,6 +197,15 @@ export default function VisitorsPanel({ showToast }) {
               {f === 'all' ? 'All Time' : f === 'today' ? 'Today' : 'This Week'}
             </button>
           ))}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={simulateVisit}
+            disabled={simulating}
+            style={{ background:'rgba(74,158,255,0.08)', color:'#4a9eff', border:'1px solid rgba(74,158,255,0.2)' }}
+            title="Simulate a test visitor to verify tracking is working"
+          >
+            {simulating ? '⏳ Sending…' : '🧪 Test Visit'}
+          </button>
           <button className="btn btn-outline btn-sm" onClick={exportCSV} disabled={exporting}>
             {exporting ? '⏳' : '📊 Export CSV'}
           </button>
