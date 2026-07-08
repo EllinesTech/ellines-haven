@@ -1081,27 +1081,29 @@ exports.sendPasswordResetOtp = onCall(
           html:    htmlBody,
         });
         if (resendError) {
-          console.warn("[sendOtp] Resend error:", resendError.message);
+          // 403 = domain not verified — fall through to SMTP silently
+          console.warn("[sendOtp] Resend error:", resendError.message, "| falling back to SMTP");
         } else {
           emailSent = true;
           console.log("[sendOtp] Email sent via Resend to", email);
         }
       } catch (e) {
-        console.warn("[sendOtp] Resend failed:", e.message);
+        console.warn("[sendOtp] Resend failed:", e.message, "| falling back to SMTP");
       }
     }
 
-    // ── 1b. Send email via SMTP (nodemailer) — fallback channel ──────────────
+    // ── 1b. Send email via SMTP port 587 (fallback — works on Cloud Run) ─────
     if (!emailSent && smtpHost && smtpUser && smtpPass) {
       try {
         const transporter = nodemailer.createTransport({
           host:   smtpHost,
-          port:   smtpPort,
-          secure: smtpPort === 465,
+          port:   587,           // always use 587 — 465 is blocked on Cloud Run
+          secure: false,         // STARTTLS on 587
           auth:   { user: smtpUser, pass: smtpPass },
           tls:    { rejectUnauthorized: false },
-          connectionTimeout: 10000,
-          greetingTimeout:   10000,
+          connectionTimeout: 15000,
+          greetingTimeout:   15000,
+          socketTimeout:     15000,
         });
         await transporter.sendMail({
           from:    `"Ellines Haven" <${smtpUser}>`,
@@ -1111,10 +1113,10 @@ exports.sendPasswordResetOtp = onCall(
           html:    htmlBody,
         });
         emailSent = true;
-        console.log("[sendOtp] Email sent via SMTP to", email);
+        console.log("[sendOtp] Email sent via SMTP/587 to", email);
       } catch (e) {
         smtpError = e.message;
-        console.warn("[sendOtp] SMTP email failed:", e.message, "| code:", e.code, "| port:", smtpPort);
+        console.warn("[sendOtp] SMTP/587 failed:", e.message, "| code:", e.code);
       }
     }
 
@@ -1546,27 +1548,28 @@ exports.sendAdminPasswordResetNotification = onCall(
           html:    htmlBody,
         });
         if (resendError) {
-          console.warn("[adminPwReset] Resend error:", resendError.message);
+          console.warn("[adminPwReset] Resend error:", resendError.message, "| falling back to SMTP");
         } else {
           emailSent = true;
           console.log("[adminPwReset] Email sent via Resend to", email);
         }
       } catch (e) {
-        console.warn("[adminPwReset] Resend failed:", e.message);
+        console.warn("[adminPwReset] Resend failed:", e.message, "| falling back to SMTP");
       }
     }
 
-    // ── Send via SMTP (nodemailer) — fallback ─────────────────────────────────
+    // ── Send via SMTP port 587 — fallback ─────────────────────────────────────
     if (!emailSent && smtpHost && smtpUser && smtpPass) {
       try {
         const transporter = nodemailer.createTransport({
           host:   smtpHost,
-          port:   smtpPort,
-          secure: smtpPort === 465,
+          port:   587,
+          secure: false,
           auth:   { user: smtpUser, pass: smtpPass },
           tls:    { rejectUnauthorized: false },
-          connectionTimeout: 10000,
-          greetingTimeout:   10000,
+          connectionTimeout: 15000,
+          greetingTimeout:   15000,
+          socketTimeout:     15000,
         });
         await transporter.sendMail({
           from:    `"Ellines Haven" <${smtpUser}>`,
@@ -1576,9 +1579,9 @@ exports.sendAdminPasswordResetNotification = onCall(
           html:    htmlBody,
         });
         emailSent = true;
-        console.log("[adminPwReset] Notification email sent to", email);
+        console.log("[adminPwReset] Notification sent via SMTP/587 to", email);
       } catch (e) {
-        console.warn("[adminPwReset] SMTP failed:", e.message, "| port:", smtpPort);
+        console.warn("[adminPwReset] SMTP/587 failed:", e.message, "| port: 587");
       }
     }
 
