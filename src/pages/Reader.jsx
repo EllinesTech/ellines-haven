@@ -1,4 +1,4 @@
-import { useParams, Link, useLocation } from 'react-router-dom';
+﻿import { useParams, Link, useLocation } from 'react-router-dom';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -701,7 +701,15 @@ export default function Reader() {
 
   const viewMode   = hasPdf ? mode : (mode === 'listen' ? 'listen' : 'text');
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Default sidebar closed on mobile to avoid covering reading content
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 900 : true);
+  // Detect mobile for two-row nav
+  const [isMobileNav, setIsMobileNav] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 769 : false);
+  useEffect(() => {
+    const fn = () => setIsMobileNav(window.innerWidth < 769);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
 
   return (
     <div
@@ -774,89 +782,137 @@ export default function Reader() {
       <div className={'reader__main' + (sidebarOpen ? ' sidebar-open' : '')}>
 
       {/* ── Top navigation bar ── */}
-      <div className="reader__nav">
-        {/* Sidebar toggle */}
-        <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
-          <span /><span /><span />
-        </button>
+      <div className={`reader__nav${isMobileNav ? ' reader__nav--wrap' : ''}`}>
 
-        <Link to="/my-library" className="reader__back">← My Library</Link>
-
-        <div className="reader__info">
-          <strong>{book.title}</strong>
-          <span>by {book.author}</span>
-        </div>
-
-        <div className="reader__nav-right">
-          {/* ── Offline indicator ── */}
-          {isOffline && (
-            <span className="reader__offline-badge" title="You are offline — reading from local cache">
-              📵 Offline
-            </span>
-          )}
-
-          {/* ── Offline save / remove button — only when admin allows it ── */}
-          {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
-            offlineSaved ? (
-              <button
-                className="reader__font-btn"
-                style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71'}}
-                title="Remove from offline library"
-                onClick={handleRemoveOffline}
-              >
-                ✅ Saved Offline
+        {isMobileNav ? (
+          /* ════ MOBILE: Two-row layout ════ */
+          <>
+            {/* Row 1: toggle | back | title | offline badge */}
+            <div className="reader__nav-row1">
+              <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
+                <span /><span /><span />
               </button>
-            ) : (
-              <button
-                className="reader__font-btn"
-                style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)'}}
-                title="Save book for offline reading (stored in your browser)"
-                onClick={handleSaveOffline}
-                disabled={offlineSaving}
-              >
-                {offlineSaving ? '⏳ Saving…' : '📥 Save Offline'}
-              </button>
-            )
-          )}
-
-          {/* Offline save feedback message */}
-          {offlineSaveMsg && (
-            <span style={{fontSize:'0.75rem',color:'var(--muted)',flexShrink:0}}>{offlineSaveMsg}</span>
-          )}
-          {/* Mode toggle — PDF + Text + Listen */}
-          <div className="reader__mode-toggle">
-            {hasPdf && (
-              <button className={'reader__mode-btn' + (viewMode === 'pdf'  ? ' on' : '')} onClick={() => setMode('pdf')}>
-                📄 PDF
-              </button>
-            )}
-            <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>
-              📖 Read
-            </button>
-            <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>
-              🎧 Listen
-            </button>
-          </div>
-
-          {/* Zoom controls — PDF mode */}
-          {viewMode === 'pdf' && hasPdf && (
-            <div className="reader__zoom-group">
-              <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))} title="Zoom out">−</button>
-              <span className="reader__zoom-label">{zoom}%</span>
-              <button className="reader__font-btn" onClick={() => setZoom(z => Math.min(200, z + 10))} title="Zoom in">+</button>
-              <button className="reader__font-btn" onClick={() => setZoom(100)} title="Reset zoom" style={{fontSize:'0.7rem'}}>↺</button>
+              <Link to="/my-library" className="reader__back">← Library</Link>
+              <div className="reader__info">
+                <strong>{book.title}</strong>
+              </div>
+              {isOffline && (
+                <span className="reader__offline-badge" title="You are offline — reading from local cache">📵</span>
+              )}
             </div>
-          )}
 
-          {/* Font size — text/listen mode */}
-          {(viewMode === 'text' || viewMode === 'listen') && (
-            <div className="reader__zoom-group">
-              <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A−</button>
-              <span className="reader__zoom-label">{fontSize}px</span>
-              <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))} title="Larger text">A+</button>
+            {/* Row 2: offline save | mode toggle | font/zoom controls */}
+            <div className="reader__nav-row2">
+              {/* Offline save button */}
+              {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
+                offlineSaved ? (
+                  <button
+                    className="reader__font-btn"
+                    style={{padding:'3px 9px',fontSize:'0.7rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71',whiteSpace:'nowrap'}}
+                    title="Remove from offline library"
+                    onClick={handleRemoveOffline}
+                  >✅ Offline</button>
+                ) : (
+                  <button
+                    className="reader__font-btn"
+                    style={{padding:'3px 9px',fontSize:'0.7rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)',whiteSpace:'nowrap'}}
+                    title="Save book for offline reading"
+                    onClick={handleSaveOffline}
+                    disabled={offlineSaving}
+                  >{offlineSaving ? '⏳' : '📥 Save'}</button>
+                )
+              )}
+
+              {/* Mode toggle */}
+              <div className="reader__mode-toggle">
+                {hasPdf && (
+                  <button className={'reader__mode-btn' + (viewMode === 'pdf' ? ' on' : '')} onClick={() => setMode('pdf')}>PDF</button>
+                )}
+                <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>📖 Read</button>
+                <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>🎧 Listen</button>
+              </div>
+
+              {/* Zoom / font size */}
+              {viewMode === 'pdf' && hasPdf && (
+                <div className="reader__zoom-group">
+                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))}>−</button>
+                  <span className="reader__zoom-label">{zoom}%</span>
+                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.min(200, z + 10))}>+</button>
+                </div>
+              )}
+              {(viewMode === 'text' || viewMode === 'listen') && (
+                <div className="reader__zoom-group">
+                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))}>A−</button>
+                  <span className="reader__zoom-label">{fontSize}px</span>
+                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))}>A+</button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          /* ════ DESKTOP/TABLET: Single-row layout ════ */
+          <>
+            <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
+              <span /><span /><span />
+            </button>
+            <Link to="/my-library" className="reader__back">← My Library</Link>
+            <div className="reader__info">
+              <strong>{book.title}</strong>
+              <span>by {book.author}</span>
+            </div>
+            <div className="reader__nav-right">
+              {isOffline && (
+                <span className="reader__offline-badge" title="You are offline — reading from local cache">
+                  📵 Offline
+                </span>
+              )}
+              {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
+                offlineSaved ? (
+                  <button
+                    className="reader__font-btn"
+                    style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71'}}
+                    title="Remove from offline library"
+                    onClick={handleRemoveOffline}
+                  >✅ Saved Offline</button>
+                ) : (
+                  <button
+                    className="reader__font-btn"
+                    style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)'}}
+                    title="Save book for offline reading (stored in your browser)"
+                    onClick={handleSaveOffline}
+                    disabled={offlineSaving}
+                  >{offlineSaving ? '⏳ Saving…' : '📥 Save Offline'}</button>
+                )
+              )}
+              {offlineSaveMsg && (
+                <span style={{fontSize:'0.75rem',color:'var(--muted)',flexShrink:0}}>{offlineSaveMsg}</span>
+              )}
+              {/* Mode toggle — PDF + Text + Listen */}
+              <div className="reader__mode-toggle">
+                {hasPdf && (
+                  <button className={'reader__mode-btn' + (viewMode === 'pdf' ? ' on' : '')} onClick={() => setMode('pdf')}>📄 PDF</button>
+                )}
+                <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>📖 Read</button>
+                <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>🎧 Listen</button>
+              </div>
+              {viewMode === 'pdf' && hasPdf && (
+                <div className="reader__zoom-group">
+                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))} title="Zoom out">−</button>
+                  <span className="reader__zoom-label">{zoom}%</span>
+                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.min(200, z + 10))} title="Zoom in">+</button>
+                  <button className="reader__font-btn" onClick={() => setZoom(100)} title="Reset zoom" style={{fontSize:'0.7rem'}}>↺</button>
+                </div>
+              )}
+              {(viewMode === 'text' || viewMode === 'listen') && (
+                <div className="reader__zoom-group">
+                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A−</button>
+                  <span className="reader__zoom-label">{fontSize}px</span>
+                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))} title="Larger text">A+</button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Offline reading banner ── */}

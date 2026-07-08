@@ -32,6 +32,8 @@
   flex-direction: column;
   color: #2c2218;
   padding-top: var(--reader-offset);
+  /* safe area on notched iPhones */
+  padding-top: max(var(--reader-offset), calc(var(--reader-offset) + env(safe-area-inset-top)));
 }
 
 /* ══════════════════════════════
@@ -251,37 +253,82 @@
   z-index: 400;
   background: #1a1a1a;
   border-bottom: 1px solid rgba(201,168,76,0.3);
-  padding: 0 20px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.5);
+  /* safe area on notched phones */
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
 }
+
+/* Two-row layout on mobile */
+.reader__nav--wrap {
+  flex-wrap: wrap;
+  height: auto;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.reader__nav-row1 {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  min-height: 40px;
+}
+.reader__nav-row2 {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 6px;
+  min-height: 34px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  flex-wrap: wrap;
+}
+
 .reader__back {
   color: #c9a84c;
-  font-size: .85rem;
+  font-size: .82rem;
   transition: color .2s;
   white-space: nowrap;
   text-decoration: none;
   font-weight: 600;
+  flex-shrink: 0;
 }
 .reader__back:hover { color: #f0d98a; }
 .reader__info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   text-align: center;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
-.reader__info strong { font-size: .92rem; color: #f0ece2; }
-.reader__info span   { font-size: .72rem; color: rgba(240,236,226,0.55); }
+.reader__info strong {
+  font-size: .9rem;
+  color: #f0ece2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reader__info span {
+  font-size: .7rem;
+  color: rgba(240,236,226,0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .reader__nav-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -356,7 +403,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 20px;
+  padding: 0 max(20px, env(safe-area-inset-left));
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -691,15 +738,35 @@
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .reader { --reader-nav-h: 52px; --reader-wm-h: 28px; }
-  .reader__nav { padding: 0 10px; gap: 6px; }
-  .reader__info { display: none; }
-  .reader__page { padding: 24px 16px; }
-  .reader__body { padding: 16px 8px 60px; }
+  /* Two-row nav: row1 = toggle|back|title|offline, row2 = mode+font/zoom controls */
+  .reader {
+    --reader-nav-h: 94px; /* taller to fit 2 rows */
+    --reader-wm-h: 26px;
+  }
+  .reader__nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px max(10px, env(safe-area-inset-left)) 8px max(10px, env(safe-area-inset-left));
+    gap: 0;
+  }
+  /* Row 1 — always visible */
+  .reader__nav-row1 { display: flex; }
+  /* Row 2 — controls row */
+  .reader__nav-row2 { display: flex; }
+
+  .reader__info { display: flex; } /* show title in row 1 */
+  .reader__info strong { font-size: .82rem; }
+  .reader__info span { display: none; } /* hide author on small screens */
+
+  .reader__page { padding: 20px 14px; }
+  .reader__body { padding: 14px 6px 60px; }
   .reader__pdf-frame,
-  .reader__pdf-zoom-wrap iframe { height: calc(100vh - 90px); }
-  .reader__mode-btn { padding: 5px 7px; font-size: 0.68rem; }
+  .reader__pdf-zoom-wrap iframe { height: calc(100vh - var(--reader-offset) - 10px); }
+  .reader__mode-btn { padding: 5px 9px; font-size: 0.7rem; }
   .reader__text p:first-child::first-letter { font-size: 2.4em; }
+
+  /* Old single-row right area — hide on mobile (controls moved to row2) */
+  .reader__nav-right { display: none; }
 
   /* Offline badge: shorter on mobile */
   .reader__offline-badge {
@@ -707,21 +774,19 @@
     padding: 2px 7px;
   }
 
-  /* Save offline / offline feedback text — hide long text, keep icon */
-  .reader__nav-right span[style*="var(--muted)"] {
-    display: none;
-  }
-
   /* Zoom group — compact */
   .reader__zoom-group {
     padding: 2px 4px;
     gap: 2px;
   }
-  .reader__zoom-label { min-width: 30px; font-size: 0.68rem; }
-  .reader__font-btn   { padding: 4px 6px; font-size: 0.72rem; }
+  .reader__zoom-label { min-width: 28px; font-size: 0.67rem; }
+  .reader__font-btn   { padding: 4px 7px; font-size: 0.7rem; }
 
-  /* Nav right: tighter */
-  .reader__nav-right { gap: 4px; }
+  /* Watermark strip — safe area bottom aware */
+  .reader__watermark {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
 }
 
 /* ── Tablet (769–1024px) ── */
@@ -735,15 +800,35 @@
   }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - 100px); }
+  /* On tablet, hide the row-2 wrappers (single row is fine at 769+) */
+  .reader__nav-row1, .reader__nav-row2 { display: none; }
 }
 
-/* ── Very small phones ── */
-@media (max-width: 380px) {
-  .reader__back { font-size: 0.75rem; }
-  .reader__mode-btn { padding: 4px 5px; font-size: 0.64rem; }
-  .reader__offline-badge { display: none; }
-  /* Hide zoom group on very small phones to save space */
-  .reader__zoom-group { display: none; }
+/* ── Very small phones (≤400px) ── */
+@media (max-width: 400px) {
+  .reader { --reader-nav-h: 88px; }
+  .reader__back { font-size: 0.72rem; }
+  .reader__mode-btn { padding: 4px 7px; font-size: 0.65rem; }
+  .reader__offline-badge { display: none; } /* too cramped */
+  .reader__info strong { font-size: 0.75rem; }
+}
+
+/* ── Landscape phone ── */
+@media (max-width: 900px) and (orientation: landscape) {
+  .reader { --reader-nav-h: 44px; --reader-wm-h: 22px; }
+  .reader__nav {
+    flex-wrap: nowrap;
+    height: 44px;
+    padding: 0 10px;
+  }
+  .reader__nav-row1, .reader__nav-row2 { display: none; }
+  .reader__nav-right { display: flex; }
+  .reader__info { display: flex; }
+  .reader__info span { display: none; }
+  .reader__page { padding: 16px 14px; }
+  .reader__body { padding: 10px 8px 40px; }
+  .reader__pdf-frame,
+  .reader__pdf-zoom-wrap iframe { height: calc(100vh - 70px); }
 }
 
 /* ══════════════════════════════════════════

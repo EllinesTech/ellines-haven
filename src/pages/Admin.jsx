@@ -25,6 +25,7 @@ const SMSPanel          = lazy(() => import('./admin-panels/SMSPanel'));
 const ChatSettingsPanel = lazy(() => import('./admin-panels/ChatSettingsPanel'));
 const PaymentFeesPanel  = lazy(() => import('./admin-panels/PaymentFeesPanel'));
 const ContentProtectionPanel = lazy(() => import('./admin-panels/ContentProtectionPanel'));
+const DeviceSettingsPanel    = lazy(() => import('./admin-panels/DeviceSettingsPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3067,6 +3068,7 @@ export default function Admin() {
     { k:'sms',           label:'SMS Broadcast',      icon:'📱', group:'admin' },
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
+    { k:'devicesettings', label:'Device & Phone',    icon:'📱', group:'admin' },
     /* ── Power tools — visible to both admin & superadmin ── */
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
     { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
@@ -5122,6 +5124,13 @@ export default function Admin() {
             showToast={showToast}
             isSuper={isSuper}
           />
+        )}
+
+        {/* -- DEVICE & PHONE SETTINGS -- */}
+        {tab === 'devicesettings' && (
+          <Suspense fallback={<PanelLoader />}>
+            <DeviceSettingsPanel showToast={showToast} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- PAGE EDITOR -- */}
