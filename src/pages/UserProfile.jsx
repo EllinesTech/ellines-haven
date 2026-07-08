@@ -213,6 +213,18 @@ export default function UserProfile() {
       await setDoc(doc(db,'user_profiles',user.email.toLowerCase()),
         { name:form.name, phone:form.phone, bio:form.bio, location:form.location, updatedAt:serverTimestamp() }, {merge:true});
       showToast('✅ Profile saved!');
+      // Track profile update in activity feed
+      import('../utils/adminActivityTracker').then(({ trackActivity, NOTIFICATION_CATEGORIES }) =>
+        trackActivity({
+          category: NOTIFICATION_CATEGORIES.PROFILE_UPDATE,
+          title: 'Profile Updated',
+          message: `${form.name} updated their profile`,
+          userEmail: user.email,
+          userName: form.name,
+          metadata: { hasPhone: !!form.phone, hasLocation: !!form.location, hasBio: !!form.bio },
+          priority: 'low',
+        })
+      ).catch(() => {});
     } catch { showToast('✅ Saved locally'); }
     setSaving(false);
   };

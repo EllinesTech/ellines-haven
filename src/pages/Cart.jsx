@@ -498,6 +498,20 @@ export default function Cart() {
                   const { notifyBooksUnlocked } = await import('../utils/userNotifier');
                   await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
                 } catch {}
+                // Track purchase in activity feed
+                try {
+                  const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+                  const titles = (order.items || []).map(i => i.title).join(', ');
+                  trackActivity({
+                    category: NOTIFICATION_CATEGORIES.BOOK_PURCHASE,
+                    title: '📚 Book Purchase Confirmed',
+                    message: `${user.name || user.email} purchased ${(order.items || []).length} book${(order.items || []).length !== 1 ? 's' : ''}: ${titles} — KSh ${(order.total || 0).toLocaleString()}`,
+                    userEmail: user.email.toLowerCase(),
+                    userName: user.name,
+                    metadata: { orderId: order.id, total: order.total, method: 'paystack', ref: response.reference },
+                    priority: 'high',
+                  }).catch(() => {});
+                } catch {}
                 clearCart();
                 setStep('done');
               } catch (unlockErr) {

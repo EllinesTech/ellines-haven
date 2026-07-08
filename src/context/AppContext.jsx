@@ -308,15 +308,28 @@ export function AppProvider({ children }) {
       : [
           ...wishlist,
           {
-            // Snapshot all fields so new books with any extra properties are preserved
             ...book,
-            // Overwrite large/mutable fields with safe lightweight copies
-            chapters: undefined,  // don't store full chapter content in wishlist
+            chapters: undefined,
             addedAt: Date.now(),
           },
         ];
     setWishlistState(next);
     save(key, next);
+
+    // Track wishlist adds (not removes) in activity feed
+    if (!already) {
+      import('../utils/adminActivityTracker').then(({ trackActivity, NOTIFICATION_CATEGORIES }) =>
+        trackActivity({
+          category: NOTIFICATION_CATEGORIES.WISHLIST_ADD,
+          title: 'Book Added to Wishlist',
+          message: `${user.name || user.email} wishlisted "${book.title}"`,
+          userEmail: user.email,
+          userName: user.name,
+          metadata: { bookId: book.id, bookTitle: book.title, price: book.price },
+          priority: 'low',
+        })
+      ).catch(() => {});
+    }
   };
   const isWishlisted = (id) => wishlist.some(b => b.id === id);
 
@@ -545,6 +558,21 @@ export function AppProvider({ children }) {
       });
     } catch (e) { console.warn('[placeOrder] admin notification failed:', e.message); }
 
+    // ── Also write a properly-categorised activity notification ──────────
+    try {
+      const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+      const itemList = order.items.map(i => i.title).join(', ');
+      await trackActivity({
+        category: NOTIFICATION_CATEGORIES.CART_CHECKOUT,
+        title: '🛒 New Order Placed',
+        message: `${order.userName} ordered ${order.items.length} book${order.items.length !== 1 ? 's' : ''}: ${itemList} — KSh ${order.total.toLocaleString()}`,
+        userEmail: order.userEmail,
+        userName: order.userName,
+        metadata: { orderId: order.id, total: order.total, method, items: order.items.length, promoCode: order.promoCode || null },
+        priority: 'high',
+      });
+    } catch (e) { console.warn('[placeOrder] trackActivity failed:', e.message); }
+
     // ── Increment promo code usage count ──────────────────────────────────
     if (promoApplied?.code) {
       try {
@@ -597,6 +625,21 @@ export function AppProvider({ children }) {
     await unlockBooksForBuyer(order.userEmail, resolved);
     try { await updateDoc(doc(db,'orders',orderId), { status:'Completed', confirmedAt: serverTimestamp() }); }
     catch (e) { console.error('confirmOrder failed:', e); }
+
+    // Track book purchase confirmation in activity feed
+    try {
+      const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+      const titles = (order.items || []).map(i => i.title).join(', ');
+      trackActivity({
+        category: NOTIFICATION_CATEGORIES.BOOK_PURCHASE,
+        title: '📚 Book Purchase Confirmed',
+        message: `${order.userName || order.userEmail} purchased ${order.items?.length || 1} book${(order.items?.length || 1) !== 1 ? 's' : ''}: ${titles} — KSh ${(order.total || 0).toLocaleString()}`,
+        userEmail: order.userEmail,
+        userName: order.userName,
+        metadata: { orderId, total: order.total, method: order.method, items: order.items?.length },
+        priority: 'high',
+      }).catch(() => {});
+    } catch {}
   };
 
   const rejectOrder = async (orderId) => {

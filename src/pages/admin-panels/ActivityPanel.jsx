@@ -90,12 +90,16 @@ export default function ActivityPanel({ user, showToast }) {
     setFirestoreError(null);
 
     // Use a simple collection scan — no composite index needed, sort client-side.
+    // limitToLast not used — plain limit(500) with client-side sort.
     const q = query(
       collection(db, 'admin_notifications'),
       limit(500)
     );
 
-    const unsub = onSnapshot(q, snap => {
+    const unsub = onSnapshot(
+      q,
+      { includeMetadataChanges: false },
+      snap => {
       // Filter out soft-deleted notifications client-side
       const fresh = snap.docs
         .map(d => {
@@ -416,18 +420,48 @@ export default function ActivityPanel({ user, showToast }) {
       {/* Notifications List */}
       {filteredNotifs.length === 0 ? (
         <div className="card" style={{ padding: 60, textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 16 }}>📊</div>
-          <p style={{ fontSize: '1rem', marginBottom: 8 }}>
-            {searchQuery ? 'No matching activity' : showUnreadOnly ? 'All caught up!' : 'No activity yet'}
+          <div style={{ fontSize: '3rem', marginBottom: 16 }}>
+            {firestoreError ? '⚠️' : searchQuery ? '🔍' : showUnreadOnly ? '✅' : '📊'}
+          </div>
+          <p style={{ fontSize: '1rem', marginBottom: 8, fontWeight: 600 }}>
+            {firestoreError
+              ? 'Firestore connection problem'
+              : searchQuery
+              ? 'No matching activity'
+              : showUnreadOnly
+              ? 'All caught up!'
+              : notifs.length === 0
+              ? 'No activity recorded yet'
+              : 'No results for this filter'}
           </p>
-          <p style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
-            {searchQuery 
-              ? 'Try adjusting your search or filters'
-              : showUnreadOnly 
-                ? 'You have no unread notifications'
-                : 'User activity will appear here as it happens'
-            }
+          <p style={{ fontSize: '0.82rem', color: 'var(--muted)', maxWidth: 420, margin: '0 auto 20px' }}>
+            {firestoreError
+              ? 'Check your internet connection and try refreshing.'
+              : searchQuery
+              ? 'Try adjusting your search or filters.'
+              : showUnreadOnly
+              ? 'You have no unread notifications.'
+              : notifs.length === 0
+              ? 'Activity is recorded when users log in, register, place orders, submit contact messages, or interact with the site. Use the 🧪 Test button above to verify the feed is working.'
+              : 'Try selecting a different category or clearing filters.'}
           </p>
+          {notifs.length === 0 && !firestoreError && !searchQuery && !showUnreadOnly && (
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={writeTestActivity}
+                disabled={testWriting}
+                className="btn btn-primary btn-sm"
+              >
+                {testWriting ? '⏳ Writing…' : '🧪 Write Test Activity'}
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="btn btn-ghost btn-sm"
+              >
+                🔄 Reload Page
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

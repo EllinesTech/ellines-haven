@@ -803,7 +803,27 @@ export default function MyLibrary() {
                           }
                           {/* PDF download — only shown when a real file exists */}
                           {b.downloadUnlocked && canDl && b.driveUrl && (
-                            <a href={toDownloadUrl(b.driveUrl)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">⬇ PDF</a>
+                            <a
+                              href={toDownloadUrl(b.driveUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-outline btn-sm"
+                              onClick={() => {
+                                try {
+                                  import('../utils/adminActivityTracker').then(({ trackActivity, NOTIFICATION_CATEGORIES }) =>
+                                    trackActivity({
+                                      category: NOTIFICATION_CATEGORIES.BOOK_DOWNLOAD,
+                                      title: 'Book Downloaded',
+                                      message: `${user?.name || user?.email} downloaded "${b.title}"`,
+                                      userEmail: user?.email,
+                                      userName: user?.name,
+                                      metadata: { bookId: b.id, bookTitle: b.title },
+                                      priority: 'low',
+                                    })
+                                  ).catch(() => {});
+                                } catch {}
+                              }}
+                            >⬇ PDF</a>
                           )}
                           {b.downloadUnlocked && !canDl && !isFullOff && (
                             <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
