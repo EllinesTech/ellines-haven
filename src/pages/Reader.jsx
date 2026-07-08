@@ -220,13 +220,17 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
   return (
     <div className="audio-player">
-      {/* Left: chapter info */}
-      <div className="audio-player__info">
-        <span className="audio-player__icon">🎧</span>
-        <div>
-          <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
-          <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
+      {/* Top row: chapter info (left) + gear button (right) */}
+      <div className="audio-player__header">
+        <div className="audio-player__info">
+          <span className="audio-player__icon">🎧</span>
+          <div>
+            <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
+            <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
+          </div>
         </div>
+        {/* Gear lives in the header so it's always top-right on all screen sizes */}
+        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">⚙️</button>
       </div>
 
       {/* Centre: controls + progress */}
@@ -267,7 +271,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         </div>
       </div>
 
-      {/* Right: speed pills + settings gear */}
+      {/* Speed pills row — always visible */}
       <div className="audio-player__right">
         <div className="audio-speed-pills">
           {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
@@ -281,7 +285,6 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
             </button>
           ))}
         </div>
-        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">⚙️</button>
       </div>
 
       {/* Settings panel */}
