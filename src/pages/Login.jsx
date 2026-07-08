@@ -159,7 +159,7 @@ function ForgotPasswordModal({ onClose }) {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     setCode(otp);
 
-    // Attempt to send via Cloud Function (email + SMS if phone available)
+    // Send via Cloud Function — SMTP email + AT SMS
     const phone = fsUser?.phone || found?.phone || '';
     const delivered = [];
     try {
@@ -168,8 +168,9 @@ function ForgotPasswordModal({ onClose }) {
       if (result.data?.emailSent) delivered.push('email');
       if (result.data?.smsSent)  delivered.push('SMS');
     } catch (fnErr) {
-      // Cloud Function not yet deployed or no credentials — OTP is still set locally
-      console.warn('[ForgotPassword] Cloud Function unavailable:', fnErr.message);
+      // The cloud function throws when all delivery channels fail
+      setErr('We could not send the reset code. Please check your email address or contact support at ellines.haven@gmail.com.');
+      setSending(false); return;
     }
     setDeliveredTo(delivered);
     setSending(false);
@@ -223,18 +224,15 @@ function ForgotPasswordModal({ onClose }) {
             {deliveredTo.length > 0 ? (
               <p>
                 A 6-digit reset code was sent to{' '}
-                {deliveredTo.includes('email') && <strong style={{color:'var(--gold)'}}>your email</strong>}
+                {deliveredTo.includes('email') && <><strong style={{color:'var(--gold)'}}>{email}</strong> (email)</>}
                 {deliveredTo.includes('email') && deliveredTo.includes('SMS') && ' and '}
                 {deliveredTo.includes('SMS') && <strong style={{color:'var(--gold)'}}>your mobile phone</strong>}.
+                {' '}Check your inbox (and spam folder).
               </p>
             ) : (
-              <div>
-                <p>We attempted to send a code to <strong style={{color:'var(--gold)'}}>{email}</strong>.</p>
-                <div className="reset-demo-note">
-                  <strong>Demo code:</strong> <strong style={{color:'var(--gold)',fontSize:'1.2em',letterSpacing:3}}>{code}</strong>
-                  <br/><small>Configure Africa's Talking credentials to enable real SMS/email delivery.</small>
-                </div>
-              </div>
+              <p>
+                A 6-digit reset code was sent to <strong style={{color:'var(--gold)'}}>{email}</strong>. Check your inbox and spam folder.
+              </p>
             )}
             {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>Enter 6-Digit Code</label>

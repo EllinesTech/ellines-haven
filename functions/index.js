@@ -1007,19 +1007,15 @@ exports.sendPasswordResetOtp = onCall(
     invoker: "public",
   },
   async (request) => {
+    const nodemailer = require("nodemailer");
+
     const { email, phone, otp, name } = request.data;
     if (!email || !otp) throw new HttpsError("invalid-argument", "email and otp are required");
 
     const userName  = name  || "Valued Reader";
     const otpCode   = String(otp).slice(0, 6);
-    const emailSent = { sent: false };
-    const smsSent   = { sent: false };
-
-    // ── 1. Send via SMTP (nodemailer-style using axios to SMTP directly is complex;
-    //         use Africa's Talking email API which is simpler) ──────────────────
-    // Africa's Talking Email API: POST https://api.africastalking.com/version1/messaging/email
-    // Alternatively we send via SMTP using the "node-fetch + raw SMTP" pattern.
-    // Simplest: use AT Email if AT credentials are present, else fallback to SMTP.
+    let   emailSent = false;
+    let   smsSent   = false;
 
     const atApiKey   = AT_API_KEY.value()   || "";
     const atUsername = AT_USERNAME.value()  || "";
@@ -1030,52 +1026,85 @@ exports.sendPasswordResetOtp = onCall(
     const smtpUser = SMTP_USER.value() || "";
     const smtpPass = SMTP_PASS.value() || "";
 
-    const emailBody = `
-Hi ${userName},
+    // ── HTML email body ───────────────────────────────────────────────────────
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0d0d1a;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d1a;padding:40px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#13132a;border-radius:12px;border:1px solid rgba(201,168,76,0.3);overflow:hidden;">
+        <tr><td style="background:linear-gradient(135deg,#1a1a0f,#2a2508);padding:28px 36px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
+          <h1 style="margin:0;color:#c9a84c;font-size:1.5rem;letter-spacing:1px;">📖 Ellines Haven</h1>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="margin:0 0 8px;color:#f0ece2;font-size:1rem;">Hi <strong>${userName}</strong>,</p>
+          <p style="margin:0 0 24px;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">
+            We received a request to reset your Ellines Haven password. Use the code below — it expires in <strong style="color:#c9a84c;">15 minutes</strong>.
+          </p>
+          <div style="text-align:center;margin:28px 0;">
+            <div style="display:inline-block;background:#0d0d1a;border:2px solid #c9a84c;border-radius:12px;padding:20px 40px;">
+              <div style="color:#c9a84c;font-size:2.2rem;font-weight:700;letter-spacing:10px;font-family:monospace;">${otpCode}</div>
+            </div>
+          </div>
+          <p style="margin:24px 0 0;color:rgba(240,236,226,0.5);font-size:0.82rem;line-height:1.6;">
+            If you did not request a password reset, you can safely ignore this email. Your password will not change.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · ellines.haven@gmail.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
 
-Your Ellines Haven password reset code is:
+    const textBody = `Hi ${userName},\n\nYour Ellines Haven password reset code is: ${otpCode}\n\nThis code expires in 15 minutes. If you didn't request this, ignore this email.\n\n— Ellines Haven`;
 
-  ┌─────────────────┐
-  │   ${otpCode}   │
-  └─────────────────┘
+    // ── 1. Send email via SMTP (nodemailer) — primary channel ────────────────
+    if (smtpHost && smtpUser && smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host:   smtpHost,
+          port:   smtpPort,
+          secure: smtpPort === 465,   // true for 465, false for 587
+          auth:   { user: smtpUser, pass: smtpPass },
+          tls:    { rejectUnauthorized: false },
+        });
+        await transporter.sendMail({
+          from:    `"Ellines Haven" <${smtpUser}>`,
+          to:      email,
+          subject: `Your reset code: ${otpCode} — Ellines Haven`,
+          text:    textBody,
+          html:    htmlBody,
+        });
+        emailSent = true;
+        console.log("[sendOtp] Email sent via SMTP to", email);
+      } catch (e) {
+        console.warn("[sendOtp] SMTP email failed:", e.message);
+      }
+    }
 
-This code is valid for 15 minutes. If you didn't request a password reset, please ignore this email.
-
-— The Ellines Haven Team
-https://ellines-haven.web.app
-`.trim();
-
-    // ── 1. Send SMS via Africa's Talking SMS API (primary channel) ───────────
-    // Sandbox note: do NOT pass a `from` field — AT sandbox ignores custom sender
-    // IDs and rejects requests that include them. Only pass `from` in production.
+    // ── 2. Send SMS via Africa's Talking (if phone provided + AT creds set) ──
     if (atApiKey && atUsername) {
       const rawPhone = phone ? String(phone).replace(/\D/g, "") : "";
-      // Build the recipient list — always send to the account email as SMS if no
-      // phone is provided (AT can't send to an email via SMS, so skip in that case)
-      const targets = [];
-
       if (rawPhone) {
         let formattedPhone = rawPhone;
         if (rawPhone.startsWith("0"))        formattedPhone = "+254" + rawPhone.slice(1);
         else if (rawPhone.startsWith("254")) formattedPhone = "+"   + rawPhone;
         else if (!rawPhone.startsWith("+"))  formattedPhone = "+254" + rawPhone;
-        targets.push(formattedPhone);
-      }
 
-      if (targets.length > 0) {
-        const smsText = `Ellines Haven reset code: ${otpCode}. Valid 15 mins. Don't share.`;
+        const smsText = `Ellines Haven reset code: ${otpCode}. Valid 15 mins. Do not share.`;
         try {
-          // AT SMS API expects application/x-www-form-urlencoded body
           const isSandbox = atUsername === "sandbox";
           const params = new URLSearchParams({
             username: atUsername,
-            to:       targets.join(","),
+            to:       formattedPhone,
             message:  smsText,
           });
-          // Only add `from` for production — sandbox rejects it
-          if (!isSandbox && atSenderId) {
-            params.append("from", atSenderId);
-          }
+          if (!isSandbox && atSenderId) params.append("from", atSenderId);
 
           const smsRes = await axios.post(
             "https://api.africastalking.com/version1/messaging",
@@ -1090,54 +1119,23 @@ https://ellines-haven.web.app
           );
           console.log("[sendOtp] SMS response:", JSON.stringify(smsRes.data));
           const recipients = smsRes.data?.SMSMessageData?.Recipients || [];
-          smsSent.sent = recipients.some(r => r.statusCode === 101 || r.status === "Success");
+          smsSent = recipients.some(r => r.statusCode === 101 || r.status === "Success");
         } catch (e) {
           console.warn("[sendOtp] SMS failed:", e.response?.data || e.message);
         }
       }
     }
 
-    // ── 2. Send email via AT Email API (best-effort, sandbox may not support) ─
-    // AT Email API uses form-encoded params, NOT JSON body
-    if (atApiKey && atUsername && atUsername !== "sandbox") {
-      try {
-        const emailParams = new URLSearchParams({
-          username: atUsername,
-          to:       email,
-          from:     smtpUser || "noreply@ellines-haven.web.app",
-          subject:  `Your Ellines Haven reset code: ${otpCode}`,
-          message:  emailBody,
-        });
-        await axios.post(
-          "https://api.africastalking.com/version1/messaging/email",
-          emailParams.toString(),
-          {
-            headers: {
-              apiKey:         atApiKey,
-              Accept:         "application/json",
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-          }
-        );
-        emailSent.sent = true;
-      } catch (e) {
-        console.warn("[sendOtp] AT email failed:", e.response?.data || e.message);
-      }
+    // ── 3. If neither channel worked, throw so the client knows delivery failed
+    if (!emailSent && !smsSent) {
+      console.error(`[sendOtp] All delivery channels failed for ${email}. SMTP configured: ${!!(smtpHost && smtpUser && smtpPass)}`);
+      throw new HttpsError(
+        "unavailable",
+        "Could not deliver the reset code. Please check your email address or contact support at ellines.haven@gmail.com."
+      );
     }
 
-    // ── Fallback: store OTP in Firestore so admin can retrieve it in dev mode ─
-    if (!smsSent.sent && !emailSent.sent) {
-      console.log(`[sendOtp] OTP for ${email}: ${otpCode} — credentials: apiKey=${!!atApiKey} username=${atUsername}`);
-      try {
-        await db.collection("dev_otps").doc(email.toLowerCase().replace(/[^a-z0-9]/g, "_")).set({
-          email, otp: otpCode,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          expiresAt: Date.now() + 900000,
-        });
-      } catch {}
-    }
-
-    return { emailSent: emailSent.sent, smsSent: smsSent.sent };
+    return { emailSent, smsSent };
   }
 );
 
@@ -1446,42 +1444,96 @@ exports.sendAdminPasswordResetNotification = onCall(
     invoker: "public",
   },
   async (request) => {
+    const nodemailer = require("nodemailer");
+
     const { email, name, tempPassword } = request.data;
     if (!email) throw new HttpsError("invalid-argument", "email is required");
 
     const userName = name || "Valued Reader";
 
+    const smtpHost = SMTP_HOST.value() || "";
+    const smtpPort = parseInt(SMTP_PORT.value() || "465", 10);
+    const smtpUser = SMTP_USER.value() || "";
+    const smtpPass = SMTP_PASS.value() || "";
+
     const atApiKey   = AT_API_KEY.value()   || "";
     const atUsername = AT_USERNAME.value()  || "";
     const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
-    const smtpUser   = SMTP_USER.value()    || "";
 
-    const emailBody = `
-Hi ${userName},
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0d0d1a;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d1a;padding:40px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#13132a;border-radius:12px;border:1px solid rgba(201,168,76,0.3);overflow:hidden;">
+        <tr><td style="background:linear-gradient(135deg,#1a1a0f,#2a2508);padding:28px 36px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
+          <h1 style="margin:0;color:#c9a84c;font-size:1.5rem;letter-spacing:1px;">📖 Ellines Haven</h1>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="margin:0 0 8px;color:#f0ece2;font-size:1rem;">Hi <strong>${userName}</strong>,</p>
+          <p style="margin:0 0 20px;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">
+            An administrator has reset your Ellines Haven account password. Your temporary password is:
+          </p>
+          <div style="text-align:center;margin:20px 0;">
+            <div style="display:inline-block;background:#0d0d1a;border:2px solid #c9a84c;border-radius:12px;padding:16px 32px;">
+              <div style="color:#c9a84c;font-size:1.4rem;font-weight:700;letter-spacing:4px;font-family:monospace;">${tempPassword}</div>
+            </div>
+          </div>
+          <p style="margin:20px 0 0;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">
+            When you sign in, you will be asked to set a new password of your choice.
+          </p>
+          <p style="margin:16px 0 0;color:rgba(240,236,226,0.5);font-size:0.82rem;line-height:1.6;">
+            If you did not expect this change, contact us immediately at <a href="mailto:ellines.haven@gmail.com" style="color:#c9a84c;">ellines.haven@gmail.com</a> or WhatsApp: 0748 255 466.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · ellines.haven@gmail.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
 
-An administrator has reset your Ellines Haven account password.
-
-Your temporary password is: ${tempPassword}
-
-For your security, you will be prompted to set a new password when you next sign in.
-
-If you did not request this change, please contact us immediately at ellines.haven@gmail.com or WhatsApp: 0748 255 466.
-
-— The Ellines Haven Team
-https://ellines-haven.web.app
-`.trim();
+    const textBody = `Hi ${userName},\n\nAn administrator has reset your Ellines Haven password.\n\nYour temporary password is: ${tempPassword}\n\nYou will be required to set a new password when you next sign in.\n\nIf you did not expect this, contact us at ellines.haven@gmail.com.\n\n— Ellines Haven`;
 
     let emailSent = false;
 
-    // ── 1. Send via Africa's Talking Email (production only, not sandbox) ────
-    if (atApiKey && atUsername && atUsername !== "sandbox") {
+    // ── Send via SMTP (nodemailer) ────────────────────────────────────────────
+    if (smtpHost && smtpUser && smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host:   smtpHost,
+          port:   smtpPort,
+          secure: smtpPort === 465,
+          auth:   { user: smtpUser, pass: smtpPass },
+          tls:    { rejectUnauthorized: false },
+        });
+        await transporter.sendMail({
+          from:    `"Ellines Haven" <${smtpUser}>`,
+          to:      email,
+          subject: "Your Ellines Haven password was reset by an admin",
+          text:    textBody,
+          html:    htmlBody,
+        });
+        emailSent = true;
+        console.log("[adminPwReset] Notification email sent to", email);
+      } catch (e) {
+        console.warn("[adminPwReset] SMTP failed:", e.message);
+      }
+    }
+
+    // ── Fallback: AT Email (production only) ─────────────────────────────────
+    if (!emailSent && atApiKey && atUsername && atUsername !== "sandbox") {
       try {
         const emailParams = new URLSearchParams({
           username: atUsername,
           to:       email,
           from:     smtpUser || "noreply@ellines-haven.web.app",
           subject:  "Your Ellines Haven password was reset by an admin",
-          message:  emailBody,
+          message:  textBody,
         });
         await axios.post(
           "https://api.africastalking.com/version1/messaging/email",
@@ -1496,19 +1548,18 @@ https://ellines-haven.web.app
         );
         emailSent = true;
       } catch (e) {
-        console.warn("[sendAdminPasswordResetNotification] AT email failed:", e.response?.data || e.message);
+        console.warn("[adminPwReset] AT email failed:", e.response?.data || e.message);
       }
     }
 
-    // ── 2. Fallback: log to Firestore so admin can see the notification was attempted ─
     if (!emailSent) {
-      console.log(`[sendAdminPasswordResetNotification] Email notification for ${email} (credentials not configured — logged to Firestore)`);
+      console.warn(`[adminPwReset] Could not send notification to ${email} — SMTP not configured`);
       try {
         await db.collection("admin_pw_reset_log").add({
           email,
           userName,
           notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-          deliveryStatus: "pending_credentials",
+          deliveryStatus: "failed_no_credentials",
         });
       } catch {}
     }
