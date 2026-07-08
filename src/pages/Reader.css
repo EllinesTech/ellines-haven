@@ -484,27 +484,27 @@
 
 /* ══════════════════════════════
    TEXT / CHAPTER MODE
-   — warm book page feel
+   — premium novel typography
 ══════════════════════════════ */
 .reader__body {
   flex: 1;
-  background: #f0ebe2;
+  background: #e8e2d9;
   padding: 40px 24px 100px;
 }
 
 .reader__page {
-  max-width: 820px;
+  max-width: 680px;      /* tighter column = more readable, like a real book */
   margin: 0 auto;
-  background: #fdf8f0;   /* cream paper */
+  background: #fdf8f0;
   border: 1px solid #d4c9b0;
   border-radius: 4px;
-  padding: 60px 72px;
+  padding: 64px 80px;
   position: relative;
   overflow: hidden;
   box-shadow:
-    0 2px 8px rgba(120,90,60,0.12),
-    0 8px 32px rgba(120,90,60,0.08),
-    inset 0 0 60px rgba(200,170,120,0.04);
+    0 1px 4px rgba(120,90,60,0.10),
+    0 6px 28px rgba(120,90,60,0.10),
+    inset 0 0 80px rgba(200,170,120,0.04);
 }
 
 /* Ghost watermark */
@@ -651,27 +651,55 @@
   line-height: 1.5;
 }
 
-/* Body text — the reading experience */
+/* Body text — premium novel typography */
 .reader__text {
   color: #2c2218;
-  line-height: 1.95;
+  line-height: 1.92;
   font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1rem;        /* base; overridden by inline style from font-size control */
+  word-spacing: 0.02em;
 }
+
+/* Every paragraph: first-line indent, no gap — exactly like a printed novel */
 .reader__text p {
-  margin-bottom: 1.5em;
-  text-indent: 1.6em;
+  margin: 0;
+  padding: 0;
+  text-indent: 2em;
   text-align: justify;
   hyphens: auto;
+  -webkit-hyphens: auto;
+  orphans: 3;
+  widows: 3;
+  line-height: inherit;
 }
-.reader__text p:first-child { text-indent: 0; }
+
+/* No indent on very first paragraph of chapter (drop-cap handles the opening) */
+.reader__text p:first-child {
+  text-indent: 0;
+}
+
+/* Drop cap — elegant, like Penguin or Scribner */
 .reader__text p:first-child::first-letter {
-  font-size: 3.2em;
+  font-size: 3.6em;
   font-family: 'Playfair Display', Georgia, serif;
   float: left;
-  line-height: 0.75;
-  margin: 0.08em 0.08em 0 0;
+  line-height: 0.72;
+  margin: 0.06em 0.1em 0 0;
   color: #c9a84c;
   font-weight: 700;
+}
+
+/* Scene breaks — three asterisks or blank paragraphs */
+.reader__text p:empty,
+.reader__text p.scene-break {
+  text-indent: 0;
+  text-align: center;
+  margin: 1.2em 0;
+}
+
+/* Non-justify modes (left / center) — override the indent-based rhythm */
+.reader__text p[style] {
+  text-indent: 0 !important;  /* inline style wins, but make sure indent is gone */
 }
 
 /* Inline watermark */
@@ -738,28 +766,49 @@
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  /* Two-row nav: row1 = toggle|back|title|offline, row2 = mode+font/zoom controls */
+  /* Two-row nav: row1 = toggle|back|title|offline, row2 = mode+font/zoom controls
+     Nav actual height: row1 ~40px + 4px gap + row2 ~34px + 8px top + 8px bottom = ~94px
+     Adding extra headroom to prevent overlap on varying content */
   .reader {
-    --reader-nav-h: 94px; /* taller to fit 2 rows */
+    --reader-nav-h: 100px; /* extra headroom for two-row nav */
     --reader-wm-h: 26px;
   }
   .reader__nav {
     flex-wrap: wrap;
     height: auto;
+    min-height: var(--reader-nav-h);
     padding: 8px max(10px, env(safe-area-inset-left)) 8px max(10px, env(safe-area-inset-left));
     gap: 0;
+    /* Ensure nav never overlaps itself */
+    align-content: flex-start;
   }
   /* Row 1 — always visible */
-  .reader__nav-row1 { display: flex; }
+  .reader__nav-row1 {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    min-height: 40px;
+    flex-wrap: nowrap;
+  }
   /* Row 2 — controls row */
-  .reader__nav-row2 { display: flex; }
+  .reader__nav-row2 {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 6px;
+    min-height: 38px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    flex-wrap: wrap;
+  }
 
-  .reader__info { display: flex; } /* show title in row 1 */
-  .reader__info strong { font-size: .82rem; }
+  .reader__info { display: flex; flex: 1; min-width: 0; overflow: hidden; } /* show title in row 1 */
+  .reader__info strong { font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .reader__info span { display: none; } /* hide author on small screens */
 
-  .reader__page { padding: 20px 14px; }
-  .reader__body { padding: 14px 6px 60px; }
+  .reader__page { padding: 20px 18px; }
+  .reader__body { padding: 14px 6px 80px; }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - var(--reader-offset) - 10px); }
   .reader__mode-btn { padding: 5px 9px; font-size: 0.7rem; }
@@ -768,30 +817,43 @@
   /* Old single-row right area — hide on mobile (controls moved to row2) */
   .reader__nav-right { display: none; }
 
+  /* Mode toggle — ensure buttons don't overflow */
+  .reader__mode-toggle {
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
   /* Offline badge: shorter on mobile */
   .reader__offline-badge {
     font-size: 0.68rem;
     padding: 2px 7px;
+    flex-shrink: 0;
   }
 
   /* Zoom group — compact */
   .reader__zoom-group {
     padding: 2px 4px;
     gap: 2px;
+    flex-shrink: 0;
   }
   .reader__zoom-label { min-width: 28px; font-size: 0.67rem; }
   .reader__font-btn   { padding: 4px 7px; font-size: 0.7rem; }
 
-  /* Watermark strip — safe area bottom aware */
+  /* Watermark strip — positioned exactly below the nav */
   .reader__watermark {
-    padding-left: max(16px, env(safe-area-inset-left));
-    padding-right: max(16px, env(safe-area-inset-right));
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+    font-size: 0.65rem;
+    /* Truncate long email addresses gracefully */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
 /* ── Tablet (769–1024px) ── */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .reader__page { padding: 40px 36px; }
+  .reader__page { padding: 48px 48px; }
   .reader__body { padding: 28px 16px 80px; }
   .reader__nav  { padding: 0 14px; }
   .reader__sidebar { width: 240px; }
@@ -806,11 +868,14 @@
 
 /* ── Very small phones (≤400px) ── */
 @media (max-width: 400px) {
-  .reader { --reader-nav-h: 88px; }
-  .reader__back { font-size: 0.72rem; }
-  .reader__mode-btn { padding: 4px 7px; font-size: 0.65rem; }
-  .reader__offline-badge { display: none; } /* too cramped */
+  .reader { --reader-nav-h: 104px; } /* a little extra room — row2 may wrap */
+  .reader__back { font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; }
+  .reader__mode-btn { padding: 4px 6px; font-size: 0.62rem; }
+  .reader__offline-badge { display: none; } /* too cramped at 400px */
   .reader__info strong { font-size: 0.75rem; }
+  /* Keep rows displaying */
+  .reader__nav-row1,
+  .reader__nav-row2 { display: flex; }
 }
 
 /* ── Landscape phone ── */

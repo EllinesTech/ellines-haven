@@ -1045,9 +1045,31 @@ export default function Reader() {
             )}
 
             <div className="reader__text" style={{ fontSize: fontSize + 'px' }}>
-              {(chapters[chapter]?.text || '').split('\n\n').map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+              {(() => {
+                const align = chapters[chapter]?.textAlign || 'justify';
+                const isNonJustify = align !== 'justify';
+                const nonJustifyStyle = { textAlign: align, hyphens: 'none', textIndent: 0 };
+
+                // Split on blank lines (paragraph breaks). Single \n = soft wrap, stay in same para.
+                const rawParas = (chapters[chapter]?.text || '')
+                  .split(/\n{2,}/)
+                  .map(p => p.replace(/\n/g, ' ').trim())
+                  .filter(p => p.length > 0);
+
+                return rawParas.map((p, i) => {
+                  // Scene break lines — render as a centred ornament
+                  if (/^(\*{1,3}|—{1,3}|-{3,}|#{1,3}|\u2605|\u00b7{1,3})$/.test(p)) {
+                    return (
+                      <p key={i} style={{ textAlign: 'center', textIndent: 0, margin: '1.4em 0', color: '#c9a84c', letterSpacing: '0.3em', fontSize: '0.85em' }}>
+                        ✦ ✦ ✦
+                      </p>
+                    );
+                  }
+                  return (
+                    <p key={i} style={isNonJustify ? nonJustifyStyle : undefined}>{p}</p>
+                  );
+                });
+              })()}
             </div>
 
             {/* Inline licence watermark */}
@@ -1124,9 +1146,29 @@ export default function Reader() {
 
             {/* Follow-along text */}
             <div className="reader__text reader__text--listen" style={{ fontSize: fontSize + 'px' }}>
-              {(chapters[chapter]?.text || '').split('\n\n').map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+              {(() => {
+                const align = chapters[chapter]?.textAlign || 'justify';
+                const isNonJustify = align !== 'justify';
+                const nonJustifyStyle = { textAlign: align, hyphens: 'none', textIndent: 0 };
+
+                const rawParas = (chapters[chapter]?.text || '')
+                  .split(/\n{2,}/)
+                  .map(p => p.replace(/\n/g, ' ').trim())
+                  .filter(p => p.length > 0);
+
+                return rawParas.map((p, i) => {
+                  if (/^(\*{1,3}|—{1,3}|-{3,}|#{1,3}|\u2605|\u00b7{1,3})$/.test(p)) {
+                    return (
+                      <p key={i} style={{ textAlign: 'center', textIndent: 0, margin: '1.4em 0', color: '#c9a84c', letterSpacing: '0.3em', fontSize: '0.85em' }}>
+                        ✦ ✦ ✦
+                      </p>
+                    );
+                  }
+                  return (
+                    <p key={i} style={isNonJustify ? nonJustifyStyle : undefined}>{p}</p>
+                  );
+                });
+              })()}
             </div>
 
             <p className="reader__inline-mark" aria-hidden="true">

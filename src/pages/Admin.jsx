@@ -1056,11 +1056,72 @@ function BookForm({ initial, onSave, onCancel }) {
                       <input className="field" value={ch.subtitle||''} placeholder="e.g. A Young Man With Big Dreams · Karen, Nairobi — 2013"
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,subtitle:e.target.value}:c))}/>
                     </div>
+                    <div className="adm-field-group" style={{marginBottom:10}}>
+                      <label>Text Alignment <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(how paragraph text aligns in the reader — auto-picks best for all screens)</span></label>
+                      <div className="adm-toggle-row">
+                        {[
+                          { value: 'justify', label: '⬛ Justify', desc: 'Default — evenly spaced, clean on all devices' },
+                          { value: 'left',    label: '⬛ Left',    desc: 'Ragged right — natural for poetry or fragments' },
+                          { value: 'center',  label: '⬛ Centre',  desc: 'Centred — good for short, lyrical chapters' },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            title={opt.desc}
+                            className={'adm-toggle' + ((ch.textAlign||'justify') === opt.value ? ' on' : '')}
+                            onClick={() => set('chapters', form.chapters.map((c,j) => j===i ? {...c, textAlign: opt.value} : c))}
+                          >{opt.label}</button>
+                        ))}
+                      </div>
+                      <small style={{color:'var(--muted)',fontSize:'0.69rem',marginTop:4,display:'block'}}>
+                        💡 <strong>Justify</strong> is best for most novels — words fill the full line width on every screen size. Use <strong>Left</strong> if long lines are breaking awkwardly on mobile.
+                      </small>
+                    </div>
                     <div className="adm-field-group" style={{marginBottom:0}}>
                       <label>Chapter Text <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(paste from Word / Google Docs)</span></label>
-                      <textarea className="field" rows={20} value={ch.text||''} placeholder="Paste full chapter text here...&#10;&#10;Paragraphs separated by blank lines will display correctly in the reader."
-                        style={{resize:'vertical',fontFamily:'Georgia,serif',lineHeight:1.9,fontSize:'0.9rem',minHeight:320}}
-                        onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,text:e.target.value}:c))}/>
+                      {/* Tab bar: Edit / Preview */}
+                      {(() => {
+                        const previewKey = `chPreview_${i}`;
+                        const isPrev = form[previewKey] === true;
+                        const align = ch.textAlign || 'justify';
+                        return (
+                          <>
+                            <div style={{display:'flex',gap:0,marginBottom:0,borderBottom:'1px solid var(--dim)'}}>
+                              <button type="button"
+                                style={{padding:'5px 16px',fontSize:'0.76rem',fontWeight: !isPrev?700:400,border:'none',borderBottom: !isPrev?'2px solid var(--gold)':'2px solid transparent',background:'none',color: !isPrev?'var(--gold)':'var(--muted)',cursor:'pointer',transition:'all 0.15s'}}
+                                onClick={()=>set(previewKey,false)}>✏️ Edit</button>
+                              <button type="button"
+                                style={{padding:'5px 16px',fontSize:'0.76rem',fontWeight: isPrev?700:400,border:'none',borderBottom: isPrev?'2px solid var(--gold)':'2px solid transparent',background:'none',color: isPrev?'var(--gold)':'var(--muted)',cursor:'pointer',transition:'all 0.15s'}}
+                                onClick={()=>set(previewKey,true)}>👁 Preview ({align})</button>
+                            </div>
+                            {!isPrev ? (
+                              <textarea className="field" rows={20} value={ch.text||''} placeholder="Paste full chapter text here...&#10;&#10;Paragraphs separated by blank lines will display correctly in the reader."
+                                style={{resize:'vertical',fontFamily:'Georgia,serif',lineHeight:1.9,fontSize:'0.9rem',minHeight:320,borderTopLeftRadius:0,borderTopRightRadius:0}}
+                                onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,text:e.target.value}:c))}/>
+                            ) : (
+                              <div style={{
+                                minHeight:320,maxHeight:520,overflowY:'auto',
+                                background:'#fdf8f0',border:'1px solid var(--dim)',borderTop:'none',
+                                borderBottomLeftRadius:'var(--r-sm)',borderBottomRightRadius:'var(--r-sm)',
+                                padding:'24px 32px',
+                                fontFamily:'Georgia,serif',fontSize:'0.9rem',lineHeight:1.9,
+                                color:'#2c2218',
+                              }}>
+                                {ch.text ? ch.text.split('\n\n').map((p, pi) => (
+                                  <p key={pi} style={{
+                                    marginBottom:'1.2em',
+                                    textAlign: align,
+                                    hyphens: align === 'justify' ? 'auto' : 'none',
+                                    textIndent: align === 'justify' ? (pi === 0 ? 0 : '1.6em') : 0,
+                                  }}>{p}</p>
+                                )) : (
+                                  <p style={{color:'#aaa',fontStyle:'italic'}}>No text yet — switch to Edit tab and paste your chapter.</p>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="adm-field-group" style={{marginBottom:0,marginTop:10}}>
                       <label>End-of-Chapter Message <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(shown to reader at the bottom of this chapter)</span></label>
@@ -1072,7 +1133,7 @@ function BookForm({ initial, onSave, onCancel }) {
                 );
               })}
               <button type="button" className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:4}}
-                onClick={()=>set('chapters',[...(form.chapters||[]),{part:'',title:'Chapter '+((form.chapters||[]).length+1),subtitle:'',text:''}])}>
+                onClick={()=>set('chapters',[...(form.chapters||[]),{part:'',title:'Chapter '+((form.chapters||[]).length+1),subtitle:'',textAlign:'justify',text:''}])}>
                 + Add Chapter
               </button>
             </div>
