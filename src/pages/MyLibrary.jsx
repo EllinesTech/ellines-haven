@@ -6,6 +6,7 @@ import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
 import { isBookSavedOffline, saveBookOffline, removeOfflineBook } from '../hooks/useOfflineBook';
 import { bookPath, readPath } from '../utils/slugify';
+import { getFallbackChapters } from '../data/bookChapters';
 import './MyLibrary.css';
 
 // Helper: get a map of bookId -> progress for current user
@@ -795,19 +796,20 @@ export default function MyLibrary() {
                         )}
 
                         <div className="mylib-card__actions">
+                          {/* Primary CTA */}
                           {canRead
                             ? <Link to={readPath(b)} className="btn btn-primary btn-sm">📖 Read Now</Link>
                             : <span className="btn btn-primary btn-sm mylib-disabled" title={reason}>📖 Read Now</span>
                           }
-                          {b.downloadUnlocked && canDl && b.driveUrl
-                            ? <a href={toDownloadUrl(b.driveUrl)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">⬇ PDF</a>
-                            : b.downloadUnlocked && canDl
-                              ? <span className="btn btn-outline btn-sm mylib-disabled">PDF Soon</span>
-                              : b.downloadUnlocked && !canDl
-                                ? <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
-                                : null
-                          }
+                          {/* PDF download — only shown when a real file exists */}
+                          {b.downloadUnlocked && canDl && b.driveUrl && (
+                            <a href={toDownloadUrl(b.driveUrl)} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">⬇ PDF</a>
+                          )}
+                          {b.downloadUnlocked && !canDl && !isFullOff && (
+                            <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
+                          )}
                           <Link to={bookPath(b)} className="btn btn-ghost btn-sm">Details</Link>
+                          {/* Trash — confirm inline */}
                           {removingBook === b.id ? (
                             <span className="mylib-remove-confirm">
                               Remove?{' '}
@@ -845,11 +847,11 @@ export default function MyLibrary() {
                                 style={{ fontSize:'0.75rem', padding:'3px 10px', color:'var(--muted)', border:'1px solid rgba(255,255,255,0.1)' }}
                                 disabled={offlineState[b.id] === 'saving'}
                                 title="Save this book's chapters to your browser for offline reading"
-                                onClick={async () => {
+                                onClick={() => {
                                   setOfflineState(s => ({ ...s, [b.id]: 'saving' }));
-                                  // We can only save the chapter data we have locally
-                                  // The full chapters are fetched in the reader; here we save minimal meta
-                                  const ok = saveBookOffline(user.email, b.id, b, b.chapters || [{ title:'Open in reader to cache full content', text:'' }]);
+                                  // Use fallback chapters — same source the Reader uses
+                                  const chapters = getFallbackChapters(b);
+                                  const ok = saveBookOffline(user.email, b.id, b, chapters);
                                   setOfflineState(s => ({ ...s, [b.id]: ok ? 'saved' : false }));
                                 }}
                               >

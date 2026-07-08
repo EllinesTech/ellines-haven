@@ -184,8 +184,8 @@
 /* ── Library grid ── */
 .mylib-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
   margin-bottom: 28px;
 }
 
@@ -206,18 +206,21 @@
 .mylib-card__cover-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 120px;
+  width: 140px;
+  align-self: stretch;
 }
 .mylib-card__cover {
-  width: 120px;
+  width: 140px;
   height: 100%;
-  min-height: 165px;
+  min-height: 200px;
   object-fit: cover;
+  object-position: center top;
   display: block;
 }
 .mylib-card__cover--styled {
-  width: 120px;
-  min-height: 165px;
+  width: 140px;
+  min-height: 200px;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,7 +255,7 @@
 
 /* ── Body column ── */
 .mylib-card__body {
-  padding: 16px 18px 14px;
+  padding: 16px 18px 16px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -291,11 +294,11 @@
 /* ── Action buttons ── */
 .mylib-card__actions {
   display: flex;
-  gap: 6px;
+  gap: 7px;
   flex-wrap: wrap;
   align-items: center;
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 12px;
 }
 .mylib-disabled {
   opacity: 0.4;
@@ -910,8 +913,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid rgba(255,255,255,0.06);
   flex-wrap: nowrap;   /* keep badge + remove on one line */
 }
