@@ -999,9 +999,12 @@ exports.trackVisitor = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Send Password Reset OTP — email + SMS via Africa's Talking ───────────────
 // ─────────────────────────────────────────────────────────────────────────────
+// ── RESEND_API_KEY secret (HTTPS email — works from Cloud Run, no port issues)
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+
 exports.sendPasswordResetOtp = onCall(
   {
-    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, RESEND_API_KEY],
     region: "us-central1",
     allowInvalidAppCheckToken: true,
     invoker: "public",
@@ -1016,15 +1019,17 @@ exports.sendPasswordResetOtp = onCall(
     const otpCode   = String(otp).slice(0, 6);
     let   emailSent = false;
     let   smsSent   = false;
+    let   smtpError = "";
 
     const atApiKey   = AT_API_KEY.value()   || "";
     const atUsername = AT_USERNAME.value()  || "";
     const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
 
-    const smtpHost = SMTP_HOST.value() || "";
-    const smtpPort = parseInt(SMTP_PORT.value() || "465", 10);
-    const smtpUser = SMTP_USER.value() || "";
-    const smtpPass = SMTP_PASS.value() || "";
+    const smtpHost     = SMTP_HOST.value()     || "";
+    const smtpPort     = parseInt(SMTP_PORT.value() || "587", 10);
+    const smtpUser     = SMTP_USER.value()     || "";
+    const smtpPass     = SMTP_PASS.value()     || "";
+    const resendApiKey = RESEND_API_KEY.value() || "";
 
     // ── HTML email body ───────────────────────────────────────────────────────
     const htmlBody = `
@@ -1063,15 +1068,40 @@ exports.sendPasswordResetOtp = onCall(
 
     const textBody = `Hi ${userName},\n\nYour Ellines Haven password reset code is: ${otpCode}\n\nThis code expires in 15 minutes. If you didn't request this, ignore this email.\n\n— Ellines Haven`;
 
-    // ── 1. Send email via SMTP (nodemailer) — primary channel ────────────────
-    if (smtpHost && smtpUser && smtpPass) {
+    // ── 1a. Send email via Resend (HTTPS — primary, no port blocking) ─────────
+    if (resendApiKey) {
+      try {
+        const { Resend } = require("resend");
+        const resend = new Resend(resendApiKey);
+        const { error: resendError } = await resend.emails.send({
+          from:    "Ellines Haven <onboarding@resend.dev>",
+          to:      [email],
+          subject: `Your reset code: ${otpCode} — Ellines Haven`,
+          text:    textBody,
+          html:    htmlBody,
+        });
+        if (resendError) {
+          console.warn("[sendOtp] Resend error:", resendError.message);
+        } else {
+          emailSent = true;
+          console.log("[sendOtp] Email sent via Resend to", email);
+        }
+      } catch (e) {
+        console.warn("[sendOtp] Resend failed:", e.message);
+      }
+    }
+
+    // ── 1b. Send email via SMTP (nodemailer) — fallback channel ──────────────
+    if (!emailSent && smtpHost && smtpUser && smtpPass) {
       try {
         const transporter = nodemailer.createTransport({
           host:   smtpHost,
           port:   smtpPort,
-          secure: smtpPort === 465,   // true for 465, false for 587
+          secure: smtpPort === 465,
           auth:   { user: smtpUser, pass: smtpPass },
           tls:    { rejectUnauthorized: false },
+          connectionTimeout: 10000,
+          greetingTimeout:   10000,
         });
         await transporter.sendMail({
           from:    `"Ellines Haven" <${smtpUser}>`,
@@ -1083,7 +1113,8 @@ exports.sendPasswordResetOtp = onCall(
         emailSent = true;
         console.log("[sendOtp] Email sent via SMTP to", email);
       } catch (e) {
-        console.warn("[sendOtp] SMTP email failed:", e.message);
+        smtpError = e.message;
+        console.warn("[sendOtp] SMTP email failed:", e.message, "| code:", e.code, "| port:", smtpPort);
       }
     }
 
@@ -1128,7 +1159,7 @@ exports.sendPasswordResetOtp = onCall(
 
     // ── 3. If neither channel worked, throw so the client knows delivery failed
     if (!emailSent && !smsSent) {
-      console.error(`[sendOtp] All delivery channels failed for ${email}. SMTP configured: ${!!(smtpHost && smtpUser && smtpPass)}`);
+      console.error(`[sendOtp] All delivery channels failed for ${email}. SMTP error: ${smtpError || "none"}. Resend key set: ${!!resendApiKey}`);
       throw new HttpsError(
         "unavailable",
         "Could not deliver the reset code. Please check your email address or contact support at ellines.haven@gmail.com."
@@ -1438,7 +1469,7 @@ exports.getUserLoginHistory = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 exports.sendAdminPasswordResetNotification = onCall(
   {
-    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, RESEND_API_KEY],
     region: "us-central1",
     allowInvalidAppCheckToken: true,
     invoker: "public",
@@ -1451,10 +1482,11 @@ exports.sendAdminPasswordResetNotification = onCall(
 
     const userName = name || "Valued Reader";
 
-    const smtpHost = SMTP_HOST.value() || "";
-    const smtpPort = parseInt(SMTP_PORT.value() || "465", 10);
-    const smtpUser = SMTP_USER.value() || "";
-    const smtpPass = SMTP_PASS.value() || "";
+    const smtpHost     = SMTP_HOST.value()      || "";
+    const smtpPort     = parseInt(SMTP_PORT.value() || "587", 10);
+    const smtpUser     = SMTP_USER.value()      || "";
+    const smtpPass     = SMTP_PASS.value()      || "";
+    const resendApiKey = RESEND_API_KEY.value() || "";
 
     const atApiKey   = AT_API_KEY.value()   || "";
     const atUsername = AT_USERNAME.value()  || "";
@@ -1501,8 +1533,31 @@ exports.sendAdminPasswordResetNotification = onCall(
 
     let emailSent = false;
 
-    // ── Send via SMTP (nodemailer) ────────────────────────────────────────────
-    if (smtpHost && smtpUser && smtpPass) {
+    // ── Send via Resend (primary — HTTPS, no port blocking) ──────────────────
+    if (resendApiKey) {
+      try {
+        const { Resend } = require("resend");
+        const resend = new Resend(resendApiKey);
+        const { error: resendError } = await resend.emails.send({
+          from:    "Ellines Haven <onboarding@resend.dev>",
+          to:      [email],
+          subject: "Your Ellines Haven password was reset by an admin",
+          text:    textBody,
+          html:    htmlBody,
+        });
+        if (resendError) {
+          console.warn("[adminPwReset] Resend error:", resendError.message);
+        } else {
+          emailSent = true;
+          console.log("[adminPwReset] Email sent via Resend to", email);
+        }
+      } catch (e) {
+        console.warn("[adminPwReset] Resend failed:", e.message);
+      }
+    }
+
+    // ── Send via SMTP (nodemailer) — fallback ─────────────────────────────────
+    if (!emailSent && smtpHost && smtpUser && smtpPass) {
       try {
         const transporter = nodemailer.createTransport({
           host:   smtpHost,
@@ -1510,6 +1565,8 @@ exports.sendAdminPasswordResetNotification = onCall(
           secure: smtpPort === 465,
           auth:   { user: smtpUser, pass: smtpPass },
           tls:    { rejectUnauthorized: false },
+          connectionTimeout: 10000,
+          greetingTimeout:   10000,
         });
         await transporter.sendMail({
           from:    `"Ellines Haven" <${smtpUser}>`,
@@ -1521,7 +1578,7 @@ exports.sendAdminPasswordResetNotification = onCall(
         emailSent = true;
         console.log("[adminPwReset] Notification email sent to", email);
       } catch (e) {
-        console.warn("[adminPwReset] SMTP failed:", e.message);
+        console.warn("[adminPwReset] SMTP failed:", e.message, "| port:", smtpPort);
       }
     }
 

@@ -458,9 +458,9 @@ export function AppProvider({ children }) {
     if (!user?.email) { setLibState([]); setLibLoaded(false); return; }
     const ref = doc(db, 'libraries', libDocId(user.email));
 
-    // Timeout fallback: if Firestore snapshot takes > 4 s, mark as loaded anyway
+    // Timeout fallback: if Firestore snapshot takes > 2 s, mark as loaded anyway
     // so Reader / MyLibrary never show an infinite spinner
-    const timeout = setTimeout(() => setLibLoaded(true), 4000);
+    const timeout = setTimeout(() => setLibLoaded(true), 2000);
 
     const unsub = onSnapshot(ref, snap => {
       clearTimeout(timeout);
