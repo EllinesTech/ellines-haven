@@ -113,22 +113,55 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // Service worker: skip on localhost dev (avoids stale cache issues during development)
-      // On production: register and check for updates immediately on every load
+      // ── Service Worker — production only, never on localhost ─────────────────
+      // Strategy: when a new SW installs and activates (new deploy detected),
+      // the page reloads automatically — no banner, no user action required.
+      // This works on all devices including iOS Safari.
       if ('serviceWorker' in navigator) {
         const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         if (isLocalhost) {
-          // Dev: unregister any leftover SW so it never interferes with hot reload
+          // Dev: unregister any leftover SW so Vite HMR works cleanly
           navigator.serviceWorker.getRegistrations().then(regs => {
             regs.forEach(r => r.unregister());
           });
         } else {
+          // Track whether the page has already been refreshed to prevent loops
+          let refreshing = false;
+
+          // When a new SW takes control, reload immediately to load fresh assets
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+
           window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-              // Check for updates immediately, then every 60 seconds
-              reg.update();
-              setInterval(() => reg.update(), 60000);
-            }).catch(() => {});
+            navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+              .then(reg => {
+                // Check for an update right now
+                reg.update();
+                // Then poll every 30s — catches deploys within half a minute
+                setInterval(() => reg.update(), 30000);
+
+                // If there's a waiting SW (new deploy detected), activate it now
+                if (reg.waiting) {
+                  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+
+                // Watch for new SWs that arrive later
+                reg.addEventListener('updatefound', () => {
+                  const newSW = reg.installing;
+                  if (!newSW) return;
+                  newSW.addEventListener('statechange', () => {
+                    if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                      // New SW installed and there's an existing controller — activate immediately
+                      newSW.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                  });
+                });
+              })
+              .catch(() => {});
           });
         }
       }

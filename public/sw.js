@@ -1,90 +1,90 @@
 /**
  * Ellines Haven Service Worker
  *
- * Strategy:
- *  - HTML navigation  → network-FIRST always (never serve stale HTML)
- *  - /assets/**       → cache-first (content-hashed, never stale)
+ * Update flow — fully automatic, works on all devices including iOS Safari:
+ *  1. Every deploy stamps a new CACHE_NAME timestamp via vite.config.js
+ *  2. Browser fetches sw.js (served with no-cache header from Firebase Hosting)
+ *  3. New SW installs → receives SKIP_WAITING message → activates immediately
+ *  4. controllerchange fires → page auto-reloads → user gets fresh code
+ *  No banner. No manual tap. Happens within 30 seconds of any deploy.
+ *
+ * Caching strategy:
+ *  - HTML navigation  → ALWAYS network (never cached — stale HTML = broken app)
+ *  - /assets/**       → cache-first  (content-hashed filenames, safe to cache forever)
  *  - images/fonts     → stale-while-revalidate
- *
- * CACHE_NAME is auto-stamped with a build timestamp by vite.config.js on every
- * production build, so every deploy gets a brand-new cache key.
- * Old caches are wiped on activate — no stale chunks ever.
- *
- * On activation the SW posts { type: 'SW_UPDATED' } to all open tabs so the
- * app can show a "New version available — refresh" banner.
  */
 
 const CACHE_NAME = 'ellines-haven-20260707'; // replaced at build time by stamp-sw plugin
 
-const SHELL_ASSETS = [
+const STATIC_ASSETS = [
   '/logo-icon.png',
   '/favicon.svg',
 ];
 
-// ── Install: pre-cache minimal shell (NOT index.html — always fetch fresh) ───
+// ── Install ───────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
+  // Pre-cache only truly static assets (not index.html)
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll(SHELL_ASSETS).catch(() => {})
-    )
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
   );
-  // Take control immediately — don't wait for old SW to die
-  self.skipWaiting();
+  // Do NOT self.skipWaiting() here — let the registration code trigger it
+  // via the SKIP_WAITING message so we can reload cleanly
 });
 
-// ── Activate: delete ALL stale caches, claim clients ────────────────────────
+// ── Message: SKIP_WAITING — triggered by registration code on update ──────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// ── Activate: wipe all old caches ─────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((k) => k !== CACHE_NAME)
-          .map((k) => {
-            console.log('[SW] Deleting stale cache:', k);
-            return caches.delete(k);
-          })
-      )
-    ).then(() => self.clients.claim())
-      .then(() => {
-        // Notify every open tab that a new version is live
-        return self.clients.matchAll({ type: 'window' }).then((clients) => {
-          clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED' }));
-        });
-      })
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log('[SW] Deleting old cache:', k);
+          return caches.delete(k);
+        })
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// ── Fetch ────────────────────────────────────────────────────────────────────
+// ── Fetch ─────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle same-origin GET requests
+  // Only handle same-origin GET
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
-  // ── HTML navigation: ALWAYS network-first, never serve stale HTML ─────────
-  // This is critical — stale index.html causes blank/loading screens after deploy
+  // ── HTML navigation: ALWAYS network-first, never cache ───────────────────
+  // Stale index.html is the #1 cause of blank/loading-stuck screens after deploy
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .catch(() =>
-          // Offline only: serve cached index.html if available
-          caches.match('/index.html').then((r) => r || new Response('Offline', { status: 503 }))
+          // Offline fallback only
+          caches.match('/index.html')
+            .then(r => r || new Response('Offline — please reconnect', { status: 503 }))
         )
     );
     return;
   }
 
-  // ── Content-hashed /assets/**: cache-first (filenames change on each build) 
+  // ── /assets/** — cache-first (Vite content-hashes filenames on every build) ─
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
-      caches.match(request).then((cached) => {
+      caches.match(request).then(cached => {
         if (cached) return cached;
-        return fetch(request).then((res) => {
+        return fetch(request).then(res => {
           if (res.ok) {
             caches.open(CACHE_NAME)
-              .then((cache) => cache.put(request, res.clone()))
+              .then(cache => cache.put(request, res.clone()))
               .catch(() => {});
           }
           return res;
@@ -94,22 +94,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ── Static assets (images, fonts): stale-while-revalidate ────────────────
+  // ── Images / fonts — stale-while-revalidate ───────────────────────────────
   if (/\.(png|jpg|jpeg|svg|webp|woff2|woff|ico|gif)$/.test(url.pathname)) {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
-        cache.match(request).then((cached) => {
-          const networkFetch = fetch(request)
-            .then((res) => {
+      caches.open(CACHE_NAME).then(cache =>
+        cache.match(request).then(cached => {
+          const fresh = fetch(request)
+            .then(res => {
               if (res.ok) cache.put(request, res.clone()).catch(() => {});
               return res;
             })
             .catch(() => cached);
-          return cached || networkFetch;
+          return cached || fresh;
         })
       )
     );
     return;
   }
-  // Everything else — fetch normally (Firebase API calls, Cloud Functions, etc.)
+  // Everything else: pass through (Firebase calls, Cloud Functions, etc.)
 });
