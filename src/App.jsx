@@ -111,7 +111,8 @@ const AdminProfile = lazy(() => import('./pages/AdminProfile'));
 const FAQ          = lazy(() => import('./pages/FAQ'));
 const Terms        = lazy(() => import('./pages/Terms'));
 const Privacy      = lazy(() => import('./pages/Privacy'));
-const Wishlist     = lazy(() => import('./pages/Wishlist'));
+const Wishlist        = lazy(() => import('./pages/Wishlist'));
+const ChangePassword  = lazy(() => import('./pages/ChangePassword'));
 
 /* ── Scroll to top on route change ── */
 function ScrollToTop() {
@@ -535,7 +536,8 @@ export default function App() {
                           <Route path="/faq"           element={<FAQ />} />
                           <Route path="/terms"         element={<Terms />} />
                           <Route path="/privacy"       element={<Privacy />} />
-                          <Route path="/wishlist"      element={<Wishlist />} />
+                          <Route path="/wishlist"         element={<Wishlist />} />
+                          <Route path="/change-password" element={<ChangePassword />} />
                           {/* Catch-all: try custom pages first, then 404 */}
                           <Route path="*" element={<CustomPageRenderer />} />
                         </Routes>

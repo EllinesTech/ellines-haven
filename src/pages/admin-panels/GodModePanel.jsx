@@ -152,14 +152,35 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
         ov[selectedUser.email.toLowerCase()] = newPw;
         localStorage.setItem('eh_pw_overrides', JSON.stringify(ov));
         // Write directly to Firestore users/{id} — this is what Login checks first on any device
+        // Also set mustChangePassword flag so the user is forced to set their own password on next login
         try {
           const userId = selectedUser.id || selectedUser.email.toLowerCase().replace(/[^a-z0-9]/g,'_');
-          await setDoc(doc(db,'users',userId), { passwordHash: newPw, updatedAt: serverTimestamp() }, { merge: true });
+          await setDoc(doc(db,'users',userId), {
+            passwordHash: newPw,
+            mustChangePassword: true,
+            passwordResetBy: 'admin',
+            passwordResetAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
         } catch {}
         // Also sync pwOverrides into registered_users with merge:true (never wipe the whole doc)
         try {
           await setDoc(doc(db,'site_data','registered_users'), { pwOverrides: ov, updatedAt: serverTimestamp() }, { merge: true });
         } catch {}
+        // Notify the user via email — send them an OTP-reset email so they know their password was changed
+        try {
+          const { getFunctions, httpsCallable } = await import('firebase/functions');
+          const fns = getFunctions();
+          const notifyFn = httpsCallable(fns, 'sendAdminPasswordResetNotification');
+          await notifyFn({
+            email: selectedUser.email,
+            name: selectedUser.name || editFields.name || 'Valued Reader',
+            tempPassword: newPw,
+          });
+        } catch (notifyErr) {
+          // Non-blocking — notification failure should not block the save
+          console.warn('[GodMode] Password reset notification failed:', notifyErr.message);
+        }
       }
       if (newRole !== selectedUser.role) {
         // Persist role to Firestore (not just localStorage)

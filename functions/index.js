@@ -1434,3 +1434,85 @@ exports.getUserLoginHistory = onCall(
     }
   }
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Admin Password Reset Notification — email user when admin resets their pw ─
+// ─────────────────────────────────────────────────────────────────────────────
+exports.sendAdminPasswordResetNotification = onCall(
+  {
+    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { email, name, tempPassword } = request.data;
+    if (!email) throw new HttpsError("invalid-argument", "email is required");
+
+    const userName = name || "Valued Reader";
+
+    const atApiKey   = AT_API_KEY.value()   || "";
+    const atUsername = AT_USERNAME.value()  || "";
+    const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
+    const smtpUser   = SMTP_USER.value()    || "";
+
+    const emailBody = `
+Hi ${userName},
+
+An administrator has reset your Ellines Haven account password.
+
+Your temporary password is: ${tempPassword}
+
+For your security, you will be prompted to set a new password when you next sign in.
+
+If you did not request this change, please contact us immediately at ellines.haven@gmail.com or WhatsApp: 0748 255 466.
+
+— The Ellines Haven Team
+https://ellines-haven.web.app
+`.trim();
+
+    let emailSent = false;
+
+    // ── 1. Send via Africa's Talking Email (production only, not sandbox) ────
+    if (atApiKey && atUsername && atUsername !== "sandbox") {
+      try {
+        const emailParams = new URLSearchParams({
+          username: atUsername,
+          to:       email,
+          from:     smtpUser || "noreply@ellines-haven.web.app",
+          subject:  "Your Ellines Haven password was reset by an admin",
+          message:  emailBody,
+        });
+        await axios.post(
+          "https://api.africastalking.com/version1/messaging/email",
+          emailParams.toString(),
+          {
+            headers: {
+              apiKey:         atApiKey,
+              Accept:         "application/json",
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        emailSent = true;
+      } catch (e) {
+        console.warn("[sendAdminPasswordResetNotification] AT email failed:", e.response?.data || e.message);
+      }
+    }
+
+    // ── 2. Fallback: log to Firestore so admin can see the notification was attempted ─
+    if (!emailSent) {
+      console.log(`[sendAdminPasswordResetNotification] Email notification for ${email} (credentials not configured — logged to Firestore)`);
+      try {
+        await db.collection("admin_pw_reset_log").add({
+          email,
+          userName,
+          notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+          deliveryStatus: "pending_credentials",
+        });
+      } catch {}
+    }
+
+    return { emailSent };
+  }
+);

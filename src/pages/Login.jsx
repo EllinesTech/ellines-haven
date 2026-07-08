@@ -342,10 +342,13 @@ export default function Login() {
         clearAttempts(emailKey);
         const roleOverrides1 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
         const effectiveRole1 = roleOverrides1[emailKey] || fsUser.role || 'user';
-        const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: effectiveRole1 };
+        const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: effectiveRole1, mustChangePassword: !!fsUser.mustChangePassword };
         setUser(sessionUser);
         await logLogin(fsUser.email, fsUser.name);
         showLoginSuccess(fsUser.name);
+        if (fsUser.mustChangePassword) {
+          navigate('/change-password', { replace: true }); setBusy(false); return;
+        }
         navigate(from, { replace: true }); setBusy(false); return;
       }
 
