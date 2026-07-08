@@ -488,23 +488,27 @@
 ══════════════════════════════ */
 .reader__body {
   flex: 1;
-  background: #e8e2d9;
-  padding: 40px 24px 100px;
+  background: #ddd8cf;
+  padding: 36px 20px 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;  /* horizontally centres the page card regardless of sidebar */
 }
 
 .reader__page {
-  max-width: 680px;      /* tighter column = more readable, like a real book */
-  margin: 0 auto;
+  width: 100%;
+  max-width: 750px;      /* wide enough to feel spacious, narrow enough to read comfortably */
   background: #fdf8f0;
   border: 1px solid #d4c9b0;
-  border-radius: 4px;
-  padding: 64px 80px;
+  border-radius: 3px;
+  padding: 56px 64px;
   position: relative;
   overflow: hidden;
   box-shadow:
-    0 1px 4px rgba(120,90,60,0.10),
-    0 6px 28px rgba(120,90,60,0.10),
-    inset 0 0 80px rgba(200,170,120,0.04);
+    0 1px 3px rgba(100,70,40,0.08),
+    0 4px 20px rgba(100,70,40,0.10),
+    0 12px 48px rgba(100,70,40,0.06),
+    inset 0 0 100px rgba(200,170,120,0.03);
 }
 
 /* Ghost watermark */
@@ -666,6 +670,7 @@
   padding: 0;
   text-indent: 2em;
   text-align: justify;
+  text-align-last: left;  /* last line of each para aligns left, not stretched */
   hyphens: auto;
   -webkit-hyphens: auto;
   orphans: 3;
@@ -807,8 +812,8 @@
   .reader__info strong { font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .reader__info span { display: none; } /* hide author on small screens */
 
-  .reader__page { padding: 20px 18px; }
-  .reader__body { padding: 14px 6px 80px; }
+  .reader__page { padding: 28px 22px; }
+  .reader__body { padding: 10px 8px 80px; }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - var(--reader-offset) - 10px); }
   .reader__mode-btn { padding: 5px 9px; font-size: 0.7rem; }
@@ -853,8 +858,8 @@
 
 /* ── Tablet (769–1024px) ── */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .reader__page { padding: 48px 48px; }
-  .reader__body { padding: 28px 16px 80px; }
+  .reader__page { padding: 44px 48px; }
+  .reader__body { padding: 24px 12px 80px; }
   .reader__nav  { padding: 0 14px; }
   .reader__sidebar { width: 240px; }
   .reader {
@@ -890,8 +895,8 @@
   .reader__nav-right { display: flex; }
   .reader__info { display: flex; }
   .reader__info span { display: none; }
-  .reader__page { padding: 16px 14px; }
-  .reader__body { padding: 10px 8px 40px; }
+  .reader__page { padding: 16px 16px; }
+  .reader__body { padding: 8px 6px 40px; }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - 70px); }
 }
