@@ -32,6 +32,192 @@ const PanelLoader = () => (
     <span style={{ color:'var(--muted)', fontSize:'0.82rem' }}>Loading panel…</span>
   </div>
 );
+
+// ── Auto-Refresh Settings Storage Key ────────────────────────────────────────
+const AR_KEY = 'eh_admin_auto_refresh';
+const AR_DEFAULT = { enabled: true, intervalMs: 60000 }; // 1 minute default
+
+function loadArSettings() {
+  try { return { ...AR_DEFAULT, ...JSON.parse(localStorage.getItem(AR_KEY) || '{}') }; }
+  catch { return AR_DEFAULT; }
+}
+function saveArSettings(s) {
+  try { localStorage.setItem(AR_KEY, JSON.stringify(s)); } catch {}
+}
+
+// Interval options shown to admin
+const AR_OPTIONS = [
+  { label: '15 s',  ms: 15000  },
+  { label: '30 s',  ms: 30000  },
+  { label: '1 min', ms: 60000  },
+  { label: '2 min', ms: 120000 },
+  { label: '5 min', ms: 300000 },
+  { label: '10 min',ms: 600000 },
+];
+
+/**
+ * AutoRefreshBar
+ * Renders the auto-refresh status strip that sits below the dashboard header.
+ * Props:
+ *   onRefresh   – called when auto-refresh fires or user clicks manual refresh
+ *   lastRefresh – Date object of last refresh (used for "Last updated X ago" text)
+ */
+function AutoRefreshBar({ onRefresh, lastRefresh }) {
+  const [settings, setSettings]   = useState(loadArSettings);
+  const [open,    setOpen]         = useState(false);
+  const [countdown, setCountdown]  = useState(0);
+  const timerRef  = useRef(null);
+  const cdRef     = useRef(null);
+
+  // Format "last refreshed" as relative time
+  const fmtAgo = (d) => {
+    if (!d) return 'never';
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 5)  return 'just now';
+    if (s < 60) return `${s}s ago`;
+    return `${Math.floor(s/60)}m ago`;
+  };
+
+  const applySettings = (next) => {
+    setSettings(next);
+    saveArSettings(next);
+    // Also persist to Firestore so it syncs across devices (best-effort)
+    import('../firebase').then(({ db }) => {
+      import('firebase/firestore').then(({ doc, setDoc, serverTimestamp }) => {
+        setDoc(doc(db, 'admin_preferences', '__auto_refresh__'), {
+          ...next,
+          updatedAt: serverTimestamp(),
+        }, { merge: true }).catch(() => {});
+      });
+    });
+  };
+
+  // Load Firestore copy on mount (overrides localStorage if newer)
+  useEffect(() => {
+    import('../firebase').then(({ db }) => {
+      import('firebase/firestore').then(({ doc, getDoc }) => {
+        getDoc(doc(db, 'admin_preferences', '__auto_refresh__')).then(snap => {
+          if (snap.exists()) {
+            const fs = snap.data();
+            const merged = { ...AR_DEFAULT, ...fs };
+            setSettings(merged);
+            saveArSettings(merged);
+          }
+        }).catch(() => {});
+      });
+    });
+  }, []);
+
+  // Main auto-refresh timer
+  useEffect(() => {
+    clearInterval(timerRef.current);
+    clearInterval(cdRef.current);
+    if (!settings.enabled) { setCountdown(0); return; }
+
+    setCountdown(Math.round(settings.intervalMs / 1000));
+
+    timerRef.current = setInterval(() => {
+      onRefresh();
+      setCountdown(Math.round(settings.intervalMs / 1000));
+    }, settings.intervalMs);
+
+    cdRef.current = setInterval(() => {
+      setCountdown(c => (c > 1 ? c - 1 : Math.round(settings.intervalMs / 1000)));
+    }, 1000);
+
+    return () => { clearInterval(timerRef.current); clearInterval(cdRef.current); };
+  }, [settings.enabled, settings.intervalMs]); // eslint-disable-line
+
+  const toggleEnabled = () => applySettings({ ...settings, enabled: !settings.enabled });
+  const setInterval_  = (ms) => applySettings({ ...settings, intervalMs: ms });
+
+  // Progress ring
+  const total = Math.round(settings.intervalMs / 1000);
+  const pct   = settings.enabled && total > 0 ? ((total - countdown) / total) : 0;
+  const r = 9, circ = 2 * Math.PI * r;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+      padding: '8px 14px',
+      background: 'rgba(255,255,255,0.02)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--r-sm)',
+      marginBottom: 16,
+      position: 'relative',
+    }}>
+      {/* Toggle */}
+      <button
+        onClick={toggleEnabled}
+        title={settings.enabled ? 'Disable auto-refresh' : 'Enable auto-refresh'}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: settings.enabled ? 'rgba(46,204,113,0.1)' : 'rgba(148,144,160,0.08)',
+          border: `1px solid ${settings.enabled ? 'rgba(46,204,113,0.3)' : 'rgba(148,144,160,0.2)'}`,
+          borderRadius: 20, padding: '3px 10px 3px 6px',
+          cursor: 'pointer', color: settings.enabled ? '#2ecc71' : 'var(--muted)',
+          fontSize: '0.76rem', fontWeight: 600, transition: 'all 0.2s',
+        }}
+      >
+        {/* Progress ring */}
+        <svg width="22" height="22" style={{ flexShrink: 0 }}>
+          <circle cx="11" cy="11" r={r} fill="none"
+            stroke={settings.enabled ? 'rgba(46,204,113,0.15)' : 'rgba(148,144,160,0.1)'}
+            strokeWidth="2.5" />
+          {settings.enabled && (
+            <circle cx="11" cy="11" r={r} fill="none"
+              stroke="#2ecc71" strokeWidth="2.5"
+              strokeDasharray={circ}
+              strokeDashoffset={circ * (1 - pct)}
+              strokeLinecap="round"
+              transform="rotate(-90 11 11)"
+              style={{ transition: 'stroke-dashoffset 1s linear' }}
+            />
+          )}
+          <text x="11" y="15" textAnchor="middle"
+            style={{ fontSize: '7px', fill: settings.enabled ? '#2ecc71' : 'var(--muted)', fontWeight: 700 }}>
+            {settings.enabled ? (countdown < 10 ? `0${countdown}` : countdown > 99 ? '99+' : countdown) : '—'}
+          </text>
+        </svg>
+        {settings.enabled ? 'Auto' : 'Manual'}
+      </button>
+
+      {/* Interval pills */}
+      {AR_OPTIONS.map(o => (
+        <button key={o.ms}
+          onClick={() => setInterval_(o.ms)}
+          style={{
+            padding: '3px 9px', borderRadius: 14, fontSize: '0.72rem', cursor: 'pointer',
+            background: settings.intervalMs === o.ms && settings.enabled ? 'rgba(201,168,76,0.15)' : 'transparent',
+            border: `1px solid ${settings.intervalMs === o.ms && settings.enabled ? 'rgba(201,168,76,0.4)' : 'var(--border)'}`,
+            color: settings.intervalMs === o.ms && settings.enabled ? 'var(--gold)' : 'var(--muted)',
+            transition: 'all 0.15s',
+            opacity: settings.enabled ? 1 : 0.5,
+          }}
+        >{o.label}</button>
+      ))}
+
+      {/* Divider */}
+      <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+
+      {/* Last refreshed */}
+      <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
+        Updated: <strong style={{ color: 'var(--text)' }}>{fmtAgo(lastRefresh)}</strong>
+      </span>
+
+      {/* Manual refresh */}
+      <button
+        onClick={() => { onRefresh(); setCountdown(Math.round(settings.intervalMs / 1000)); }}
+        className="btn btn-ghost btn-sm"
+        style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '3px 10px' }}
+        title="Refresh now"
+      >
+        🔄 Now
+      </button>
+    </div>
+  );
+}
+
 import './Admin.css';
 
 const EMPTY_BOOK = {
@@ -2420,6 +2606,15 @@ export default function Admin() {
   // Reset selection when tab changes
   useEffect(() => { clearSelected(); }, [tab]); // eslint-disable-line
 
+  // ── Auto-refresh state ────────────────────────────────────────────────────
+  const [lastRefresh, setLastRefresh] = useState(() => new Date());
+
+  const doRefresh = () => {
+    syncOrders();
+    setTick(t => t + 1);
+    setLastRefresh(new Date());
+  };
+
   // ── Load reviews + promos from Firestore (persist across refresh) ──────────
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'reviews')).then(snap => {
@@ -3261,10 +3456,13 @@ export default function Admin() {
                   <span style={{ color:'var(--gold)' }}>{new Date().toLocaleDateString('en-KE',{weekday:'long',day:'numeric',month:'long'})}</span>
                 </span>
               </div>
-              <button className="btn btn-outline btn-sm" onClick={() => { syncOrders(); setTick(t=>t+1); showToast('Dashboard refreshed'); }}>
+              <button className="btn btn-outline btn-sm" onClick={() => { doRefresh(); showToast('Dashboard refreshed'); }}>
                 🔄 Refresh
               </button>
             </div>
+
+            {/* ── Auto-Refresh Bar ── */}
+            <AutoRefreshBar onRefresh={doRefresh} lastRefresh={lastRefresh} />
 
             {/* ── Pending alert ── */}
             {pendingCount > 0 && (
@@ -3486,10 +3684,10 @@ export default function Admin() {
                   {books.filter(b=>b.active!==false).length} live books · {users.filter(u=>u.status==='Active').length} active users
                 </span>
                 <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
-                  Refreshed {new Date().toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' })}
+                  Refreshed {lastRefresh.toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' })}
                 </span>
                 <button className="btn btn-ghost btn-sm" style={{ fontSize:'0.72rem', padding:'3px 10px' }}
-                  onClick={() => { syncOrders(); setTick(t=>t+1); showToast('Refreshed'); }}>
+                  onClick={() => { doRefresh(); showToast('Refreshed'); }}>
                   🔄 Sync
                 </button>
               </div>

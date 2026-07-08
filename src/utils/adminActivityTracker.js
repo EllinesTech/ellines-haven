@@ -148,15 +148,15 @@ export async function trackActivity({
       notificationData
     );
 
-    // Also log to activity log for historical tracking
-    await logActivity({
+    // Also log to activity log for historical tracking (best-effort, non-blocking)
+    logActivity({
       category,
       action: title,
       details: message,
       userEmail,
       userName,
       metadata,
-    });
+    }).catch(e => console.warn('[trackActivity] logActivity failed:', e.message));
 
     return notificationId;
   } catch (err) {

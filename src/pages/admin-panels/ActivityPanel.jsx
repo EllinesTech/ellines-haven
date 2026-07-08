@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 import {
   NOTIFICATION_CATEGORIES,
@@ -41,6 +41,8 @@ export default function ActivityPanel({ user, showToast }) {
     unread: 0,
     byCategory: {},
   });
+  const [firestoreError, setFirestoreError] = useState(null);
+  const [testWriting, setTestWriting] = useState(false);
 
   const adminEmail = user?.email?.toLowerCase() || '';
   const isSuper = user?.role === 'superadmin';
@@ -53,15 +55,43 @@ export default function ActivityPanel({ user, showToast }) {
     });
   }, [adminEmail]);
 
+  // Write a test activity to verify Firestore connectivity
+  const writeTestActivity = async () => {
+    setTestWriting(true);
+    try {
+      const testId = `test_activity_${Date.now()}`;
+      await setDoc(doc(db, 'admin_notifications', testId), {
+        id: testId,
+        category: 'system',
+        title: '🧪 Test Activity',
+        message: `Activity feed test written by ${user?.name || adminEmail} at ${new Date().toLocaleString('en-KE')}`,
+        icon: '🧪',
+        userEmail: adminEmail,
+        userName: user?.name || adminEmail,
+        metadata: { test: true },
+        priority: 'low',
+        readBy: [],
+        createdAt: serverTimestamp(),
+      });
+      showToast?.('✅ Test activity written — it should appear below');
+    } catch (err) {
+      console.error('[writeTestActivity]', err);
+      showToast?.('❌ Write failed: ' + err.message);
+      setFirestoreError(err.message);
+    }
+    setTestWriting(false);
+  };
+
   // Listen to notifications
+  // NOTE: No orderBy — we sort client-side so legacy docs without `createdAt`
+  // are also included (Firestore excludes docs missing the ordered field).
   useEffect(() => {
     setLoading(true);
-    // Simple query with no composite-index requirement.
-    // We filter out soft-deleted docs client-side to avoid needing
-    // a (deleted ASC + createdAt DESC) composite index in Firestore.
+    setFirestoreError(null);
+
+    // Use a simple collection scan — no composite index needed, sort client-side.
     const q = query(
       collection(db, 'admin_notifications'),
-      orderBy('createdAt', 'desc'),
       limit(500)
     );
 
@@ -77,6 +107,9 @@ export default function ActivityPanel({ user, showToast }) {
             // Map known legacy types to proper categories
             const typeToCategory = {
               order_confirmed_auto: 'book_purchase',
+              new_order:            'cart_checkout',
+              payment_issue:        'payment',
+              account_deletion:     'account_deletion',
             };
             normalized.category = typeToCategory[normalized.type] || 'system';
           }
@@ -92,8 +125,15 @@ export default function ActivityPanel({ user, showToast }) {
           }
           return normalized;
         })
-        .filter(n => n.deleted !== true);
+        .filter(n => n.deleted !== true)
+        // Sort newest first client-side — handles both Timestamp and missing createdAt
+        .sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() ?? (typeof a.createdAt === 'number' ? a.createdAt : 0);
+          const tb = b.createdAt?.toMillis?.() ?? (typeof b.createdAt === 'number' ? b.createdAt : 0);
+          return tb - ta;
+        });
       setNotifs(fresh);
+      setFirestoreError(null);
       
       // Calculate stats
       const byCategory = {};
@@ -116,7 +156,11 @@ export default function ActivityPanel({ user, showToast }) {
       });
       
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => {
+      console.error('[ActivityPanel] Firestore error:', err);
+      setFirestoreError(err.message || 'Failed to load activity feed');
+      setLoading(false);
+    });
 
     return () => unsub();
   }, [adminEmail]);
@@ -223,6 +267,15 @@ export default function ActivityPanel({ user, showToast }) {
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
+            onClick={writeTestActivity}
+            disabled={testWriting}
+            className="btn btn-ghost btn-sm"
+            style={{ background: 'rgba(74,158,255,0.08)', color: '#4a9eff', border: '1px solid rgba(74,158,255,0.2)' }}
+            title="Write a test activity to verify Firestore is working"
+          >
+            {testWriting ? '⏳ Writing…' : '🧪 Test'}
+          </button>
+          <button
             onClick={() => setShowSettings(s => !s)}
             className="btn btn-ghost btn-sm"
             style={{ background: showSettings ? 'rgba(201,168,76,0.1)' : undefined }}
@@ -236,6 +289,26 @@ export default function ActivityPanel({ user, showToast }) {
           )}
         </div>
       </div>
+
+      {/* Firestore error banner */}
+      {firestoreError && (
+        <div style={{
+          background: 'rgba(231,76,60,0.1)',
+          border: '1px solid rgba(231,76,60,0.4)',
+          borderRadius: 8,
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+          <div>
+            <strong style={{ color: '#e74c3c', display: 'block', marginBottom: 2 }}>Firestore connection error</strong>
+            <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{firestoreError}</span>
+          </div>
+        </div>
+      )}
 
       {/* Settings Panel */}
       {showSettings && preferences && (
