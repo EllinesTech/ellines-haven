@@ -768,10 +768,9 @@ export default function BookDetail() {
                   {owned
                     ? <>
                         <Link to={readPath(book)} className="btn btn-primary">Read Now</Link>
-                        {book.driveUrl
-                          ? <a href={book.driveUrl.replace('/view', '/export?format=pdf').replace('/preview', '/export?format=pdf')} target="_blank" rel="noopener noreferrer" className="btn btn-outline">Download PDF</a>
-                          : <button className="btn btn-outline" disabled title="PDF not yet uploaded">PDF Coming Soon</button>
-                        }
+                        {book.driveUrl && (
+                          <a href={book.driveUrl.replace('/view', '/export?format=pdf').replace('/preview', '/export?format=pdf')} target="_blank" rel="noopener noreferrer" className="btn btn-outline">Download PDF</a>
+                        )}
                       </>
                     : user && !libLoaded
                       ? <button className="btn btn-primary" disabled style={{opacity:0.6}}>⏳ Verifying access…</button>
