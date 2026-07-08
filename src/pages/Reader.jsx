@@ -1,4 +1,4 @@
-﻿import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -15,10 +15,10 @@ import {
 import { getFallbackChapters } from '../data/bookChapters';
 import './Reader.css';
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Audio Book Player â€” Web Speech API
+/* ─────────────────────────────────────────────
+   Audio Book Player — Web Speech API
    Reads chapter text aloud with voice settings
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+───────────────────────────────────────────── */
 function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   const synth = window.speechSynthesis;
 
@@ -42,7 +42,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
   const chapterText = chapters[currentChapter]?.text || '';
 
-  // Load available voices â€” auto-select best neural English voice
+  // Load available voices — auto-select best neural English voice
   useEffect(() => {
     const load = () => {
       const v = synth.getVoices();
@@ -51,7 +51,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
       // Priority: Microsoft Neural voices > Google voices > any en-US > fallback
       const NEURAL_PRIORITY = [
-        // Microsoft neural (Edge/Chrome Windows â€” genuinely human quality)
+        // Microsoft neural (Edge/Chrome Windows — genuinely human quality)
         'Microsoft Jenny', 'Microsoft Aria', 'Microsoft Guy', 'Microsoft Davis',
         'Microsoft Emma', 'Microsoft Brian', 'Microsoft Ana', 'Microsoft Andrew',
         // Google neural
@@ -107,7 +107,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
     return voices.filter(v => {
       const n = v.name.toLowerCase();
       if (filter === 'female') return n.includes('female') || n.includes('woman') || /zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|neerja|heera|raveena|manjari|lekha|kalpana|asha|zuzana|paulina|lucia|almudena|marta|zosia|ewa|ioana|afrikaans|hessa|leila|naayf|laila|fatima|tamar|joana|mariana|linh/.test(n);
-      if (filter === 'male')   return n.includes('male') || /david|mark|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|andrÃ©s|enrique/.test(n);
+      if (filter === 'male')   return n.includes('male') || /david|mark|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|andrés|enrique/.test(n);
       return true;
     });
   }
@@ -211,7 +211,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   const available = typeof window !== 'undefined' && 'speechSynthesis' in window;
   if (!available) return (
     <div className="audio-player audio-player--unsupported">
-      ðŸ”‡ Text-to-speech is not supported in this browser. Try Chrome or Edge.
+      🔇 Text-to-speech is not supported in this browser. Try Chrome or Edge.
     </div>
   );
 
@@ -222,9 +222,9 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
     <div className="audio-player">
       {/* Left: chapter info */}
       <div className="audio-player__info">
-        <span className="audio-player__icon">ðŸŽ§</span>
+        <span className="audio-player__icon">🎧</span>
         <div>
-          <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listeningâ€¦'}</strong>
+          <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
           <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
         </div>
       </div>
@@ -232,12 +232,12 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
       {/* Centre: controls + progress */}
       <div className="audio-player__centre">
         <div className="audio-player__controls">
-          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}>â®</button>
+          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}>⏮</button>
           <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay}>
-            {playing ? 'â¸' : 'â–¶'}
+            {playing ? '⏸' : '▶'}
           </button>
-          <button className="audio-btn" title="Stop" onClick={handleStop}>â¹</button>
-          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}>â­</button>
+          <button className="audio-btn" title="Stop" onClick={handleStop}>⏹</button>
+          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}>⏭</button>
         </div>
         <div className="audio-player__progress-row">
           <span className="audio-player__time">{fmtTime(elapsed)}</span>
@@ -275,13 +275,13 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               key={r}
               className={'audio-speed-pill' + (rate === r ? ' on' : '')}
               onClick={() => { setRate(r); if (playing) { speak(charRef.current); } }}
-              title={`${r}Ã— speed`}
+              title={`${r}× speed`}
             >
-              {r === 1.0 ? '1Ã—' : `${r}Ã—`}
+              {r === 1.0 ? '1×' : `${r}×`}
             </button>
           ))}
         </div>
-        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">âš™ï¸</button>
+        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">⚙️</button>
       </div>
 
       {/* Settings panel */}
@@ -293,7 +293,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               {['all','female','male'].map(f => (
                 <button key={f} className={'audio-filter-btn' + (filter === f ? ' on' : '')}
                   onClick={() => { setFilter(f); setVoiceIdx(0); }}>
-                  {f === 'female' ? 'â™€ Female' : f === 'male' ? 'â™‚ Male' : 'ðŸŒ All'}
+                  {f === 'female' ? '♀ Female' : f === 'male' ? '♂ Male' : '🌐 All'}
                 </button>
               ))}
             </div>
@@ -309,14 +309,14 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                 <span>
                   {dispVoices[safeIdx]?.name || 'Select voice'}
                   {dispVoices[safeIdx] && /microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi)/i.test(dispVoices[safeIdx].name) && (
-                    <span className="audio-neural-badge">âœ¨ Neural</span>
+                    <span className="audio-neural-badge">✨ Neural</span>
                   )}
                   {dispVoices[safeIdx] && /google/i.test(dispVoices[safeIdx].name) && (
-                    <span className="audio-neural-badge audio-neural-badge--google">ðŸ”µ Neural</span>
+                    <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
                   )}
                   {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
                 </span>
-                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>â–¾</span>
+                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
               </button>
               {voiceDdOpen && (
                 <div className="audio-custom-dd__list">
@@ -337,10 +337,10 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                       <span className="audio-custom-dd__name">
                         {v.name}
                         {/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi)/i.test(v.name) && (
-                          <span className="audio-neural-badge">âœ¨ Neural</span>
+                          <span className="audio-neural-badge">✨ Neural</span>
                         )}
                         {/google/i.test(v.name) && (
-                          <span className="audio-neural-badge audio-neural-badge--google">ðŸ”µ Neural</span>
+                          <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
                         )}
                       </span>
                       <span className="audio-custom-dd__lang">{v.lang}</span>
@@ -351,7 +351,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
             </div>
           </div>
           <div className="audio-settings__row">
-            <label>Speed â€” {rate}Ã—</label>
+            <label>Speed — {rate}×</label>
             <div className="audio-speed-pills">
               {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
                 <button
@@ -359,13 +359,13 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                   className={'audio-speed-pill' + (rate === r ? ' on' : '')}
                   onClick={() => { setRate(r); if (playing) speak(charRef.current); }}
                 >
-                  {r}Ã—
+                  {r}×
                 </button>
               ))}
             </div>
           </div>
           <div className="audio-settings__row">
-            <label>Pitch â€” {pitch.toFixed(1)}</label>
+            <label>Pitch — {pitch.toFixed(1)}</label>
             <input type="range" min="0.5" max="2" step="0.1" value={pitch}
               className="audio-slider"
               onChange={e => { setPitch(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
@@ -379,7 +379,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   );
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────
    Google Drive URL converter
    Accepts any of these formats from the admin:
      https://drive.google.com/file/d/FILE_ID/view
@@ -388,9 +388,9 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
      https://drive.google.com/uc?export=download&id=FILE_ID
    Returns the embed URL:
      https://drive.google.com/file/d/FILE_ID/preview
-   which renders the PDF inline â€” no download button visible,
+   which renders the PDF inline — no download button visible,
    no raw URL exposed to the user.
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+───────────────────────────────────────────── */
 function toDriveEmbed(url) {
   if (!url) return null;
   try {
@@ -408,9 +408,9 @@ function toDriveEmbed(url) {
   return null;
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────
    Main Reader Component
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+───────────────────────────────────────────── */
 export default function Reader() {
   const { id } = useParams();
   const location = useLocation();
@@ -428,7 +428,7 @@ export default function Reader() {
   const [drmBlock,  setDrmBlock]  = useState(false);
   const [resumeBanner, setResumeBanner] = useState(false);
 
-  // â”€â”€ Offline reading state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Offline reading state ─────────────────────────────────────────────────
   const [isOffline,       setIsOffline]       = useState(!navigator.onLine);
   const [offlineSaved,    setOfflineSaved]     = useState(false);
   const [offlineSaving,   setOfflineSaving]    = useState(false);
@@ -458,15 +458,15 @@ export default function Reader() {
     }
   }, [user?.email, book?.id]); // eslint-disable-line
 
-  // â”€â”€ Chapters: serve from IndexedDB cache instantly, then live-update â”€â”€â”€â”€â”€â”€
-  // Phase 1: getDocFromCache â†’ zero network latency, renders immediately
-  // Phase 2: onSnapshot â†’ picks up admin edits in real-time, no page refresh needed
+  // ── Chapters: serve from IndexedDB cache instantly, then live-update ──────
+  // Phase 1: getDocFromCache → zero network latency, renders immediately
+  // Phase 2: onSnapshot → picks up admin edits in real-time, no page refresh needed
   const [liveChapters, setLiveChapters] = useState(null);
   useEffect(() => {
     if (!book?.id) return;
     const ref = doc(db, 'book_chapters', String(book.id));
 
-    // Serve from IndexedDB cache first (instant â€” no network)
+    // Serve from IndexedDB cache first (instant — no network)
     getDocFromCache(ref)
       .then(snap => {
         if (snap.exists() && snap.data().chapters?.length > 0) {
@@ -485,10 +485,10 @@ export default function Reader() {
     return () => unsub();
   }, [book?.id]); // eslint-disable-line
 
-  // â”€â”€ Reading progress â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Reading progress ──────────────────────────────────────────────────────
   const { getProgress, saveProgress } = useReadingProgress(user?.email, book?.id);
 
-  // Support deep-linking to a specific chapter â€” switch to text mode automatically
+  // Support deep-linking to a specific chapter — switch to text mode automatically
   useEffect(() => {
     if (location.state?.chapter !== undefined) {
       setMode('text');
@@ -520,7 +520,7 @@ export default function Reader() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter]);
 
-  // Ownership check â€” uses Firestore-backed library state from AppContext
+  // Ownership check — uses Firestore-backed library state from AppContext
   const checkOwned = useCallback(() => {
     if (!user) return false;
     return isOwned(book?.id ?? id);
@@ -532,7 +532,7 @@ export default function Reader() {
     return library.find(x => x.id === (book?.id ?? id)) || null;
   }, [user, library, book?.id, id]);
 
-  /* â”€â”€ DRM: block right-click, copy, print on the reader element â”€â”€ */
+  /* ── DRM: block right-click, copy, print on the reader element ── */
   useEffect(() => {
     const el = readerRef.current;
     if (!el || !user) return;
@@ -564,7 +564,7 @@ export default function Reader() {
     };
   }, [user?.id, siteControls]); // eslint-disable-line
 
-  /* â”€â”€ DRM: block print â”€â”€ */
+  /* ── DRM: block print ── */
   useEffect(() => {
     if ((siteControls || {}).disablePrint === false) return; // admin disabled this protection
     const before = () => { setDrmBlock(true); };
@@ -572,10 +572,10 @@ export default function Reader() {
     return () => window.removeEventListener('beforeprint', before);
   }, [siteControls]);
 
-  /* â”€â”€ Gates â”€â”€ */
+  /* ── Gates ── */
   if (!book) return (
     <div className="reader-error">
-      <div className="reader-error__icon">ðŸ“š</div>
+      <div className="reader-error__icon">📚</div>
       <h2>Book not found</h2>
       <Link to="/library" className="btn btn-primary">Back to Library</Link>
     </div>
@@ -583,7 +583,7 @@ export default function Reader() {
 
   if (!user) return (
     <div className="reader-error">
-      <div className="reader-error__icon">ðŸ”’</div>
+      <div className="reader-error__icon">🔒</div>
       <h2>Sign in to read</h2>
       <p>You need to be logged in to access this book.</p>
       <Link to="/login" className="btn btn-primary">Sign In</Link>
@@ -591,28 +591,28 @@ export default function Reader() {
   );
 
   if (!checkOwned()) {
-    // Still waiting for Firestore library snapshot â€” show loading briefly.
+    // Still waiting for Firestore library snapshot — show loading briefly.
     // Only block if we genuinely don't have any library data yet.
     // If library is empty AND libLoaded is false, wait up to 4 s (AppContext timeout handles that).
     if (!libLoaded) return (
       <div className="reader-error">
-        <div style={{ fontSize:'2rem', marginBottom:16 }}>â³</div>
-        <p style={{ color:'var(--muted)' }}>Verifying accessâ€¦</p>
+        <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
+        <p style={{ color:'var(--muted)' }}>Verifying access…</p>
       </div>
     );
     return (
       <div className="reader-error">
-        <div className="reader-error__icon">ðŸ›’</div>
+        <div className="reader-error__icon">🛒</div>
         <h2>Purchase required</h2>
         <p>Buy this book to unlock reading and download access.</p>
-        <Link to={bookPath(book)} className="btn btn-primary">Buy â€” KSh {book.price}</Link>
+        <Link to={bookPath(book)} className="btn btn-primary">Buy — KSh {book.price}</Link>
       </div>
     );
   }
 
   if (user && myPerms && myPerms.canReadOnline === false) return (
     <div className="reader-error">
-      <div className="reader-error__icon">ðŸ”’</div>
+      <div className="reader-error__icon">🔒</div>
       <h2>Reading Restricted</h2>
       <p>You don't have permission to read books online. Contact support.</p>
       <Link to="/my-library" className="btn btn-primary">My Library</Link>
@@ -625,7 +625,7 @@ export default function Reader() {
     const reason = ownedEntry?.deactivationReason || 'Access to this book has been restricted by the administrator.';
     return (
       <div className="reader-error">
-        <div className="reader-error__icon">âš ï¸</div>
+        <div className="reader-error__icon">⚠️</div>
         <h2>Book Deactivated</h2>
         <p style={{ maxWidth:400, textAlign:'center' }}>{reason}</p>
         <Link to="/my-library" className="btn btn-primary">My Library</Link>
@@ -635,7 +635,7 @@ export default function Reader() {
 
   if (drmBlock) return (
     <div className="reader-error">
-      <div className="reader-error__icon">â›”</div>
+      <div className="reader-error__icon">⛔</div>
       <h2>Printing not allowed</h2>
       <p>This content is protected. Printing and sharing are not permitted.</p>
       <button className="btn btn-ghost btn-sm" onClick={() => setDrmBlock(false)}>Continue Reading</button>
@@ -647,7 +647,7 @@ export default function Reader() {
   // Per-book admin deactivation check
   if (ownedBook?.readDeactivated === true) return (
     <div className="reader-error">
-      <div className="reader-error__icon">â›”</div>
+      <div className="reader-error__icon">⛔</div>
       <h2>Reading Access Restricted</h2>
       <p style={{ color:'var(--muted)', maxWidth:400, textAlign:'center' }}>
         Online reading for this book has been restricted on your account.
@@ -659,10 +659,10 @@ export default function Reader() {
   const rawUrl     = ownedBook?.driveUrl || book.driveUrl || '';
   const embedUrl   = toDriveEmbed(rawUrl);
   const hasPdf     = !!embedUrl;
-  // Chapters: prefer live Firestore â†’ offline cache â†’ fallback static content
+  // Chapters: prefer live Firestore → offline cache → fallback static content
   const chapters   = liveChapters || offlineChapters || getFallbackChapters(book);
 
-  // â”€â”€ Save for offline handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Save for offline handler ──────────────────────────────────────────────
   const handleSaveOffline = async () => {
     if (!user?.email || !book?.id) return;
     setOfflineSaving(true);
@@ -672,9 +672,9 @@ export default function Reader() {
     if (ok) {
       setOfflineSaved(true);
       setOfflineChapters(chapters);
-      setOfflineSaveMsg('âœ… Saved for offline reading');
+      setOfflineSaveMsg('✅ Saved for offline reading');
     } else {
-      setOfflineSaveMsg('âŒ Could not save â€” storage may be full');
+      setOfflineSaveMsg('❌ Could not save — storage may be full');
     }
     setTimeout(() => setOfflineSaveMsg(''), 3500);
   };
@@ -684,11 +684,11 @@ export default function Reader() {
     removeOfflineBook(user.email, book.id);
     setOfflineSaved(false);
     setOfflineChapters(null);
-    setOfflineSaveMsg('ðŸ—‘ Removed from offline library');
+    setOfflineSaveMsg('🗑 Removed from offline library');
     setTimeout(() => setOfflineSaveMsg(''), 3000);
   };
 
-  // Download URL â€” uses Google Drive's export endpoint for direct PDF download
+  // Download URL — uses Google Drive's export endpoint for direct PDF download
   const downloadUrl = rawUrl ? (() => {
     try {
       const fileMatch = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -709,17 +709,17 @@ export default function Reader() {
       ref={readerRef}
     >
 
-      {/* â”€â”€ Sidebar overlay (mobile) â”€â”€ */}
+      {/* ── Sidebar overlay (mobile) ── */}
       {sidebarOpen && (
         <div className="reader__sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          LEFT SIDEBAR â€” book info + TOC
-      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ══════════════════════════════
+          LEFT SIDEBAR — book info + TOC
+      ══════════════════════════════ */}
       <aside className={'reader__sidebar' + (sidebarOpen ? ' open' : '')}>
         {/* Close button (mobile) */}
-        <button className="reader__sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">âœ•</button>
+        <button className="reader__sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
 
         {/* Book cover */}
         {book.cover && (
@@ -770,17 +770,17 @@ export default function Reader() {
         </nav>
       </aside>
 
-      {/* â”€â”€ Main content wrapper (shifts right when sidebar open on desktop) â”€â”€ */}
+      {/* ── Main content wrapper (shifts right when sidebar open on desktop) ── */}
       <div className={'reader__main' + (sidebarOpen ? ' sidebar-open' : '')}>
 
-      {/* â”€â”€ Top navigation bar â”€â”€ */}
+      {/* ── Top navigation bar ── */}
       <div className="reader__nav">
         {/* Sidebar toggle */}
         <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
           <span /><span /><span />
         </button>
 
-        <Link to="/my-library" className="reader__back">â† My Library</Link>
+        <Link to="/my-library" className="reader__back">← My Library</Link>
 
         <div className="reader__info">
           <strong>{book.title}</strong>
@@ -788,14 +788,14 @@ export default function Reader() {
         </div>
 
         <div className="reader__nav-right">
-          {/* â”€â”€ Offline indicator â”€â”€ */}
+          {/* ── Offline indicator ── */}
           {isOffline && (
-            <span className="reader__offline-badge" title="You are offline â€” reading from local cache">
-              ðŸ“µ Offline
+            <span className="reader__offline-badge" title="You are offline — reading from local cache">
+              📵 Offline
             </span>
           )}
 
-          {/* â”€â”€ Offline save / remove button â€” only when admin allows it â”€â”€ */}
+          {/* ── Offline save / remove button — only when admin allows it ── */}
           {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
             offlineSaved ? (
               <button
@@ -804,7 +804,7 @@ export default function Reader() {
                 title="Remove from offline library"
                 onClick={handleRemoveOffline}
               >
-                âœ… Saved Offline
+                ✅ Saved Offline
               </button>
             ) : (
               <button
@@ -814,7 +814,7 @@ export default function Reader() {
                 onClick={handleSaveOffline}
                 disabled={offlineSaving}
               >
-                {offlineSaving ? 'â³ Savingâ€¦' : 'ðŸ“¥ Save Offline'}
+                {offlineSaving ? '⏳ Saving…' : '📥 Save Offline'}
               </button>
             )
           )}
@@ -823,35 +823,35 @@ export default function Reader() {
           {offlineSaveMsg && (
             <span style={{fontSize:'0.75rem',color:'var(--muted)',flexShrink:0}}>{offlineSaveMsg}</span>
           )}
-          {/* Mode toggle â€” PDF + Text + Listen */}
+          {/* Mode toggle — PDF + Text + Listen */}
           <div className="reader__mode-toggle">
             {hasPdf && (
               <button className={'reader__mode-btn' + (viewMode === 'pdf'  ? ' on' : '')} onClick={() => setMode('pdf')}>
-                ðŸ“„ PDF
+                📄 PDF
               </button>
             )}
             <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>
-              ðŸ“– Read
+              📖 Read
             </button>
             <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>
-              ðŸŽ§ Listen
+              🎧 Listen
             </button>
           </div>
 
-          {/* Zoom controls â€” PDF mode */}
+          {/* Zoom controls — PDF mode */}
           {viewMode === 'pdf' && hasPdf && (
             <div className="reader__zoom-group">
-              <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))} title="Zoom out">âˆ’</button>
+              <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))} title="Zoom out">−</button>
               <span className="reader__zoom-label">{zoom}%</span>
               <button className="reader__font-btn" onClick={() => setZoom(z => Math.min(200, z + 10))} title="Zoom in">+</button>
-              <button className="reader__font-btn" onClick={() => setZoom(100)} title="Reset zoom" style={{fontSize:'0.7rem'}}>â†º</button>
+              <button className="reader__font-btn" onClick={() => setZoom(100)} title="Reset zoom" style={{fontSize:'0.7rem'}}>↺</button>
             </div>
           )}
 
-          {/* Font size â€” text/listen mode */}
+          {/* Font size — text/listen mode */}
           {(viewMode === 'text' || viewMode === 'listen') && (
             <div className="reader__zoom-group">
-              <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">Aâˆ’</button>
+              <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A−</button>
               <span className="reader__zoom-label">{fontSize}px</span>
               <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))} title="Larger text">A+</button>
             </div>
@@ -859,7 +859,7 @@ export default function Reader() {
         </div>
       </div>
 
-      {/* â”€â”€ Offline reading banner â”€â”€ */}
+      {/* ── Offline reading banner ── */}
       {isOffline && offlineSaved && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
@@ -868,8 +868,8 @@ export default function Reader() {
           borderBottom: '1px solid rgba(46,204,113,0.2)',
           fontSize: '0.82rem', color: '#2ecc71',
         }}>
-          <span>ðŸ“µ</span>
-          <span>Reading from offline cache â€” no internet required.</span>
+          <span>📵</span>
+          <span>Reading from offline cache — no internet required.</span>
         </div>
       )}
       {isOffline && !offlineSaved && (
@@ -880,12 +880,12 @@ export default function Reader() {
           borderBottom: '1px solid rgba(231,76,60,0.2)',
           fontSize: '0.82rem', color: '#e74c3c',
         }}>
-          <span>âš ï¸</span>
+          <span>⚠️</span>
           <span>You are offline. This book was not saved for offline reading. Connect to the internet to continue.</span>
         </div>
       )}
 
-      {/* â”€â”€ Resume reading banner â”€â”€ */}
+      {/* ── Resume reading banner ── */}
       {resumeBanner && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
@@ -894,7 +894,7 @@ export default function Reader() {
           borderBottom: '1px solid rgba(201,168,76,0.25)',
           fontSize: '0.85rem', flexWrap: 'wrap',
         }}>
-          <span style={{ color: 'var(--gold)' }}>ðŸ“– You were reading this book. Resume where you left off?</span>
+          <span style={{ color: 'var(--gold)' }}>📖 You were reading this book. Resume where you left off?</span>
           <button
             className="btn btn-primary btn-sm"
             style={{ padding: '4px 14px', fontSize: '0.78rem' }}
@@ -912,17 +912,17 @@ export default function Reader() {
         </div>
       )}
 
-      {/* â”€â”€ Watermark strip â”€â”€ */}
+      {/* ── Watermark strip ── */}
       <div className="reader__watermark">
-        ðŸ”’ Licensed to &bull;<strong>{user.name}</strong> &bull; {user.email} â€” Personal use only. Sharing or redistribution is prohibited.
+        🔒 Licensed to &bull;<strong>{user.name}</strong> &bull; {user.email} — Personal use only. Sharing or redistribution is prohibited.
       </div>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* ══════════════════════════════
           PDF EMBED MODE
           Google Drive renders the PDF
           inside an iframe on our page.
           User sees the book, not the URL.
-      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      ══════════════════════════════ */}
       {viewMode === 'pdf' && hasPdf && (
         <div className="reader__pdf-wrap">
 
@@ -932,11 +932,11 @@ export default function Reader() {
           {/* Ghost watermark tiles visible over the PDF */}
           <div className="reader__pdf-wm" aria-hidden="true">
             {Array.from({ length: 30 }).map((_, i) => (
-              <span key={i}>{user.name} Â· {user.email} Â· Ellines Haven</span>
+              <span key={i}>{user.name} · {user.email} · Ellines Haven</span>
             ))}
           </div>
 
-          {/* The actual PDF viewer â€” Google Drive embed, toolbar hidden */}
+          {/* The actual PDF viewer — Google Drive embed, toolbar hidden */}
           <div
             className="reader__pdf-zoom-wrap"
             style={{
@@ -957,16 +957,16 @@ export default function Reader() {
 
           {/* Bottom licence note */}
           <div className="reader__pdf-footer">
-            Â© {new Date().getFullYear()} Ellines Haven Â· This copy is licensed to {user.name} Â· Redistribution is prohibited
+            © {new Date().getFullYear()} Ellines Haven · This copy is licensed to {user.name} · Redistribution is prohibited
           </div>
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* ══════════════════════════════
           TEXT / CHAPTER MODE
           Fallback when no PDF, or user
           switches to text view.
-      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      ══════════════════════════════ */}
       {viewMode === 'text' && (
         <div className="reader__body">
           <div className="reader__page reader__page--drm">
@@ -974,7 +974,7 @@ export default function Reader() {
             {/* Ghost watermark tiled in background */}
             <div className="reader__ghost-wm" aria-hidden="true">
               {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i}>{user.name} Â· Ellines Haven Â· {user.email}</span>
+                <span key={i}>{user.name} · Ellines Haven · {user.email}</span>
               ))}
             </div>
 
@@ -996,31 +996,31 @@ export default function Reader() {
 
             {/* Inline licence watermark */}
             <p className="reader__inline-mark" aria-hidden="true">
-              ðŸ”’ Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
+              🔒 Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
             </p>
 
             {/* Chapter navigation */}
             <div className="reader__page-nav">
               {chapter > 0 && (
                 <button className="btn btn-ghost btn-sm" onClick={() => { setChapter(c => c - 1); window.scrollTo(0, 0); }}>
-                  â† Previous
+                  ← Previous
                 </button>
               )}
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginLeft:'auto' }}
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
-                  Next â†’
+                  Next →
                 </button>
               )}
             </div>
 
-            {/* End-of-chapter marker â€” auto-generates from chapter data, admin-editable */}
+            {/* End-of-chapter marker — auto-generates from chapter data, admin-editable */}
             <div className="reader__end">
-              <p>{chapters[chapter]?.endMessage || `â€” End of Chapter ${chapter + 1} â€”`}</p>
+              <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
-                  Continue to Chapter {chapter + 2} â†’
+                  Continue to Chapter {chapter + 2} →
                 </button>
               )}
               {chapter === chapters.length - 1 && !hasPdf && (
@@ -1033,11 +1033,11 @@ export default function Reader() {
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* ══════════════════════════════
           LISTEN MODE
           Text-to-speech audio player
           + text display for follow-along
-      â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      ══════════════════════════════ */}
       {viewMode === 'listen' && (
         <div className="reader__body">
           <div className="reader__page reader__page--drm">
@@ -1045,7 +1045,7 @@ export default function Reader() {
             {/* Ghost watermark */}
             <div className="reader__ghost-wm" aria-hidden="true">
               {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i}>{user.name} Â· Ellines Haven Â· {user.email}</span>
+                <span key={i}>{user.name} · Ellines Haven · {user.email}</span>
               ))}
             </div>
 
@@ -1074,30 +1074,30 @@ export default function Reader() {
             </div>
 
             <p className="reader__inline-mark" aria-hidden="true">
-              ðŸ”’ Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
+              🔒 Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
             </p>
 
             <div className="reader__page-nav">
               {chapter > 0 && (
                 <button className="btn btn-ghost btn-sm" onClick={() => { setChapter(c => c - 1); window.scrollTo(0, 0); }}>
-                  â† Previous
+                  ← Previous
                 </button>
               )}
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
-                  Next â†’
+                  Next →
                 </button>
               )}
             </div>
 
             {/* End-of-chapter marker for listen mode */}
             <div className="reader__end">
-              <p>{chapters[chapter]?.endMessage || `â€” End of Chapter ${chapter + 1} â€”`}</p>
+              <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
-                  Continue to Chapter {chapter + 2} â†’
+                  Continue to Chapter {chapter + 2} →
                 </button>
               )}
               {chapter === chapters.length - 1 && !hasPdf && (
