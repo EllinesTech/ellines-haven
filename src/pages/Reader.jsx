@@ -42,6 +42,28 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
   const chapterText = chapters[currentChapter]?.text || '';
 
+  // ── Neural voice detection ────────────────────────────────────────────────
+  // Returns true for voices that are genuinely high-quality / neural
+  function isNeuralVoice(v) {
+    const n = v.name.toLowerCase();
+    // Microsoft neural (Windows/Edge/Chrome on desktop + Android)
+    if (/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi|clara|liam|natasha|william|william|william|olivia|james|luna|william)/i.test(v.name)) return true;
+    // Google neural (Android Chrome / Chrome OS)
+    if (/google (uk english female|uk english male|us english|日本語|français|deutsch|español)/i.test(v.name)) return true;
+    // iOS/macOS Siri-quality voices (marked local=false are server neural on iOS 16+)
+    if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|junior|frederica|joana|mariana|luciana|Isabel|paola|soledad|monica|jorge|juan|pablo|diego|enrique|carlos|ximena|angelica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
+    // Samsung / Android built-in neural (appear as "Samsung" prefix)
+    if (/samsung/i.test(n) && /female|male|neural|enhanced/i.test(n)) return true;
+    // Android "en-us-x-" internal IDs exposed on some devices
+    if (v.voiceURI && /x-nob|x-sfg|x-iob|x-tpf|x-iom/i.test(v.voiceURI)) return true;
+    return false;
+  }
+
+  // ── Google neural badge helper ────────────────────────────────────────────
+  function isGoogleNeural(v) {
+    return /^google /i.test(v.name);
+  }
+
   // Load available voices — auto-select best neural English voice
   useEffect(() => {
     const load = () => {
@@ -49,25 +71,63 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
       if (!v.length) return;
       setVoices(v);
 
-      // Priority: Microsoft Neural voices > Google voices > any en-US > fallback
+      // Priority order: Microsoft Neural > Google Neural > iOS enhanced >
+      //                 any en-US/en-GB local > any English > first voice
       const NEURAL_PRIORITY = [
-        // Microsoft neural (Edge/Chrome Windows — genuinely human quality)
-        'Microsoft Jenny', 'Microsoft Aria', 'Microsoft Guy', 'Microsoft Davis',
-        'Microsoft Emma', 'Microsoft Brian', 'Microsoft Ana', 'Microsoft Andrew',
-        // Google neural
-        'Google UK English Female', 'Google UK English Male',
+        // ── Microsoft Neural (Windows / Edge / Android WebView) ──────────
+        'Microsoft Jenny',   // en-US female ★ top pick
+        'Microsoft Aria',    // en-US female
+        'Microsoft Emma',    // en-GB female
+        'Microsoft Sonia',   // en-GB female
+        'Microsoft Libby',   // en-GB female
+        'Microsoft Mia',     // es-MX female
+        'Microsoft Ana',     // es-US female
+        'Microsoft Neerja',  // en-IN female
+        'Microsoft Guy',     // en-US male
+        'Microsoft Davis',   // en-US male
+        'Microsoft Brian',   // en-US male
+        'Microsoft Andrew',  // en-US male
+        'Microsoft Ryan',    // en-GB male
+        // ── Google Neural (Android Chrome / Chrome OS) ───────────────────
+        'Google UK English Female',
         'Google US English',
+        'Google UK English Male',
+        // ── iOS / macOS enhanced voices ──────────────────────────────────
+        'Ava',          // en-US female (iOS enhanced)
+        'Allison',      // en-US female (iOS enhanced)
+        'Samantha',     // en-US female (classic iOS, good quality)
+        'Karen',        // en-AU female
+        'Moira',        // en-IE female
+        'Tessa',        // en-ZA female
+        'Fiona',        // en-Scotland female
+        'Victoria',     // en-US female
+        // ── Samsung Internet neural ──────────────────────────────────────
+        'Samsung English Female',
+        'Samsung English Male',
       ];
+
       let bestIdx = 0;
       for (const name of NEURAL_PRIORITY) {
         const idx = v.findIndex(x => x.name.startsWith(name));
         if (idx >= 0) { bestIdx = idx; break; }
       }
-      // Fallback: first en-US or en-GB voice
+
+      // Fallback 1: any local en-US voice
       if (bestIdx === 0) {
-        const enIdx = v.findIndex(x => x.lang?.startsWith('en'));
-        if (enIdx >= 0) bestIdx = enIdx;
+        const i = v.findIndex(x => x.lang === 'en-US' && x.localService);
+        if (i >= 0) bestIdx = i;
       }
+      // Fallback 2: any en-GB
+      if (bestIdx === 0) {
+        const i = v.findIndex(x => x.lang === 'en-GB');
+        if (i >= 0) bestIdx = i;
+      }
+      // Fallback 3: any English
+      if (bestIdx === 0) {
+        const i = v.findIndex(x => x.lang?.startsWith('en'));
+        if (i >= 0) bestIdx = i;
+      }
+
       setVoiceIdx(bestIdx);
     };
     load();
@@ -106,8 +166,40 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
     if (filter === 'all') return voices;
     return voices.filter(v => {
       const n = v.name.toLowerCase();
-      if (filter === 'female') return n.includes('female') || n.includes('woman') || /zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|neerja|heera|raveena|manjari|lekha|kalpana|asha|zuzana|paulina|lucia|almudena|marta|zosia|ewa|ioana|afrikaans|hessa|leila|naayf|laila|fatima|tamar|joana|mariana|linh/.test(n);
-      if (filter === 'male')   return n.includes('male') || /david|mark|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|andrés|enrique/.test(n);
+      const uri = (v.voiceURI || '').toLowerCase();
+
+      if (filter === 'female') {
+        // Explicit "female" or "woman" in the name
+        if (n.includes('female') || n.includes('woman') || n.includes('femme')) return true;
+        // Named female voices — Windows, macOS, iOS, Android, Samsung
+        if (/\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia|almudena|marta|zosia|ewa|ioana|laila|fatima|tamar|leila|hessa|linh|naayf|yan|meijia|tingting|sinji|milena|yelena|irina|katya|anna|vicki|alice|amelie|julie|aurelie|petra|katrin|hanna|lotte|claire|ellen|nora|carmit|tamar|lekha|kalpana|sara|yuna|kyoko|otoya)\b/.test(n)) return true;
+        // iOS "Ava" en-US, "Allison" en-US without explicit gender tag
+        if (/^(ava|allison|victoria|fiona|karen|moira|tessa|samantha|nicky|frederica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
+        // Google UK English Female
+        if (/google uk english female/i.test(v.name)) return true;
+        // Samsung female
+        if (/samsung.*female/i.test(v.name)) return true;
+        // voiceURI hints on Android
+        if (/female/i.test(uri)) return true;
+        return false;
+      }
+
+      if (filter === 'male') {
+        // Explicit "male" (but not female) in the name
+        if ((n.includes('male') && !n.includes('female')) || n.includes('man') || n.includes('homme')) return true;
+        // Named male voices
+        if (/\b(guy|davis|brian|andrew|ryan|mark|david|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|enrique|carlos|juan|william|liam|james|thomas|oliver|harry|arthur|oliver)\b/.test(n)) return true;
+        // iOS male
+        if (/^(daniel|oliver|arthur|thomas|fred|junior|alex)/i.test(v.name) && v.lang?.startsWith('en')) return true;
+        // Google male
+        if (/google uk english male/i.test(v.name)) return true;
+        // Samsung male
+        if (/samsung.*male/i.test(v.name)) return true;
+        // voiceURI hints
+        if (/male/i.test(uri) && !/female/i.test(uri)) return true;
+        return false;
+      }
+
       return true;
     });
   }
@@ -311,11 +403,11 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               >
                 <span>
                   {dispVoices[safeIdx]?.name || 'Select voice'}
-                  {dispVoices[safeIdx] && /microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi)/i.test(dispVoices[safeIdx].name) && (
-                    <span className="audio-neural-badge">✨ Neural</span>
-                  )}
-                  {dispVoices[safeIdx] && /google/i.test(dispVoices[safeIdx].name) && (
+                  {dispVoices[safeIdx] && isGoogleNeural(dispVoices[safeIdx]) && (
                     <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                  )}
+                  {dispVoices[safeIdx] && !isGoogleNeural(dispVoices[safeIdx]) && isNeuralVoice(dispVoices[safeIdx]) && (
+                    <span className="audio-neural-badge">✨ Neural</span>
                   )}
                   {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
                 </span>
@@ -324,7 +416,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               {voiceDdOpen && (
                 <div className="audio-custom-dd__list">
                   {dispVoices.length === 0 && (
-                    <div className="audio-custom-dd__empty">No voices found</div>
+                    <div className="audio-custom-dd__empty">No voices found for this filter</div>
                   )}
                   {dispVoices.map((v, i) => (
                     <button
@@ -339,11 +431,11 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                     >
                       <span className="audio-custom-dd__name">
                         {v.name}
-                        {/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi)/i.test(v.name) && (
-                          <span className="audio-neural-badge">✨ Neural</span>
-                        )}
-                        {/google/i.test(v.name) && (
+                        {isGoogleNeural(v) && (
                           <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                        )}
+                        {!isGoogleNeural(v) && isNeuralVoice(v) && (
+                          <span className="audio-neural-badge">✨ Neural</span>
                         )}
                       </span>
                       <span className="audio-custom-dd__lang">{v.lang}</span>
@@ -374,7 +466,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               onChange={e => { setPitch(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
           </div>
           <p className="audio-settings__note">
-            Available voices depend on your device and browser. Chrome / Edge on Windows or Android give the most choices.
+            Available voices depend on your device and browser. Chrome / Edge on Windows or Android give the most choices. On iPhone/iPad use Safari for the best iOS voices. Voices marked ✨ or 🔵 are high-quality neural voices.
           </p>
         </div>
       )}
@@ -595,8 +687,7 @@ export default function Reader() {
 
   if (!checkOwned()) {
     // Still waiting for Firestore library snapshot — show loading briefly.
-    // Only block if we genuinely don't have any library data yet.
-    // If library is empty AND libLoaded is false, wait up to 4 s (AppContext timeout handles that).
+    // Hard cap: if libLoaded is still false after 3s, unblock and show purchase screen.
     if (!libLoaded) return (
       <div className="reader-error">
         <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>

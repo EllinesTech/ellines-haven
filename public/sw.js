@@ -2,12 +2,13 @@
  * Ellines Haven Service Worker
  *
  * Strategy:
- *  - HTML navigation  → network-first, fall back to /index.html (SPA support)
+ *  - HTML navigation  → network-FIRST always (never serve stale HTML)
  *  - /assets/**       → cache-first (content-hashed, never stale)
  *  - images/fonts     → stale-while-revalidate
  *
  * CACHE_NAME is auto-stamped with a build timestamp by vite.config.js on every
- * production build, so mobile users always get fresh JS/CSS after a deploy.
+ * production build, so every deploy gets a brand-new cache key.
+ * Old caches are wiped on activate — no stale chunks ever.
  *
  * On activation the SW posts { type: 'SW_UPDATED' } to all open tabs so the
  * app can show a "New version available — refresh" banner.
@@ -16,41 +17,40 @@
 const CACHE_NAME = 'ellines-haven-20260707'; // replaced at build time by stamp-sw plugin
 
 const SHELL_ASSETS = [
-  '/',
-  '/index.html',
   '/logo-icon.png',
   '/favicon.svg',
 ];
 
-// ── Install: pre-cache shell ─────────────────────────────────────────────────
+// ── Install: pre-cache minimal shell (NOT index.html — always fetch fresh) ───
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll(SHELL_ASSETS).catch(() => {}) // non-fatal if an asset is missing
+      cache.addAll(SHELL_ASSETS).catch(() => {})
     )
   );
   // Take control immediately — don't wait for old SW to die
   self.skipWaiting();
 });
 
-// ── Activate: delete stale caches, tell all tabs ─────────────────────────────
+// ── Activate: delete ALL stale caches, claim clients ────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
         keys
           .filter((k) => k !== CACHE_NAME)
-          .map((k) => caches.delete(k))
+          .map((k) => {
+            console.log('[SW] Deleting stale cache:', k);
+            return caches.delete(k);
+          })
       )
-    ).then(() => {
-      // Claim all clients so pages under this scope use the new SW immediately
-      return self.clients.claim();
-    }).then(() => {
-      // Notify every open tab that a new version is live
-      return self.clients.matchAll({ type: 'window' }).then((clients) => {
-        clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED' }));
-      });
-    })
+    ).then(() => self.clients.claim())
+      .then(() => {
+        // Notify every open tab that a new version is live
+        return self.clients.matchAll({ type: 'window' }).then((clients) => {
+          clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED' }));
+        });
+      })
   );
 });
 
@@ -63,29 +63,20 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
-  // ── HTML navigation: network-first, SPA fallback ──────────────────────────
-  // Preserves the exact URL on reload — React Router rehydrates to the right page
+  // ── HTML navigation: ALWAYS network-first, never serve stale HTML ─────────
+  // This is critical — stale index.html causes blank/loading screens after deploy
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((res) => {
-          if (res.ok) {
-            // Cache a fresh copy
-            caches.open(CACHE_NAME)
-              .then((cache) => cache.put(new Request('/index.html'), res.clone()))
-              .catch(() => {});
-          }
-          return res;
-        })
+      fetch(request, { cache: 'no-store' })
         .catch(() =>
-          // Offline: serve cached shell — browser URL stays as-is, SPA handles routing
+          // Offline only: serve cached index.html if available
           caches.match('/index.html').then((r) => r || new Response('Offline', { status: 503 }))
         )
     );
     return;
   }
 
-  // ── Content-hashed assets: cache-first (immutable) ───────────────────────
+  // ── Content-hashed /assets/**: cache-first (filenames change on each build) 
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -113,13 +104,12 @@ self.addEventListener('fetch', (event) => {
               if (res.ok) cache.put(request, res.clone()).catch(() => {});
               return res;
             })
-            .catch(() => cached); // network failed — serve cache
-          // Return cache immediately if available, background-update regardless
+            .catch(() => cached);
           return cached || networkFetch;
         })
       )
     );
     return;
   }
-  // Everything else — just fetch normally (Firebase API calls, etc.)
+  // Everything else — fetch normally (Firebase API calls, Cloud Functions, etc.)
 });

@@ -113,11 +113,24 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // Register service worker for offline support and fast repeat loads
+      // Service worker: skip on localhost dev (avoids stale cache issues during development)
+      // On production: register and check for updates immediately on every load
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
+        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (isLocalhost) {
+          // Dev: unregister any leftover SW so it never interferes with hot reload
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            regs.forEach(r => r.unregister());
+          });
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(reg => {
+              // Check for updates immediately, then every 60 seconds
+              reg.update();
+              setInterval(() => reg.update(), 60000);
+            }).catch(() => {});
+          });
+        }
       }
     </script>
   </body>
