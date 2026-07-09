@@ -33,7 +33,7 @@ export default function Footer() {
           {/* Brand column */}
           <div className="footer__brand">
             <Link to="/" className="footer__logo-link">
-              <img src={`${navLogo}?v=20260709`} alt="Ellines Haven" className="footer__logo" />
+              <img src={navLogo} alt="Ellines Haven" className="footer__logo" />
             </Link>
             <p className="footer__tagline">
               A sanctuary for original African literature — stories born from real life, written in Kenya, read by the world.

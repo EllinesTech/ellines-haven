@@ -102,7 +102,7 @@ export default function Navbar() {
 
         {/* ── Brand ── */}
         <Link to="/" className="nav__brand" onClick={closeAll}>
-          <img src={`${navLogo}?v=20260709`} alt="Ellines Haven" className="nav__logo-img" />
+          <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" />
           <div className="nav__brand-text">
             <span className="nav__brand-name">Ellines Haven</span>
             <span className="nav__brand-tagline">Home For The Story Soul</span>

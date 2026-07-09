@@ -3,8 +3,11 @@ import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
 
-// ── Plugin: stamp sw.js with a fresh build timestamp on every build ──────────
-// This ensures mobile users always get the new service worker after a deploy.
+// ── Build stamp — shared across plugins ──────────────────────────────────────
+const BUILD_STAMP = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+
+// ── Plugin 1: Stamp sw.js cache name on every build ──────────────────────────
+// Ensures every device picks up the new service worker within 30s of deploy.
 function stampServiceWorker() {
   return {
     name: 'stamp-sw',
@@ -12,20 +15,44 @@ function stampServiceWorker() {
       const swDist = path.resolve('dist', 'sw.js');
       if (!fs.existsSync(swDist)) return;
       let src = fs.readFileSync(swDist, 'utf-8');
-      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-      // Replace the hardcoded cache name with a fresh timestamped one
       src = src.replace(
         /const CACHE_NAME\s*=\s*['"][^'"]*['"]/,
-        `const CACHE_NAME = 'ellines-haven-${stamp}'`
+        `const CACHE_NAME = 'ellines-haven-${BUILD_STAMP}'`
       );
       fs.writeFileSync(swDist, src);
-      console.log(`[stamp-sw] Cache name → ellines-haven-${stamp}`);
+      console.log(`[stamp-sw] Cache name → ellines-haven-${BUILD_STAMP}`);
+    },
+  };
+}
+
+// ── Plugin 2: Inject BUILD_STAMP into index.html for image cache-busting ─────
+// Replaces every ?v=XXXXXXXX in the built index.html with the current stamp.
+// This means logo, favicon, og-image URLs in <head> are always fresh.
+function stampPublicAssets() {
+  return {
+    name: 'stamp-public-assets',
+    closeBundle() {
+      const indexPath = path.resolve('dist', 'index.html');
+      if (!fs.existsSync(indexPath)) return;
+      let html = fs.readFileSync(indexPath, 'utf-8');
+      // Replace any existing ?v= params on public asset refs
+      html = html.replace(/\?v=\d{8,}/g, `?v=${BUILD_STAMP}`);
+      // Also add ?v= to any logo/icon/og refs that don't have it yet
+      html = html.replace(
+        /(href|src)="(\/(?:logo|pwa|og-image|favicon)[^"]*\.(?:png|webp|svg|ico))"/g,
+        (_, attr, url) => {
+          const base = url.split('?')[0];
+          return `${attr}="${base}?v=${BUILD_STAMP}"`;
+        }
+      );
+      fs.writeFileSync(indexPath, html);
+      console.log(`[stamp-public-assets] Stamped public asset URLs with ?v=${BUILD_STAMP}`);
     },
   };
 }
 
 export default defineConfig({
-  plugins: [react(), stampServiceWorker()],
+  plugins: [react(), stampServiceWorker(), stampPublicAssets()],
   server: {
     port: 5173,
     strictPort: true,
@@ -38,26 +65,18 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Firebase — split auth away from the heavy SDK
-          if (id.includes('firebase/auth') || id.includes('@firebase/auth')) {
+          if (id.includes('firebase/auth') || id.includes('@firebase/auth'))
             return 'vendor-firebase-auth';
-          }
-          if (id.includes('firebase/firestore') || id.includes('@firebase/firestore')) {
+          if (id.includes('firebase/firestore') || id.includes('@firebase/firestore'))
             return 'vendor-firebase-firestore';
-          }
-          if (id.includes('firebase/storage') || id.includes('@firebase/storage')) {
+          if (id.includes('firebase/storage') || id.includes('@firebase/storage'))
             return 'vendor-firebase-storage';
-          }
-          if (id.includes('firebase') || id.includes('@firebase')) {
+          if (id.includes('firebase') || id.includes('@firebase'))
             return 'vendor-firebase-core';
-          }
-          // React ecosystem
-          if (id.includes('react-dom') || id.includes('react-router')) {
+          if (id.includes('react-dom') || id.includes('react-router'))
             return 'vendor-react';
-          }
-          if (id.includes('node_modules')) {
+          if (id.includes('node_modules'))
             return 'vendor';
-          }
         },
       },
     },
