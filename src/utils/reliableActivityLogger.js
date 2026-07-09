@@ -70,6 +70,8 @@ function saveActivityQueue(queue) {
  */
 function queueActivity(activity) {
   const queue = getActivityQueue();
+  // Cap queue at 20 entries so it can never grow unbounded
+  if (queue.length >= 20) queue.shift();
   queue.push({
     ...activity,
     queuedAt: new Date().toISOString(),
@@ -77,15 +79,6 @@ function queueActivity(activity) {
   });
   saveActivityQueue(queue);
   return queue.length;
-}
-
-/**
- * Remove activity from queue after successful submission
- */
-function dequeueActivity(index) {
-  const queue = getActivityQueue();
-  queue.splice(index, 1);
-  saveActivityQueue(queue);
 }
 
 /**
@@ -121,12 +114,9 @@ export async function logUserLoginReliable(userEmail, userName, metadata = {}) {
   } catch (err) {
     console.error('[logUserLoginReliable] Failed:', err.message);
     
-    // Queue for retry
+    // Queue for retry on next app load — no recursive setTimeout
     const queueLength = queueActivity(activity);
     console.log(`[logUserLoginReliable] Activity queued for retry (queue length: ${queueLength})`);
-    
-    // Try to flush queue after 3 seconds
-    setTimeout(() => flushActivityQueue(), 3000);
     
     // Return success anyway - activity is queued
     return { success: true, queued: true };
@@ -163,16 +153,17 @@ export async function logUserRegistrationReliable(userEmail, userName, metadata 
   } catch (err) {
     console.error('[logUserRegistrationReliable] Failed:', err.message);
     
-    // Queue for retry
+    // Queue for retry on next app load — no recursive setTimeout
     queueActivity(activity);
-    setTimeout(() => flushActivityQueue(), 3000);
     
     return { success: true, queued: true };
   }
 }
 
 /**
- * Flush queued activities (retry failed submissions)
+ * Flush queued activities (retry failed submissions).
+ * Called once on app load by initializeActivityLogger().
+ * Does NOT schedule itself — no recursive timeouts.
  */
 export async function flushActivityQueue() {
   const queue = getActivityQueue();
@@ -181,47 +172,52 @@ export async function flushActivityQueue() {
     return { flushed: 0 };
   }
 
-  console.log(`[flushActivityQueue] Processing ${queue.length} queued activities`);
+  // Safety: discard corrupt / ancient entries (older than 7 days)
+  const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+  const fresh = queue.filter(a => {
+    const age = Date.now() - new Date(a.queuedAt || 0).getTime();
+    return age < SEVEN_DAYS && (a.attempts || 0) < 3;
+  });
+  if (fresh.length !== queue.length) {
+    saveActivityQueue(fresh);
+    if (fresh.length === 0) return { flushed: 0 };
+  }
+
+  console.log(`[flushActivityQueue] Processing ${fresh.length} queued activities`);
   let flushed = 0;
+  const remaining = [];
 
-  for (let i = 0; i < queue.length; i++) {
-    const activity = queue[i];
-    
-    // Skip if already attempted too many times
-    if ((activity.attempts || 0) >= 3) {
-      console.warn(`[flushActivityQueue] Giving up on activity after 3 attempts:`, activity);
-      dequeueActivity(i);
-      i--;
-      continue;
-    }
-
+  for (const activity of fresh) {
     try {
-      const logFn = httpsCallable(functions, 
+      const logFn = httpsCallable(functions,
         activity.type === 'login' ? 'logUserLoginServer' : 'logUserRegistrationServer'
       );
 
       await logFn({
         userEmail: activity.userEmail,
-        userName: activity.userName,
+        userName:  activity.userName,
         metadata: {
-          device: activity.device,
+          device:    activity.device,
           userAgent: activity.userAgent,
         },
       });
 
       console.log(`[flushActivityQueue] Successfully flushed:`, activity.type);
-      dequeueActivity(i);
       flushed++;
-      i--;
+      // Successfully sent — do NOT add to remaining
     } catch (err) {
-      // Increment attempt count and keep in queue
-      activity.attempts = (activity.attempts || 0) + 1;
-      saveActivityQueue(queue);
-      console.warn(`[flushActivityQueue] Retry ${activity.attempts}/3 failed:`, err.message);
+      const attempts = (activity.attempts || 0) + 1;
+      if (attempts < 3) {
+        remaining.push({ ...activity, attempts });
+        console.warn(`[flushActivityQueue] Retry ${attempts}/3 failed for ${activity.type}:`, err.message);
+      } else {
+        console.warn(`[flushActivityQueue] Giving up on activity after 3 attempts:`, activity.type);
+      }
     }
   }
 
-  return { flushed, remaining: queue.length };
+  saveActivityQueue(remaining);
+  return { flushed, remaining: remaining.length };
 }
 
 /**
