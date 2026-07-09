@@ -1,5 +1,5 @@
 /**
- * Ellines Haven Service Worker — Bulletproof Update Strategy
+ * Ellines Haven Service Worker — Nuclear Update Strategy
  *
  * HOW UPDATES REACH EVERY DEVICE:
  *
@@ -13,7 +13,7 @@
  * 3. New SW calls self.skipWaiting() immediately on install — no waiting,
  *    no banner, no user tap required.
  *
- * 4. Activate wipes ALL old caches — no stale assets survive.
+ * 4. Activate wipes ALL old caches without exception — no stale assets survive.
  *
  * 5. clients.claim() takes control of all open tabs instantly.
  *
@@ -35,27 +35,30 @@ const STATIC_ASSETS = [
   '/favicon.svg',
 ];
 
-// ── Install: cache static assets + skip waiting immediately ──────────────────
+// ── Install: skip waiting FIRST, then cache static assets ────────────────────
 self.addEventListener('install', (event) => {
+  // Skip waiting immediately — new SW takes over without any delay.
+  // Safe because Vite content-hashes all /assets/ filenames.
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
   );
-  // Take control immediately — don't wait for existing SW to finish.
-  // Safe because Vite content-hashes all /assets/ filenames.
-  self.skipWaiting();
 });
 
-// ── Activate: wipe EVERY old cache, then claim all open tabs ─────────────────
+// ── Activate: NUKE every cache (old AND current), rebuild fresh ───────────────
+// This is the nuclear option: on every new deploy, wipe everything so users
+// never get a MIME-type error from stale cached HTML/CSS mismatches.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(
-        keys
-          .filter(k => k !== CACHE_NAME)
-          .map(k => caches.delete(k))
-      ))
+      .then(keys => Promise.all(keys.map(k => caches.delete(k)))) // delete ALL caches
       .then(() => self.clients.claim()) // Take control of all open pages now
+      .then(() => {
+        // Tell all clients to reload so they get the fresh assets
+        return self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
+          .then(clients => clients.forEach(c => c.navigate(c.url)));
+      })
   );
 });
 

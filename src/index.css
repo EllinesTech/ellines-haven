@@ -11,7 +11,7 @@
   --sh-card:0 8px 36px rgba(0,0,0,0.45);
   --r:12px; --r-sm:6px; --r-lg:20px;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;min-width:0}
 html{scroll-behavior:smooth;overflow-x:hidden;padding-top:env(safe-area-inset-top)}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden;width:100%;min-width:0;padding-bottom:env(safe-area-inset-bottom)}
 h1,h2,h3,h4,h5{font-family:'Playfair Display',serif;line-height:1.2}
@@ -22,7 +22,7 @@ input,select,textarea{font-family:'Inter',sans-serif;outline:none}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--gold-dk);border-radius:3px}
-.container{max-width:1280px;margin:0 auto;padding:0 24px}
+.container{max-width:1280px;margin:0 auto;padding:0 24px;width:100%}
 .section{padding:88px 0}
 .gold-text{background:var(--grad-gold);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:var(--r);font-size:.92rem;font-weight:600;transition:all .25s;cursor:pointer;border:none}
@@ -68,99 +68,85 @@ select.field option { background:#1a1a30; color:#f0ece2; }
 .btn-wa:active { transform: translateY(0); }
 
 /* ════════════════════════════════════════
-   GLOBAL RESPONSIVE — mobile-first fixes
+   GLOBAL RESPONSIVE — water & glass
+   Fits any device without overlap or overflow
 ════════════════════════════════════════ */
 
-/* ════════════════════════════════════════
-   GLOBAL RESPONSIVE — prevent any content
-   from being hidden or overflowing on mobile
-════════════════════════════════════════ */
-
-/* Prevent horizontal scroll on the page — but NEVER clip content vertically */
+/* ── Core containment — nothing escapes the viewport ── */
 html {
   overflow-x: hidden;
+  /* Respect notches on iOS */
+  padding-top: env(safe-area-inset-top);
 }
 body {
   overflow-x: hidden;
-  /* Allow full width — images/grids will wrap naturally */
   width: 100%;
   min-width: 0;
+  /* Respect home-bar on iOS */
+  padding-bottom: env(safe-area-inset-bottom);
 }
-*, *::before, *::after { box-sizing: border-box; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  /* Prevent any element from breaking out of its parent */
+  min-width: 0;
+}
 
-/* All images and videos are responsive by default */
-img, video, svg {
+/* ── All media is fluid ── */
+img, video, svg, canvas, embed, object, iframe {
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
-/* Tables that overflow scroll horizontally instead of clipping */
-table {
-  border-collapse: collapse;
-}
+/* ── Tables scroll instead of overflow ── */
+table { border-collapse: collapse; width: 100%; }
 .table-responsive {
+  width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Fix: inputs never exceed their container */
-input, select, textarea {
+/* ── Form elements never overflow their container ── */
+input, select, textarea, button {
   max-width: 100%;
 }
 
-/* ════════════════════════════════════════
-   GLOBAL RESPONSIVE — mobile-first fixes
-════════════════════════════════════════ */
-
-/* ════════════════════════════════════════
-   GLOBAL RESPONSIVE — prevent any content
-   from being hidden or overflowing on mobile
-════════════════════════════════════════ */
-
-/* All images and videos are responsive by default */
-img, video, svg {
-  max-width: 100%;
-  height: auto;
+/* ── Text wraps cleanly everywhere ── */
+p, h1, h2, h3, h4, h5, h6, li, label, span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
-/* Tables that overflow scroll horizontally instead of clipping */
-table {
-  border-collapse: collapse;
-}
-.table-responsive {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Fix: inputs never exceed their container */
-input, select, textarea {
-  max-width: 100%;
+/* ── Container fluid scaling ── */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+  width: 100%;
 }
 
 /* ── Floating action buttons — clean vertical stack ──
-   All three buttons use the same right edge (20px)
-   and stack vertically with consistent 10px gaps:
-     WhatsApp:  bottom 20px  (height 50px → top at 70px)
-     LiveChat:  bottom 80px  (70 + 10gap)  (height 50px → top at 130px)
-     Ellinea:   bottom 140px (130 + 10gap)
-   This is enforced in App.jsx, LiveChat.jsx, EllineaAI.css
+   WhatsApp:  bottom 20px
+   LiveChat:  bottom 80px
+   Ellinea:   bottom 140px
 ── */
 
-/* ── Intermediate breakpoints for tablets and large phones ── */
+/* ── Breakpoints ── */
+@media (max-width: 1100px) {
+  .container { padding: 0 22px; }
+}
+
 @media (max-width: 900px) {
-  /* Wide tablet range: tweak container padding */
   .container { padding: 0 20px; }
 }
 
 @media (max-width: 768px) {
-  /* Section / container spacing */
   .section { padding: 56px 0; }
   .container { padding: 0 16px; }
   .page-header { padding: 88px 0 40px; }
 }
 
 @media (max-width: 600px) {
-  /* Large phones (Galaxy S, Pixel) */
   .section { padding: 48px 0; }
   .container { padding: 0 15px; }
 }
@@ -168,11 +154,10 @@ input, select, textarea {
 @media (max-width: 480px) {
   .section { padding: 40px 0; }
   .container { padding: 0 14px; }
-  /* On small phones, chat windows open as bottom sheets (handled in component CSS) */
 }
 
 @media (max-width: 380px) {
-  /* Very small (SE, Galaxy A series) */
+  /* Very small phones — SE, Galaxy A series */
   .section { padding: 32px 0; }
   .container { padding: 0 12px; }
   .btn { padding: 10px 20px; font-size: 0.85rem; }
@@ -180,11 +165,36 @@ input, select, textarea {
 }
 
 /* ── Safe-area padding for fixed elements on notched phones ── */
-.nav { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.nav {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
 .footer { padding-bottom: env(safe-area-inset-bottom); }
 
 /* ── Landscape orientation on phones ── */
 @media (max-width: 900px) and (orientation: landscape) {
   .section { padding: 32px 0; }
   .page-header { padding: 70px 0 30px; }
+}
+
+/* ── Flex/grid children never overflow their parent ── */
+.flex-wrap-safe {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.grid-safe > * {
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Prevent long URLs or unbreakable strings from overflowing ── */
+a, pre, code {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* ── Modals & overlays stay inside viewport ── */
+.modal, .dropdown, .popover {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
 }
