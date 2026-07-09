@@ -255,6 +255,17 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // ── EMERGENCY CACHE CLEAR ────────────────────────────────────────────────
+      // Immediately clear all caches if the site is black/broken
+      if ('caches' in window) {
+        caches.keys().then(keys => {
+          if (keys.length > 0) {
+            console.log('[EMERGENCY] Clearing all caches:', keys);
+            Promise.all(keys.map(k => caches.delete(k)));
+          }
+        });
+      }
+
       // ── Service Worker — production only ─────────────────────────────────────
       // Registration URL includes ?v=BUILD_STAMP — stamped at build time by vite.config.js.
       // A new query string = browser always fetches a fresh sw.js, bypassing the
