@@ -102,7 +102,7 @@ export default function Navbar() {
 
         {/* ── Brand ── */}
         <Link to="/" className="nav__brand" onClick={closeAll}>
-          <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" style={{height:40,objectFit:'contain'}} />
+          <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" />
           <div className="nav__brand-text">
             <span className="nav__brand-name">Ellines Haven</span>
             <span className="nav__brand-tagline">Home For The Story Soul</span>
