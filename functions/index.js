@@ -1074,7 +1074,7 @@ exports.sendPasswordResetOtp = onCall(
         const { Resend } = require("resend");
         const resend = new Resend(resendApiKey);
         const { error: resendError } = await resend.emails.send({
-          from:    "Ellines Haven <onboarding@resend.dev>",
+          from:    "Ellines Haven <noreply@haven.ellines.co.ke>",
           to:      [email],
           subject: `Your reset code: ${otpCode} — Ellines Haven`,
           text:    textBody,
@@ -1289,75 +1289,94 @@ exports.logUserLoginServer = onCall(
   },
   async (request) => {
     const { userEmail, userName, metadata = {} } = request.data;
-    
+
     if (!userEmail) {
       throw new HttpsError("invalid-argument", "userEmail is required");
     }
 
+    // Extract real IP from request headers (same as trackVisitor)
+    const headers       = request.rawRequest?.headers || {};
+    const xForwardedFor = headers["x-forwarded-for"] || "";
+    const xRealIp       = headers["x-real-ip"]       || "";
+    const cfConnecting  = headers["cf-connecting-ip"] || "";
+    const fastlyClient  = headers["fastly-client-ip"] || "";
+
+    const rawIp    = cfConnecting || fastlyClient || xRealIp || xForwardedFor.split(",")[0].trim() || "unknown";
+    const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
+
+    const activityId = "act_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+    const now        = Date.now();
+    const activityData = {
+      id:       activityId,
+      category: "user_login",
+      userEmail: userEmail.toLowerCase(),
+      userName:  userName || userEmail,
+      title:     "User Login",
+      message:   `${userName || userEmail} logged in`,
+      icon:      "🔐",
+      clientIp,
+      userAgent: metadata.userAgent || headers["user-agent"] || "",
+      device:    metadata.device || "Unknown",
+      metadata:  {
+        ...metadata,
+        loginTime: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+      },
+      priority:    "low",
+      read:        false,
+      readBy:      [],
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      createdAtMs: now,
+    };
+
+    let wroteNotification = false;
+    let wroteLog          = false;
+    let sessionId         = null;
+
+    // Write to admin_notifications (best-effort — never throws)
     try {
-      // Extract real IP from request headers (same as trackVisitor)
-      const xForwardedFor = request.rawRequest?.headers["x-forwarded-for"] || "";
-      const xRealIp       = request.rawRequest?.headers["x-real-ip"]       || "";
-      const cfConnecting  = request.rawRequest?.headers["cf-connecting-ip"] || "";
-      const fastlyClient  = request.rawRequest?.headers["fastly-client-ip"]|| "";
-      
-      const rawIp = cfConnecting || fastlyClient || xRealIp || xForwardedFor.split(",")[0].trim() || "unknown";
-      const clientIp = rawIp.replace(/^::ffff:/, "").trim();
-
-      // Create activity record
-      const activityId = "act_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
-      const activityData = {
-        id: activityId,
-        category: "user_login",
-        userEmail: userEmail.toLowerCase(),
-        userName: userName || userEmail,
-        title: "User Login",
-        message: `${userName || userEmail} logged in`,
-        icon: "🔐",
-        clientIp,
-        userAgent: metadata.userAgent || request.rawRequest?.headers["user-agent"] || "",
-        device: metadata.device || "Unknown",
-        metadata: {
-          ...metadata,
-          loginTime: new Date().toISOString(),
-          timestamp: new Date().toISOString(),
-        },
-        priority: "low",
-        read: false,
-        readBy: [],
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAtMs: Date.now(),
-      };
-
-      // Write to admin notifications (for admin dashboard)
       await db.collection("admin_notifications").doc(activityId).set(activityData);
+      wroteNotification = true;
+    } catch (e) {
+      console.warn("[logUserLoginServer] admin_notifications write failed:", e.message);
+    }
 
-      // Write to activity logs (for historical tracking)
-      const logId = "log_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+    // Write to activity_logs (best-effort)
+    try {
+      const logId = "log_" + now + "_" + Math.random().toString(36).slice(2, 7);
       await db.collection("activity_logs").doc(logId).set({
         id: logId,
         ...activityData,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      // Create a user session record for cross-device tracking
-      const sessionId = "session_" + userEmail.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + Date.now();
-      await db.collection("user_sessions").doc(sessionId).set({
-        userEmail: userEmail.toLowerCase(),
-        sessionId,
-        loginTime: admin.firestore.FieldValue.serverTimestamp(),
-        ip: clientIp,
-        device: metadata.device || "Unknown",
-        userAgent: metadata.userAgent || "",
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      });
-
-      console.log("[logUserLoginServer] Login recorded for", userEmail, "from IP:", clientIp);
-      return { success: true, activityId, sessionId };
-    } catch (err) {
-      console.error("[logUserLoginServer] error:", err.message);
-      throw new HttpsError("internal", "Failed to log login activity");
+      wroteLog = true;
+    } catch (e) {
+      console.warn("[logUserLoginServer] activity_logs write failed:", e.message);
     }
+
+    // Write user_session (best-effort)
+    try {
+      sessionId = "session_" + userEmail.toLowerCase().replace(/[^a-z0-9]/g, "_") + "_" + now;
+      await db.collection("user_sessions").doc(sessionId).set({
+        userEmail:  userEmail.toLowerCase(),
+        sessionId,
+        loginTime:  admin.firestore.FieldValue.serverTimestamp(),
+        ip:         clientIp,
+        device:     metadata.device || "Unknown",
+        userAgent:  metadata.userAgent || "",
+        expiresAt:  new Date(now + 30 * 24 * 60 * 60 * 1000), // 30 days
+      });
+    } catch (e) {
+      console.warn("[logUserLoginServer] user_sessions write failed:", e.message);
+      sessionId = null;
+    }
+
+    console.log("[logUserLoginServer] Login recorded for", userEmail,
+      "IP:", clientIp,
+      "| notif:", wroteNotification, "| log:", wroteLog, "| session:", !!sessionId);
+
+    // Always succeed from the client's perspective — tracking is non-blocking
+    return { success: true, activityId, sessionId };
   }
 );
 

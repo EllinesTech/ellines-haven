@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import EditableImage from '../components/EditableImage';
 import './Founder.css';
 
 /* ── Firestore key ── */
@@ -130,17 +129,17 @@ export default function Founder() {
   const [saving,  setSaving]  = useState(false);
   const [toast,   setToast]   = useState('');
   const [activePhoto, setActivePhoto] = useState(0);
-  const [fading,      setFading]      = useState(false);
 
-  /* Auto-cycle photos every 30 seconds with a crossfade */
+  /* Navigate to a photo with a smooth crossfade */
+  const goToPhoto = (idx) => {
+    setActivePhoto(idx);
+  };
+
+  /* Auto-cycle photos every 5 seconds */
   useEffect(() => {
     const timer = setInterval(() => {
-      setFading(true);
-      setTimeout(() => {
-        setActivePhoto(p => (p + 1) % HERO_PHOTOS.length);
-        setFading(false);
-      }, 800); // fade-out duration before swapping
-    }, 30000);
+      setActivePhoto(p => (p + 1) % HERO_PHOTOS.length);
+    }, 5000);
     return () => clearInterval(timer);
   }, []);
 
@@ -186,30 +185,19 @@ export default function Founder() {
         <div className="founder-hero-content">
           <div className="founder-photo-wrap">
             <div className="founder-photo-ring">
-              {isSA ? (
-                <EditableImage
-                  field="founderPhoto"
-                  src={content.founderPhoto || HERO_PHOTOS[activePhoto].src}
-                  alt={HERO_PHOTOS[activePhoto].alt}
-                  className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
-                  storageFolder="site-images"
-                  onUpload={url => patch('founderPhoto', url)}
-                />
-              ) : (
-                <picture>
-                  <source
-                    srcSet={(content.founderPhoto || HERO_PHOTOS[activePhoto].src).replace(/\.png$/i, '.webp')}
-                    type="image/webp"
-                  />
+              {/* Stack all photos — CSS opacity transition handles the crossfade */}
+              {HERO_PHOTOS.map((photo, i) => (
+                <picture key={i} className={`founder-photo-layer${activePhoto === i ? ' active' : ''}`}>
+                  <source srcSet={photo.src.replace(/\.png$/i, '.webp')} type="image/webp" />
                   <img
-                    src={content.founderPhoto || HERO_PHOTOS[activePhoto].src}
-                    alt={HERO_PHOTOS[activePhoto].alt}
-                    className={`founder-photo founder-photo--fade${fading ? ' out' : ' in'}`}
-                    loading="eager"
+                    src={photo.src}
+                    alt={photo.alt}
+                    className="founder-photo"
+                    loading={i === 0 ? 'eager' : 'lazy'}
                     decoding="async"
                   />
                 </picture>
-              )}
+              ))}
               <span className="founder-badge-float">{HERO_PHOTOS[activePhoto].caption}</span>
             </div>
             {/* Dot indicators */}
@@ -218,7 +206,7 @@ export default function Founder() {
                 <button
                   key={i}
                   className={`founder-photo-dot${activePhoto === i ? ' active' : ''}`}
-                  onClick={() => { setFading(true); setTimeout(() => { setActivePhoto(i); setFading(false); }, 400); }}
+                  onClick={() => goToPhoto(i)}
                   aria-label={`View photo ${i + 1}`}
                 />
               ))}
