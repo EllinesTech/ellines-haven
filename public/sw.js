@@ -77,7 +77,19 @@ self.addEventListener('fetch', (event) => {
       caches.match(request).then(cached => {
         if (cached) return cached;
         return fetch(request).then(res => {
+          // If server returns HTML for a JS/CSS file, it means the asset no longer exists
+          // (deploy rollover). Tell the page to reload so it picks up the new index.html.
           if (res.ok && res.status === 200) {
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('text/html') && (
+              url.pathname.endsWith('.js') || url.pathname.endsWith('.css')
+            )) {
+              // Asset hash mismatch — send a special reload response
+              return new Response(
+                `// Stale asset — reloading\nif(typeof self==='undefined')window.location.reload();`,
+                { status: 200, headers: { 'Content-Type': 'application/javascript' } }
+              );
+            }
             const clone = res.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {});
           }

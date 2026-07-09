@@ -1,13 +1,31 @@
-name: Build & Deploy to Firebase Hosting
+##############################################################################
+# ELLINES HAVEN — DEPLOYMENT NOTES
+#
+# HOSTING: Cloudflare Pages handles all web hosting automatically.
+#   - Every push to `main` triggers a Cloudflare Pages build + deploy.
+#   - NO manual deploy needed. Just `git push origin main`.
+#   - Live site: haven.ellines.co.ke
+#
+# FIREBASE: Used for Firestore database, Auth, Storage, and Cloud Functions.
+#   - Firebase does NOT host the website.
+#   - This workflow deploys ONLY Firestore security rules + Cloud Functions.
+#   - DO NOT add `--only hosting` to firebase deploy here.
+#
+# Admin email: ellines.haven@gmail.com
+##############################################################################
 
-# Fires on every push to main
+name: Deploy Firestore Rules & Functions
+
 on:
   push:
     branches:
       - main
+    paths:
+      - 'firestore.rules'
+      - 'functions/**'
 
 jobs:
-  build_and_deploy:
+  deploy_firebase:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,13 +37,10 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install dependencies
+      - name: Install functions dependencies
         run: npm install
+        working-directory: functions
 
-      - name: Build (stamps SW cache name + public asset ?v= tokens)
-        run: npm run build
-
-      # Write service account JSON so firebase-tools can authenticate
       - name: Authenticate with Firebase
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_ELLINES_HAVEN_WEB }}' > /tmp/sa.json
@@ -34,8 +49,8 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy to Firebase Hosting
-        run: firebase deploy --only hosting --project ellines-haven-web
+      - name: Deploy Firestore rules + Cloud Functions only
+        run: firebase deploy --only firestore:rules,functions --project ellines-haven-web
 
       - name: Clean up credentials
         if: always()

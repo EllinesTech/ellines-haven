@@ -1,3 +1,30 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║              ELLINES HAVEN — INFRASTRUCTURE OVERVIEW            ║
+ * ╠══════════════════════════════════════════════════════════════════╣
+ * ║                                                                  ║
+ * ║  HOSTING  →  Cloudflare Pages (ellines-haven)                   ║
+ * ║              Live URL : haven.ellines.co.ke                      ║
+ * ║              Preview  : ellines-haven.pages.dev                  ║
+ * ║              Deploy   : git push origin main → auto-build        ║
+ * ║                                                                  ║
+ * ║  DATABASE →  Firebase (project: ellines-haven-web)               ║
+ * ║              Firebase is used ONLY for:                          ║
+ * ║                • Firestore (all app data — books, orders,        ║
+ * ║                  users, libraries, messages, etc.)               ║
+ * ║                • Firebase Auth (custom email/password)           ║
+ * ║                • Firebase Storage (book covers, uploads)         ║
+ * ║                • Cloud Functions (M-Pesa, Paystack, PayPal)      ║
+ * ║              Firebase does NOT host the website files.           ║
+ * ║                                                                  ║
+ * ║  ADMIN EMAIL → ellines.haven@gmail.com                           ║
+ * ║  SUPPORT TEL → +254 748 255 466 (WhatsApp)                       ║
+ * ║                                                                  ║
+ * ║  DO NOT run `firebase deploy --only hosting`                     ║
+ * ║  The site is hosted on Cloudflare Pages, NOT Firebase Hosting.   ║
+ * ║  Deploying to Firebase Hosting has NO effect on the live site.   ║
+ * ╚══════════════════════════════════════════════════════════════════╝
+ */
 import { initializeApp } from 'firebase/app';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
