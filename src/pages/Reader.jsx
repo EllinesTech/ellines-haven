@@ -559,6 +559,10 @@ export default function Reader() {
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
   const [resumeBanner, setResumeBanner] = useState(false);
+  // These MUST be here (before any early return) — React requires all hooks
+  // to be called unconditionally on every render (Rules of Hooks)
+  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 900 : true);
+  const [isMobileNav, setIsMobileNav] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 769 : false);
 
   // ── Offline reading state ─────────────────────────────────────────────────
   const [isOffline,       setIsOffline]       = useState(!navigator.onLine);
@@ -832,10 +836,7 @@ export default function Reader() {
 
   const viewMode   = hasPdf ? mode : (mode === 'listen' ? 'listen' : 'text');
 
-  // Default sidebar closed on mobile to avoid covering reading content
-  const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 900 : true);
-  // Detect mobile for two-row nav
-  const [isMobileNav, setIsMobileNav] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 769 : false);
+  // resize listener for mobile nav detection (declared above with state)
   useEffect(() => {
     const fn = () => setIsMobileNav(window.innerWidth < 769);
     window.addEventListener('resize', fn);

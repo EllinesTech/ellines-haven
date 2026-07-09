@@ -30,7 +30,9 @@ class ChunkErrorBoundary extends Component {
       // Use localStorage (not sessionStorage) so it persists across reloads
       const reloadKey = 'eh_chunk_reload';
       const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
-      if (Date.now() - last > 60_000) {
+      // Never auto-reload while the user is reading — they'll lose their place
+      const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
+      if (!isReading && Date.now() - last > 60_000) {
         localStorage.setItem(reloadKey, String(Date.now()));
         // Clear all caches before reloading to ensure fresh assets
         if ('caches' in window) {
@@ -431,18 +433,21 @@ function WatermarkOverlay() {
 /* ── Auto Refresh — admin-controlled, stored in siteControls ── */
 function AutoRefresh() {
   const { siteControls, user } = useApp();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const enabled  = siteControls?.autoRefreshEnabled;
     const interval = parseInt(siteControls?.autoRefreshInterval, 10) || 30;
     // Never auto-refresh for admins — they'd lose their place mid-edit
     const isAdmin  = user?.role === 'admin' || user?.role === 'superadmin';
-    if (!enabled || isAdmin) return;
+    // Never auto-refresh while reading — it would kick readers out mid-chapter
+    const isReading = pathname.startsWith('/read');
+    if (!enabled || isAdmin || isReading) return;
 
     const ms = interval * 60 * 1000; // minutes → ms
     const timer = setTimeout(() => window.location.reload(), ms);
     return () => clearTimeout(timer);
-  }, [siteControls?.autoRefreshEnabled, siteControls?.autoRefreshInterval, user?.role]);
+  }, [siteControls?.autoRefreshEnabled, siteControls?.autoRefreshInterval, user?.role, pathname]);
 
   return null;
 }

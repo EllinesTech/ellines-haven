@@ -266,8 +266,11 @@
         } else {
           const RELOAD_KEY = 'eh_sw_reloaded';
 
+          // When the new SW takes control, reload once to serve fresh assets.
+          // Skip reload if the user is actively reading — never interrupt a reader.
           navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!sessionStorage.getItem(RELOAD_KEY)) {
+            const isReading = location.pathname.startsWith('/read');
+            if (!sessionStorage.getItem(RELOAD_KEY) && !isReading) {
               sessionStorage.setItem(RELOAD_KEY, '1');
               window.location.reload();
             }
