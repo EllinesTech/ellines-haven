@@ -1,6 +1,6 @@
 name: Deploy to Firebase Hosting
 
-# Triggers on every push to main
+# Auto-deploys to haven.ellines.co.ke on every push to main
 on:
   push:
     branches:
@@ -11,11 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Get the code
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Node setup with npm cache
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
@@ -23,18 +21,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
 
-      # 3. Install frontend deps
       - name: Install dependencies
         run: npm ci
 
-      # 4. Build (Vite stamps a fresh SW cache name every build)
       - name: Build
         run: npm run build
 
-      # 5. Deploy dist/ to Firebase Hosting
       - name: Deploy to Firebase Hosting
-        uses: w9jds/firebase-action@v14.0.0
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          args: deploy --only hosting --project ellines-haven-web
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ELLINES_HAVEN_WEB }}
+          channelId: live
+          projectId: ellines-haven-web
