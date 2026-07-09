@@ -3,9 +3,9 @@
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/assets/**", "destination": "/assets/**" },
       { "source": "**", "destination": "/index.html" }
     ],
+    "cleanUrls": true,
     "headers": [
       {
         "source": "/sw.js",
