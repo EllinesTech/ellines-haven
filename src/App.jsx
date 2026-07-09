@@ -27,13 +27,20 @@ class ChunkErrorBoundary extends Component {
       (err?.message || '').includes('Importing a module script failed') ||
       (err?.message || '').includes('error loading dynamically imported module');
     if (isChunkError) {
-      // Only reload if we haven't reloaded very recently (prevent loops)
+      // Use localStorage (not sessionStorage) so it persists across reloads
       const reloadKey = 'eh_chunk_reload';
-      const last = parseInt(sessionStorage.getItem(reloadKey) || '0', 10);
-      if (Date.now() - last > 30_000) {
-        sessionStorage.setItem(reloadKey, String(Date.now()));
-        window.location.reload();
-        return { hasError: false }; // Don't show error UI — reloading
+      const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
+      if (Date.now() - last > 60_000) {
+        localStorage.setItem(reloadKey, String(Date.now()));
+        // Clear all caches before reloading to ensure fresh assets
+        if ('caches' in window) {
+          caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+            .then(() => window.location.reload())
+            .catch(() => window.location.reload());
+        } else {
+          window.location.reload();
+        }
+        return { hasError: false };
       }
     }
     return { hasError: true };
@@ -57,7 +64,16 @@ class ChunkErrorBoundary extends Component {
               color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer',
               fontWeight: 700, fontSize: '0.9rem',
             }}
-            onClick={() => { sessionStorage.removeItem('eh_chunk_reload'); window.location.reload(); }}
+            onClick={() => {
+              localStorage.removeItem('eh_chunk_reload');
+              if ('caches' in window) {
+                caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+                  .then(() => window.location.reload())
+                  .catch(() => window.location.reload());
+              } else {
+                window.location.reload();
+              }
+            }}
           >
             Refresh Now
           </button>
