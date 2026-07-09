@@ -1,6 +1,5 @@
 name: Deploy to Firebase Hosting
 
-# Auto-deploys to haven.ellines.co.ke on every push to main
 on:
   push:
     branches:
@@ -28,6 +27,9 @@ jobs:
         run: npm run build
 
       - name: Deploy to Firebase Hosting
-        run: npx firebase-tools deploy --only hosting --project ellines-haven-web --token "$FIREBASE_TOKEN"
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ELLINES_HAVEN_WEB }}
+          channelId: live
+          projectId: ellines-haven-web
