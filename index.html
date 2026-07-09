@@ -282,9 +282,16 @@
             navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
               .then(reg => {
                 // Check for an update right now
-                reg.update();
-                // Then poll every 30s — catches deploys within half a minute
-                setInterval(() => reg.update(), 30000);
+                reg.update().catch(() => {});
+                // Poll every 60s AND when the tab becomes visible again
+                // (covers devices that had the tab open for hours)
+                const poll = () => reg.update().catch(() => {});
+                setInterval(poll, 60000);
+                document.addEventListener('visibilitychange', () => {
+                  if (document.visibilityState === 'visible') poll();
+                });
+                // Also poll when the user comes back online
+                window.addEventListener('online', poll);
 
                 // If there's a waiting SW (new deploy detected), activate it now
                 if (reg.waiting) {
@@ -303,7 +310,9 @@
                   });
                 });
               })
-              .catch(() => {});
+              .catch(() => {
+                // SW registration failed — silently continue without offline support
+              });
           });
         }
       }

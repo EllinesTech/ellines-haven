@@ -19,6 +19,44 @@ import './Reader.css';
    Audio Book Player — Web Speech API
    Reads chapter text aloud with voice settings
 ───────────────────────────────────────────── */
+
+// SVG icons — render correctly on every device/browser (no emoji font needed)
+const IcoHeadphones = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M12 3C7.03 3 3 7.03 3 12v4a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H5.07A7 7 0 0 1 12 5a7 7 0 0 1 6.93 6H18a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-4c0-4.97-4.03-9-9-9z"/>
+  </svg>
+);
+const IcoRewind = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
+  </svg>
+);
+const IcoPlay = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M8 5v14l11-7z"/>
+  </svg>
+);
+const IcoPause = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+  </svg>
+);
+const IcoStop = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M6 6h12v12H6z"/>
+  </svg>
+);
+const IcoSkip = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M6 18l8.5-6L6 6v12zm2-8.14 5.08 2.14L8 14.14V9.86zM16 6h2v12h-2z"/>
+  </svg>
+);
+const IcoGear = () => (
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+    <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.02 7.02 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+  </svg>
+);
+
 function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   const synth = window.speechSynthesis;
 
@@ -315,25 +353,24 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
       {/* Top row: chapter info (left) + gear button (right) */}
       <div className="audio-player__header">
         <div className="audio-player__info">
-          <span className="audio-player__icon">🎧</span>
+          <span className="audio-player__icon"><IcoHeadphones /></span>
           <div>
             <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
             <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
           </div>
         </div>
-        {/* Gear lives in the header so it's always top-right on all screen sizes */}
-        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings">⚙️</button>
+        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title="Voice settings"><IcoGear /></button>
       </div>
 
       {/* Centre: controls + progress */}
       <div className="audio-player__centre">
         <div className="audio-player__controls">
-          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}>⏮</button>
+          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}><IcoRewind /></button>
           <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay}>
-            {playing ? '⏸' : '▶'}
+            {playing ? <IcoPause /> : <IcoPlay />}
           </button>
-          <button className="audio-btn" title="Stop" onClick={handleStop}>⏹</button>
-          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}>⏭</button>
+          <button className="audio-btn" title="Stop" onClick={handleStop}><IcoStop /></button>
+          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}><IcoSkip /></button>
         </div>
         <div className="audio-player__progress-row">
           <span className="audio-player__time">{fmtTime(elapsed)}</span>
