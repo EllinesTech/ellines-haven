@@ -49,12 +49,19 @@ export default function Navbar() {
   const dropRef                   = useRef(null);
   const navigate                  = useNavigate();
 
-  const [navLogo, setNavLogo] = useState('/logo-nobg3.png');
+  // Logo: cache in sessionStorage so mobile/desktop see the same logo instantly (no flash)
+  const [navLogo, setNavLogo] = useState(() => {
+    try { return sessionStorage.getItem('eh_nav_logo') || '/logo-nobg3.png'; } catch { return '/logo-nobg3.png'; }
+  });
   useEffect(() => {
     import('../firebase').then(({ db }) => {
       import('firebase/firestore').then(({ doc, getDoc }) => {
         getDoc(doc(db, 'site_data', 'design_settings')).then(snap => {
-          if (snap.exists() && snap.data().navLogo) setNavLogo(snap.data().navLogo);
+          if (snap.exists() && snap.data().navLogo) {
+            const logo = snap.data().navLogo;
+            setNavLogo(logo);
+            try { sessionStorage.setItem('eh_nav_logo', logo); } catch {}
+          }
         }).catch(() => {});
       });
     });
@@ -102,7 +109,10 @@ export default function Navbar() {
 
         {/* ── Brand ── */}
         <Link to="/" className="nav__brand" onClick={closeAll}>
-          <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" />
+          <picture>
+            <source srcSet={navLogo.replace(/\.png$/i, '.webp')} type="image/webp" />
+            <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" width="72" height="72" />
+          </picture>
           <div className="nav__brand-text">
             <span className="nav__brand-name">Ellines Haven</span>
             <span className="nav__brand-tagline">Home For The Story Soul</span>

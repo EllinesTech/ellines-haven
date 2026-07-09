@@ -281,31 +281,28 @@
           window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
               .then(reg => {
-                // Check for an update right now
-                reg.update().catch(() => {});
-                // Poll every 60s AND when the tab becomes visible again
-                // (covers devices that had the tab open for hours)
+                // Trigger update check immediately and on every visibility/online event
                 const poll = () => reg.update().catch(() => {});
+                poll();
                 setInterval(poll, 60000);
                 document.addEventListener('visibilitychange', () => {
                   if (document.visibilityState === 'visible') poll();
                 });
-                // Also poll when the user comes back online
                 window.addEventListener('online', poll);
 
-                // If there's a waiting SW (new deploy detected), activate it now
+                // SW now calls skipWaiting() on install automatically.
+                // If there's already a waiting SW, send the message as a belt-and-suspenders.
                 if (reg.waiting) {
                   reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                 }
 
-                // Watch for new SWs that arrive later
                 reg.addEventListener('updatefound', () => {
                   const newSW = reg.installing;
                   if (!newSW) return;
                   newSW.addEventListener('statechange', () => {
-                    if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-                      // New SW installed and there's an existing controller — activate immediately
-                      newSW.postMessage({ type: 'SKIP_WAITING' });
+                    // New SW activated — reload to pick up fresh assets
+                    if (newSW.state === 'activated') {
+                      if (!refreshing) { refreshing = true; window.location.reload(); }
                     }
                   });
                 });

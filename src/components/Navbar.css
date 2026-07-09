@@ -50,6 +50,9 @@
   filter: drop-shadow(0 2px 12px rgba(201,168,76,0.6)) brightness(1.2);
   transition: filter 0.2s, transform 0.2s;
   flex-shrink: 0;
+  /* Prevent layout shift while image loads */
+  aspect-ratio: auto;
+  min-width: 56px;
 }
 .nav__logo-img:hover {
   filter: drop-shadow(0 2px 22px rgba(201,168,76,0.9)) brightness(1.35);

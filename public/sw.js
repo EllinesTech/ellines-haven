@@ -28,8 +28,9 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
   );
-  // Do NOT self.skipWaiting() here — let the registration code trigger it
-  // via the SKIP_WAITING message so we can reload cleanly
+  // Skip waiting immediately — safe because Vite content-hashes all /assets/ files.
+  // Old assets still served from old cache; new SW activates right away.
+  self.skipWaiting();
 });
 
 // ── Message: SKIP_WAITING — triggered by registration code on update ──────────
