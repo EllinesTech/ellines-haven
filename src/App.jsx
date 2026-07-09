@@ -76,7 +76,7 @@ function PageLoader() {
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: 20,
     }}>
-      <img src="/logo-icon.png" alt="Ellines Haven" style={{ height: 56, opacity: 0.9, animation: 'eh-pulse 1.4s ease-in-out infinite' }} />
+      <img src="/pwa-icon-192.png" alt="Ellines Haven" style={{ height: 56, opacity: 0.95, animation: 'eh-pulse 1.4s ease-in-out infinite' }} />
       <div style={{ display: 'flex', gap: 7 }}>
         {[0,1,2].map(i => (
           <span key={i} style={{
@@ -506,7 +506,7 @@ function NotFound() {
       <div className="notfound-glow notfound-glow--a" />
       <div className="notfound-glow notfound-glow--b" />
       <div className="notfound-inner">
-        <img src="/logo-icon.png" alt="Ellines Haven" className="notfound-logo" />
+        <img src="/pwa-icon-192.png" alt="Ellines Haven" className="notfound-logo" />
         <div className="notfound-number" aria-hidden="true">404</div>
         <h1 className="notfound-title">Page Not Found</h1>
         <p className="notfound-sub">

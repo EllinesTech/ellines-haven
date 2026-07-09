@@ -49,6 +49,17 @@ export default function Navbar() {
   const dropRef                   = useRef(null);
   const navigate                  = useNavigate();
 
+  const [navLogo, setNavLogo] = useState('/logo-nobg3.png');
+  useEffect(() => {
+    import('../firebase').then(({ db }) => {
+      import('firebase/firestore').then(({ doc, getDoc }) => {
+        getDoc(doc(db, 'site_data', 'design_settings')).then(snap => {
+          if (snap.exists() && snap.data().navLogo) setNavLogo(snap.data().navLogo);
+        }).catch(() => {});
+      });
+    });
+  }, []);
+
   /* ── Scroll listener ── */
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60);
@@ -91,7 +102,7 @@ export default function Navbar() {
 
         {/* ── Brand ── */}
         <Link to="/" className="nav__brand" onClick={closeAll}>
-          <img src="/logo-nobg3.png" alt="Ellines Haven" className="nav__logo-img" />
+          <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" style={{height:40,objectFit:'contain'}} />
           <div className="nav__brand-text">
             <span className="nav__brand-name">Ellines Haven</span>
             <span className="nav__brand-tagline">Home For The Story Soul</span>

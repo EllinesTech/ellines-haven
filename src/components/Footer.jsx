@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import NewsletterSignup from './NewsletterSignup';
 import './Footer.css';
@@ -5,6 +6,16 @@ import './Footer.css';
 const GENRES = ['Romance', 'Mystery', 'Drama', 'Historical', 'Short Stories', 'Fantasy'];
 
 export default function Footer() {
+  const [navLogo, setNavLogo] = useState('/logo-nobg3.png');
+  useEffect(() => {
+    import('../firebase').then(({ db }) => {
+      import('firebase/firestore').then(({ doc, getDoc }) => {
+        getDoc(doc(db, 'site_data', 'design_settings')).then(snap => {
+          if (snap.exists() && snap.data().navLogo) setNavLogo(snap.data().navLogo);
+        }).catch(() => {});
+      });
+    });
+  }, []);
   return (
     <footer className="footer">
 
@@ -22,7 +33,7 @@ export default function Footer() {
           {/* Brand column */}
           <div className="footer__brand">
             <Link to="/" className="footer__logo-link">
-              <img src="/logo-nobg3.png" alt="Ellines Haven" className="footer__logo" />
+              <img src={navLogo} alt="Ellines Haven" className="footer__logo" />
             </Link>
             <p className="footer__tagline">
               A sanctuary for original African literature — stories born from real life, written in Kenya, read by the world.

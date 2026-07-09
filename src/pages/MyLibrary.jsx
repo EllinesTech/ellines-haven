@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -33,16 +33,16 @@ function toDownloadUrl(url) {
 }
 
 const STATUS_META = {
-  complete:      { label:'Complete',      icon:'✅', color:'#2ecc71', bg:'rgba(46,204,113,0.12)'  },
-  ongoing:       { label:'Ongoing',       icon:'📖', color:'#4a9eff', bg:'rgba(74,158,255,0.12)'  },
-  premium:       { label:'Premium',       icon:'⭐', color:'#c9a84c', bg:'rgba(201,168,76,0.12)'  },
-  'free-preview':{ label:'Free Preview',  icon:'👀', color:'#a855f7', bg:'rgba(168,85,247,0.12)'  },
-  'coming-soon': { label:'Coming Soon',   icon:'🔜', color:'#e8832a', bg:'rgba(232,131,42,0.12)'  },
-  limited:       { label:'Limited',       icon:'⏳', color:'#e74c3c', bg:'rgba(231,76,60,0.12)'   },
-  draft:         { label:'Draft',         icon:'📝', color:'#64748b', bg:'rgba(100,116,139,0.12)' },
+  complete:      { label:'Complete',      icon:'?', color:'#2ecc71', bg:'rgba(46,204,113,0.12)'  },
+  ongoing:       { label:'Ongoing',       icon:'??', color:'#4a9eff', bg:'rgba(74,158,255,0.12)'  },
+  premium:       { label:'Premium',       icon:'?', color:'#c9a84c', bg:'rgba(201,168,76,0.12)'  },
+  'free-preview':{ label:'Free Preview',  icon:'??', color:'#a855f7', bg:'rgba(168,85,247,0.12)'  },
+  'coming-soon': { label:'Coming Soon',   icon:'??', color:'#e8832a', bg:'rgba(232,131,42,0.12)'  },
+  limited:       { label:'Limited',       icon:'?', color:'#e74c3c', bg:'rgba(231,76,60,0.12)'   },
+  draft:         { label:'Draft',         icon:'??', color:'#64748b', bg:'rgba(100,116,139,0.12)' },
 };
 
-// ── Reading Stats Panel ─────────────────────────────────────────────────────
+// -- Reading Stats Panel -----------------------------------------------------
 function ReadingStats({ user, library, catalog, orders }) {
   const stats = getAllReadingStats(user.email);
   const booksStarted   = Object.keys(stats).length;
@@ -96,26 +96,26 @@ function ReadingStats({ user, library, catalog, orders }) {
   const streakDays = last7Days.filter(d => activeDays.has(d)).length;
 
   const statCards = [
-    { icon:'📚', value: booksCompleted,                      label:'Books Owned'       },
-    { icon:'📖', value: booksStarted,                        label:'Books Started'      },
-    { icon:'🛒', value: totalOrders,                         label:'Total Orders'       },
-    { icon:'💰', value:`KSh ${totalSpent.toLocaleString()}`, label:'Total Spent'        },
-    { icon:'🔥', value:`${streakDays}/7`,                    label:'Active Days (week)' },
-    { icon:'🏆', value: topGenres[0]?.[0] || '—',            label:'Favourite Genre'    },
+    { icon:'??', value: booksCompleted,                      label:'Books Owned'       },
+    { icon:'??', value: booksStarted,                        label:'Books Started'      },
+    { icon:'??', value: totalOrders,                         label:'Total Orders'       },
+    { icon:'??', value:`KSh ${totalSpent.toLocaleString()}`, label:'Total Spent'        },
+    { icon:'??', value:`${streakDays}/7`,                    label:'Active Days (week)' },
+    { icon:'??', value: topGenres[0]?.[0] || '—',            label:'Favourite Genre'    },
   ];
 
   return (
     <div className="mylib-stats">
-      <h3 className="mylib-stats-title">📊 Reading Stats</h3>
+      <h3 className="mylib-stats-title">?? Reading Stats</h3>
 
-      {/* ── Reading Challenge ── */}
+      {/* -- Reading Challenge -- */}
       <div className="card mylib-challenge">
         <div className="mylib-challenge-header">
           <div>
             <span className="mylib-challenge-label">{challenge.year} Reading Challenge</span>
             <h4>
               {challengeDone
-                ? `🎉 Goal Complete! ${booksCompleted} of ${challenge.goal} books`
+                ? `?? Goal Complete! ${booksCompleted} of ${challenge.goal} books`
                 : `${booksCompleted} of ${challenge.goal} books read`}
             </h4>
           </div>
@@ -134,7 +134,7 @@ function ReadingStats({ user, library, catalog, orders }) {
                 aria-label="Reading goal"
               />
               <button className="btn btn-primary btn-sm" onClick={saveGoal}>Save</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setEditGoal(false)}>✕</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setEditGoal(false)}>?</button>
             </div>
           )}
         </div>
@@ -146,7 +146,7 @@ function ReadingStats({ user, library, catalog, orders }) {
         </div>
         <p className="mylib-challenge-note">
           {challengeDone
-            ? `You crushed it! 🎉 Consider raising your goal for next time.`
+            ? `You crushed it! ?? Consider raising your goal for next time.`
             : `${Math.max(0, challenge.goal - booksCompleted)} more book${challenge.goal - booksCompleted !== 1 ? 's' : ''} to reach your ${challenge.year} goal.`}
         </p>
       </div>
@@ -165,13 +165,13 @@ function ReadingStats({ user, library, catalog, orders }) {
       {/* Last read */}
       {lastReadBook && (
         <div className="card mylib-last-read">
-          <span style={{ fontSize:'1.5rem' }}>📖</span>
+          <span style={{ fontSize:'1.5rem' }}>??</span>
           <div>
             <strong>Last Read</strong>
             <p>{lastReadBook.title} <span style={{ color:'var(--muted)', fontSize:'0.8rem' }}>— {lastReadDate}</span></p>
           </div>
           <Link to={readPath(lastReadBook)} className="btn btn-outline btn-sm" style={{ flexShrink:0 }}>
-            Continue →
+            Continue ?
           </Link>
         </div>
       )}
@@ -212,13 +212,13 @@ function ReadingStats({ user, library, catalog, orders }) {
           ))}
         </div>
         <p className="mylib-heatmap-note">
-          {streakDays > 0 ? `You read on ${streakDays} of the last 7 days. Keep it up! 🔥` : 'No reading activity this week. Open a book and start! 📚'}
+          {streakDays > 0 ? `You read on ${streakDays} of the last 7 days. Keep it up! ??` : 'No reading activity this week. Open a book and start! ??'}
         </p>
       </div>
 
       {library.length === 0 && (
         <div className="mylib-empty" style={{ marginTop:24 }}>
-          <div className="mylib-empty-icon">📊</div>
+          <div className="mylib-empty-icon">??</div>
           <h3>No reading data yet</h3>
           <p>Purchase and read books to start building your reading history.</p>
           <Link to="/library" className="btn btn-primary">Browse Books</Link>
@@ -228,7 +228,7 @@ function ReadingStats({ user, library, catalog, orders }) {
   );
 }
 
-// ── Account Settings Panel ──────────────────────────────────────────────────
+// -- Account Settings Panel --------------------------------------------------
 function AccountSettings({ user, myPerms }) {
   const [prefs, setPrefs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('eh_user_prefs_' + user.email) || '{}'); } catch { return {}; }
@@ -286,18 +286,18 @@ function AccountSettings({ user, myPerms }) {
   const pwDisplay = pwMsg.replace(/^(ok|error):/, '');
 
   const preferenceGroups = [
-    { label:'📖 Reading Experience', items:[
+    { label:'?? Reading Experience', items:[
       { key:'darkReader',      label:'Dark reader background',  desc:'Darker background in the online reader',   def:true  },
       { key:'largeText',       label:'Larger text by default',  desc:'Start reader with bigger font size',       def:false },
       { key:'showProgress',    label:'Show reading progress',   desc:'Display chapter progress indicator',       def:true  },
       { key:'autoNextChapter', label:'Auto-advance chapters',   desc:'Automatically scroll to next chapter',    def:false },
     ]},
-    { label:'🔔 Notifications', items:[
+    { label:'?? Notifications', items:[
       { key:'notifyNewBooks',  label:'New book releases',       desc:'Notified when new books are published',    def:true  },
       { key:'notifyOrders',    label:'Order status updates',    desc:'Updates on your payment verification',     def:true  },
       { key:'notifyPromos',    label:'Promotions & discounts',  desc:'Exclusive deals and promo codes',          def:false },
     ]},
-    { label:'🔒 Privacy', items:[
+    { label:'?? Privacy', items:[
       { key:'showInLeaders',   label:'Reading leaderboard',     desc:'Let others see your reading activity',     def:true  },
       { key:'publicProfile',   label:'Public profile',          desc:'Allow others to see your collection',      def:false },
     ]},
@@ -314,13 +314,13 @@ function AccountSettings({ user, myPerms }) {
           <h3>{user.name}</h3>
           <span>{user.email}</span>
           <span className="mylib-role-badge">
-            {user.role === 'admin' ? '🛡 Admin' : user.role === 'superadmin' ? '⭐ Super Admin' : '📚 Reader'}
+            {user.role === 'admin' ? '?? Admin' : user.role === 'superadmin' ? '? Super Admin' : '?? Reader'}
           </span>
         </div>
         <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I need help with my Ellines Haven account: ' + user.email)}`}
           target="_blank" rel="noopener noreferrer"
           className="btn btn-sm mylib-support-btn">
-          💬 Support
+          ?? Support
         </a>
       </div>
 
@@ -337,7 +337,7 @@ function AccountSettings({ user, myPerms }) {
             { key:'canPlaceOrders',label:'Orders'     },
           ].map(p => (
             <span key={p.key} className={'mylib-perm-badge' + (myPerms?.[p.key] === false ? ' off' : ' on')}>
-              {myPerms?.[p.key] === false ? '✗' : '✓'} {p.label}
+              {myPerms?.[p.key] === false ? '?' : '?'} {p.label}
             </span>
           ))}
         </div>
@@ -345,7 +345,7 @@ function AccountSettings({ user, myPerms }) {
 
       {/* Preference groups */}
       {saved && (
-        <div className="mylib-saved-msg">✅ {saved}</div>
+        <div className="mylib-saved-msg">? {saved}</div>
       )}
       {preferenceGroups.map(group => (
         <div key={group.label} className="card mylib-pref-card">
@@ -368,10 +368,10 @@ function AccountSettings({ user, myPerms }) {
 
       {/* Change password */}
       <div className="card mylib-pref-card">
-        <h4>🔑 Change Password</h4>
+        <h4>?? Change Password</h4>
         {pwMsg && (
           <div className={'mylib-pw-msg' + (isOk ? ' ok' : ' err')}>
-            {isOk ? '✅' : '❌'} {pwDisplay}
+            {isOk ? '?' : '?'} {pwDisplay}
           </div>
         )}
         <form onSubmit={handlePwChange} className="mylib-pw-form">
@@ -393,7 +393,7 @@ function AccountSettings({ user, myPerms }) {
 
       {/* Support */}
       <div className="card mylib-support-card">
-        <span style={{ fontSize:'2rem' }}>💬</span>
+        <span style={{ fontSize:'2rem' }}>??</span>
         <div>
           <strong>Need help?</strong>
           <span>WhatsApp us directly — we reply fast</span>
@@ -407,7 +407,7 @@ function AccountSettings({ user, myPerms }) {
   );
 }
 
-// ── Pending Order Row — shows retry button for Paystack orders ──────────────
+// -- Pending Order Row — shows retry button for Paystack orders --------------
 // NOTE: We do the Firestore unlock directly from the frontend using the
 // client SDK. The Cloud Function (callVerifyPaystack) only checks with
 // Paystack's API to confirm payment — we no longer rely on it to write
@@ -466,7 +466,7 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
       if (orderData?.status === 'Completed') {
         // Order is complete but library may not have been updated — ensure unlock
         await doFrontendUnlock(o.id, userEmail.toLowerCase(), orderData.items || o.items || []);
-        setRetryMsg('✅ Books unlocked! Refreshing…');
+        setRetryMsg('? Books unlocked! Refreshing…');
         setRetryDone(true);
         setTimeout(() => window.location.reload(), 1500);
         return;
@@ -499,7 +499,7 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
         if (paymentConfirmed) {
           // Payment confirmed — do the unlock directly from frontend
           await doFrontendUnlock(o.id, userEmail.toLowerCase(), o.items || []);
-          setRetryMsg('✅ Books unlocked! Refreshing…');
+          setRetryMsg('? Books unlocked! Refreshing…');
           setRetryDone(true);
           setTimeout(() => window.location.reload(), 1500);
           return;
@@ -519,7 +519,7 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
     <div className="mylib-order-pending-row">
       {retryMsg
         ? <p style={{ color: retryDone ? '#2ecc71' : '#e8832a' }}>{retryMsg}</p>
-        : <p>⏳ This order is processing. Your books will unlock automatically — usually within seconds. If it takes longer, use the button to retry.</p>
+        : <p>? This order is processing. Your books will unlock automatically — usually within seconds. If it takes longer, use the button to retry.</p>
       }
       <div style={{ display:'flex', gap:8, flexWrap:'wrap', flexShrink:0 }}>
         {isPendingPaystack && !retryDone && (
@@ -529,20 +529,20 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
             onClick={retryActivation}
             disabled={retrying}
           >
-            {retrying ? '⏳ Activating…' : '🔄 Retry Activation'}
+            {retrying ? '? Activating…' : '?? Retry Activation'}
           </button>
         )}
         <a href={`https://wa.me/${WA_NUMBER}?text=${encodeURIComponent('Hi, I have a pending order ' + o.id + ' for KSh ' + o.total + '. Please check my payment. Ref: ' + (o.paystackRef||o.ref||'N/A'))}`}
           target="_blank" rel="noopener noreferrer"
           className="btn btn-sm" style={{ background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', whiteSpace:'nowrap' }}>
-          💬 Contact Support
+          ?? Contact Support
         </a>
       </div>
     </div>
   );
 }
 
-// ── Main MyLibrary Page ─────────────────────────────────────────────────────
+// -- Main MyLibrary Page -----------------------------------------------------
 export default function MyLibrary() {
   const { user, library, books: catalog, myPerms, removeFromMyLibrary, siteControls } = useApp();
   const [liveOrders, setLiveOrders] = useState([]);
@@ -556,7 +556,7 @@ export default function MyLibrary() {
       setLiveOrders([]); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
-    // Pull reading progress from Firestore → localStorage so stats are cross-device
+    // Pull reading progress from Firestore ? localStorage so stats are cross-device
     hydrateReadingStats(user.email).catch(() => {});
 
     const q = query(collection(db, 'orders'), where('userEmail', '==', user.email.toLowerCase()));
@@ -583,7 +583,7 @@ export default function MyLibrary() {
     <main className="mylib-page">
       <div className="container">
         <div className="mylib-gate">
-          <img src="/logo-nobg3.png" alt="" className="mylib-gate-logo" />
+          <img src="/logo-nobg3.png" alt="Ellines Haven" className="mylib-gate-logo" />
           <h2>Your Library Awaits</h2>
           <p>Sign in to access your books, track orders, and manage your reading journey.</p>
           <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
@@ -599,7 +599,7 @@ export default function MyLibrary() {
     <main className="mylib-page">
       <div className="container">
         <div className="mylib-gate">
-          <div className="mylib-gate-icon">🔒</div>
+          <div className="mylib-gate-icon">??</div>
           <h2>Library Access Restricted</h2>
           <p>Your access has been restricted by an administrator. Please contact support.</p>
           <a href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">Contact Support</a>
@@ -633,16 +633,16 @@ export default function MyLibrary() {
   });
 
   const TABS = [
-    { k:'library', label:'📚 My Books',  badge: library.length   || null  },
-    { k:'orders',  label:'🛒 Orders',    badge: myPending.length || null  },
-    { k:'stats',   label:'📊 Stats',     badge: null                       },
-    { k:'account', label:'⚙️ Account',   badge: null                       },
+    { k:'library', label:'?? My Books',  badge: library.length   || null  },
+    { k:'orders',  label:'?? Orders',    badge: myPending.length || null  },
+    { k:'stats',   label:'?? Stats',     badge: null                       },
+    { k:'account', label:'?? Account',   badge: null                       },
   ];
 
   return (
     <main className="mylib-page">
 
-      {/* ── Hero header ── */}
+      {/* -- Hero header -- */}
       <div className="mylib-hero">
         <div className="mylib-hero-glow mylib-hero-glow--a" />
         <div className="mylib-hero-glow mylib-hero-glow--b" />
@@ -676,7 +676,7 @@ export default function MyLibrary() {
         </div>
       </div>
 
-      {/* ── Tab bar ── */}
+      {/* -- Tab bar -- */}
       <div className="mylib-tabbar">
         <div className="container mylib-tabs">
           {TABS.map(t => (
@@ -691,10 +691,10 @@ export default function MyLibrary() {
 
       <div className="container mylib-body">
 
-        {/* ── Pending payment alert ── */}
+        {/* -- Pending payment alert -- */}
         {activeTab === 'library' && myPending.length > 0 && (
           <div className="mylib-alert">
-            <span className="mylib-alert-icon">⏳</span>
+            <span className="mylib-alert-icon">?</span>
             <div>
               <strong>Processing payment…</strong>
               <p>You have {myPending.length} order{myPending.length !== 1 ? 's' : ''} still processing. Your books will appear here automatically once confirmed.</p>
@@ -705,12 +705,12 @@ export default function MyLibrary() {
           </div>
         )}
 
-        {/* ── LIBRARY TAB ── */}
+        {/* -- LIBRARY TAB -- */}
         {activeTab === 'library' && (
           <>
             {enrichedLibrary.length === 0 ? (
               <div className="mylib-empty">
-                <div className="mylib-empty-icon">📚</div>
+                <div className="mylib-empty-icon">??</div>
                 <h3>Your library is empty</h3>
                 <p>Browse our collection and purchase books to start your reading journey.</p>
                 <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
@@ -738,12 +738,12 @@ export default function MyLibrary() {
                           ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
                           : <div className="mylib-card__cover mylib-card__cover--styled"
                               style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
-                              <span style={{ fontSize:'1.6rem', opacity:0.35 }}>📖</span>
+                              <span style={{ fontSize:'1.6rem', opacity:0.35 }}>??</span>
                             </div>
                         }
                         {/* Currently Reading badge */}
                         {isReading && !anyOff && (
-                          <div className="mylib-reading-badge">📖 Reading</div>
+                          <div className="mylib-reading-badge">?? Reading</div>
                         )}
                         {/* Status badge on cover */}
                         {b.status && b.status !== 'complete' && (
@@ -751,7 +751,7 @@ export default function MyLibrary() {
                             {sm.icon} {sm.label}
                           </span>
                         )}
-                        {anyOff && <div className="mylib-card__restricted-overlay">🔒 Restricted</div>}
+                        {anyOff && <div className="mylib-card__restricted-overlay">?? Restricted</div>}
                       </div>
 
                       <div className="mylib-card__body">
@@ -783,14 +783,14 @@ export default function MyLibrary() {
                         {isReading && !anyOff && (!b.chapters || b.chapters.length <= 1) && (
                           <div className="mylib-progress-wrap">
                             <span className="mylib-progress-label" style={{ color: 'var(--gold)', fontSize: '0.75rem' }}>
-                              📖 In progress
+                              ?? In progress
                             </span>
                           </div>
                         )}
 
                         {anyOff && (
                           <div className="mylib-restriction-notice">
-                            <strong>⚠ Access Restricted</strong>
+                            <strong>? Access Restricted</strong>
                             <p>{reason}</p>
                           </div>
                         )}
@@ -798,8 +798,8 @@ export default function MyLibrary() {
                         <div className="mylib-card__actions">
                           {/* Primary CTA */}
                           {canRead
-                            ? <Link to={readPath(b)} className="btn btn-primary btn-sm">📖 Read Now</Link>
-                            : <span className="btn btn-primary btn-sm mylib-disabled" title={reason}>📖 Read Now</span>
+                            ? <Link to={readPath(b)} className="btn btn-primary btn-sm">?? Read Now</Link>
+                            : <span className="btn btn-primary btn-sm mylib-disabled" title={reason}>?? Read Now</span>
                           }
                           {/* PDF download — only shown when a real file exists */}
                           {b.downloadUnlocked && canDl && b.driveUrl && (
@@ -823,7 +823,7 @@ export default function MyLibrary() {
                                   ).catch(() => {});
                                 } catch {}
                               }}
-                            >⬇ PDF</a>
+                            >? PDF</a>
                           )}
                           {b.downloadUnlocked && !canDl && !isFullOff && (
                             <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
@@ -841,16 +841,16 @@ export default function MyLibrary() {
                               className="btn btn-ghost btn-sm mylib-remove-btn"
                               title="Remove from library"
                               onClick={() => setRemovingBook(b.id)}
-                            >🗑</button>
+                            >??</button>
                           )}
                         </div>
 
-                        {/* ── Offline save row ── */}
+                        {/* -- Offline save row -- */}
                         {siteControls?.offlineEnabled !== false && !anyOff && (
                           <div className="mylib-offline-row">
                             {offlineState[b.id] === 'saved' ? (
                               <>
-                                <span className="mylib-offline-badge">📵 Saved Offline</span>
+                                <span className="mylib-offline-badge">?? Saved Offline</span>
                                 <button
                                   className="btn btn-ghost btn-sm"
                                   style={{ fontSize:'0.72rem', padding:'2px 8px' }}
@@ -875,7 +875,7 @@ export default function MyLibrary() {
                                   setOfflineState(s => ({ ...s, [b.id]: ok ? 'saved' : false }));
                                 }}
                               >
-                                {offlineState[b.id] === 'saving' ? '⏳ Saving…' : '📥 Save Offline'}
+                                {offlineState[b.id] === 'saving' ? '? Saving…' : '?? Save Offline'}
                               </button>
                             )}
                           </div>
@@ -898,18 +898,18 @@ export default function MyLibrary() {
                   <strong>Discover more stories</strong>
                   <span>Browse our full catalogue of original East African fiction</span>
                 </div>
-                <Link to="/library" className="btn btn-outline btn-sm">Browse Library →</Link>
+                <Link to="/library" className="btn btn-outline btn-sm">Browse Library ?</Link>
               </div>
             )}
           </>
         )}
 
-        {/* ── ORDERS TAB ── */}
+        {/* -- ORDERS TAB -- */}
         {activeTab === 'orders' && (
           <div className="mylib-orders">
             {liveOrders.length === 0 ? (
               <div className="mylib-empty">
-                <div className="mylib-empty-icon">🛒</div>
+                <div className="mylib-empty-icon">??</div>
                 <h3>No orders yet</h3>
                 <p>Your purchase history will appear here once you place an order.</p>
                 <Link to="/library" className="btn btn-primary">Browse Books</Link>
@@ -946,8 +946,8 @@ export default function MyLibrary() {
                             {o.ref && <span className="mylib-order-ref">Ref: {o.ref}</span>}
                             {o.promoCode && (
                               <span style={{ fontSize:'0.72rem', color:'var(--ok)', fontWeight:600 }}>
-                                🎟 {o.promoCode}
-                                {o.discountAmount > 0 && ` (−KSh ${o.discountAmount.toLocaleString()})`}
+                                ?? {o.promoCode}
+                                {o.discountAmount > 0 && ` (-KSh ${o.discountAmount.toLocaleString()})`}
                               </span>
                             )}
                           </div>
@@ -960,7 +960,7 @@ export default function MyLibrary() {
                             )}
                             <span className="mylib-order-status-badge"
                               style={{ background: statusBg, color: statusColor, border:`1px solid ${statusColor}40` }}>
-                              {o.status === 'Completed' ? '✅' : o.status === 'Pending' ? '⏳' : '✕'} {o.status}
+                              {o.status === 'Completed' ? '?' : o.status === 'Pending' ? '?' : '?'} {o.status}
                             </span>
                           </div>
                         </div>
@@ -976,10 +976,10 @@ export default function MyLibrary() {
           </div>
         )}
 
-        {/* ── ACCOUNT TAB ── */}
+        {/* -- ACCOUNT TAB -- */}
         {activeTab === 'account' && <AccountSettings user={user} myPerms={myPerms} />}
 
-        {/* ── STATS TAB ── */}
+        {/* -- STATS TAB -- */}
         {activeTab === 'stats' && (
           <ReadingStats
             user={user}

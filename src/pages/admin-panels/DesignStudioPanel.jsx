@@ -169,6 +169,71 @@ export default function DesignStudioPanel({ showToast }) {
 
         {/* RIGHT */}
         <div style={{display:'flex',flexDirection:'column',gap:18}}>
+          {/* Branding & Logos */}
+          <div className="card" style={{padding:18}}>
+            <h3 style={{fontSize:'0.88rem',marginBottom:4,color:'var(--gold)'}}>🖼️ Branding & Logos</h3>
+            <p style={{fontSize:'0.72rem',color:'var(--muted)',marginBottom:14,lineHeight:1.5}}>
+              Upload logos used across the site. Changes save to Firestore and update live.
+            </p>
+
+            {[
+              { key:'navLogo',    label:'Navbar / Footer Logo', desc:'Shown in header and footer (transparent bg works best)', preview: s.navLogo || '/logo-nobg3.png' },
+              { key:'iconLogo',   label:'Site Icon (square)',    desc:'Book covers, page loader, 404 page, About poster', preview: s.iconLogo || '/logo-icon.png' },
+              { key:'pwsIcon',    label:'PWA / Favicon Icon',    desc:'Browser tab, homescreen shortcut, notifications', preview: s.pwsIcon || '/pwa-icon-192.png' },
+              { key:'ogImage',    label:'Social Share (OG) Image', desc:'Shown when sharing on WhatsApp, Twitter, Facebook (1200×630)', preview: s.ogImage || '/og-image.png' },
+            ].map(item => (
+              <div key={item.key} style={{display:'flex',gap:12,alignItems:'center',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                <img
+                  src={item.preview}
+                  alt={item.label}
+                  style={{width:48,height:48,objectFit:'contain',borderRadius:8,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.1)',flexShrink:0}}
+                  onError={e=>{e.target.style.opacity='0.3';}}
+                />
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:'0.8rem',fontWeight:600,marginBottom:2}}>{item.label}</div>
+                  <div style={{fontSize:'0.68rem',color:'var(--muted)',marginBottom:6}}>{item.desc}</div>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    <input
+                      className="field"
+                      value={s[item.key] || ''}
+                      onChange={e => upd(item.key, e.target.value)}
+                      placeholder={item.preview}
+                      style={{flex:1,minWidth:160,fontSize:'0.72rem',padding:'4px 8px',fontFamily:'monospace'}}
+                    />
+                    <label style={{
+                      padding:'4px 10px',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',
+                      borderRadius:6,cursor:'pointer',fontSize:'0.72rem',color:'var(--gold)',fontWeight:600,
+                      whiteSpace:'nowrap',
+                    }}>
+                      📁 Upload
+                      <input
+                        type="file" accept="image/*" style={{display:'none'}}
+                        onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          // Convert to base64 data URL and store in Firestore
+                          const reader = new FileReader();
+                          reader.onload = evt => upd(item.key, evt.target.result);
+                          reader.readAsDataURL(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {s[item.key] && (
+                      <button
+                        onClick={() => upd(item.key, '')}
+                        style={{padding:'4px 8px',background:'rgba(231,76,60,0.12)',border:'1px solid rgba(231,76,60,0.25)',borderRadius:6,cursor:'pointer',fontSize:'0.72rem',color:'#e74c3c'}}
+                      >✕</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <p style={{fontSize:'0.68rem',color:'var(--muted)',marginTop:10,lineHeight:1.5}}>
+              💡 Tip: Use <strong style={{color:'var(--gold)'}}>icon3.png</strong> (transparent bg) for site icons on dark surfaces. Use <strong style={{color:'var(--gold)'}}>icon2.png</strong> (solid bg) for PWA/favicon. Click <strong style={{color:'var(--gold)'}}>Save & Publish</strong> to make changes live.
+            </p>
+          </div>
+
           {/* Live Preview */}
           <div className="card" style={{padding:18}}>
             <h3 style={{fontSize:'0.88rem',marginBottom:12,color:'var(--gold)'}}>👁️ Live Preview</h3>

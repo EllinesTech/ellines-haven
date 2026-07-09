@@ -1,8 +1,8 @@
-// Uses the real logo from /public
+// Uses the high-res icon with visible dark background
 export default function Logo({ size = 38, className = '' }) {
   return (
     <img
-      src="/logo-icon.png"
+      src="/pwa-icon-192.png"
       alt="Ellines Haven"
       className={`ellines-logo ${className}`}
       style={{
@@ -13,6 +13,7 @@ export default function Logo({ size = 38, className = '' }) {
         objectFit: 'contain',
         display: 'block',
         flexShrink: 0,
+        borderRadius: Math.round(size * 0.22),
       }}
     />
   );
