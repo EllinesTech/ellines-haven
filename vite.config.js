@@ -48,12 +48,15 @@ function stampPublicAssets() {
         }
       );
       // ── Stamp the SW registration URL ──────────────────────────────────────
-      // /sw.js?v=BUILD_STAMP forces browsers to re-fetch the SW on every deploy,
-      // bypassing the browser's 24-hour SW update throttle.
-      // Works because the browser treats /sw.js?v=AAA and /sw.js?v=BBB as different scripts.
       html = html.replace(
         /\/sw\.js(\?v=[\w]+)?/g,
         `/sw.js?v=${BUILD_STAMP}`
+      );
+      // ── Inject unique build stamp comment so Firebase always uploads fresh index.html ──
+      // Without this Firebase deduplicates the file and serves an old version
+      html = html.replace(
+        '</head>',
+        `<!-- build:${BUILD_STAMP} -->\n  </head>`
       );
       fs.writeFileSync(indexPath, html);
       console.log(`[stamp-public-assets] Stamped public asset URLs with ?v=${BUILD_STAMP}`);
