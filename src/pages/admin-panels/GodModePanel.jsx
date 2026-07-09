@@ -78,7 +78,13 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
   useEffect(() => {
     setFsUsersLoading(true);
     const unsub = onSnapshot(collection(db, 'users'), (snap) => {
-      const fetched = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Filter out permanently deleted users immediately
+      const deleted = new Set([
+        ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+      ].map(e => e.toLowerCase()));
+      const fetched = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => !deleted.has((u.email || '').toLowerCase()));
       setFsUsers(fetched);
       setFsUsersLoading(false);
     }, () => setFsUsersLoading(false));
@@ -224,10 +230,92 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
   };
 
   const forceDeleteUser = async (email) => {
-    await setDoc(doc(db,'user_profiles',email),{status:'deleted',deletedAt:serverTimestamp()},{merge:true});
-    const del = JSON.parse(localStorage.getItem('eh_deleted_users')||'[]');
-    del.push(email.toLowerCase()); localStorage.setItem('eh_deleted_users',JSON.stringify(del));
-    setPendingDels(p=>p.filter(d=>d.email!==email)); showToast?.('🗑 Account deleted: '+email);
+    const emailKey = email.toLowerCase();
+    const libId = libDocId(emailKey);
+
+    // 1. Hard-delete from every Firestore collection
+    const deletes = [
+      deleteDoc(doc(db, 'users', emailKey)).catch(() => {}),
+      deleteDoc(doc(db, 'users', emailKey.replace(/[^a-z0-9]/g, '_'))).catch(() => {}),
+      deleteDoc(doc(db, 'user_profiles', emailKey)).catch(() => {}),
+      deleteDoc(doc(db, 'libraries', libId)).catch(() => {}),
+    ];
+    await Promise.all(deletes);
+
+    // 2. Remove from site_data/registered_users (both the array and deletedEmails blocklist)
+    try {
+      const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
+      if (regSnap.exists()) {
+        const d = regSnap.data();
+        const registered = (d.registered || []).filter(r => r.email?.toLowerCase() !== emailKey);
+        const deletedEmails = [...new Set([...(d.deletedEmails || []), emailKey])];
+        const pwOverrides   = { ...(d.pwOverrides   || {}) }; delete pwOverrides[emailKey];
+        const roleOverrides = { ...(d.roleOverrides || {}) }; delete roleOverrides[emailKey];
+        await setDoc(doc(db, 'site_data', 'registered_users'), {
+          registered, deletedEmails, pwOverrides, roleOverrides, updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+    } catch {}
+
+    // 3. Remove from user_permissions (Firestore)
+    try {
+      const permSnap = await getDoc(doc(db, 'site_data', 'user_permissions'));
+      if (permSnap.exists()) {
+        const perms = { ...(permSnap.data().perms || {}) };
+        delete perms[emailKey];
+        await setDoc(doc(db, 'site_data', 'user_permissions'), { perms, updatedAt: serverTimestamp() }, { merge: true });
+      }
+    } catch {}
+
+    // 4. Delete their orders from Firestore
+    try {
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      const orderDels = [];
+      ordersSnap.forEach(d => {
+        const o = d.data();
+        if (o.userEmail?.toLowerCase() === emailKey) orderDels.push(deleteDoc(d.ref).catch(() => {}));
+      });
+      await Promise.all(orderDels);
+    } catch {}
+
+    // 5. Sync deletedEmails blocklist to user_permissions doc too (belt + suspenders)
+    try {
+      await setDoc(doc(db, 'site_data', 'user_permissions'), {
+        deletedEmails: [emailKey],
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch {}
+
+    // 6. Scrub every relevant localStorage key
+    const lsDeleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
+    if (!lsDeleted.includes(emailKey)) {
+      localStorage.setItem('eh_deleted_users', JSON.stringify([...lsDeleted, emailKey]));
+    }
+    const lsRegistered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+    localStorage.setItem('eh_registered_users', JSON.stringify(
+      lsRegistered.filter(r => r.email?.toLowerCase() !== emailKey)
+    ));
+    const lsSuspended = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
+    localStorage.setItem('eh_suspended_users', JSON.stringify(lsSuspended.filter(e => e !== emailKey)));
+    const lsSuspendedFs = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
+    localStorage.setItem('eh_suspended_fs', JSON.stringify(lsSuspendedFs.filter(e => e !== emailKey)));
+    const lsPwOv = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+    delete lsPwOv[emailKey];
+    localStorage.setItem('eh_pw_overrides', JSON.stringify(lsPwOv));
+    const lsRoleOv = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+    delete lsRoleOv[emailKey];
+    localStorage.setItem('eh_role_overrides', JSON.stringify(lsRoleOv));
+    // Force-logout if this user is currently logged in on this browser
+    const session = JSON.parse(localStorage.getItem('eh_user') || 'null');
+    if (session?.email?.toLowerCase() === emailKey) localStorage.removeItem('eh_user');
+
+    // 7. Remove from local UI state immediately
+    setPendingDels(p => p.filter(d => d.email !== email));
+    setFsUsers(p => p.filter(u => u.email?.toLowerCase() !== emailKey));
+    if (selectedUser?.email?.toLowerCase() === emailKey) setSelectedUser(null);
+
+    await logAction('user_delete', 'Force deleted user: ' + email);
+    showToast?.('🗑 Account permanently deleted: ' + email);
   };
 
   const impersonate = u => { setAdminSession({...user}); setUser({...u}); localStorage.setItem('eh_user',JSON.stringify(u)); setImpersonating(u); showToast?.('👤 Impersonating '+u.name); };

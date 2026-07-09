@@ -3011,58 +3011,97 @@ export default function Admin() {
   // Delete user  persists across refresh via eh_deleted_users blocklist + Firestore
   const handleDeleteUser = async (u) => {
     const emailKey = u.email.toLowerCase();
+    const libId    = emailKey.replace(/[^a-z0-9]/g, '_');
 
-    // 1. Add to permanent deleted blocklist (localStorage)
-    const deleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
-    if (!deleted.includes(emailKey)) {
-      localStorage.setItem('eh_deleted_users', JSON.stringify([...deleted, emailKey]));
-    }
-    // 2. Remove from registered users (localStorage)
-    const registered = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-    const updatedRegistered = registered.filter(r => r.email.toLowerCase() !== emailKey);
-    localStorage.setItem('eh_registered_users', JSON.stringify(updatedRegistered));
-
-    // 3. Sync deletion to Firestore so real-time listener doesn't re-add on refresh
+    // ── Firestore: hard-delete every doc that belongs to this user ──────────
     try {
-      const deleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
-      // Use merge:true — only update the deletedEmails blocklist, never wipe other users
-      await setDoc(doc(db, 'site_data', 'registered_users'), {
-        deletedEmails: [...new Set([...deleted, emailKey])],
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-      // Remove from the registered array in Firestore too (fetch first, then update)
+      // users collection — try both email-derived ID and the stored u.id
+      await Promise.all([
+        deleteDoc(doc(db, 'users', emailKey)).catch(() => {}),
+        deleteDoc(doc(db, 'users', libId)).catch(() => {}),
+        u.id && u.id !== emailKey && u.id !== libId
+          ? deleteDoc(doc(db, 'users', u.id)).catch(() => {})
+          : Promise.resolve(),
+        deleteDoc(doc(db, 'user_profiles', emailKey)).catch(() => {}),
+        deleteDoc(doc(db, 'libraries',     libId)).catch(() => {}),
+      ]);
+
+      // Remove from site_data/registered_users (registered array + blocklists)
       const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
       if (regSnap.exists()) {
-        const fsRegistered = (regSnap.data().registered || []).filter(r => r.email?.toLowerCase() !== emailKey);
+        const d = regSnap.data();
+        const registered    = (d.registered    || []).filter(r => r.email?.toLowerCase() !== emailKey);
+        const deletedEmails = [...new Set([...(d.deletedEmails || []), emailKey])];
+        const pwOverrides   = { ...(d.pwOverrides   || {}) }; delete pwOverrides[emailKey];
+        const roleOverrides = { ...(d.roleOverrides || {}) }; delete roleOverrides[emailKey];
         await setDoc(doc(db, 'site_data', 'registered_users'), {
-          registered: fsRegistered,
-          updatedAt: serverTimestamp(),
+          registered, deletedEmails, pwOverrides, roleOverrides, updatedAt: serverTimestamp(),
         }, { merge: true });
       }
-      // Also delete from users collection
-      await deleteDoc(doc(db, 'users', u.id)).catch(() => {});
+
+      // Remove from user_permissions
+      const permSnap = await getDoc(doc(db, 'site_data', 'user_permissions'));
+      if (permSnap.exists()) {
+        const perms = { ...(permSnap.data().perms || {}) };
+        delete perms[emailKey];
+        // Also persist to deletedEmails blocklist in the perms doc
+        const deletedEmails = [...new Set([...(permSnap.data().deletedEmails || []), emailKey])];
+        await setDoc(doc(db, 'site_data', 'user_permissions'), {
+          perms, deletedEmails, updatedAt: serverTimestamp(),
+        }, { merge: true });
+      }
+
+      // Delete their orders from Firestore
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      const orderDels = [];
+      ordersSnap.forEach(d => {
+        const o = d.data();
+        if (o.userEmail?.toLowerCase() === emailKey || o.userId === u.id) {
+          orderDels.push(deleteDoc(d.ref).catch(() => {}));
+        }
+      });
+      await Promise.all(orderDels);
+
     } catch (e) { console.warn('[deleteUser] Firestore sync failed:', e.message); }
 
-    // 4. Remove ALL their orders
-    const allStoredOrders = JSON.parse(localStorage.getItem('eh_orders') || '[]');
-    localStorage.setItem('eh_orders', JSON.stringify(
-      allStoredOrders.filter(o => o.userId !== u.id && o.userEmail?.toLowerCase() !== emailKey)
+    // ── localStorage: scrub every key that references this user ─────────────
+    // Deleted blocklist
+    const lsDeleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
+    if (!lsDeleted.includes(emailKey))
+      localStorage.setItem('eh_deleted_users', JSON.stringify([...lsDeleted, emailKey]));
+    // Registered array
+    const lsReg = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
+    localStorage.setItem('eh_registered_users', JSON.stringify(
+      lsReg.filter(r => r.email?.toLowerCase() !== emailKey)
     ));
-    // 5. Remove from suspended list
-    const suspended = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
-    localStorage.setItem('eh_suspended_users', JSON.stringify(suspended.filter(e => e !== emailKey)));
-    // 6. Clear their library data
+    // Suspended lists
+    const lsSusp = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
+    localStorage.setItem('eh_suspended_users', JSON.stringify(lsSusp.filter(e => e !== emailKey)));
+    const lsSuspFs = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
+    localStorage.setItem('eh_suspended_fs', JSON.stringify(lsSuspFs.filter(e => e !== emailKey)));
+    // Password + role overrides
+    const lsPwOv = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+    delete lsPwOv[emailKey];
+    localStorage.setItem('eh_pw_overrides', JSON.stringify(lsPwOv));
+    const lsRoleOv = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
+    delete lsRoleOv[emailKey];
+    localStorage.setItem('eh_role_overrides', JSON.stringify(lsRoleOv));
+    // Orders
+    const lsOrders = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+    localStorage.setItem('eh_orders', JSON.stringify(
+      lsOrders.filter(o => o.userId !== u.id && o.userEmail?.toLowerCase() !== emailKey)
+    ));
+    // Misc per-user keys
     localStorage.removeItem('eh_lib_' + u.id);
     localStorage.removeItem('eh_lib_email_' + emailKey);
-    // 7. If this user is currently logged in on this browser, log them out
-    const currentSession = JSON.parse(localStorage.getItem('eh_user') || 'null');
-    if (currentSession && currentSession.email?.toLowerCase() === emailKey) {
-      localStorage.removeItem('eh_user');
-    }
-    // 8. Refresh state immediately — remove from UI right away
+    // Force-logout if they're the active session
+    const session = JSON.parse(localStorage.getItem('eh_user') || 'null');
+    if (session?.email?.toLowerCase() === emailKey) localStorage.removeItem('eh_user');
+
+    // ── Update React state immediately ───────────────────────────────────────
     setUsers(prev => prev.filter(x => x.email.toLowerCase() !== emailKey));
     setTick(t => t + 1);
-    showToast(`User "${u.name}" permanently deleted`);
+    showToast(`🗑 User "${u.name}" permanently deleted`);
   };
 
   // Navigate to Books tab with a pre-set status filter

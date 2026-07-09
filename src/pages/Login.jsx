@@ -423,6 +423,12 @@ export default function Login() {
       /* 1. Check Firestore users collection first */
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
+        // Block deleted users from logging in — check both Firestore status and localStorage blocklist
+        const lsDeleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
+        if (fsUser.status === 'deleted' || lsDeleted.includes(emailKey)) {
+          setErr('No account found with that email address. Please check your email or create an account.');
+          setBusy(false); return;
+        }
         if (fsUser.suspended) {
           setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
           setBusy(false); return;
@@ -474,7 +480,13 @@ export default function Login() {
         const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
         if (regSnap.exists()) {
           const regData = regSnap.data();
-          const regUser = (regData.registered || []).find(u => u.email?.toLowerCase() === emailKey);
+          // Check both Firestore deletedEmails and localStorage blocklist
+          const fsDeletedEmails = new Set((regData.deletedEmails || []).map(e => e.toLowerCase()));
+          const lsDeleted       = new Set(JSON.parse(localStorage.getItem('eh_deleted_users') || '[]').map(e => e.toLowerCase()));
+          const isDeleted       = fsDeletedEmails.has(emailKey) || lsDeleted.has(emailKey);
+          const regUser = !isDeleted
+            ? (regData.registered || []).find(u => u.email?.toLowerCase() === emailKey)
+            : null;
           if (regUser) {
             const fsPwOverrides = regData.pwOverrides || {};
             const localOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
