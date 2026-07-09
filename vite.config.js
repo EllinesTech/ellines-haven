@@ -4,7 +4,7 @@ import fs from 'fs'
 import path from 'path'
 
 // ── Build stamp — shared across plugins ──────────────────────────────────────
-const BUILD_STAMP = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+const BUILD_STAMP = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
 
 // ── Plugin 1: Stamp sw.js cache name on every build ──────────────────────────
 // Ensures every device picks up the new service worker within 30s of deploy.

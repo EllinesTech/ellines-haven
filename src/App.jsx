@@ -27,12 +27,13 @@ class ChunkErrorBoundary extends Component {
       (err?.message || '').includes('Importing a module script failed') ||
       (err?.message || '').includes('error loading dynamically imported module');
     if (isChunkError) {
-      // Reload once to pick up fresh chunks — guard against reload loops
+      // Only reload if we haven't reloaded very recently (prevent loops)
       const reloadKey = 'eh_chunk_reload';
       const last = parseInt(sessionStorage.getItem(reloadKey) || '0', 10);
-      if (Date.now() - last > 10_000) {
+      if (Date.now() - last > 30_000) {
         sessionStorage.setItem(reloadKey, String(Date.now()));
         window.location.reload();
+        return { hasError: false }; // Don't show error UI — reloading
       }
     }
     return { hasError: true };
@@ -48,7 +49,7 @@ class ChunkErrorBoundary extends Component {
           <div style={{ fontSize: '2.5rem' }}>⚡</div>
           <h2 style={{ color: '#c9a84c', margin: 0 }}>Update Available</h2>
           <p style={{ color: 'rgba(255,255,255,0.55)', maxWidth: 340, margin: 0 }}>
-            A new version of Ellines Haven is available. Refreshing to load the latest…
+            A new version of Ellines Haven is available.
           </p>
           <button
             style={{

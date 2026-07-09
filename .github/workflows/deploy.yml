@@ -1,13 +1,10 @@
 name: Build & Deploy to Firebase Hosting
 
-# DISABLED — deployments are done manually via: firebase deploy --only hosting
-# Re-enable by changing 'workflow_dispatch' back to the push trigger
+# Fires on every push to main
 on:
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: 'Reason for manual deploy'
-        required: false
+  push:
+    branches:
+      - main
 
 jobs:
   build_and_deploy:
