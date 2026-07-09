@@ -269,6 +269,7 @@
         } else {
           // Prevent reload loops: use sessionStorage (survives reload, not new tabs)
           const RELOAD_KEY = 'eh_sw_reloaded';
+          const UNREGISTER_KEY = 'eh_sw_unregistered';
 
           // When the new SW takes control, reload once to serve fresh assets
           navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -282,35 +283,52 @@
             // Clear the reload guard after successful load (ready for next deploy)
             sessionStorage.removeItem(RELOAD_KEY);
 
-            // Register with stamped URL — browser sees a new script on every deploy
-            navigator.serviceWorker.register('/sw.js?v=BUILD_STAMP', { updateViaCache: 'none' })
-              .then(reg => {
-                // Poll for updates: immediately + every 60s + on visibility/online
-                const poll = () => reg.update().catch(() => {});
-                poll();
-                setInterval(poll, 60000);
-                document.addEventListener('visibilitychange', () => {
-                  if (document.visibilityState === 'visible') poll();
-                });
-                window.addEventListener('online', poll);
-
-                // Handle any already-waiting SW (e.g. user had tab open during deploy)
-                if (reg.waiting) {
-                  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                }
-
-                // Watch for new SWs installing
-                reg.addEventListener('updatefound', () => {
-                  const sw = reg.installing;
-                  if (!sw) return;
-                  sw.addEventListener('statechange', () => {
-                    if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                      sw.postMessage({ type: 'SKIP_WAITING' });
-                    }
+            // NUCLEAR OPTION: On first visit, unregister ALL old SWs before registering new
+            // This clears all cached assets and forces a fresh start
+            navigator.serviceWorker.getRegistrations().then(regs => {
+              const hasUnregistered = sessionStorage.getItem(UNREGISTER_KEY);
+              
+              if (!hasUnregistered && regs.length > 0) {
+                // First visit after deploy: unregister all old SWs, then reload
+                sessionStorage.setItem(UNREGISTER_KEY, '1');
+                Promise.all(regs.map(r => r.unregister()))
+                  .then(() => {
+                    // Give browser time to clean up caches, then reload
+                    setTimeout(() => window.location.reload(), 500);
                   });
-                });
-              })
-              .catch(() => {/* SW not available — app works fine without it */});
+                return;
+              }
+
+              // Register with stamped URL — browser sees a new script on every deploy
+              navigator.serviceWorker.register('/sw.js?v=BUILD_STAMP', { updateViaCache: 'none' })
+                .then(reg => {
+                  // Poll for updates: immediately + every 60s + on visibility/online
+                  const poll = () => reg.update().catch(() => {});
+                  poll();
+                  setInterval(poll, 60000);
+                  document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') poll();
+                  });
+                  window.addEventListener('online', poll);
+
+                  // Handle any already-waiting SW (e.g. user had tab open during deploy)
+                  if (reg.waiting) {
+                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  }
+
+                  // Watch for new SWs installing
+                  reg.addEventListener('updatefound', () => {
+                    const sw = reg.installing;
+                    if (!sw) return;
+                    sw.addEventListener('statechange', () => {
+                      if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                        sw.postMessage({ type: 'SKIP_WAITING' });
+                      }
+                    });
+                  });
+                })
+                .catch(() => {/* SW not available — app works fine without it */});
+            });
           });
         }
       }
