@@ -1,5 +1,3 @@
-// v202607091920 — force cache bust
-const _BUILD = '202607091920';
 import { createRoot } from 'react-dom/client';
 import { Component } from 'react';
 import './index.css';
