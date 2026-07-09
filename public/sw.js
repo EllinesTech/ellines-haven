@@ -1,57 +1,67 @@
 /**
- * Ellines Haven Service Worker
+ * Ellines Haven Service Worker — Bulletproof Update Strategy
  *
- * Update flow — fully automatic, works on all devices including iOS Safari:
- *  1. Every deploy stamps a new CACHE_NAME timestamp via vite.config.js
- *  2. Browser fetches sw.js (served with no-cache header from Firebase Hosting)
- *  3. New SW installs → receives SKIP_WAITING message → activates immediately
- *  4. controllerchange fires → page auto-reloads → user gets fresh code
- *  No banner. No manual tap. Happens within 30 seconds of any deploy.
+ * HOW UPDATES REACH EVERY DEVICE:
  *
- * Caching strategy:
- *  - HTML navigation  → ALWAYS network (never cached — stale HTML = broken app)
- *  - /assets/**       → cache-first  (content-hashed filenames, safe to cache forever)
- *  - images/fonts     → stale-while-revalidate
+ * 1. Every build stamps a unique CACHE_NAME (e.g. ellines-haven-202607091828)
+ *    via vite.config.js stampServiceWorker plugin.
+ *
+ * 2. The registration URL is /sw.js?v=202607091828 — stamped at build time.
+ *    A changed query string = browser always treats it as a NEW script,
+ *    bypassing the browser's 24-hour SW update throttle entirely.
+ *
+ * 3. New SW calls self.skipWaiting() immediately on install — no waiting,
+ *    no banner, no user tap required.
+ *
+ * 4. Activate wipes ALL old caches — no stale assets survive.
+ *
+ * 5. clients.claim() takes control of all open tabs instantly.
+ *
+ * 6. The page listens for 'controllerchange' and reloads — users always
+ *    get the newest code within one page load.
+ *
+ * CACHING STRATEGY (safe for continuous deployment):
+ *  - HTML navigation  → ALWAYS network-only, never cached
+ *  - /assets/**       → cache-first (Vite content-hashes filenames — old
+ *                        hashes simply never requested after an update)
+ *  - /sw.js           → NEVER cached (passes through, no SW intercept)
+ *  - images/fonts     → network-first with cache fallback (always fresh)
+ *  - everything else  → pass through to network
  */
 
-const CACHE_NAME = 'ellines-haven-20260707'; // replaced at build time by stamp-sw plugin
+const CACHE_NAME = 'ellines-haven-BUILD_STAMP'; // replaced at build time by stamp-sw plugin
 
 const STATIC_ASSETS = [
-  '/logo-icon.png',
   '/favicon.svg',
 ];
 
-// ── Install ───────────────────────────────────────────────────────────────────
+// ── Install: cache static assets + skip waiting immediately ──────────────────
 self.addEventListener('install', (event) => {
-  // Pre-cache only truly static assets (not index.html)
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
   );
-  // Skip waiting immediately — safe because Vite content-hashes all /assets/ files.
-  // Old assets still served from old cache; new SW activates right away.
+  // Take control immediately — don't wait for existing SW to finish.
+  // Safe because Vite content-hashes all /assets/ filenames.
   self.skipWaiting();
 });
 
-// ── Message: SKIP_WAITING — triggered by registration code on update ──────────
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// ── Activate: wipe all old caches ─────────────────────────────────────────────
+// ── Activate: wipe EVERY old cache, then claim all open tabs ─────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => {
-          console.log('[SW] Deleting old cache:', k);
-          return caches.delete(k);
-        })
+        keys
+          .filter(k => k !== CACHE_NAME)
+          .map(k => caches.delete(k))
       ))
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim()) // Take control of all open pages now
   );
+});
+
+// ── Message handler (belt-and-suspenders) ─────────────────────────────────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -59,34 +69,39 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle same-origin GET
+  // Only intercept same-origin GETs
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
-  // ── HTML navigation: ALWAYS network-first, never cache ───────────────────
-  // Stale index.html is the #1 cause of blank/loading-stuck screens after deploy
+  // ── Never cache sw.js itself ──────────────────────────────────────────────
+  if (url.pathname === '/sw.js') return;
+
+  // ── HTML navigation: network-only, never serve from cache ────────────────
+  // Stale HTML is the #1 cause of users stuck on old versions.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request, { cache: 'no-store' })
         .catch(() =>
-          // Offline fallback only
           caches.match('/index.html')
-            .then(r => r || new Response('Offline — please reconnect', { status: 503 }))
+            .then(r => r || new Response(
+              '<h1>You are offline</h1><p>Reconnect to continue reading.</p>',
+              { status: 503, headers: { 'Content-Type': 'text/html' } }
+            ))
         )
     );
     return;
   }
 
-  // ── /assets/** — cache-first (Vite content-hashes filenames on every build) ─
+  // ── /assets/** — cache-first (content-hashed, safe to cache forever) ─────
+  // Old asset hashes are never requested after a deploy — no staleness risk.
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
       caches.match(request).then(cached => {
         if (cached) return cached;
         return fetch(request).then(res => {
-          if (res.ok) {
-            caches.open(CACHE_NAME)
-              .then(cache => cache.put(request, res.clone()))
-              .catch(() => {});
+          if (res.ok && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {});
           }
           return res;
         });
@@ -95,22 +110,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ── Images / fonts — stale-while-revalidate ───────────────────────────────
-  if (/\.(png|jpg|jpeg|svg|webp|woff2|woff|ico|gif)$/.test(url.pathname)) {
+  // ── Images / fonts — network-first, fall back to cache ───────────────────
+  // Network-first ensures users always get the latest logo/cover images.
+  if (/\.(png|jpg|jpeg|svg|webp|woff2|woff|ico|gif)(\?.*)?$/.test(url.pathname)) {
     event.respondWith(
-      caches.open(CACHE_NAME).then(cache =>
-        cache.match(request).then(cached => {
-          const fresh = fetch(request)
-            .then(res => {
-              if (res.ok) cache.put(request, res.clone()).catch(() => {});
-              return res;
-            })
-            .catch(() => cached);
-          return cached || fresh;
+      fetch(request, { cache: 'no-cache' })
+        .then(res => {
+          if (res.ok && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {});
+          }
+          return res;
         })
-      )
+        .catch(() => caches.match(request))
     );
     return;
   }
-  // Everything else: pass through (Firebase calls, Cloud Functions, etc.)
+
+  // Everything else (Firebase, Paystack, etc.) — pass through
 });

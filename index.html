@@ -255,10 +255,10 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
-      // ── Service Worker — production only, never on localhost ─────────────────
-      // Strategy: when a new SW installs and activates (new deploy detected),
-      // the page reloads automatically — no banner, no user action required.
-      // This works on all devices including iOS Safari.
+      // ── Service Worker — production only ─────────────────────────────────────
+      // Registration URL includes ?v=BUILD_STAMP — stamped at build time by vite.config.js.
+      // A new query string = browser always fetches a fresh sw.js, bypassing the
+      // 24-hour SW update throttle that causes stale content on mobile devices.
       if ('serviceWorker' in navigator) {
         const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
         if (isLocalhost) {
@@ -267,21 +267,25 @@
             regs.forEach(r => r.unregister());
           });
         } else {
-          // Track whether the page has already been refreshed to prevent loops
-          let refreshing = false;
+          // Prevent reload loops: use sessionStorage (survives reload, not new tabs)
+          const RELOAD_KEY = 'eh_sw_reloaded';
 
-          // When a new SW takes control, reload immediately to load fresh assets
+          // When the new SW takes control, reload once to serve fresh assets
           navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
-              refreshing = true;
+            if (!sessionStorage.getItem(RELOAD_KEY)) {
+              sessionStorage.setItem(RELOAD_KEY, '1');
               window.location.reload();
             }
           });
 
           window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+            // Clear the reload guard after successful load (ready for next deploy)
+            sessionStorage.removeItem(RELOAD_KEY);
+
+            // Register with stamped URL — browser sees a new script on every deploy
+            navigator.serviceWorker.register('/sw.js?v=BUILD_STAMP', { updateViaCache: 'none' })
               .then(reg => {
-                // Trigger update check immediately and on every visibility/online event
+                // Poll for updates: immediately + every 60s + on visibility/online
                 const poll = () => reg.update().catch(() => {});
                 poll();
                 setInterval(poll, 60000);
@@ -290,26 +294,23 @@
                 });
                 window.addEventListener('online', poll);
 
-                // SW now calls skipWaiting() on install automatically.
-                // If there's already a waiting SW, send the message as a belt-and-suspenders.
+                // Handle any already-waiting SW (e.g. user had tab open during deploy)
                 if (reg.waiting) {
                   reg.waiting.postMessage({ type: 'SKIP_WAITING' });
                 }
 
+                // Watch for new SWs installing
                 reg.addEventListener('updatefound', () => {
-                  const newSW = reg.installing;
-                  if (!newSW) return;
-                  newSW.addEventListener('statechange', () => {
-                    // New SW activated — reload to pick up fresh assets
-                    if (newSW.state === 'activated') {
-                      if (!refreshing) { refreshing = true; window.location.reload(); }
+                  const sw = reg.installing;
+                  if (!sw) return;
+                  sw.addEventListener('statechange', () => {
+                    if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                      sw.postMessage({ type: 'SKIP_WAITING' });
                     }
                   });
                 });
               })
-              .catch(() => {
-                // SW registration failed — silently continue without offline support
-              });
+              .catch(() => {/* SW not available — app works fine without it */});
           });
         }
       }

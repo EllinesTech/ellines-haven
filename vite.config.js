@@ -15,10 +15,12 @@ function stampServiceWorker() {
       const swDist = path.resolve('dist', 'sw.js');
       if (!fs.existsSync(swDist)) return;
       let src = fs.readFileSync(swDist, 'utf-8');
+      // Replace both the CACHE_NAME and the BUILD_STAMP placeholder
       src = src.replace(
         /const CACHE_NAME\s*=\s*['"][^'"]*['"]/,
         `const CACHE_NAME = 'ellines-haven-${BUILD_STAMP}'`
       );
+      src = src.replace(/BUILD_STAMP/g, BUILD_STAMP);
       fs.writeFileSync(swDist, src);
       console.log(`[stamp-sw] Cache name → ellines-haven-${BUILD_STAMP}`);
     },
@@ -44,6 +46,14 @@ function stampPublicAssets() {
           const base = url.split('?')[0];
           return `${attr}="${base}?v=${BUILD_STAMP}"`;
         }
+      );
+      // ── Stamp the SW registration URL ──────────────────────────────────────
+      // /sw.js?v=BUILD_STAMP forces browsers to re-fetch the SW on every deploy,
+      // bypassing the browser's 24-hour SW update throttle.
+      // Works because the browser treats /sw.js?v=AAA and /sw.js?v=BBB as different scripts.
+      html = html.replace(
+        /\/sw\.js(\?v=[\w]+)?/g,
+        `/sw.js?v=${BUILD_STAMP}`
       );
       fs.writeFileSync(indexPath, html);
       console.log(`[stamp-public-assets] Stamped public asset URLs with ?v=${BUILD_STAMP}`);
