@@ -1,3 +1,22 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  ELLINES HAVEN ARCHITECTURE                                              ║
+ * ║                                                                          ║
+ * ║  HOSTING: Cloudflare Pages (haven.ellines.co.ke)                        ║
+ * ║    - Static file hosting with global CDN                                ║
+ * ║    - Auto-builds from Git pushes                                        ║
+ * ║    - Handles all asset caching via immutable URLs                       ║
+ * ║                                                                          ║
+ * ║  DATABASE: Firebase Firestore (ellines.haven@gmail.com)                 ║
+ * ║    - Real-time document database for all site data                      ║
+ * ║    - Authentication via Firebase Auth                                    ║
+ * ║    - Cloud Functions for server-side logic                              ║
+ * ║    - NOT used for hosting — only data storage                           ║
+ * ║                                                                          ║
+ * ║  DEPLOYMENT FLOW: Code → Git → Cloudflare Pages → haven.ellines.co.ke   ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
+ */
+
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect, useState, lazy, Suspense, Component } from 'react';
 import { AppProvider, useApp } from './context/AppContext';

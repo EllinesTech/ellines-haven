@@ -1,7 +1,36 @@
+// v202607091920 — force cache bust
+const _BUILD = '202607091920';
 import { createRoot } from 'react-dom/client';
 import { Component } from 'react';
 import './index.css';
 import App from './App.jsx';
+
+// ── Global chunk error handler — catches stale imports before React even starts ─
+// If a dynamic import fails (stale chunk after deploy), clear all caches and reload
+// This prevents the black screen entirely — users see a quick flash and get the working site
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (e) => {
+    const isChunkError = e.message?.includes('Loading chunk') || 
+                        e.message?.includes('Failed to fetch dynamically imported module');
+    
+    if (isChunkError) {
+      const reloadKey = 'eh_chunk_reload_global';
+      const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
+      
+      // Only auto-reload once per 30 seconds to prevent loops
+      if (Date.now() - last > 30_000) {
+        localStorage.setItem(reloadKey, String(Date.now()));
+        if ('caches' in window) {
+          caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+            .then(() => window.location.reload())
+            .catch(() => window.location.reload());
+        } else {
+          window.location.reload();
+        }
+      }
+    }
+  });
+}
 
 /* ── Top-level error boundary — catches any render crash and shows it ── */
 class RootErrorBoundary extends Component {
