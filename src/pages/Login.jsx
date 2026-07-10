@@ -3,6 +3,9 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
+import { ErrorAlert, SuccessAlert, useToast } from '../components/ErrorDisplay';
+import { useAuthFormValidation } from '../hooks/useFormValidation';
+import { handleAuthError, logError } from '../utils/errorHandler';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -352,12 +355,18 @@ export default function Login() {
   const navigate    = useNavigate();
   const loc         = useLocation();
   const from        = loc.state?.from?.pathname || '/';
-  const [form,      setForm]      = useState({ email:'', password:'' });
   const [showPw,    setShowPw]    = useState(false);
-  const [err,       setErr]       = useState('');
   const [successMsg,setSuccessMsg]= useState('');
-  const [busy,      setBusy]      = useState(false);
   const [showReset, setShowReset] = useState(false);
+  const { showError, showSuccess, ToastComponent } = useToast();
+  
+  // Use our form validation hook
+  const form = useAuthFormValidation('login', {
+    onSubmit: async (values) => {
+      return await handleLoginSubmit(values);
+    }
+  });
+  
   // Remember Me — default to what was last saved; pre-fill email if remembered
   const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('eh_remembered_email'));
   const [lc,        setLc]        = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
@@ -365,8 +374,8 @@ export default function Login() {
   // Pre-fill email from remembered credential
   useEffect(() => {
     const remembered = localStorage.getItem('eh_remembered_email');
-    if (remembered) setForm(f => ({ ...f, email: remembered }));
-  }, []);
+    if (remembered) form.setValue('email', remembered);
+  }, [form.setValue]);
 
   const showLoginSuccess = (name) => {
     setSuccessMsg(`Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`);
@@ -382,74 +391,68 @@ export default function Login() {
   const cv = (editCtx?.editMode && editCtx?.pageKey === 'login_content')
     ? { ...lc, ...editCtx.pageData } : lc;
 
-  const submit = async e => {
-    e.preventDefault();
-    setErr(''); setBusy(true);
-
-    const emailKey = form.email.trim().toLowerCase();
-
-    // ── Remember Me — save or clear the email ───────────────────────────────
-    if (rememberMe) {
-      localStorage.setItem('eh_remembered_email', form.email.trim());
-    } else {
-      localStorage.removeItem('eh_remembered_email');
-    }
-
-    // ── Helper: set user session; if !rememberMe also write to sessionStorage
-    //    so AppContext localStorage persists only when chosen ─────────────────
-    const finalizeSession = (sessionUser) => {
-      setUser(sessionUser); // AppContext always writes to localStorage
-      if (!rememberMe) {
-        // Mark this session as "session-only" — on next app load AppContext
-        // will check this flag and clear if the sessionStorage token is gone
-        sessionStorage.setItem('eh_session_only', '1');
-      } else {
-        sessionStorage.removeItem('eh_session_only');
-      }
-    };
-
-    // ── Lockout check ───────────────────────────────────────────────────────
-    const attemptData = getAttemptData(emailKey);
-    if (attemptData.lockedUntil && Date.now() < attemptData.lockedUntil) {
-      setErr(getLockoutMessage(attemptData) || 'Account temporarily locked. Please try again later.');
-      setBusy(false); return;
-    }
-    // If lockout has expired, clear it
-    if (attemptData.lockedUntil && Date.now() >= attemptData.lockedUntil) {
-      clearAttempts(emailKey);
-    }
+  const handleLoginSubmit = async (values) => {
+    const emailKey = values.email.trim().toLowerCase();
 
     try {
+      // ── Remember Me — save or clear the email ───────────────────────────────
+      if (rememberMe) {
+        localStorage.setItem('eh_remembered_email', values.email.trim());
+      } else {
+        localStorage.removeItem('eh_remembered_email');
+      }
+
+      // ── Helper: set user session; if !rememberMe also write to sessionStorage
+      //    so AppContext localStorage persists only when chosen ─────────────────
+      const finalizeSession = (sessionUser) => {
+        setUser(sessionUser); // AppContext always writes to localStorage
+        if (!rememberMe) {
+          // Mark this session as "session-only" — on next app load AppContext
+          // will check this flag and clear if the sessionStorage token is gone
+          sessionStorage.setItem('eh_session_only', '1');
+        } else {
+          sessionStorage.removeItem('eh_session_only');
+        }
+      };
+
+      // ── Lockout check ───────────────────────────────────────────────────────
+      const attemptData = getAttemptData(emailKey);
+      if (attemptData.lockedUntil && Date.now() < attemptData.lockedUntil) {
+        const lockoutMsg = getLockoutMessage(attemptData) || 'Account temporarily locked. Please try again later.';
+        return { success: false, error: lockoutMsg };
+      }
+      // If lockout has expired, clear it
+      if (attemptData.lockedUntil && Date.now() >= attemptData.lockedUntil) {
+        clearAttempts(emailKey);
+      }
+
       /* 1. Check Firestore users collection first */
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
         // Block deleted users from logging in — check both Firestore status and localStorage blocklist
         const lsDeleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
         if (fsUser.status === 'deleted' || lsDeleted.includes(emailKey)) {
-          setErr('No account found with that email address. Please check your email or create an account.');
-          setBusy(false); return;
+          return { success: false, error: 'No account found with that email address. Please check your email or create an account.' };
         }
         if (fsUser.suspended) {
-          setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
-          setBusy(false); return;
+          return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
         }
         const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
         const localOverride = pwOverrides[emailKey];
         const fsHash = fsUser.passwordHash || fsUser.password || '';
-        const passwordOk = (localOverride && localOverride === form.password) || (fsHash && fsHash === form.password);
+        const passwordOk = (localOverride && localOverride === values.password) || (fsHash && fsHash === values.password);
         if (!fsHash && !localOverride) {
-          setErr('This account has no password set. Please contact support.');
-          setBusy(false); return;
+          return { success: false, error: 'This account has no password set. Please contact support.' };
         }
         if (!passwordOk) {
           const data = recordFailedAttempt(emailKey);
           const remaining = MAX_ATTEMPTS - data.count;
           if (data.lockedUntil) {
-            setErr(getLockoutMessage(data) || 'Too many failed attempts. Account locked.');
+            const lockoutMsg = getLockoutMessage(data) || 'Too many failed attempts. Account locked.';
+            return { success: false, error: lockoutMsg };
           } else {
-            setErr(`Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`);
+            return { success: false, error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}` };
           }
-          setBusy(false); return;
         }
         clearAttempts(emailKey);
         const roleOverrides1 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
@@ -459,20 +462,23 @@ export default function Login() {
         await logLogin(fsUser.email, fsUser.name);
         showLoginSuccess(fsUser.name);
         if (fsUser.mustChangePassword) {
-          navigate('/change-password', { replace: true }); setBusy(false); return;
+          navigate('/change-password', { replace: true });
+          return { success: true };
         }
-        navigate(from, { replace: true }); setBusy(false); return;
+        navigate(from, { replace: true });
+        return { success: true };
       }
 
       /* 2. Check admin credentials in Firestore */
-      const adminAccount = await checkAdminCredentials(emailKey, form.password);
+      const adminAccount = await checkAdminCredentials(emailKey, values.password);
       if (adminAccount) {
         clearAttempts(emailKey);
         const sessionUser = { id: adminAccount.id || 'admin01', name: adminAccount.name || 'Admin', email: adminAccount.email, role: adminAccount.role };
         finalizeSession(sessionUser);
         await logLogin(adminAccount.email, adminAccount.name);
         showLoginSuccess(adminAccount.name || 'Admin');
-        navigate(from, { replace: true }); setBusy(false); return;
+        navigate(from, { replace: true });
+        return { success: true };
       }
 
       /* 3. Legacy: check localStorage registered users OR Firestore site_data/registered_users ── */
@@ -496,23 +502,21 @@ export default function Login() {
             const suspLeg = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
             const allSusp = [...new Set([...suspFs, ...suspLeg])];
             if (allSusp.includes(emailKey) || regUser.suspended) {
-              setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
-              setBusy(false); return;
+              return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
             }
             
             if (!fsPw) {
-              setErr('This account has no password set. Please contact support.');
-              setBusy(false); return;
+              return { success: false, error: 'This account has no password set. Please contact support.' };
             }
-            if (fsPw !== form.password) {
+            if (fsPw !== values.password) {
               const data = recordFailedAttempt(emailKey);
               const remaining = MAX_ATTEMPTS - data.count;
               if (data.lockedUntil) {
-                setErr(getLockoutMessage(data) || 'Too many failed attempts. Account locked.');
+                const lockoutMsg = getLockoutMessage(data) || 'Too many failed attempts. Account locked.';
+                return { success: false, error: lockoutMsg };
               } else {
-                setErr(`Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`);
+                return { success: false, error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}` };
               }
-              setBusy(false); return;
             }
             clearAttempts(emailKey);
             
@@ -537,11 +541,12 @@ export default function Login() {
             finalizeSession(sessionUser);
             await logLogin(emailKey, regUser.name);
             showLoginSuccess(regUser.name);
-            navigate(from, { replace: true }); setBusy(false); return;
+            navigate(from, { replace: true });
+            return { success: true };
           }
         }
       } catch (e) {
-        console.warn('[Login] Firestore registered_users check failed:', e.message);
+        logError(e, { operation: 'firestore-registered-users-check' });
       }
 
       /* 4. Last resort — localStorage registered users */
@@ -549,19 +554,18 @@ export default function Login() {
       const legacyAccount = legacy.find(a => a.email?.toLowerCase() === emailKey);
       if (legacyAccount) {
         if (legacyAccount.suspended) {
-          setErr('Your account has been suspended. Please contact support at ellines.haven@gmail.com.');
-          setBusy(false); return;
+          return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
         }
         const effectivePw = legacyAccount.password;
-        if (effectivePw !== form.password) {
+        if (effectivePw !== values.password) {
           const data = recordFailedAttempt(emailKey);
           const remaining = MAX_ATTEMPTS - data.count;
           if (data.lockedUntil) {
-            setErr(getLockoutMessage(data) || 'Too many failed attempts. Account locked.');
+            const lockoutMsg = getLockoutMessage(data) || 'Too many failed attempts. Account locked.';
+            return { success: false, error: lockoutMsg };
           } else {
-            setErr(`Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`);
+            return { success: false, error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}` };
           }
-          setBusy(false); return;
         }
         clearAttempts(emailKey);
         const roleOverrides4 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
@@ -570,20 +574,21 @@ export default function Login() {
         finalizeSession(sessionUser);
         await logLogin(legacyAccount.email, legacyAccount.name);
         showLoginSuccess(legacyAccount.name);
-        navigate(from, { replace: true }); setBusy(false); return;
+        navigate(from, { replace: true });
+        return { success: true };
       }
 
-      setErr('No account found with that email address. Please check your email or create an account.');
+      return { success: false, error: 'No account found with that email address. Please check your email or create an account.' };
     } catch (e) {
-      setErr('Something went wrong. Please check your connection and try again.');
-      console.error('[Login]', e);
+      logError(e, { operation: 'login', email: emailKey });
+      return handleAuthError(e, 'login');
     }
-    setBusy(false);
   };
 
   return (
     <main className="auth-page">
       {showReset && <ForgotPasswordModal onClose={() => setShowReset(false)} />}
+      {ToastComponent}
       <div className="auth-wrap">
         <div className="auth-card card">
           <div className="auth-top">
@@ -591,49 +596,66 @@ export default function Login() {
             <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
             <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
-          <form onSubmit={submit}>
-            {err && (
-              <div className="form-error auth-alert" role="alert" style={{marginBottom:'16px'}}>
-                <span className="auth-alert-icon">⚠️</span> {err}
-              </div>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            const result = await form.handleSubmit();
+            if (!result.success && result.error) {
+              showError(result.error);
+            }
+          }}>
+            {form.firstError && (
+              <ErrorAlert error={form.firstError} className="auth-alert" style={{marginBottom:'16px'}} />
             )}
             {successMsg && (
-              <div className="form-success auth-alert" role="status" style={{marginBottom:'16px'}}>
-                <span className="auth-alert-icon">✅</span> {successMsg}
-              </div>
+              <SuccessAlert message={successMsg} className="auth-alert" style={{marginBottom:'16px'}} />
             )}
-            <div className="form-group" style={{marginBottom:'16px'}}>
-              <label>Email</label>
-              <input className="field" type="email" placeholder="your@email.com"
-                value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required />
+            
+            <div className="form-group" style={{marginBottom:'15px'}}>
+              <label>Email Address</label>
+              <input 
+                {...form.getEmailProps()}
+                className="field" 
+                placeholder="your@email.com" 
+                required 
+                autoFocus 
+              />
+              {form.errors.email && (
+                <div className="field-error">⚠️ {form.errors.email}</div>
+              )}
             </div>
-            <div className="form-group" style={{marginBottom:'8px'}}>
+
+            <div className="form-group" style={{marginBottom:'20px'}}>
               <label>Password</label>
               <div className="auth-pw-wrap">
-                <input className="field" type={showPw?'text':'password'} placeholder="Your password"
-                  value={form.password} onChange={e=>setForm({...form,password:e.target.value})} required />
-                <button type="button" className="auth-pw-eye" onClick={()=>setShowPw(v=>!v)} aria-label={showPw?'Hide':'Show'}>
-                  <EyeIcon open={showPw}/>
+                <input 
+                  {...form.getPasswordProps()}
+                  className="field" 
+                  type={showPw ? 'text' : 'password'}
+                  placeholder="Your password" 
+                  required 
+                />
+                <button type="button" className="auth-pw-eye" onClick={() => setShowPw(v => !v)} aria-label="Toggle password">
+                  <EyeIcon open={showPw} />
                 </button>
               </div>
+              {form.errors.password && (
+                <div className="field-error">⚠️ {form.errors.password}</div>
+              )}
             </div>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'22px'}}>
-              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:'0.85rem',color:'var(--text)',userSelect:'none'}}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  style={{width:15,height:15,accentColor:'var(--gold)',cursor:'pointer'}}
-                />
-                Remember me
+
+            <div className="auth-remember">
+              <label className="auth-remember-check">
+                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+                <span>Keep me signed in on this device</span>
               </label>
-              <button type="button" onClick={()=>setShowReset(true)}
-                style={{background:'none',border:'none',color:'var(--gold)',fontSize:'0.82rem',cursor:'pointer',padding:0,textDecoration:'underline'}}>
-                Forgot password?
-              </button>
             </div>
-            <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={busy}>
-              {busy ? 'Signing in…' : cv.btn}
+
+            <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={form.isSubmitting}>
+              {form.isSubmitting ? 'Signing In…' : cv.btn}
+            </button>
+
+            <button type="button" className="auth-forgot" onClick={() => setShowReset(true)}>
+              Forgot your password?
             </button>
           </form>
           <p className="auth-switch">
