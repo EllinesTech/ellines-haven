@@ -18,10 +18,9 @@ export async function trackVisitorReliable(trackData, options = {}) {
     
     // Import dynamically to avoid circular dependencies
     console.log('[visitorTracker] 📦 Importing firebase functions...');
-    let callTrackVisitor, callTrackVisitorHttp;
+    let callTrackVisitorHttp;
     try {
       const firebaseModule = await import('../firebase');
-      callTrackVisitor = firebaseModule.callTrackVisitor;
       callTrackVisitorHttp = firebaseModule.callTrackVisitorHttp;
       console.log('[visitorTracker] ✅ Firebase functions imported successfully');
     } catch (importErr) {
@@ -36,30 +35,16 @@ export async function trackVisitorReliable(trackData, options = {}) {
       _clientTimestamp: new Date().toISOString(),
     };
     
-    console.log('[visitorTracker] 🌐 Attempting Cloud Function call (onCall)...');
+    console.log('[visitorTracker] 🌐 Calling HTTP endpoint (trackVisitorHttp)...');
     
     let result;
     try {
-      // Try the callable function first
-      result = await callTrackVisitor(payload);
-      console.log('[visitorTracker] 📨 onCall response received:', JSON.stringify(result));
-    } catch (callErr) {
-      console.error('[visitorTracker] ⚠️ onCall failed with error:', callErr.message);
-      console.error('[visitorTracker] Error code:', callErr.code);
-      
-      // If it's a 403 or auth error, try HTTP endpoint as fallback
-      if (callErr.code === 'permission-denied' || callErr.code === 403) {
-        console.log('[visitorTracker] 🔄 FALLBACK: Trying HTTP endpoint due to auth error...');
-        try {
-          result = await callTrackVisitorHttp(payload);
-          console.log('[visitorTracker] ✅ HTTP fallback worked:', JSON.stringify(result));
-        } catch (httpErr) {
-          console.error('[visitorTracker] ❌ HTTP fallback also failed:', httpErr.message);
-          throw httpErr;
-        }
-      } else {
-        throw callErr;
-      }
+      // Use HTTP endpoint (onRequest) which doesn't have Firebase auth restrictions
+      result = await callTrackVisitorHttp(payload);
+      console.log('[visitorTracker] 📨 HTTP response received:', JSON.stringify(result));
+    } catch (httpErr) {
+      console.error('[visitorTracker] ❌ HTTP call failed:', httpErr.message);
+      throw httpErr;
     }
     
     console.log('[visitorTracker] 📊 Response data.ok:', result?.data?.ok);
@@ -82,14 +67,14 @@ export async function trackVisitorReliable(trackData, options = {}) {
       
       return { success: true, data: result.data };
     } else {
-      console.error('[visitorTracker] ❌ Cloud Function returned not ok');
+      console.error('[visitorTracker] ❌ HTTP endpoint returned not ok');
       console.error('[visitorTracker] ❌ Response data:', JSON.stringify(result?.data));
       if (result?.data?.error) {
-        console.error('[visitorTracker] ❌ Cloud Function error message:', result.data.error);
+        console.error('[visitorTracker] ❌ Error message:', result.data.error);
       }
       // Queue for retry
       queueForRetry(trackData, isRetry ? 1 : 0);
-      return { success: false, error: 'Cloud function returned not ok: ' + (result?.data?.error || 'unknown') };
+      return { success: false, error: 'HTTP endpoint returned not ok: ' + (result?.data?.error || 'unknown') };
     }
   } catch (error) {
     console.error('[visitorTracker] ❌ EXCEPTION while tracking visitor:', error.message);
