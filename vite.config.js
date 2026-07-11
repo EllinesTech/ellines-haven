@@ -7,19 +7,16 @@ import path from 'path'
 const BUILD_STAMP = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
 
 // ── Plugin 1: Stamp sw.js cache name on every build ──────────────────────────
-// Ensures every device picks up the new service worker within 30s of deploy.
+// The SW is now a kill-switch that unregisters itself — no cache name needed.
+// This plugin is kept to avoid breaking vite.config but does nothing useful.
 function stampServiceWorker() {
   return {
     name: 'stamp-sw',
     closeBundle() {
       const swDist = path.resolve('dist', 'sw.js');
       if (!fs.existsSync(swDist)) return;
+      // Only replace BUILD_STAMP placeholder if present (kill-switch SW has none)
       let src = fs.readFileSync(swDist, 'utf-8');
-      // Replace both the CACHE_NAME and the BUILD_STAMP placeholder
-      src = src.replace(
-        /const CACHE_NAME\s*=\s*['"][^'"]*['"]/,
-        `const CACHE_NAME = 'ellines-haven-${BUILD_STAMP}'`
-      );
       src = src.replace(/BUILD_STAMP/g, BUILD_STAMP);
       fs.writeFileSync(swDist, src);
       console.log(`[stamp-sw] Cache name → ellines-haven-${BUILD_STAMP}`);

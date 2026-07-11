@@ -1,79 +1,32 @@
 /**
- * ╔══════════════════════════════════════════════════════════════╗
- * ║  ELLINES HAVEN — Service Worker (MINIMAL, SAFE)            ║
- * ║                                                             ║
- * ║  This SW is EXTREMELY conservative to prevent cache issues:║
- * ║   • DOES NOT cache anything (let Cloudflare handle it)     ║
- * ║   • Only provides offline fallback for navigation          ║
- * ║   • Clears all caches on every activation                  ║
- * ║   • Never intercepts /assets/ or anything critical         ║
- * ╚══════════════════════════════════════════════════════════════╝
+ * ELLINES HAVEN — Service Worker (KILL SWITCH)
+ * 
+ * This SW does ONE thing: immediately unregisters itself and clears all caches.
+ * We disabled the SW to prevent cache corruption on deploys.
+ * This file exists only to clean up old SW instances that are still running.
  */
 
-const CACHE_NAME = 'ellines-haven-BUILD_STAMP';
-
-// ── Install: skip waiting ────────────────────────────────────────────────────
-self.addEventListener('install', () => {
+// Immediately clear all caches and unregister
+self.addEventListener('install', (event) => {
+  // Skip waiting so this version activates immediately
   self.skipWaiting();
 });
 
-// ── Activate: clear ALL caches ───────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    // Delete everything — start fresh
-    caches.keys().then(keys => 
-      Promise.all(keys.map(k => {
-        console.log('[SW] Deleting cache:', k);
-        return caches.delete(k);
-      }))
-    ).then(() => {
-      console.log('[SW] All caches cleared, claiming clients');
-      return self.clients.claim();
+    Promise.all([
+      // Delete ALL caches
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))),
+      // Claim all clients
+      self.clients.claim(),
+    ]).then(() => {
+      // Unregister this service worker from all clients
+      return self.registration.unregister();
     })
   );
 });
 
-// ── Fetch: MINIMAL interception — almost everything passes through ──────────
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Only intercept GET requests for same-origin
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
-    return; // pass through
-  }
-
-  // NEVER touch:
-  // - /sw.js itself
-  // - /assets/* (Cloudflare CDN handles this)
-  // - Any critical assets
-  if (
-    url.pathname === '/sw.js' ||
-    url.pathname.startsWith('/assets/') ||
-    url.pathname.includes('.')  // anything with extension (js, css, json, etc)
-  ) {
-    return; // pass through to network/CDN
-  }
-
-  // HTML navigation (routes like /, /library, /admin) — fetch fresh, never cache
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .then(response => {
-          // NEVER cache HTML
-          return response;
-        })
-        .catch(() => {
-          // Offline: show simple fallback
-          return new Response(
-            '<!doctype html><html><body style="background:#0d0d1a;color:#f0ece2;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px"><h2 style="color:#c9a84c">You are offline</h2><p>Reconnect to continue.</p></body></html>',
-            { status: 503, headers: { 'Content-Type': 'text/html' } }
-          );
-        })
-    );
-    return;
-  }
-
-  // Everything else: pass through to network
-  // (images, fonts, API calls, etc. — let browser handle caching)
+// Pass ALL requests through without interception
+self.addEventListener('fetch', () => {
+  // Do nothing — let browser handle everything natively
 });
