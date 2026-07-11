@@ -137,6 +137,18 @@ service cloud.firestore {
     // ── Promo codes ───────────────────────────────────────────────────────────
     match /promos/{d} { allow read, write: if true; }
 
+    // ── Referral system ───────────────────────────────────────────────────────
+    // Each user has one doc (userEmail as ID)
+    // Users can read their own referral data
+    // Users can create their own referral doc
+    // Cloud Functions update on purchase (track conversions)
+    match /referrals/{userDocId} {
+      allow read:   if true;  // Anyone can read (needed to validate codes)
+      allow create: if true;  // Users can create their own referral data
+      allow update: if true;  // Cloud Functions update on conversions
+      allow delete: if false; // Don't allow deletion
+    }
+
     // ── Catch-all: READ yes, WRITE no for anything not explicitly covered ─────
     // This prevents accidental write exposure on new collections.
     match /{collection}/{document} {

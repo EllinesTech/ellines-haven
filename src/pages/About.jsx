@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import EditableImage from '../components/EditableImage';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './About.css';
 
 /* ── Firestore key ── */
@@ -179,6 +180,10 @@ function AboutPoster() {
 
 export default function About() {
   const { user } = useApp();
+  usePageMeta({
+    title: 'About Ellines Haven',
+    description: 'A sanctuary for original African literature — stories born from real life, written in Kenya, read by the world.',
+  });
   const isSA = user?.role === 'superadmin';
   const [content, setContent] = useState(DEFAULT_CONTENT);
   const [saving,  setSaving]  = useState(false);

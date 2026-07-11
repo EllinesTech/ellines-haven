@@ -4,6 +4,7 @@ import { doc, setDoc, addDoc, collection, getDoc, serverTimestamp } from 'fireba
 import { db } from '../firebase';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Contact.css';
 
 const WA_NUMBER = '254748255466';
@@ -29,6 +30,10 @@ const CONTACT_DEFAULTS = {
 };
 
 export default function Contact() {
+  usePageMeta({
+    title: 'Contact Us',
+    description: 'Get in touch with Ellines Haven. Chat on WhatsApp, send an email, or use the contact form — we reply fast.',
+  });
   const [form, setForm] = useState({ name:'', email:'', subject:'', message:'' });
   const [sent, setSent] = useState(false);
   const [c, setC] = useState(CONTACT_DEFAULTS);

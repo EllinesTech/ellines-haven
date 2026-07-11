@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
 import EditableField from '../components/EditableField';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Legal.css';
 
 const LAST_UPDATED = 'July 2026';
 
 export default function Terms() {
+  usePageMeta({ title: 'Terms of Service', description: 'Read the Ellines Haven Terms of Service — covering purchases, refunds, digital content licensing, and your rights as a reader.' });
   return (
     <main className="legal-page">
       <div className="legal-hero">

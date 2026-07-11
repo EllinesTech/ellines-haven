@@ -6,6 +6,7 @@ import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder }
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
 import { bookPath } from '../utils/slugify';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Cart.css';
 
 // Paystack public key — live key
@@ -217,7 +218,13 @@ function VerifyingScreen({ orderId, onDone }) {
 
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
-  const { cart, removeFromCart, clearCart, user, placeOrder, confirmOrder, settings, myPerms, siteControls } = useApp();
+  const { cart, removeFromCart, clearCart, user, placeOrder, confirmOrder, settings, myPerms, siteControls, applyReferralDiscount } = useApp();
+  
+  usePageMeta({
+    title: 'Cart',
+    description: 'Review your cart and complete your purchase securely with M-Pesa, card, or PayPal — lifetime access to books.',
+  });
+
   // steps: cart | pay | stk_waiting | pending | done | verifying | paypal_modal
   const [step,             setStep]            = useState('cart');
   const [method,           setMethod]          = useState('paystack');
@@ -231,6 +238,33 @@ export default function Cart() {
   const [refundAcked,      setRefundAcked]     = useState(false); // no-refund acknowledgement
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
+
+  // ── Auto-apply referral code from URL param ──────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refCode = params.get('ref');
+    if (refCode && !promoApplied) {
+      // Auto-apply referral code as a promo discount
+      (async () => {
+        try {
+          const result = await applyReferralDiscount(refCode);
+          if (result.success) {
+            // Create a promo-like entry for referral discount
+            setPromoApplied({
+              code: refCode,
+              type: 'Referral',
+              discountValue: Math.round(total * 0.1), // 10% for referral
+              promoId: `referral_${refCode}`,
+              referrerEmail: result.referrerEmail,
+              referrerName: result.referrerName,
+            });
+            // Clean URL so referral code isn't re-applied on refresh
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        } catch {}
+      })();
+    }
+  }, [user]); // eslint-disable-line
 
   // ── Promo code ────────────────────────────────────────────────────────────
   const [promoInput,     setPromoInput]     = useState('');
@@ -712,13 +746,121 @@ export default function Cart() {
   // ── Done screen ───────────────────────────────────────────────────────────
   if (step === 'done') return (
     <main className="cart-page">
-      <div className="container">
+      <div className="container" style={{ maxWidth: 640, margin: '0 auto' }}>
         <div className="done-box">
           <div className="done-box__check">✓</div>
           <h2>Books Unlocked!</h2>
           <p>Your payment was confirmed and your books are ready to read.</p>
-          <div style={{ display:'flex', gap:'12px', justifyContent:'center', marginTop:'28px' }}>
-            <Link to="/my-library" className="btn btn-primary">Go to My Library</Link>
+
+          {/* ── Order receipt summary ── */}
+          {placedOrder && (
+            <div style={{
+              margin: '20px 0 8px',
+              padding: '14px 18px',
+              background: 'rgba(201,168,76,0.07)',
+              border: '1px solid rgba(201,168,76,0.2)',
+              borderRadius: 'var(--r-sm)',
+              textAlign: 'left',
+              fontSize: '0.82rem',
+            }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8, fontWeight:700, color:'var(--gold)' }}>
+                <span>Order #{placedOrder.id}</span>
+                <span>KSh {(placedOrder.total||0).toLocaleString()}</span>
+              </div>
+              {(placedOrder.items || []).map(item => (
+                <div key={item.id} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.05)', color:'var(--muted)' }}>
+                  <span>{item.title}</span>
+                  <span>KSh {(item.price||0).toLocaleString()}</span>
+                </div>
+              ))}
+              {placedOrder.promoCode && (
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.05)', color:'#2ecc71' }}>
+                  <span>🎟 {placedOrder.promoCode}</span>
+                  <span>−KSh {(placedOrder.discountAmount||0).toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.08)', fontWeight:700, marginTop:4 }}>
+                <span style={{ color:'var(--text)' }}>Total Paid</span>
+                <span style={{ color:'var(--gold)' }}>KSh {(placedOrder.total||0).toLocaleString()}</span>
+              </div>
+              <div style={{ marginTop:10, display:'flex', gap:8, justifyContent:'flex-end', flexWrap:'wrap' }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize:'0.75rem' }}
+                  onClick={() => {
+                    const lines = [
+                      '=== ELLINES HAVEN — ORDER RECEIPT ===',
+                      `Order ID: ${placedOrder.id}`,
+                      `Date: ${new Date().toLocaleDateString('en-KE', { day:'numeric', month:'long', year:'numeric' })}`,
+                      `Customer: ${user?.name} (${user?.email})`,
+                      '',
+                      'BOOKS PURCHASED:',
+                      ...(placedOrder.items||[]).map(i => `  • ${i.title} — KSh ${(i.price||0).toLocaleString()}`),
+                      ...(placedOrder.promoCode ? [`  Promo (${placedOrder.promoCode}): −KSh ${(placedOrder.discountAmount||0).toLocaleString()}`] : []),
+                      '',
+                      `TOTAL PAID: KSh ${(placedOrder.total||0).toLocaleString()}`,
+                      '',
+                      'Licensed for personal use only. Visit: haven.ellines.co.ke',
+                      '======================================',
+                    ].join('\n');
+                    const blob = new Blob([lines], { type:'text/plain' });
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = `receipt-${placedOrder.id}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  📄 Save Receipt
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Share your purchase ── */}
+          <div style={{
+            margin: '16px 0 4px',
+            padding: '12px 16px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 'var(--r-sm)',
+          }}>
+            <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, fontWeight:600 }}>📢 Share with friends</p>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `📚 Just bought "${(placedOrder?.items||[]).map(i=>i.title).join('" & "')}" on Ellines Haven — amazing East African fiction!\n\nhaven.ellines.co.ke`
+                )}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(37,211,102,0.12)', border:'1px solid rgba(37,211,102,0.3)', color:'#25D366', fontSize:'0.8rem', fontWeight:600, textDecoration:'none' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                WhatsApp
+              </a>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                  `Just bought "${(placedOrder?.items||[]).map(i=>i.title).join('" & "')}" — East African fiction at its finest 📚\n\nhaven.ellines.co.ke`
+                )}`}
+                target="_blank" rel="noopener noreferrer"
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(29,161,242,0.12)', border:'1px solid rgba(29,161,242,0.3)', color:'#1da1f2', fontSize:'0.8rem', fontWeight:600, textDecoration:'none' }}
+              >
+                𝕏 Tweet
+              </a>
+              <button
+                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'var(--muted)', fontSize:'0.8rem', fontWeight:600, cursor:'pointer' }}
+                onClick={() => {
+                  const url = 'https://haven.ellines.co.ke/library';
+                  try { navigator.clipboard.writeText(url); } catch { window.prompt('Copy:', url); }
+                }}
+              >
+                🔗 Copy Link
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display:'flex', gap:'12px', justifyContent:'center', marginTop:'20px', flexWrap:'wrap' }}>
+            <Link to="/my-library" className="btn btn-primary">📚 Go to My Library</Link>
             <Link to="/library" className="btn btn-outline">Browse More</Link>
           </div>
         </div>
@@ -870,9 +1012,12 @@ export default function Cart() {
                 </div>
                 {/* ── Promo code on pay screen ── */}
                 {promoApplied && (
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', marginTop:8, background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderRadius:'var(--r-sm)', fontSize:'0.79rem' }}>
-                    <span style={{ color:'var(--ok)' }}>🎟 <strong>{promoApplied.code}</strong> applied</span>
-                    <span style={{ color:'#2ecc71', fontWeight:700 }}>−KSh {discountAmount.toLocaleString()} saved</span>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', marginTop:8, background: promoApplied.type === 'Referral' ? 'rgba(52,152,219,0.1)' : 'rgba(46,204,113,0.08)', border: promoApplied.type === 'Referral' ? '1px solid rgba(52,152,219,0.3)' : '1px solid rgba(46,204,113,0.25)', borderRadius:'var(--r-sm)', fontSize:'0.79rem' }}>
+                    <span style={{ color: promoApplied.type === 'Referral' ? '#3498db' : 'var(--ok)' }}>
+                      {promoApplied.type === 'Referral' ? '🎁' : '🎟'} <strong>{promoApplied.code}</strong> applied
+                      {promoApplied.referrerName && <span style={{ marginLeft: 6, color: 'var(--muted)', fontSize: '0.75rem' }}>from {promoApplied.referrerName}</span>}
+                    </span>
+                    <span style={{ color: promoApplied.type === 'Referral' ? '#3498db' : '#2ecc71', fontWeight:700 }}>−KSh {discountAmount.toLocaleString()}</span>
                   </div>
                 )}
                 {/* ── No-refund acknowledgement ── */}

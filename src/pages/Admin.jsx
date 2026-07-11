@@ -1960,6 +1960,107 @@ function PromoCreateForm({ onSave }) {
   );
 }
 
+// ── BulkPromoGenerator ────────────────────────────────────────────────────────
+function BulkPromoGenerator({ onSave }) {
+  const [count,    setCount]    = useState(10);
+  const [discount, setDiscount] = useState('10');
+  const [type,     setType]     = useState('Percentage');
+  const [prefix,   setPrefix]   = useState('HAVEN');
+  const [expires,  setExpires]  = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + 3);
+    return d.toISOString().slice(0,10);
+  });
+  const [maxUses,  setMaxUses]  = useState(1);
+  const [preview,  setPreview]  = useState([]);
+  const [generated, setGenerated] = useState(false);
+
+  const generate = () => {
+    const codes = [];
+    const seen  = new Set();
+    while (codes.length < Math.min(count, 500)) {
+      const suffix = Math.random().toString(36).slice(2,7).toUpperCase();
+      const code   = (prefix.toUpperCase() + suffix).slice(0, 16);
+      if (!seen.has(code)) { seen.add(code); codes.push(code); }
+    }
+    setPreview(codes);
+    setGenerated(false);
+  };
+
+  const save = () => {
+    const newCodes = preview.map(code => ({
+      id:       'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      code,
+      discount: type === 'Percentage' ? discount + '%' : 'KSh ' + discount,
+      type,
+      expires,
+      maxUses:  Number(maxUses) || 1,
+      uses:     0,
+      active:   true,
+    }));
+    onSave(newCodes);
+    setPreview([]);
+    setGenerated(true);
+  };
+
+  return (
+    <div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10, marginBottom:14 }}>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Prefix</label>
+          <input className="field" value={prefix} onChange={e=>setPrefix(e.target.value.toUpperCase().slice(0,8))} placeholder="HAVEN" style={{ textTransform:'uppercase', letterSpacing:1 }} />
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>How many</label>
+          <input className="field" type="number" min="1" max="500" value={count} onChange={e=>setCount(parseInt(e.target.value)||10)} />
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Discount value</label>
+          <input className="field" value={discount} onChange={e=>setDiscount(e.target.value)} placeholder="10" />
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Type</label>
+          <select className="field" value={type} onChange={e=>setType(e.target.value)}>
+            <option value="Percentage">Percentage (%)</option>
+            <option value="Fixed">Fixed (KSh)</option>
+          </select>
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Max uses/code</label>
+          <input className="field" type="number" min="1" value={maxUses} onChange={e=>setMaxUses(e.target.value)} />
+        </div>
+        <div className="adm-field-group" style={{ marginBottom:0 }}>
+          <label>Expires</label>
+          <input className="field" type="date" value={expires} onChange={e=>setExpires(e.target.value)} />
+        </div>
+      </div>
+      <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+        <button type="button" className="btn btn-outline btn-sm" onClick={generate}>🎲 Preview {count} Codes</button>
+        {preview.length > 0 && (
+          <>
+            <button type="button" className="btn btn-primary btn-sm" onClick={save}>💾 Save All {preview.length} Codes</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+              const csv = ['Code,Discount,Type,Max Uses,Expires', ...preview.map(c => `${c},${type==='Percentage'?discount+'%':'KSh '+discount},${type},${maxUses},${expires}`)].join('\n');
+              const blob = new Blob([csv],{type:'text/csv'});
+              const url  = URL.createObjectURL(blob);
+              const a    = document.createElement('a'); a.href=url; a.download='bulk-promos.csv'; a.click();
+              URL.revokeObjectURL(url);
+            }}>⬇ Export Preview CSV</button>
+          </>
+        )}
+        {generated && <span style={{ color:'var(--ok)', fontSize:'0.8rem', fontWeight:600 }}>✅ Saved to Firestore</span>}
+      </div>
+      {preview.length > 0 && (
+        <div style={{ marginTop:12, maxHeight:160, overflowY:'auto', display:'flex', flexWrap:'wrap', gap:6, padding:'10px', background:'var(--bg)', borderRadius:'var(--r-sm)', border:'1px solid var(--dim)' }}>
+          {preview.map(c => (
+            <code key={c} style={{ fontSize:'0.78rem', color:'var(--gold)', background:'rgba(201,168,76,0.1)', padding:'3px 8px', borderRadius:4, letterSpacing:1 }}>{c}</code>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── ManualUnlockForm ──────────────────────────────────────────────────────*/
 function ManualUnlockForm({ books, showToast, onUnlock }) {
   const [email,    setEmail]    = useState('');
   const [selected, setSelected] = useState([]);
@@ -4276,7 +4377,34 @@ export default function Admin() {
               <PromoCreateForm onSave={(newPromo) => { const next = [...promos, newPromo]; savePromos(next); showToast('✅ Promo code ' + newPromo.code + ' created'); }} />
             </div>
 
+            {/* Bulk generator */}
+            <div className="card" style={{ padding:20, marginBottom:20 }}>
+              <h3 style={{ fontSize:'0.92rem', marginBottom:12, color:'var(--gold)' }}>⚡ Bulk Generate Promo Codes</h3>
+              <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:14 }}>Generate multiple unique one-time-use codes at once — useful for campaigns, giveaways, and reader rewards.</p>
+              <BulkPromoGenerator onSave={(newCodes) => {
+                const next = [...promos, ...newCodes];
+                savePromos(next);
+                showToast(`✅ ${newCodes.length} codes generated`);
+              }} />
+            </div>
+
             <div className="card" style={{ overflow:'hidden' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid var(--dim)' }}>
+                <span style={{ fontSize:'0.82rem', color:'var(--muted)', fontWeight:600 }}>{promos.length} codes total</span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ fontSize:'0.75rem' }}
+                  onClick={() => {
+                    const rows = [['Code','Discount','Type','Uses','Active','Expires'],...promos.map(p=>[p.code,p.discount,p.type,p.uses,p.active?'Yes':'No',p.expires||''])];
+                    const csv = rows.map(r=>r.map(c=>`"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+                    const blob = new Blob([csv],{type:'text/csv'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a'); a.href=url; a.download='promo-codes.csv'; a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('📋 Codes exported');
+                  }}
+                >⬇ Export CSV</button>
+              </div>
               <table className="adm-table">
                 <thead><tr><th>Code</th><th>Discount</th><th>Type</th><th>Times Used</th><th>Active</th><th>Expires</th><th>Actions</th></tr></thead>
                 <tbody>
@@ -4291,16 +4419,16 @@ export default function Admin() {
                       </td>
                       <td><strong>{p.discount}</strong></td>
                       <td><span className="adm-badge">{p.type}</span></td>
-                      <td>{p.uses} uses</td>
+                      <td>{p.uses} uses{p.maxUses > 0 && ` / ${p.maxUses}`}</td>
                       <td>
                         <button className={'adm-flag-btn' + (p.active ? ' on' : '')}
                           onClick={() => savePromos(promos.map(x => x.id === p.id ? { ...x, active:!x.active } : x))}>
                           {p.active ? 'Active' : 'Off'}
                         </button>
                       </td>
-                      <td style={{ fontSize:'0.8rem', color: new Date(p.expires) < new Date() ? '#e74c3c' : 'var(--muted)' }}>
-                        {p.expires}
-                        {new Date(p.expires) < new Date() && <span style={{ marginLeft:4, fontSize:'0.68rem', color:'#e74c3c' }}>(Expired)</span>}
+                      <td style={{ fontSize:'0.8rem', color: p.expires && new Date(p.expires) < new Date() ? '#e74c3c' : 'var(--muted)' }}>
+                        {p.expires || '—'}
+                        {p.expires && new Date(p.expires) < new Date() && <span style={{ marginLeft:4, fontSize:'0.68rem', color:'#e74c3c' }}>(Expired)</span>}
                       </td>
                       <td>
                         <button className="adm-act-btn adm-act-del"

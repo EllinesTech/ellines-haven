@@ -250,32 +250,31 @@ function VisitorTracker() {
 /* ── Enhanced Activity Tracker for Key User Interactions ── */
 function ActivityTracker() {
   const { user, cart } = useApp();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     // Track key user interactions that indicate engagement
     const trackActivity = async (activity, details = {}) => {
       try {
-        const { callTrackVisitor } = await import('../firebase');
+        const { callTrackVisitor } = await import('./firebase');
         
         await callTrackVisitor({
-          page: `${location.pathname}#${activity}`,
+          page: `${pathname}#${activity}`,
           referrer: 'user-interaction',
           userAgent: navigator.userAgent.slice(0, 300),
           device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
           userEmail: user?.email || null,
-          userName: user?.name || null,
-          activity: activity,
+          userName: user?.name  || null,
+          activity,
           ...details
         });
-        
-        console.log(`[ActivityTracker] Tracked activity: ${activity}`);
       } catch (error) {
         console.warn(`[ActivityTracker] Failed to track ${activity}:`, error.message);
       }
     };
 
     // Track when user adds items to cart
-    const cartItemCount = cart?.items?.length || 0;
+    const cartItemCount = cart?.length || 0;
     if (cartItemCount > 0) {
       const lastCartCount = parseInt(sessionStorage.getItem('eh_last_cart_count') || '0');
       if (cartItemCount > lastCartCount) {
@@ -284,21 +283,21 @@ function ActivityTracker() {
       }
     }
 
-    // Track scroll engagement (once per session)
-    if (!sessionStorage.getItem('eh_scroll_tracked')) {
+    // Track scroll engagement (once per session per page)
+    const scrollKey = 'eh_scroll_tracked_' + pathname;
+    if (!sessionStorage.getItem(scrollKey)) {
       const trackScroll = () => {
-        const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+        const scrollPercent = (window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight)) * 100;
         if (scrollPercent > 50) {
           trackActivity('deep_scroll', { scroll_percent: Math.round(scrollPercent) });
-          sessionStorage.setItem('eh_scroll_tracked', '1');
+          sessionStorage.setItem(scrollKey, '1');
           window.removeEventListener('scroll', trackScroll);
         }
       };
-      
       window.addEventListener('scroll', trackScroll, { passive: true });
       return () => window.removeEventListener('scroll', trackScroll);
     }
-  }, [user?.email, cart?.items?.length]);
+  }, [user?.email, cart?.length, pathname]);
 
   return null;
 }

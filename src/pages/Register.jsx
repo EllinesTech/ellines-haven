@@ -5,6 +5,7 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Auth.css';
 
 function EyeIcon({ open }) {
@@ -25,6 +26,12 @@ function getDeviceTypeForReg() {
 
 export default function Register() {
   const { setUser, siteControls } = useApp();
+  
+  usePageMeta({
+    title: 'Create Account',
+    description: 'Join Ellines Haven — create your account to buy original East African novels, read online, and download books forever.',
+  });
+
   const navigate = useNavigate();
   const [form, setForm] = useState({ name:'', email:'', password:'', confirm:'', phone:'' });
   const [show, setShow] = useState({ password:false, confirm:false });

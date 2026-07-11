@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
@@ -9,6 +9,7 @@ import { handleAuthError, logError } from '../utils/errorHandler';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Auth.css';
 
 /* ── The ONE hardcoded account is the super admin only.
@@ -352,8 +353,16 @@ function ForgotPasswordModal({ onClose }) {
 
 export default function Login() {
   const { setUser, user } = useApp();
+  
+  usePageMeta({
+    title: 'Sign In',
+    description: 'Sign in to Ellines Haven to access your library, orders, and reading history — your books, always available.',
+  });
+
   const loc         = useLocation();
+  const navigate    = useNavigate();
   const [showPw,    setShowPw]    = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [successMsg,setSuccessMsg]= useState('');
   const [showReset, setShowReset] = useState(false);
   const { showError, showSuccess, ToastComponent } = useToast();
@@ -371,12 +380,10 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(!!rememberedEmail);
   const [lc, setLc] = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
 
-  // Use our form validation hook
-  const form = useAuthFormValidation('login', {
-    onSubmit: async (values) => {
-      return await handleLoginSubmit(values);
-    }
-  });
+  // Use our form validation hook — onSubmit is NOT passed here to avoid
+  // a stale-closure ReferenceError (handleLoginSubmit is defined below).
+  // Submission is handled directly in the form's onSubmit handler instead.
+  const form = useAuthFormValidation('login', {});
 
   // Pre-fill email from remembered credential — only on first mount
   useEffect(() => {
@@ -614,9 +621,25 @@ export default function Login() {
 
           <form onSubmit={async (e) => {
             e.preventDefault();
-            const result = await form.handleSubmit();
-            if (!result.success && result.error) {
-              showError(result.error);
+            setSubmitting(true);
+            try {
+              // Call handleLoginSubmit directly with current field values
+              // to avoid stale-closure issues with the hook's onSubmit callback.
+              const result = await handleLoginSubmit({
+                email: form.values.email,
+                password: form.values.password,
+              });
+              if (result && !result.success && result.error) {
+                // result.error may be a string or an object from handleAuthError
+                const msg = typeof result.error === 'string'
+                  ? result.error
+                  : (result.error?.message || 'An unexpected error occurred. Please try again.');
+                showError(msg);
+              }
+            } catch (e) {
+              showError('An unexpected error occurred. Please try again.');
+            } finally {
+              setSubmitting(false);
             }
           }}>
             {form.firstError && (
@@ -681,9 +704,9 @@ export default function Login() {
             <button
               type="submit"
               className="btn btn-primary auth-submit-btn"
-              disabled={form.isSubmitting}
+              disabled={submitting}
             >
-              {form.isSubmitting
+              {submitting
                 ? <><span className="auth-spinner" />Signing In…</>
                 : <EditableField field="btn">{cv.btn}</EditableField>
               }

@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
 import EditableField from '../components/EditableField';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Legal.css';
 
 const LAST_UPDATED = 'July 2026';
 
 export default function Privacy() {
+  usePageMeta({ title: 'Privacy Policy', description: 'How Ellines Haven collects, uses, and protects your personal data. Read our full Privacy Policy.' });
   return (
     <main className="legal-page">
       <div className="legal-hero">
