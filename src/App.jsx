@@ -179,13 +179,13 @@ function VisitorTracker() {
     // Skip admin and reader pages — don't track admin browsing as site visitors
     if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
-    // Track visitors more liberally - only prevent obvious spam/duplicates within same session
+    // Track more liberally - reduce cooldown to 2 minutes for better capture
     const sessionKey = VISITOR_SESSION_KEY + '_' + (user?.email || 'anon');
     const lastTracked = sessionStorage.getItem(sessionKey);
     const now = Date.now();
     
-    // Only skip if we tracked this exact user state very recently (within 5 minutes)
-    if (lastTracked && (now - parseInt(lastTracked)) < 300000) {
+    // Only skip if we tracked this exact user state very recently (within 2 minutes)
+    if (lastTracked && (now - parseInt(lastTracked)) < 120000) {
       console.log('[VisitorTracker] Skipping - recently tracked this user state');
       return;
     }
@@ -243,6 +243,62 @@ function VisitorTracker() {
       }
     })();
   }, [pathname, user?.email]); // re-run when route or logged-in user changes
+
+  return null;
+}
+
+/* ── Enhanced Activity Tracker for Key User Interactions ── */
+function ActivityTracker() {
+  const { user, cart } = useApp();
+
+  useEffect(() => {
+    // Track key user interactions that indicate engagement
+    const trackActivity = async (activity, details = {}) => {
+      try {
+        const { callTrackVisitor } = await import('../firebase');
+        
+        await callTrackVisitor({
+          page: `${location.pathname}#${activity}`,
+          referrer: 'user-interaction',
+          userAgent: navigator.userAgent.slice(0, 300),
+          device: /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
+          userEmail: user?.email || null,
+          userName: user?.name || null,
+          activity: activity,
+          ...details
+        });
+        
+        console.log(`[ActivityTracker] Tracked activity: ${activity}`);
+      } catch (error) {
+        console.warn(`[ActivityTracker] Failed to track ${activity}:`, error.message);
+      }
+    };
+
+    // Track when user adds items to cart
+    const cartItemCount = cart?.items?.length || 0;
+    if (cartItemCount > 0) {
+      const lastCartCount = parseInt(sessionStorage.getItem('eh_last_cart_count') || '0');
+      if (cartItemCount > lastCartCount) {
+        trackActivity('add_to_cart', { items: cartItemCount });
+        sessionStorage.setItem('eh_last_cart_count', cartItemCount.toString());
+      }
+    }
+
+    // Track scroll engagement (once per session)
+    if (!sessionStorage.getItem('eh_scroll_tracked')) {
+      const trackScroll = () => {
+        const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+        if (scrollPercent > 50) {
+          trackActivity('deep_scroll', { scroll_percent: Math.round(scrollPercent) });
+          sessionStorage.setItem('eh_scroll_tracked', '1');
+          window.removeEventListener('scroll', trackScroll);
+        }
+      };
+      
+      window.addEventListener('scroll', trackScroll, { passive: true });
+      return () => window.removeEventListener('scroll', trackScroll);
+    }
+  }, [user?.email, cart?.items?.length]);
 
   return null;
 }
@@ -521,6 +577,7 @@ export default function App() {
           <BrowserRouter>
             <ScrollToTop />
             <VisitorTracker />
+            <ActivityTracker />
             <AutoRefresh />
             <SiteControls />
             <WatermarkOverlay />

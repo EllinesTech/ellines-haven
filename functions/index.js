@@ -924,6 +924,13 @@ exports.trackVisitor = onCall(
       const cfConnecting  = headers["cf-connecting-ip"] || ""; // Cloudflare
       const fastlyClient  = headers["fastly-client-ip"]|| ""; // Fastly CDN
 
+      console.log("[trackVisitor] Headers:", {
+        "x-forwarded-for": xForwardedFor,
+        "x-real-ip": xRealIp,
+        "cf-connecting-ip": cfConnecting,
+        "fastly-client-ip": fastlyClient
+      });
+
       // Pick the first real IP: CF > Fastly > x-real-ip > first of x-forwarded-for > socket
       const rawIp =
         cfConnecting ||
@@ -934,6 +941,8 @@ exports.trackVisitor = onCall(
 
       // Strip IPv6-mapped IPv4 prefix (::ffff:1.2.3.4 → 1.2.3.4)
       const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
+
+      console.log("[trackVisitor] IP extraction:", { rawIp, clientIp });
 
       const body      = request.data || {};
       const page      = (body.page      || "/").slice(0, 200);
