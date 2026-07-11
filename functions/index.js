@@ -916,6 +916,8 @@ exports.trackVisitor = onCall(
   },
   async (request) => {
     try {
+      console.log("[trackVisitor] ✅ Function called - request data:", JSON.stringify(request.data || {}));
+
       // ── Extract the true public IP from reverse-proxy headers ──
       // Cloud Run / Firebase Hosting sets x-forwarded-for with the original client IP first.
       const headers       = request.rawRequest?.headers || {};
@@ -924,7 +926,7 @@ exports.trackVisitor = onCall(
       const cfConnecting  = headers["cf-connecting-ip"] || ""; // Cloudflare
       const fastlyClient  = headers["fastly-client-ip"]|| ""; // Fastly CDN
 
-      console.log("[trackVisitor] Headers:", {
+      console.log("[trackVisitor] 📡 Headers:", {
         "x-forwarded-for": xForwardedFor,
         "x-real-ip": xRealIp,
         "cf-connecting-ip": cfConnecting,
@@ -942,7 +944,7 @@ exports.trackVisitor = onCall(
       // Strip IPv6-mapped IPv4 prefix (::ffff:1.2.3.4 → 1.2.3.4)
       const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
 
-      console.log("[trackVisitor] IP extraction:", { rawIp, clientIp });
+      console.log("[trackVisitor] 🌐 IP extracted:", { rawIp, clientIp });
 
       const body      = request.data || {};
       const page      = (body.page      || "/").slice(0, 200);
@@ -952,11 +954,14 @@ exports.trackVisitor = onCall(
       const userEmail = (body.userEmail || "").slice(0, 200);
       const userName  = (body.userName  || "").slice(0, 100);
 
+      console.log("[trackVisitor] 📝 Data extracted:", { page, referrer, device, userEmail });
+
       // ── Geolocate with ip-api.com (free, no key, server-side call) ──
       // Fields: status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query
       let geo = {};
       if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
         try {
+          console.log("[trackVisitor] 🔍 Attempting geolocation for IP:", clientIp);
           // Use HTTP instead of HTTPS to avoid 403 errors, add user agent
           const geoRes = await axios.get(
             `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
@@ -969,10 +974,12 @@ exports.trackVisitor = onCall(
           );
           if (geoRes.data?.status === "success") {
             geo = geoRes.data;
+            console.log("[trackVisitor] ✅ ip-api success:", geo.country, geo.city);
           } else {
-            console.warn("[trackVisitor] ip-api returned:", geoRes.data?.status, "-", geoRes.data?.message);
+            console.warn("[trackVisitor] ⚠️ ip-api returned:", geoRes.data?.status, "-", geoRes.data?.message);
             // Fallback: try ipapi.co as backup
             try {
+              console.log("[trackVisitor] 🔄 Trying ipapi.co fallback...");
               const fallbackRes = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
                 timeout: 4000,
                 headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)' }
@@ -992,16 +999,17 @@ exports.trackVisitor = onCall(
                   timezone: fallbackRes.data.timezone,
                   query: clientIp
                 };
-                console.log("[trackVisitor] Used ipapi.co fallback successfully for", clientIp);
+                console.log("[trackVisitor] ✅ ipapi.co fallback success:", geo.country, geo.city);
               }
             } catch (fallbackErr) {
-              console.warn("[trackVisitor] Fallback geolocation also failed:", fallbackErr.message);
+              console.warn("[trackVisitor] ⚠️ ipapi.co fallback failed:", fallbackErr.message);
             }
           }
         } catch (geoErr) {
-          console.warn("[trackVisitor] Primary geolocation failed:", geoErr.message);
+          console.warn("[trackVisitor] ⚠️ Primary geolocation failed:", geoErr.message);
           // Try backup service
           try {
+            console.log("[trackVisitor] 🔄 Trying ipapi.co backup...");
             const backupRes = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
               timeout: 4000,
               headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)' }
@@ -1021,17 +1029,21 @@ exports.trackVisitor = onCall(
                 timezone: backupRes.data.timezone,
                 query: clientIp
               };
-              console.log("[trackVisitor] Used backup service successfully for", clientIp);
+              console.log("[trackVisitor] ✅ ipapi.co backup success:", geo.country, geo.city);
             }
           } catch (backupErr) {
-            console.warn("[trackVisitor] Backup geolocation also failed:", backupErr.message);
+            console.warn("[trackVisitor] ⚠️ ipapi.co backup also failed:", backupErr.message);
           }
         }
+      } else {
+        console.log("[trackVisitor] ℹ️ Skipping geolocation - local IP or invalid:", clientIp);
       }
 
       // ── Write to Firestore ──
       const visitId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
-      await db.collection("site_visitors").doc(visitId).set({
+      console.log("[trackVisitor] 💾 Writing to Firestore doc:", visitId);
+      
+      const visitData = {
         ip:          geo.query       || clientIp,
         city:        geo.city        || "",
         region:      geo.regionName  || geo.region || "",
@@ -1051,14 +1063,33 @@ exports.trackVisitor = onCall(
         ...(userEmail ? { userEmail, userName } : {}),
         visitedAt:   admin.firestore.FieldValue.serverTimestamp(),
         visitedAtMs: Date.now(),
-      });
+      };
+      
+      console.log("[trackVisitor] 📄 Document data:", JSON.stringify(visitData));
+      
+      await db.collection("site_visitors").doc(visitId).set(visitData);
 
-      console.log("[trackVisitor] recorded visit from", clientIp, geo.country || "unknown country");
-      return { ok: true, ip: geo.query || clientIp, city: geo.city || '', country: geo.country || '', countryCode: geo.countryCode || '', region: geo.regionName || '', isp: geo.isp || geo.org || '', lat: geo.lat || null, lon: geo.lon || null, timezone: geo.timezone || '' };
+      console.log("[trackVisitor] ✅ Successfully recorded visit from", clientIp, "in country", geo.country || "unknown");
+      
+      return { 
+        ok: true, 
+        ip: geo.query || clientIp, 
+        city: geo.city || '', 
+        country: geo.country || '', 
+        countryCode: geo.countryCode || '', 
+        region: geo.regionName || geo.region || '', 
+        isp: geo.isp || geo.org || '', 
+        lat: geo.lat || null, 
+        lon: geo.lon || null, 
+        timezone: geo.timezone || '',
+        docId: visitId
+      };
     } catch (err) {
-      console.error("[trackVisitor] error:", err.message);
+      console.error("[trackVisitor] ❌ ERROR:", err.message);
+      console.error("[trackVisitor] ❌ Error stack:", err.stack);
+      console.error("[trackVisitor] ❌ Error code:", err.code);
       // Return ok:false but don't throw — client silently ignores this
-      return { ok: false };
+      return { ok: false, error: err.message };
     }
   }
 );

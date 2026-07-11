@@ -14,10 +14,21 @@ export async function trackVisitorReliable(trackData, options = {}) {
   const { isRetry = false, maxRetries = 3 } = options;
   
   try {
-    console.log('[visitorTracker] Tracking visitor:', trackData);
+    console.log('[visitorTracker] 📤 Attempting to track visitor:', JSON.stringify(trackData));
     
     // Import dynamically to avoid circular dependencies
-    const { callTrackVisitor } = await import('../firebase');
+    console.log('[visitorTracker] 📦 Importing callTrackVisitor from firebase...');
+    let callTrackVisitor;
+    try {
+      const firebaseModule = await import('../firebase');
+      callTrackVisitor = firebaseModule.callTrackVisitor;
+      console.log('[visitorTracker] ✅ callTrackVisitor imported successfully');
+      console.log('[visitorTracker] Type:', typeof callTrackVisitor);
+    } catch (importErr) {
+      console.error('[visitorTracker] ❌ FAILED to import callTrackVisitor:', importErr.message);
+      console.error('[visitorTracker] Error:', importErr);
+      throw importErr;
+    }
     
     // Add retry count to payload for debugging
     const payload = {
@@ -26,14 +37,27 @@ export async function trackVisitorReliable(trackData, options = {}) {
       _clientTimestamp: new Date().toISOString(),
     };
     
-    const result = await callTrackVisitor(payload);
+    console.log('[visitorTracker] 🌐 Calling Cloud Function with payload:', JSON.stringify(payload));
     
-    console.log('[visitorTracker] Cloud Function response:', result);
+    let result;
+    try {
+      result = await callTrackVisitor(payload);
+      console.log('[visitorTracker] 📨 Cloud Function response received:', JSON.stringify(result));
+    } catch (callErr) {
+      console.error('[visitorTracker] ❌ Cloud Function call threw error:', callErr.message);
+      console.error('[visitorTracker] Error code:', callErr.code);
+      console.error('[visitorTracker] Error details:', callErr);
+      throw callErr;
+    }
+    
+    console.log('[visitorTracker] 📊 Response data.ok:', result?.data?.ok);
+    console.log('[visitorTracker] 📊 Full response data:', JSON.stringify(result?.data));
     
     if (result?.data?.ok) {
-      console.log('[visitorTracker] ✅ Visitor tracked successfully');
-      console.log('[visitorTracker] IP:', result.data.ip);
-      console.log('[visitorTracker] Location:', result.data.city, result.data.country);
+      console.log('[visitorTracker] ✅ Visitor tracked successfully!');
+      console.log('[visitorTracker] 🌍 IP:', result.data.ip);
+      console.log('[visitorTracker] 📍 Location:', result.data.city, result.data.country);
+      console.log('[visitorTracker] 🆔 Document ID:', result.data.docId);
       
       // Log successful tracking for debugging
       logSuccessfulTracking({
@@ -46,17 +70,22 @@ export async function trackVisitorReliable(trackData, options = {}) {
       
       return { success: true, data: result.data };
     } else {
-      console.error('[visitorTracker] ❌ Cloud Function returned not ok:', result?.data);
+      console.error('[visitorTracker] ❌ Cloud Function returned not ok');
+      console.error('[visitorTracker] ❌ Response data:', JSON.stringify(result?.data));
+      if (result?.data?.error) {
+        console.error('[visitorTracker] ❌ Cloud Function error message:', result.data.error);
+      }
       // Queue for retry
       queueForRetry(trackData, isRetry ? 1 : 0);
-      return { success: false, error: 'Cloud function returned not ok' };
+      return { success: false, error: 'Cloud function returned not ok: ' + (result?.data?.error || 'unknown') };
     }
   } catch (error) {
-    console.error('[visitorTracker] ❌ Error tracking visitor:', error.message);
-    console.error('[visitorTracker] Error details:', {
+    console.error('[visitorTracker] ❌ EXCEPTION while tracking visitor:', error.message);
+    console.error('[visitorTracker] ❌ Exception details:', {
       name: error.name,
       code: error.code,
       message: error.message,
+      stack: error.stack?.substring(0, 500),
     });
     
     // Queue for retry
