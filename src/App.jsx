@@ -42,11 +42,15 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import './App.css';
 
-/* ── Chunk error boundary — auto-reloads on stale deploy cache ── */
+/* ── Chunk error boundary — auto-reloads on stale deploy cache ──────────────
+   Only triggers full-page fallback for true chunk/module-load errors.
+   React component render errors are caught by PageErrorBoundary below,
+   which shows a recoverable inline error instead of blocking the whole app.
+────────────────────────────────────────────────────────────────────────── */
 class ChunkErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, isChunkError: false };
   }
   static getDerivedStateFromError(err) {
     const isChunkError =
@@ -54,15 +58,13 @@ class ChunkErrorBoundary extends Component {
       (err?.message || '').includes('Failed to fetch dynamically imported module') ||
       (err?.message || '').includes('Importing a module script failed') ||
       (err?.message || '').includes('error loading dynamically imported module');
+
     if (isChunkError) {
-      // Use localStorage (not sessionStorage) so it persists across reloads
       const reloadKey = 'eh_chunk_reload';
       const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
-      // Never auto-reload while the user is reading — they'll lose their place
       const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
       if (!isReading && Date.now() - last > 60_000) {
         localStorage.setItem(reloadKey, String(Date.now()));
-        // Clear all caches before reloading to ensure fresh assets
         if ('caches' in window) {
           caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
             .then(() => window.location.reload())
@@ -70,29 +72,76 @@ class ChunkErrorBoundary extends Component {
         } else {
           window.location.reload();
         }
-        return { hasError: false };
+        return { hasError: false, isChunkError: false };
       }
+      return { hasError: true, isChunkError: true };
     }
-    return { hasError: true };
+
+    // Non-chunk React errors — let PageErrorBoundary (nested) handle them.
+    // Only set hasError if this is a top-level catch (no child boundary caught it).
+    return { hasError: true, isChunkError: false };
   }
   render() {
+    if (this.state.hasError && this.state.isChunkError) {
+      // True chunk/network error — show a minimal non-blocking update banner
+      return (
+        <>
+          {/* Still render children (may be partially working) */}
+          {this.props.children}
+          {/* Floating update banner — doesn't block the page */}
+          <div style={{
+            position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 99999, background: '#1a1a2e', border: '1px solid rgba(201,168,76,0.4)',
+            borderRadius: 10, padding: '14px 24px', display: 'flex',
+            alignItems: 'center', gap: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+            maxWidth: 420, width: 'calc(100% - 32px)',
+          }}>
+            <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>⚡</span>
+            <div style={{ flex: 1 }}>
+              <strong style={{ color: '#c9a84c', fontSize: '0.9rem', display: 'block' }}>Update available</strong>
+              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78rem' }}>Refresh to get the latest version</span>
+            </div>
+            <button
+              style={{
+                padding: '7px 16px', background: '#c9a84c', color: '#000',
+                border: 'none', borderRadius: 6, cursor: 'pointer',
+                fontWeight: 700, fontSize: '0.82rem', flexShrink: 0,
+              }}
+              onClick={() => {
+                localStorage.removeItem('eh_chunk_reload');
+                if ('caches' in window) {
+                  caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+                    .then(() => window.location.reload())
+                    .catch(() => window.location.reload());
+                } else {
+                  window.location.reload();
+                }
+              }}
+            >
+              Refresh
+            </button>
+          </div>
+        </>
+      );
+    }
     if (this.state.hasError) {
+      // Non-chunk error fell through — show minimal page-level error
       return (
         <div style={{
-          minHeight: '100vh', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 16,
-          padding: 40, textAlign: 'center', background: 'var(--bg, #0d0d1a)',
+          minHeight: '60vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 14,
+          padding: 40, textAlign: 'center',
         }}>
-          <div style={{ fontSize: '2.5rem' }}>⚡</div>
-          <h2 style={{ color: '#c9a84c', margin: 0 }}>Update Available</h2>
-          <p style={{ color: 'rgba(255,255,255,0.55)', maxWidth: 340, margin: 0 }}>
-            A new version of Ellines Haven is available.
+          <div style={{ fontSize: '2.5rem' }}>⚠️</div>
+          <h2 style={{ color: '#c9a84c', margin: 0, fontSize: '1.1rem' }}>Something went wrong</h2>
+          <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 320, margin: 0, fontSize: '0.85rem' }}>
+            An unexpected error occurred. Try refreshing the page.
           </p>
           <button
             style={{
-              marginTop: 8, padding: '10px 28px', background: '#c9a84c',
+              marginTop: 8, padding: '9px 24px', background: '#c9a84c',
               color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer',
-              fontWeight: 700, fontSize: '0.9rem',
+              fontWeight: 700, fontSize: '0.87rem',
             }}
             onClick={() => {
               localStorage.removeItem('eh_chunk_reload');
@@ -105,7 +154,52 @@ class ChunkErrorBoundary extends Component {
               }
             }}
           >
-            Refresh Now
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ── Page-level error boundary — wraps individual pages so one broken page
+   doesn't kill the entire app (navbar/footer remain usable). ── */
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(err) {
+    return { hasError: true, error: err };
+  }
+  componentDidCatch(err, info) {
+    console.error('[PageErrorBoundary]', err, info?.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '60vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 14,
+          padding: 40, textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '2.5rem' }}>⚠️</div>
+          <h2 style={{ color: '#c9a84c', margin: 0, fontSize: '1.1rem' }}>
+            {this.props.label || 'This section failed to load'}
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340, margin: 0, fontSize: '0.83rem' }}>
+            {this.state.error?.message || 'An unexpected error occurred.'}
+          </p>
+          <button
+            style={{
+              marginTop: 8, padding: '9px 22px', background: 'rgba(201,168,76,0.12)',
+              color: '#c9a84c', border: '1px solid rgba(201,168,76,0.3)',
+              borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+            }}
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Try Again
           </button>
         </div>
       );
@@ -592,7 +686,7 @@ export default function App() {
                   <Routes>
                     {/* Full-screen routes — no Navbar/Footer */}
                     <Route path="/read/:id" element={<Reader />} />
-                    <Route path="/admin"    element={<Admin />} />
+                    <Route path="/admin"    element={<PageErrorBoundary label="Admin Panel failed to load"><Admin /></PageErrorBoundary>} />
 
                     {/* Layout routes — with Navbar/Footer */}
                     <Route path="/*" element={
@@ -604,12 +698,12 @@ export default function App() {
                           <Route path="/cart"          element={<Cart />} />
                           <Route path="/login"         element={<Login />} />
                           <Route path="/register"      element={<Register />} />
-                          <Route path="/my-library"    element={<MyLibrary />} />
+                          <Route path="/my-library"    element={<PageErrorBoundary label="My Library failed to load"><MyLibrary /></PageErrorBoundary>} />
                           <Route path="/about"         element={<About />} />
                           <Route path="/founder"       element={<Founder />} />
                           <Route path="/contact"       element={<Contact />} />
-                          <Route path="/profile"       element={<UserProfile />} />
-                          <Route path="/admin-profile" element={<AdminProfile />} />
+                          <Route path="/profile"       element={<PageErrorBoundary label="Profile failed to load"><UserProfile /></PageErrorBoundary>} />
+                          <Route path="/admin-profile" element={<PageErrorBoundary label="Admin Profile failed to load"><AdminProfile /></PageErrorBoundary>} />
                           <Route path="/faq"           element={<FAQ />} />
                           <Route path="/terms"         element={<Terms />} />
                           <Route path="/privacy"       element={<Privacy />} />
