@@ -1054,7 +1054,7 @@ exports.trackVisitor = onCall(
       });
 
       console.log("[trackVisitor] recorded visit from", clientIp, geo.country || "unknown country");
-      return { ok: true, ip: geo.query || clientIp };
+      return { ok: true, ip: geo.query || clientIp, city: geo.city || '', country: geo.country || '', countryCode: geo.countryCode || '', region: geo.regionName || '', isp: geo.isp || geo.org || '', lat: geo.lat || null, lon: geo.lon || null, timezone: geo.timezone || '' };
     } catch (err) {
       console.error("[trackVisitor] error:", err.message);
       // Return ok:false but don't throw — client silently ignores this

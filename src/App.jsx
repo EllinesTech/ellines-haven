@@ -292,7 +292,7 @@ function VisitorTracker() {
         console.log('[VisitorTracker] Starting tracking attempt...');
         
         // Use the centralized firebase import
-        const { callTrackVisitor } = await import('../firebase');
+        const { callTrackVisitor } = await import('./firebase');
 
         const ua = navigator.userAgent || '';
         let device = 'Desktop';
@@ -321,6 +321,11 @@ function VisitorTracker() {
         
         if (result?.data?.ok) {
           console.log('[VisitorTracker] ✅ Visit tracked successfully, IP:', result.data.ip);
+          // Cache full geo data for PresenceTracker heartbeats
+          try {
+            const { ok: _ok, ...geoData } = result.data;
+            sessionStorage.setItem('eh_last_ip_data', JSON.stringify(geoData));
+          } catch {}
         } else {
           console.error('[VisitorTracker] ❌ Track result not ok:', result?.data);
         }
@@ -337,6 +342,97 @@ function VisitorTracker() {
       }
     })();
   }, [pathname, user?.email]); // re-run when route or logged-in user changes
+
+  return null;
+}
+
+/* ── Presence Tracker — writes heartbeat to Firestore so admin can see who is online ── */
+function PresenceTracker() {
+  const { user } = useApp();
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Only track logged-in users
+    if (!user?.email) return;
+
+    const presenceId = 'presence_' + user.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+    const updatePresence = async () => {
+      try {
+        const { doc, setDoc, serverTimestamp: svTs, collection, query, where, orderBy, limit, getDocs } = await import('firebase/firestore');
+        const { db: fsDb } = await import('./firebase');
+        // Try to get IP data — first from sessionStorage (set by VisitorTracker),
+        // then fall back to the most recent user_sessions record
+        let ipData = (() => {
+          try { return JSON.parse(sessionStorage.getItem('eh_last_ip_data') || '{}'); } catch { return {}; }
+        })();
+        // If no IP cached yet, pull from user_sessions (written by logUserLoginServer)
+        if (!ipData.ip && user?.email) {
+          try {
+            const sessSnap = await getDocs(
+              query(collection(fsDb, 'user_sessions'),
+                where('userEmail', '==', user.email.toLowerCase()),
+                orderBy('loginTime', 'desc'), limit(1))
+            );
+            if (!sessSnap.empty) {
+              const s = sessSnap.docs[0].data();
+              ipData = { ip: s.ip || '', city: s.city || '', country: s.country || '', countryCode: s.countryCode || '', isp: s.isp || '', lat: s.lat || null, lon: s.lon || null, timezone: s.timezone || '' };
+            }
+          } catch {}
+        }
+        await setDoc(doc(fsDb, 'user_presence', presenceId), {
+          email:      user.email.toLowerCase(),
+          name:       user.name || '',
+          role:       user.role || 'user',
+          page:       pathname,
+          lastSeen:   svTs(),
+          lastSeenMs: Date.now(),
+          ip:         ipData.ip    || '',
+          city:       ipData.city  || '',
+          country:    ipData.country || '',
+          countryCode: ipData.countryCode || '',
+          isp:        ipData.isp   || '',
+          lat:        ipData.lat   || null,
+          lon:        ipData.lon   || null,
+          timezone:   ipData.timezone || '',
+          device:     /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
+        }, { merge: true });
+      } catch (e) {
+        // Non-critical — silently ignore
+      }
+    };
+
+    // Update immediately, then every 30s
+    updatePresence();
+    const timer = setInterval(updatePresence, 30_000);
+    return () => clearInterval(timer);
+  }, [user?.email, pathname]);
+
+  // Also check for forceLogout flag
+  useEffect(() => {
+    if (!user?.email) return;
+    const presenceId = 'presence_' + user.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    let unsub;
+    (async () => {
+      try {
+        const { doc, onSnapshot } = await import('firebase/firestore');
+        const { db: fsDb } = await import('./firebase');
+        unsub = onSnapshot(doc(fsDb, 'user_presence', presenceId), snap => {
+          if (snap.exists() && snap.data()?.forceLogout) {
+            // Clear the flag then logout
+            import('firebase/firestore').then(({ doc: d2, setDoc: set2, serverTimestamp: svTs }) =>
+              import('./firebase').then(({ db: db2 }) =>
+                set2(d2(db2, 'user_presence', presenceId), { forceLogout: false }, { merge: true })
+              )
+            );
+            localStorage.removeItem('eh_user');
+            window.location.href = '/login';
+          }
+        });
+      } catch {}
+    })();
+    return () => { if (unsub) unsub(); };
+  }, [user?.email]);
 
   return null;
 }
@@ -722,6 +818,7 @@ export default function App() {
             <ScrollToTop />
             <VisitorTracker />
             <ActivityTracker />
+            <PresenceTracker />
             <AutoRefresh />
             <SiteControls />
             <WatermarkOverlay />

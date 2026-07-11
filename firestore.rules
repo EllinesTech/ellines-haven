@@ -130,6 +130,14 @@ service cloud.firestore {
       }
     }
 
+    // ── User presence (online status heartbeat) ───────────────────────────────
+    match /user_presence/{docId} {
+      allow read:   if true;   // Admin reads who is online
+      allow create: if true;   // Users create their presence doc on login
+      allow update: if true;   // Heartbeat updates + admin force-logout flag
+      allow delete: if true;   // Admin can clear stale records
+    }
+
     // ── Soft-delete buckets ───────────────────────────────────────────────────
     match /archives/{d} { allow read, write: if true; }
     match /trash/{d}    { allow read, write: if true; }

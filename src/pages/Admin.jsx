@@ -26,6 +26,8 @@ const ChatSettingsPanel = lazy(() => import('./admin-panels/ChatSettingsPanel'))
 const PaymentFeesPanel  = lazy(() => import('./admin-panels/PaymentFeesPanel'));
 const ContentProtectionPanel = lazy(() => import('./admin-panels/ContentProtectionPanel'));
 const DeviceSettingsPanel    = lazy(() => import('./admin-panels/DeviceSettingsPanel'));
+const OnlineUsersPanel       = lazy(() => import('./admin-panels/OnlineUsersPanel'));
+const AdminOrdersPanel       = lazy(() => import('./admin-panels/AdminOrdersPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3259,6 +3261,8 @@ export default function Admin() {
     { k:'analytics',     label:'Analytics',         icon:'📊', group:'admin' },
     { k:'reports',       label:'Reports',           icon:'📈', group:'admin' },
     { k:'visitors',      label:'Site Visitors',     icon:'🌍', group:'admin' },
+    { k:'online',        label:'Online Users',       icon:'🟢', group:'admin' },
+    { k:'allorders',     label:'All Receipts',       icon:'🧾', group:'admin' },
     { k:'payments',      label:'Payment Methods',   icon:'💳', group:'admin' },
     { k:'payfees',       label:'Fee Calculator',    icon:'🧮', group:'admin' },
     { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
@@ -4467,6 +4471,20 @@ export default function Admin() {
         {tab === 'visitors' && (
           <Suspense fallback={<PanelLoader />}>
             <VisitorsPanel showToast={showToast} />
+          </Suspense>
+        )}
+
+        {/* -- ONLINE USERS -- */}
+        {tab === 'online' && (
+          <Suspense fallback={<PanelLoader />}>
+            <OnlineUsersPanel showToast={showToast} />
+          </Suspense>
+        )}
+
+        {/* -- ALL RECEIPTS & ORDERS -- */}
+        {tab === 'allorders' && (
+          <Suspense fallback={<PanelLoader />}>
+            <AdminOrdersPanel showToast={showToast} isSuper={isSuper} />
           </Suspense>
         )}
 

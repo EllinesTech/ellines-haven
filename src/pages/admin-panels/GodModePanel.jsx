@@ -70,6 +70,12 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
   const [adminStats, setAdminStats] = useState({ users:0, suspended:0, deletions:0 });
   const [selectedBook, setSelectedBook] = useState('');
   const [transferEmail, setTransferEmail] = useState('');
+  // ── User orders state ────────────────────────────────────────────────────
+  const [userOrders, setUserOrders] = useState([]);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [orderEditData, setOrderEditData] = useState({});
+  const [orderSaving, setOrderSaving] = useState(false);
+  const [userOrdersLoading, setUserOrdersLoading] = useState(false);
 
   // ── Live Firestore users ─────────────────────────────────────────────────
   const [fsUsers, setFsUsers] = useState([]);
@@ -140,13 +146,22 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
 
   const selectUser = async u => {
     setSelectedUser(u); setEditFields({name:u.name||'',phone:'',bio:'',location:''}); setNewPw('');
-    setNewRole(u.role||'user'); setUserLibrary([]);
+    setNewRole(u.role||'user'); setUserLibrary([]); setUserOrders([]); setUserOrdersLoading(true);
     try {
       const snap = await getDoc(doc(db,'user_profiles',u.email.toLowerCase()));
       if (snap.exists()) { const d=snap.data(); setUserProfile(d); setEditFields(e=>({...e,name:d.name||u.name||'',phone:d.phone||'',bio:d.bio||'',location:d.location||''})); }
       const libSnap = await getDoc(doc(db,'libraries',libDocId(u.email)));
       if (libSnap.exists()) setUserLibrary(libSnap.data().books||[]);
+      // Load this user's orders
+      try {
+        const { getDocs: gd, collection: col, query: q2, where } = await import('firebase/firestore');
+        const ordSnap = await gd(q2(col(db,'orders'), where('userEmail','==',u.email.toLowerCase())));
+        const ords = ordSnap.docs.map(d => ({ id:d.id, ...d.data(), _createdMs: d.data().createdAt?.toMillis?.() || d.data().createdAt || 0 }));
+        ords.sort((a,b) => b._createdMs - a._createdMs);
+        setUserOrders(ords);
+      } catch {}
     } catch {}
+    setUserOrdersLoading(false);
   };
 
   const saveUserProfile = async () => {
@@ -209,6 +224,83 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
       showToast?.('✅ User updated');
     } catch(e){ showToast?.('❌ '+e.message); }
     setSaving(false);
+  };
+
+  // ── Order helpers ────────────────────────────────────────────────────────
+  const openOrderEdit = o => {
+    setEditingOrder(o);
+    setOrderEditData({
+      status: o.status || 'Pending',
+      total: o.total || 0,
+      userName: o.userName || '',
+      userEmail: o.userEmail || '',
+      method: o.method || '',
+      ref: o.ref || '',
+      paystackRef: o.paystackRef || '',
+      mpesaTransactionId: o.mpesaTransactionId || '',
+      phone: o.phone || '',
+      adminNote: o.adminNote || '',
+      promoCode: o.promoCode || '',
+      discountAmount: o.discountAmount || 0,
+    });
+  };
+
+  const saveOrderEdit = async () => {
+    if (!editingOrder) return;
+    setOrderSaving(true);
+    try {
+      const patch = {
+        status: orderEditData.status,
+        total: Number(orderEditData.total) || 0,
+        userName: orderEditData.userName,
+        userEmail: orderEditData.userEmail?.toLowerCase(),
+        method: orderEditData.method,
+        ref: orderEditData.ref,
+        paystackRef: orderEditData.paystackRef,
+        mpesaTransactionId: orderEditData.mpesaTransactionId,
+        phone: orderEditData.phone,
+        adminNote: orderEditData.adminNote,
+        promoCode: orderEditData.promoCode,
+        discountAmount: Number(orderEditData.discountAmount) || 0,
+        lastEditedBy: user?.email || 'admin',
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(doc(db, 'orders', editingOrder.id), patch);
+      // If marking as Completed, also unlock books
+      if (orderEditData.status === 'Completed' && editingOrder.status !== 'Completed' && orderEditData.userEmail) {
+        const resolved = (editingOrder.items || []).map(item => ({
+          ...(books?.find(b => b.id === item.id) || item), downloadUnlocked: true,
+        }));
+        await manualUnlock?.(orderEditData.userEmail, resolved[0]?.id).catch(() => {});
+      }
+      // Refresh user orders
+      setUserOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...o, ...patch } : o));
+      showToast?.('✅ Receipt/order updated');
+      setEditingOrder(null);
+    } catch(e) { showToast?.('❌ ' + e.message); }
+    setOrderSaving(false);
+  };
+
+  const printReceipt = o => {
+    const w = window.open('', '_blank');
+    const items = (o.items||[]).map(i=>`<tr><td>${i.title}</td><td>KSh ${(i.price||0).toLocaleString()}</td></tr>`).join('');
+    w.document.write(`<!DOCTYPE html><html><head><title>Receipt ${o.id}</title>
+      <style>body{font-family:sans-serif;max-width:600px;margin:20px auto;color:#111}
+      h1{color:#c9a84c}table{width:100%;border-collapse:collapse}
+      td,th{padding:8px;border-bottom:1px solid #eee;text-align:left}.total{font-weight:bold;font-size:1.1rem}</style>
+      </head><body>
+      <h1>Ellines Haven</h1><h3>Order Receipt — ${o.id}</h3>
+      <p>Date: ${o.date || new Date(o._createdMs||Date.now()).toLocaleDateString()}</p>
+      <p>Customer: ${o.userName||'—'} (${o.userEmail||'—'})</p>
+      <table><thead><tr><th>Book</th><th>Price</th></tr></thead><tbody>${items}</tbody></table>
+      ${o.promoCode?`<p>Promo: ${o.promoCode} (−KSh ${(o.discountAmount||0).toLocaleString()})</p>`:''}
+      <p class="total">Total: KSh ${(o.total||0).toLocaleString()}</p>
+      <p>Method: ${o.method||'—'}${o.ref?` | Ref: ${o.ref}`:''}${o.paystackRef?` | Paystack: ${o.paystackRef}`:''}</p>
+      ${o.adminNote?`<p><em>Note: ${o.adminNote}</em></p>`:''}
+      <p>Status: ${o.status}</p>
+      <hr/><p style="color:#888;font-size:0.8rem">haven.ellines.co.ke · +254 748 255 466</p>
+      </body></html>`);
+    w.document.close(); w.print();
   };
 
   const unlockBook = async () => {
@@ -489,6 +581,115 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
                         <button onClick={()=>removeBook(b.id)} style={{background:'rgba(231,76,60,0.1)',border:'none',color:'#e74c3c',borderRadius:4,padding:'2px 7px',cursor:'pointer',fontSize:'0.7rem',fontFamily:'inherit'}}>✕</button>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Orders & Receipts ── */}
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:14,marginTop:4}}>
+                <strong style={{fontSize:'0.82rem',color:'var(--gold)',display:'block',marginBottom:10}}>
+                  🧾 Orders & Receipts ({userOrdersLoading ? '…' : userOrders.length})
+                </strong>
+                {/* Order edit modal */}
+                {editingOrder && (
+                  <div className="adm-overlay">
+                    <div className="adm-confirm card" style={{maxWidth:520,width:'95%',maxHeight:'88vh',overflow:'auto'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                        <h3 style={{fontSize:'0.95rem',color:'var(--gold)',margin:0}}>✏️ Edit Receipt — {editingOrder.id}</h3>
+                        <button className="adm-close-btn" onClick={()=>setEditingOrder(null)}>✕</button>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                        {[
+                          {k:'userName',l:'Customer Name'},{k:'userEmail',l:'Email'},
+                          {k:'total',l:'Total (KSh)',t:'number'},{k:'method',l:'Method'},
+                          {k:'ref',l:'Reference'},{k:'paystackRef',l:'Paystack Ref'},
+                          {k:'mpesaTransactionId',l:'M-Pesa ID'},{k:'phone',l:'Phone'},
+                          {k:'promoCode',l:'Promo Code'},{k:'discountAmount',l:'Discount (KSh)',t:'number'},
+                        ].map(f=>(
+                          <div key={f.k} className="adm-field-group">
+                            <label>{f.l}</label>
+                            <input className="field" type={f.t||'text'} value={orderEditData[f.k]||''}
+                              onChange={e=>setOrderEditData(p=>({...p,[f.k]:e.target.value}))} />
+                          </div>
+                        ))}
+                        <div className="adm-field-group">
+                          <label>Status</label>
+                          <select className="field" value={orderEditData.status}
+                            onChange={e=>setOrderEditData(p=>({...p,status:e.target.value}))}>
+                            {['Pending','Completed','Rejected','Cancelled'].map(s=><option key={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div className="adm-field-group" style={{gridColumn:'1/-1'}}>
+                          <label>Admin Note</label>
+                          <textarea className="field" rows={2} style={{resize:'vertical'}} value={orderEditData.adminNote||''}
+                            onChange={e=>setOrderEditData(p=>({...p,adminNote:e.target.value}))} placeholder="Internal admin note…" />
+                        </div>
+                      </div>
+                      <div style={{marginTop:12,padding:'10px 12px',background:'rgba(255,255,255,0.03)',borderRadius:'var(--r-sm)',border:'1px solid var(--dim)',fontSize:'0.78rem'}}>
+                        <strong style={{color:'var(--gold)',display:'block',marginBottom:6}}>📚 Items (read-only)</strong>
+                        {(editingOrder.items||[]).map((item,i)=>(
+                          <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+                            <span>{item.title}</span><span style={{color:'var(--gold)'}}>KSh {(item.price||0).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {orderEditData.status==='Completed' && editingOrder.status!=='Completed' && (
+                        <p style={{fontSize:'0.73rem',color:'#e8832a',marginTop:8}}>⚠ Setting Completed will auto-unlock books for this user.</p>
+                      )}
+                      <div style={{display:'flex',gap:8,marginTop:14}}>
+                        <button className="btn btn-primary btn-sm" onClick={saveOrderEdit} disabled={orderSaving} style={{flex:1}}>
+                          {orderSaving?'⏳ Saving…':'💾 Save Receipt'}
+                        </button>
+                        <button className="btn btn-outline btn-sm" onClick={()=>printReceipt(editingOrder)}>🖨</button>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>setEditingOrder(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {userOrdersLoading ? (
+                  <p style={{color:'var(--muted)',fontSize:'0.78rem'}}>Loading orders…</p>
+                ) : userOrders.length === 0 ? (
+                  <p style={{color:'var(--muted)',fontSize:'0.78rem'}}>No orders found for this user</p>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:240,overflowY:'auto'}}>
+                    {userOrders.map(o=>{
+                      const sc = o.status==='Completed'?'#2ecc71':o.status==='Pending'?'#e8832a':'#e74c3c';
+                      return (
+                        <div key={o.id} style={{padding:'8px 10px',background:'var(--bg)',borderRadius:'var(--r-sm)',border:'1px solid var(--border)',borderLeft:`3px solid ${sc}`}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                            <div style={{minWidth:0}}>
+                              <code style={{fontSize:'0.68rem',color:'var(--gold)'}}>{o.id}</code>
+                              <div style={{fontSize:'0.75rem',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                {(o.items||[]).map(i=>i.title).join(', ')||'—'}
+                              </div>
+                              <div style={{fontSize:'0.7rem',color:'var(--muted)',marginTop:1}}>
+                                {o.date||''}
+                                {o.adminNote && <span style={{color:'#e8832a',marginLeft:6}}>📝 {o.adminNote.slice(0,30)}</span>}
+                              </div>
+                            </div>
+                            <div style={{textAlign:'right',flexShrink:0}}>
+                              <div style={{fontWeight:700,fontSize:'0.82rem',color:'var(--gold)'}}>KSh {(o.total||0).toLocaleString()}</div>
+                              <span style={{fontSize:'0.68rem',fontWeight:700,color:sc}}>{o.status}</span>
+                            </div>
+                          </div>
+                          <div style={{display:'flex',gap:5,marginTop:6}}>
+                            <button className="adm-act-btn adm-act-edit" onClick={()=>openOrderEdit(o)} style={{fontSize:'0.68rem'}}>✏️ Edit</button>
+                            <button className="adm-act-btn" style={{fontSize:'0.68rem',color:'#4a9eff',border:'1px solid rgba(74,158,255,0.25)'}} onClick={()=>printReceipt(o)}>🖨 Print</button>
+                            {o.status==='Pending' && (
+                              <button className="adm-act-btn" style={{fontSize:'0.68rem',color:'#2ecc71',border:'1px solid rgba(46,204,113,0.25)'}}
+                                onClick={async()=>{
+                                  await updateDoc(doc(db,'orders',o.id),{status:'Completed',confirmedAt:serverTimestamp(),confirmedBy:user?.email,updatedAt:serverTimestamp()});
+                                  const resolved=(o.items||[]).map(item=>({...(books?.find(b=>b.id===item.id)||item),downloadUnlocked:true}));
+                                  if(resolved.length) await manualUnlock?.(o.userEmail||selectedUser?.email,resolved[0].id).catch(()=>{});
+                                  setUserOrders(p=>p.map(x=>x.id===o.id?{...x,status:'Completed'}:x));
+                                  showToast?.('✅ Order confirmed & books unlocked');
+                                }}>✅ Confirm</button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
