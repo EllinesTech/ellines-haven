@@ -11,84 +11,75 @@ const LAST_VISITOR_LOG = 'eh_last_visitor_log';
  * Returns success/failure and logs for debugging
  */
 export async function trackVisitorReliable(trackData, options = {}) {
-  const { isRetry = false, maxRetries = 3 } = options;
+  const { isRetry = false } = options;
   
   try {
-    console.log('[visitorTracker] 📤 Attempting to track visitor:', JSON.stringify(trackData));
+    console.log('[visitorTracker] 📤 Tracking visitor directly via Firestore:', trackData.page);
     
-    // Import dynamically to avoid circular dependencies
-    console.log('[visitorTracker] 📦 Importing firebase functions...');
-    let callTrackVisitorHttp;
-    try {
-      const firebaseModule = await import('../firebase');
-      callTrackVisitorHttp = firebaseModule.callTrackVisitorHttp;
-      console.log('[visitorTracker] ✅ Firebase functions imported successfully');
-    } catch (importErr) {
-      console.error('[visitorTracker] ❌ FAILED to import firebase functions:', importErr.message);
-      throw importErr;
-    }
+    // Import Firebase directly — write to Firestore from client
+    // Firestore rules allow: match /site_visitors/{d} { allow create: if true; }
+    const { db } = await import('../firebase');
+    const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
     
-    // Add retry count to payload for debugging
-    const payload = {
-      ...trackData,
-      _isRetry: isRetry,
-      _clientTimestamp: new Date().toISOString(),
+    const ua = trackData.userAgent || '';
+    const visitData = {
+      ip:          '',            // IP not available client-side (Cloud Function was for this)
+      city:        '',
+      region:      '',
+      country:     '',
+      countryCode: '',
+      lat:         null,
+      lon:         null,
+      isp:         '',
+      org:         '',
+      timezone:    Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+      page:        (trackData.page     || '/').slice(0, 200),
+      referrer:    (trackData.referrer || 'direct').slice(0, 200),
+      userAgent:   ua.slice(0, 300),
+      device:      trackData.device || 'Desktop',
+      rawIp:       '',
+      ...(trackData.userEmail ? { userEmail: trackData.userEmail, userName: trackData.userName || '' } : {}),
+      visitedAt:   serverTimestamp(),
+      visitedAtMs: Date.now(),
+      // Flag so we can run a background geo-enrichment later
+      _needsGeo:   true,
     };
     
-    console.log('[visitorTracker] 🌐 Calling HTTP endpoint (trackVisitorHttp)...');
+    const docRef = await addDoc(collection(db, 'site_visitors'), visitData);
+    console.log('[visitorTracker] ✅ Visit written to Firestore:', docRef.id);
     
-    let result;
-    try {
-      // Use HTTP endpoint (onRequest) which doesn't have Firebase auth restrictions
-      result = await callTrackVisitorHttp(payload);
-      console.log('[visitorTracker] 📨 HTTP response received:', JSON.stringify(result));
-    } catch (httpErr) {
-      console.error('[visitorTracker] ❌ HTTP call failed:', httpErr.message);
-      throw httpErr;
-    }
+    // Now try to enrich with geo data via Cloud Function (non-blocking, best-effort)
+    enrichVisitorGeo(docRef.id, trackData).catch(() => {});
     
-    console.log('[visitorTracker] 📊 Response data.ok:', result?.data?.ok);
-    console.log('[visitorTracker] 📊 Full response data:', JSON.stringify(result?.data));
+    // Clear retry queue
+    clearVisitorQueue();
     
-    if (result?.data?.ok) {
-      console.log('[visitorTracker] ✅ Visitor tracked successfully!');
-      console.log('[visitorTracker] 🌍 IP:', result.data.ip);
-      console.log('[visitorTracker] 📍 Location:', result.data.city, result.data.country);
-      console.log('[visitorTracker] 🆔 Document ID:', result.data.docId);
-      
-      // Log successful tracking for debugging
-      logSuccessfulTracking({
-        ...payload,
-        ...result.data,
-      });
-      
-      // Clear any retry queue
-      clearVisitorQueue();
-      
-      return { success: true, data: result.data };
-    } else {
-      console.error('[visitorTracker] ❌ HTTP endpoint returned not ok');
-      console.error('[visitorTracker] ❌ Response data:', JSON.stringify(result?.data));
-      if (result?.data?.error) {
-        console.error('[visitorTracker] ❌ Error message:', result.data.error);
-      }
-      // Queue for retry
-      queueForRetry(trackData, isRetry ? 1 : 0);
-      return { success: false, error: 'HTTP endpoint returned not ok: ' + (result?.data?.error || 'unknown') };
-    }
+    return { success: true, data: { ok: true, docId: docRef.id } };
+    
   } catch (error) {
-    console.error('[visitorTracker] ❌ EXCEPTION while tracking visitor:', error.message);
-    console.error('[visitorTracker] ❌ Exception details:', {
-      name: error.name,
-      code: error.code,
-      message: error.message,
-      stack: error.stack?.substring(0, 500),
-    });
-    
-    // Queue for retry
+    console.error('[visitorTracker] ❌ Firestore write failed:', error.message);
     queueForRetry(trackData, isRetry ? 1 : 0);
-    
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Enrich a visitor doc with geo data via Cloud Function (non-blocking, best-effort)
+ * Called after the initial Firestore write so the visitor is recorded regardless
+ */
+async function enrichVisitorGeo(docId, trackData) {
+  try {
+    const { callTrackVisitorHttp } = await import('../firebase');
+    const result = await callTrackVisitorHttp({
+      ...trackData,
+      _docId: docId,  // Cloud Function can update this doc with geo data
+    });
+    if (result?.data?.ok) {
+      console.log('[visitorTracker] 🌍 Geo enrichment successful:', result.data.country);
+    }
+  } catch (e) {
+    // Silently ignore — visitor is already recorded without geo
+    console.log('[visitorTracker] ℹ️ Geo enrichment unavailable (visitor still recorded)');
   }
 }
 

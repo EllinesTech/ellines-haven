@@ -1102,7 +1102,10 @@ exports.trackVisitor = onCall(
 exports.trackVisitorHttp = onRequest(
   { region: "us-central1", cors: true },
   async (req, res) => {
-    // Only accept POST
+    // Accept both POST and OPTIONS (CORS preflight)
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
     if (req.method !== "POST") {
       return res.status(405).json({ ok: false, error: "Method not allowed" });
     }
@@ -1118,6 +1121,7 @@ exports.trackVisitorHttp = onRequest(
       const device    = (body.device    || "Desktop").slice(0, 30);
       const userEmail = (body.userEmail || "").slice(0, 200);
       const userName  = (body.userName  || "").slice(0, 100);
+      const existingDocId = body._docId || null; // doc already created by client
 
       // Extract real IP from request headers
       const xForwardedFor = req.get("x-forwarded-for") || "";
@@ -1135,53 +1139,41 @@ exports.trackVisitorHttp = onRequest(
 
       const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
 
-      console.log("[trackVisitorHttp] 🌐 IP extracted:", { rawIp, clientIp });
-      console.log("[trackVisitorHttp] 📝 Data:", { page, referrer, device, userEmail });
+      console.log("[trackVisitorHttp] 🌐 IP:", clientIp, "| docId:", existingDocId);
 
       // Geolocate
       let geo = {};
       if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
         try {
-          console.log("[trackVisitorHttp] 🔍 Geolocation attempt for:", clientIp);
           const geoRes = await axios.get(
             `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
-            { timeout: 6000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" } }
+            { timeout: 5000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" } }
           );
           if (geoRes.data?.status === "success") {
             geo = geoRes.data;
-            console.log("[trackVisitorHttp] ✅ Geolocation success:", geo.country, geo.city);
-          } else {
-            console.warn("[trackVisitorHttp] ⚠️ Trying fallback...");
-            const fallbackRes = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
-              timeout: 4000,
-              headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" }
-            });
-            if (fallbackRes.data && !fallbackRes.data.error) {
-              geo = {
-                status: "success",
-                country: fallbackRes.data.country_name,
-                countryCode: fallbackRes.data.country_code,
-                region: fallbackRes.data.region_code,
-                regionName: fallbackRes.data.region,
-                city: fallbackRes.data.city,
-                lat: fallbackRes.data.latitude,
-                lon: fallbackRes.data.longitude,
-                isp: fallbackRes.data.org || fallbackRes.data.isp,
-                org: fallbackRes.data.org,
-                timezone: fallbackRes.data.timezone,
-                query: clientIp
-              };
-              console.log("[trackVisitorHttp] ✅ Fallback success:", geo.country);
-            }
+            console.log("[trackVisitorHttp] ✅ Geo:", geo.country, geo.city);
           }
         } catch (geoErr) {
-          console.warn("[trackVisitorHttp] ⚠️ Geolocation failed:", geoErr.message);
+          // Try backup
+          try {
+            const fallback = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
+              timeout: 4000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" }
+            });
+            if (fallback.data && !fallback.data.error) {
+              geo = {
+                status: "success",
+                country: fallback.data.country_name, countryCode: fallback.data.country_code,
+                region: fallback.data.region_code, regionName: fallback.data.region,
+                city: fallback.data.city, lat: fallback.data.latitude, lon: fallback.data.longitude,
+                isp: fallback.data.org || fallback.data.isp, org: fallback.data.org,
+                timezone: fallback.data.timezone, query: clientIp
+              };
+            }
+          } catch (_) { /* ignore */ }
         }
       }
 
-      // Write to Firestore
-      const visitId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
-      const visitData = {
+      const geoData = {
         ip:          geo.query       || clientIp,
         city:        geo.city        || "",
         region:      geo.regionName  || geo.region || "",
@@ -1192,20 +1184,27 @@ exports.trackVisitorHttp = onRequest(
         isp:         geo.isp         || geo.org || "",
         org:         geo.org         || "",
         timezone:    geo.timezone    || "",
-        page,
-        referrer,
-        userAgent,
-        device,
         rawIp:       clientIp,
-        ...(userEmail ? { userEmail, userName } : {}),
-        visitedAt:   admin.firestore.FieldValue.serverTimestamp(),
-        visitedAtMs: Date.now(),
+        _needsGeo:   false,  // mark as enriched
       };
 
-      console.log("[trackVisitorHttp] 💾 Writing to Firestore doc:", visitId);
-      await db.collection("site_visitors").doc(visitId).set(visitData);
+      if (existingDocId) {
+        // Update the doc that was already created by the client
+        await db.collection("site_visitors").doc(existingDocId).update(geoData);
+        console.log("[trackVisitorHttp] ✅ Updated existing doc:", existingDocId, "with geo data");
+      } else {
+        // Create a new doc if none exists (legacy flow)
+        const visitId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+        await db.collection("site_visitors").doc(visitId).set({
+          ...geoData,
+          page, referrer, userAgent, device,
+          ...(userEmail ? { userEmail, userName } : {}),
+          visitedAt:   admin.firestore.FieldValue.serverTimestamp(),
+          visitedAtMs: Date.now(),
+        });
+        console.log("[trackVisitorHttp] ✅ Created new doc:", visitId);
+      }
 
-      console.log("[trackVisitorHttp] ✅ Success:", clientIp, geo.country || "unknown");
       res.json({
         ok: true,
         ip: geo.query || clientIp,
@@ -1217,11 +1216,10 @@ exports.trackVisitorHttp = onRequest(
         lat: geo.lat || null,
         lon: geo.lon || null,
         timezone: geo.timezone || '',
-        docId: visitId
+        docId: existingDocId || null
       });
     } catch (err) {
       console.error("[trackVisitorHttp] ❌ Error:", err.message);
-      console.error("[trackVisitorHttp] ❌ Stack:", err.stack);
       res.status(500).json({ ok: false, error: err.message });
     }
   }
