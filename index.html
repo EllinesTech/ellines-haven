@@ -57,13 +57,11 @@
     <meta name="apple-mobile-web-app-title" content="Ellines Haven" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
-    <!-- Preload critical above-fold images -->
-    <link rel="preload" as="image" href="/logo-icon.png"  type="image/png" />
-    <link rel="preload" as="image" href="/logo-nobg3.png" type="image/png" />
-    <link rel="preload" as="image" href="/cover-marriage-is-a-scam.webp" type="image/webp" />
-    <!-- Paystack — preload so it's ready before checkout -->
-    <link rel="preload" href="https://js.paystack.co/v1/inline.js" as="script" />
-    <link rel="preconnect" href="https://js.paystack.co" />
+    <!-- Preload only immediately critical resources that are used on every page -->
+    <link rel="preload" as="image" href="/logo-icon.png" type="image/png" />
+    <!-- Payment and other resources - only preconnect, no preload since they're not used on every page -->
+    <link rel="dns-prefetch" href="https://js.paystack.co" />
+    <link rel="preconnect" href="https://js.paystack.co" crossorigin />
     <!-- PayPal — preconnect so SDK loads faster -->
     <link rel="preconnect" href="https://www.paypal.com" />
     <link rel="preconnect" href="https://www.paypalobjects.com" />
