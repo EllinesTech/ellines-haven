@@ -277,20 +277,15 @@ function VisitorTracker() {
       return;
     }
 
-    // Track page visits with VERY short cooldown for testing (10 seconds instead of 60)
+    // Track page visits with per-page cooldown (60 seconds per page per session)
     const sessionKey = 'eh_visitor_' + pathname + '_' + (user?.email || 'anon');
     const lastTracked = sessionStorage.getItem(sessionKey);
     const now = Date.now();
     
-    // Only skip if we tracked this exact page very recently (within 10 seconds FOR TESTING)
-    if (lastTracked && (now - parseInt(lastTracked)) < 10000) {
-      console.log('[VisitorTracker] Skipping - recently tracked this page', {
-        lastTracked, now, diff: now - parseInt(lastTracked)
-      });
+    // Only track once per page per 60 seconds
+    if (lastTracked && (now - parseInt(lastTracked)) < 60000) {
       return;
-    }
-
-    console.log('[VisitorTracker] Will track this page visit');
+    };
     // Mark this tracking attempt
     sessionStorage.setItem(sessionKey, now.toString());
 
