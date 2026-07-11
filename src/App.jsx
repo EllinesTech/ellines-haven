@@ -195,6 +195,7 @@ function VisitorTracker() {
 
     (async () => {
       try {
+        console.log('[VisitorTracker] Starting tracking attempt...');
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const fns = getFunctions(undefined, 'us-central1');
         const trackFn = httpsCallable(fns, 'trackVisitor');
@@ -208,29 +209,35 @@ function VisitorTracker() {
           ? (() => { try { return new URL(document.referrer).hostname; } catch { return document.referrer.slice(0, 100); } })()
           : 'direct';
 
-        console.log('[VisitorTracker] Tracking visit:', { 
-          pathname, 
-          userEmail: user?.email || 'anonymous', 
-          device,
-          referrer: referrer === location.hostname ? 'internal' : referrer
-        });
-        
-        const result = await trackFn({
+        const trackData = {
           page: pathname,
           referrer,
           userAgent: ua.slice(0, 300),
           device,
           userEmail: user?.email || null,
           userName:  user?.name  || null,
-        });
+        };
+
+        console.log('[VisitorTracker] Tracking data:', trackData);
+        console.log('[VisitorTracker] Calling Cloud Function...');
+        
+        const result = await trackFn(trackData);
+        
+        console.log('[VisitorTracker] Cloud Function result:', result);
         
         if (result?.data?.ok) {
-          console.log('[VisitorTracker] Visit tracked successfully, IP:', result.data.ip);
+          console.log('[VisitorTracker] ✅ Visit tracked successfully, IP:', result.data.ip);
         } else {
-          console.warn('[VisitorTracker] Track result not ok:', result?.data);
+          console.error('[VisitorTracker] ❌ Track result not ok:', result?.data);
         }
       } catch (error) {
-        console.error('[VisitorTracker] Failed to track visit:', error.message);
+        console.error('[VisitorTracker] ❌ Failed to track visit:', error);
+        console.error('[VisitorTracker] Error details:', {
+          name: error.name,
+          message: error.message,
+          code: error.code,
+          stack: error.stack?.substring(0, 500)
+        });
         // Don't mark as successfully tracked if it failed
         sessionStorage.removeItem(sessionKey);
       }
