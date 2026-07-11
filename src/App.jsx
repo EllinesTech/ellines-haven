@@ -1,19 +1,28 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════╗
- * ║  ELLINES HAVEN ARCHITECTURE                                              ║
+ * ║  ELLINES HAVEN ARCHITECTURE - IMPORTANT                                  ║
  * ║                                                                          ║
- * ║  HOSTING: Cloudflare Pages (haven.ellines.co.ke)                        ║
- * ║    - Static file hosting with global CDN                                ║
- * ║    - Auto-builds from Git pushes                                        ║
- * ║    - Handles all asset caching via immutable URLs                       ║
+ * ║  🌐 HOSTING: Cloudflare Pages (haven.ellines.co.ke)                     ║
+ * ║    - Static website hosting with global CDN                             ║
+ * ║    - Auto-deploys from Git pushes to main branch                        ║
+ * ║    - Handles all static assets (HTML, JS, CSS, images)                  ║
+ * ║    - Cloudflare handles caching and CDN distribution                    ║
  * ║                                                                          ║
- * ║  DATABASE: Firebase Firestore (ellines.haven@gmail.com)                 ║
- * ║    - Real-time document database for all site data                      ║
- * ║    - Authentication via Firebase Auth                                    ║
- * ║    - Cloud Functions for server-side logic                              ║
- * ║    - NOT used for hosting — only data storage                           ║
+ * ║  🔥 FIREBASE: Database ONLY (ellines.haven@gmail.com)                   ║
+ * ║    - Firestore: Document database for all site data                     ║
+ * ║    - Firebase Auth: User authentication and management                  ║
+ * ║    - Cloud Functions: Server-side logic (M-Pesa, Paystack, etc.)       ║
+ * ║    - Cloud Storage: File uploads (book covers, user avatars)            ║
+ * ║    - Firebase does NOT host the website - only provides backend        ║
  * ║                                                                          ║
- * ║  DEPLOYMENT FLOW: Code → Git → Cloudflare Pages → haven.ellines.co.ke   ║
+ * ║  🚀 DEPLOYMENT FLOW:                                                    ║
+ * ║    Code → Git Push → Cloudflare Pages → haven.ellines.co.ke             ║
+ * ║                                                                          ║
+ * ║  ⚡ CHUNK ERROR PROTECTION:                                             ║
+ * ║    - Service Worker: Never caches /assets/ (lets CDN handle)            ║
+ * ║    - Global Handler: Auto-reloads on chunk errors before React mounts  ║
+ * ║    - ChunkErrorBoundary: React-level protection with user-friendly UI  ║
+ * ║    - Never interrupts readers: Skip auto-reload when on /read pages     ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
