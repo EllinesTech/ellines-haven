@@ -103,11 +103,11 @@ service cloud.firestore {
     match /newsletter_signups/{d}   { allow read, write: if true; }
     match /newsletter_campaigns/{d} { allow read, write: if true; }
 
-    // ── Visitor tracking (written by Cloud Function) ──────────────────────────
+    // ── Visitor tracking (written by client + enriched by Cloud Function) ──────
     match /site_visitors/{d} {
       allow read:   if true;
       allow create: if true;
-      allow update: if false;
+      allow update: if true;   // Cloud Function enriches with geo data
       allow delete: if false;
     }
 
