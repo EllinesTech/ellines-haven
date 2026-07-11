@@ -1095,6 +1095,139 @@ exports.trackVisitor = onCall(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ── HTTP endpoint for visitor tracking (alternative to onCall, 100% public) ───
+// ─────────────────────────────────────────────────────────────────────────────
+// This HTTP endpoint bypasses Firebase callable functions entirely.
+// Used as fallback if onCall is blocked by auth/CORS/AppCheck issues.
+exports.trackVisitorHttp = onRequest(
+  { region: "us-central1", cors: true },
+  async (req, res) => {
+    // Only accept POST
+    if (req.method !== "POST") {
+      return res.status(405).json({ ok: false, error: "Method not allowed" });
+    }
+
+    try {
+      console.log("[trackVisitorHttp] 📨 HTTP request received");
+
+      // Extract data from POST body
+      const body = req.body || {};
+      const page      = (body.page      || "/").slice(0, 200);
+      const referrer  = (body.referrer  || "direct").slice(0, 200);
+      const userAgent = (body.userAgent || "").slice(0, 300);
+      const device    = (body.device    || "Desktop").slice(0, 30);
+      const userEmail = (body.userEmail || "").slice(0, 200);
+      const userName  = (body.userName  || "").slice(0, 100);
+
+      // Extract real IP from request headers
+      const xForwardedFor = req.get("x-forwarded-for") || "";
+      const cfConnecting  = req.get("cf-connecting-ip") || "";
+      const fastlyClient  = req.get("fastly-client-ip") || "";
+      const xRealIp       = req.get("x-real-ip") || "";
+
+      const rawIp =
+        cfConnecting ||
+        fastlyClient ||
+        xRealIp ||
+        xForwardedFor.split(",")[0].trim() ||
+        req.socket?.remoteAddress ||
+        "";
+
+      const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
+
+      console.log("[trackVisitorHttp] 🌐 IP extracted:", { rawIp, clientIp });
+      console.log("[trackVisitorHttp] 📝 Data:", { page, referrer, device, userEmail });
+
+      // Geolocate
+      let geo = {};
+      if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
+        try {
+          console.log("[trackVisitorHttp] 🔍 Geolocation attempt for:", clientIp);
+          const geoRes = await axios.get(
+            `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
+            { timeout: 6000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" } }
+          );
+          if (geoRes.data?.status === "success") {
+            geo = geoRes.data;
+            console.log("[trackVisitorHttp] ✅ Geolocation success:", geo.country, geo.city);
+          } else {
+            console.warn("[trackVisitorHttp] ⚠️ Trying fallback...");
+            const fallbackRes = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
+              timeout: 4000,
+              headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" }
+            });
+            if (fallbackRes.data && !fallbackRes.data.error) {
+              geo = {
+                status: "success",
+                country: fallbackRes.data.country_name,
+                countryCode: fallbackRes.data.country_code,
+                region: fallbackRes.data.region_code,
+                regionName: fallbackRes.data.region,
+                city: fallbackRes.data.city,
+                lat: fallbackRes.data.latitude,
+                lon: fallbackRes.data.longitude,
+                isp: fallbackRes.data.org || fallbackRes.data.isp,
+                org: fallbackRes.data.org,
+                timezone: fallbackRes.data.timezone,
+                query: clientIp
+              };
+              console.log("[trackVisitorHttp] ✅ Fallback success:", geo.country);
+            }
+          }
+        } catch (geoErr) {
+          console.warn("[trackVisitorHttp] ⚠️ Geolocation failed:", geoErr.message);
+        }
+      }
+
+      // Write to Firestore
+      const visitId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+      const visitData = {
+        ip:          geo.query       || clientIp,
+        city:        geo.city        || "",
+        region:      geo.regionName  || geo.region || "",
+        country:     geo.country     || "",
+        countryCode: geo.countryCode || "",
+        lat:         geo.lat         || null,
+        lon:         geo.lon         || null,
+        isp:         geo.isp         || geo.org || "",
+        org:         geo.org         || "",
+        timezone:    geo.timezone    || "",
+        page,
+        referrer,
+        userAgent,
+        device,
+        rawIp:       clientIp,
+        ...(userEmail ? { userEmail, userName } : {}),
+        visitedAt:   admin.firestore.FieldValue.serverTimestamp(),
+        visitedAtMs: Date.now(),
+      };
+
+      console.log("[trackVisitorHttp] 💾 Writing to Firestore doc:", visitId);
+      await db.collection("site_visitors").doc(visitId).set(visitData);
+
+      console.log("[trackVisitorHttp] ✅ Success:", clientIp, geo.country || "unknown");
+      res.json({
+        ok: true,
+        ip: geo.query || clientIp,
+        city: geo.city || '',
+        country: geo.country || '',
+        countryCode: geo.countryCode || '',
+        region: geo.regionName || geo.region || '',
+        isp: geo.isp || geo.org || '',
+        lat: geo.lat || null,
+        lon: geo.lon || null,
+        timezone: geo.timezone || '',
+        docId: visitId
+      });
+    } catch (err) {
+      console.error("[trackVisitorHttp] ❌ Error:", err.message);
+      console.error("[trackVisitorHttp] ❌ Stack:", err.stack);
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ── Send Password Reset OTP — email + SMS via Africa's Talking ───────────────
 // ─────────────────────────────────────────────────────────────────────────────
 // ── RESEND_API_KEY secret (HTTPS email — works from Cloud Run, no port issues)

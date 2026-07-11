@@ -17,16 +17,15 @@ export async function trackVisitorReliable(trackData, options = {}) {
     console.log('[visitorTracker] 📤 Attempting to track visitor:', JSON.stringify(trackData));
     
     // Import dynamically to avoid circular dependencies
-    console.log('[visitorTracker] 📦 Importing callTrackVisitor from firebase...');
-    let callTrackVisitor;
+    console.log('[visitorTracker] 📦 Importing firebase functions...');
+    let callTrackVisitor, callTrackVisitorHttp;
     try {
       const firebaseModule = await import('../firebase');
       callTrackVisitor = firebaseModule.callTrackVisitor;
-      console.log('[visitorTracker] ✅ callTrackVisitor imported successfully');
-      console.log('[visitorTracker] Type:', typeof callTrackVisitor);
+      callTrackVisitorHttp = firebaseModule.callTrackVisitorHttp;
+      console.log('[visitorTracker] ✅ Firebase functions imported successfully');
     } catch (importErr) {
-      console.error('[visitorTracker] ❌ FAILED to import callTrackVisitor:', importErr.message);
-      console.error('[visitorTracker] Error:', importErr);
+      console.error('[visitorTracker] ❌ FAILED to import firebase functions:', importErr.message);
       throw importErr;
     }
     
@@ -37,17 +36,30 @@ export async function trackVisitorReliable(trackData, options = {}) {
       _clientTimestamp: new Date().toISOString(),
     };
     
-    console.log('[visitorTracker] 🌐 Calling Cloud Function with payload:', JSON.stringify(payload));
+    console.log('[visitorTracker] 🌐 Attempting Cloud Function call (onCall)...');
     
     let result;
     try {
+      // Try the callable function first
       result = await callTrackVisitor(payload);
-      console.log('[visitorTracker] 📨 Cloud Function response received:', JSON.stringify(result));
+      console.log('[visitorTracker] 📨 onCall response received:', JSON.stringify(result));
     } catch (callErr) {
-      console.error('[visitorTracker] ❌ Cloud Function call threw error:', callErr.message);
+      console.error('[visitorTracker] ⚠️ onCall failed with error:', callErr.message);
       console.error('[visitorTracker] Error code:', callErr.code);
-      console.error('[visitorTracker] Error details:', callErr);
-      throw callErr;
+      
+      // If it's a 403 or auth error, try HTTP endpoint as fallback
+      if (callErr.code === 'permission-denied' || callErr.code === 403) {
+        console.log('[visitorTracker] 🔄 FALLBACK: Trying HTTP endpoint due to auth error...');
+        try {
+          result = await callTrackVisitorHttp(payload);
+          console.log('[visitorTracker] ✅ HTTP fallback worked:', JSON.stringify(result));
+        } catch (httpErr) {
+          console.error('[visitorTracker] ❌ HTTP fallback also failed:', httpErr.message);
+          throw httpErr;
+        }
+      } else {
+        throw callErr;
+      }
     }
     
     console.log('[visitorTracker] 📊 Response data.ok:', result?.data?.ok);

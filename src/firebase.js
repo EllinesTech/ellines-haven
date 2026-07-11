@@ -69,4 +69,18 @@ export const callCreatePayPalOrder  = (data) => httpsCallable(functions, 'create
 export const callCapturePayPalOrder = (data) => httpsCallable(functions, 'capturePayPalOrder')(data);
 export const callTrackVisitor     = (data) => httpsCallable(functions, 'trackVisitor')(data);
 
+// HTTP endpoints (as fallback if callable functions fail)
+export async function callTrackVisitorHttp(data) {
+  const regionUrl = 'https://us-central1-ellines-haven-web.cloudfunctions.net';
+  const response = await fetch(`${regionUrl}/trackVisitorHttp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+  return { data: await response.json() };
+}
+
 export default app;
