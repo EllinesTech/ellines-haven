@@ -36,6 +36,7 @@ import Footer from './components/Footer';
 import WelcomePrompt from './components/WelcomePrompt';
 import EllineaAI from './components/EllineaAI';
 import EditToolbar from './components/EditToolbar';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { initializeActivityLogger } from './utils/reliableActivityLogger';
 
 import { doc, getDoc } from 'firebase/firestore';
@@ -840,6 +841,7 @@ export default function App() {
             <VisitorTracker />
             <ActivityTracker />
             <PresenceTracker />
+            <PWAInstallPrompt />
             <AutoRefresh />
             <SiteControls />
             <WatermarkOverlay />

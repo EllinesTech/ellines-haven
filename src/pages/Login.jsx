@@ -404,7 +404,10 @@ export default function Login() {
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'login_content')).then(snap => {
       if (snap.exists()) setLc(prev => ({ ...prev, ...snap.data() }));
-    }).catch(() => {});
+    }).catch(err => {
+      console.warn('[Login] Failed to load login content:', err.message);
+      // Silently fail — use default content if Firestore is down
+    });
   }, []);
 
   const cv = (editCtx?.editMode && editCtx?.pageKey === 'login_content')

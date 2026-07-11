@@ -395,3 +395,31 @@ export function handleAuthError(authError, operation = 'authentication') {
   logError(authError, context);
   return createErrorResponse(authError, context);
 }
+
+
+/**
+ * Silent error handler - logs error but doesn't throw
+ * Use for non-critical operations where failure is acceptable
+ * @param {Error|string} error - Error to log silently
+ * @param {string} context - Human-readable context (e.g., "[Login] Failed to fetch user content")
+ * @returns {void}
+ */
+export function silentError(error, context = '') {
+  const errorMsg = typeof error === 'string' ? error : error?.message || 'Unknown error';
+  const fullMessage = context ? `${context}: ${errorMsg}` : errorMsg;
+  
+  console.warn(`[Silently Handled] ${fullMessage}`);
+  
+  // Store in localStorage for debugging (but don't escalate to admin)
+  try {
+    const stored = JSON.parse(localStorage.getItem('eh_silent_errors') || '[]');
+    stored.unshift({
+      timestamp: new Date().toISOString(),
+      message: fullMessage,
+      context: context || 'unknown'
+    });
+    localStorage.setItem('eh_silent_errors', JSON.stringify(stored.slice(0, 20)));
+  } catch {
+    // Fail silently on storage error
+  }
+}
