@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
@@ -352,65 +352,46 @@ function ForgotPasswordModal({ onClose }) {
 
 export default function Login() {
   const { setUser, user } = useApp();
-  const navigate    = useNavigate();
   const loc         = useLocation();
   const [showPw,    setShowPw]    = useState(false);
   const [successMsg,setSuccessMsg]= useState('');
   const [showReset, setShowReset] = useState(false);
   const { showError, showSuccess, ToastComponent } = useToast();
-  const [navigationTimeout, setNavigationTimeout] = useState(null);
 
-  // ── Redirect immediately if user is already logged in ─────────────────────
-  useEffect(() => {
-    if (!user) return;
-    // Determine where to go — avoid redirect loops
+  // ── Block render if already logged in — no flash, instant redirect ─────────
+  if (user) {
     const raw = loc.state?.from?.pathname;
     const safe = raw && raw !== '/login' && raw !== '/register' ? raw : '/';
-    // Use window.location for guaranteed navigation (React Router navigate
-    // can silently fail inside nested route layouts on some deployments)
     window.location.replace(safe);
-  }, [user]); // eslint-disable-line
+    return null; // render nothing while redirecting
+  }
 
-  // Cleanup timeout on unmount to prevent navigation after unmount
-  useEffect(() => {
-    return () => {
-      if (navigationTimeout) {
-        clearTimeout(navigationTimeout);
-      }
-    };
-  }, [navigationTimeout]);
-  
+  // Remember Me state — only pre-checks if user explicitly saved it before
+  const rememberedEmail = localStorage.getItem('eh_remembered_email') || '';
+  const [rememberMe, setRememberMe] = useState(!!rememberedEmail);
+  const [lc, setLc] = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
+
   // Use our form validation hook
   const form = useAuthFormValidation('login', {
     onSubmit: async (values) => {
       return await handleLoginSubmit(values);
     }
   });
-  
-  // Remember Me — default to what was last saved; pre-fill email if remembered
-  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem('eh_remembered_email'));
-  const [lc,        setLc]        = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
 
-  // Pre-fill email from remembered credential
+  // Pre-fill email from remembered credential — only on first mount
   useEffect(() => {
-    const remembered = localStorage.getItem('eh_remembered_email');
-    if (remembered) form.setValue('email', remembered);
-  }, [form.setValue]);
+    if (rememberedEmail) form.setValue('email', rememberedEmail);
+  }, []); // eslint-disable-line
 
   const showLoginSuccess = (name) => {
-    const message = `Login successful — welcome back${name ? ', ' + name : ''}!`;
+    const message = `Welcome back${name ? ', ' + name : ''}! Taking you in…`;
     setSuccessMsg(message);
     showSuccess(message);
-    // Navigate immediately via window.location — bypasses any React Router quirks
-    // Small delay (400ms) so the success message is briefly visible
     const raw = loc.state?.from?.pathname;
     const targetPath = raw && raw !== '/login' && raw !== '/register' ? raw : '/';
-    const timeoutId = setTimeout(() => {
-      window.location.replace(targetPath);
-    }, 400);
-    setNavigationTimeout(timeoutId);
-    return timeoutId;
+    setTimeout(() => window.location.replace(targetPath), 600);
   };
+
   const editCtx = useEditMode();
 
   useEffect(() => {
@@ -426,7 +407,8 @@ export default function Login() {
     const emailKey = values.email.trim().toLowerCase();
 
     try {
-      // ── Remember Me — save or clear the email ───────────────────────────────
+      // ── Remember Me — save or clear based on current checkbox state ──────────
+      // Always respects the current email the user typed, not any cached email
       if (rememberMe) {
         localStorage.setItem('eh_remembered_email', values.email.trim());
       } else {
@@ -629,6 +611,7 @@ export default function Login() {
             <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
             <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
+
           <form onSubmit={async (e) => {
             e.preventDefault();
             const result = await form.handleSubmit();
@@ -642,55 +625,71 @@ export default function Login() {
             {successMsg && (
               <SuccessAlert message={successMsg} className="auth-alert" style={{marginBottom:'16px'}} />
             )}
-            
-            <div className="form-group" style={{marginBottom:'15px'}}>
+
+            <div className="form-group">
               <label>Email Address</label>
-              <input 
+              <input
                 {...form.getEmailProps()}
-                className="field" 
-                placeholder="your@email.com" 
-                required 
-                autoFocus 
+                className={`field${form.errors.email ? ' field--error' : ''}`}
+                placeholder="your@email.com"
+                required
+                autoFocus
+                autoComplete="email"
               />
-              {form.errors.email && (
-                <div className="field-error">⚠️ {form.errors.email}</div>
-              )}
+              {form.errors.email && <div className="field-error">⚠️ {form.errors.email}</div>}
             </div>
 
-            <div className="form-group" style={{marginBottom:'20px'}}>
+            <div className="form-group">
               <label>Password</label>
               <div className="auth-pw-wrap">
-                <input 
+                <input
                   {...form.getPasswordProps()}
-                  className="field" 
+                  className={`field${form.errors.password ? ' field--error' : ''}`}
                   type={showPw ? 'text' : 'password'}
-                  placeholder="Your password" 
-                  required 
+                  placeholder="Your password"
+                  required
+                  autoComplete="current-password"
                 />
-                <button type="button" className="auth-pw-eye" onClick={() => setShowPw(v => !v)} aria-label="Toggle password">
+                <button type="button" className="auth-pw-eye" onClick={() => setShowPw(v => !v)} aria-label="Toggle password visibility">
                   <EyeIcon open={showPw} />
                 </button>
               </div>
-              {form.errors.password && (
-                <div className="field-error">⚠️ {form.errors.password}</div>
-              )}
+              {form.errors.password && <div className="field-error">⚠️ {form.errors.password}</div>}
             </div>
 
-            <div className="auth-remember">
-              <label className="auth-remember-check">
-                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+            <div className="auth-remember-row">
+              <label className="auth-remember-label">
+                <input
+                  type="checkbox"
+                  className="auth-remember-checkbox"
+                  checked={rememberMe}
+                  onChange={e => {
+                    setRememberMe(e.target.checked);
+                    // If unchecking, clear any saved email so a different user can log in freely
+                    if (!e.target.checked) {
+                      localStorage.removeItem('eh_remembered_email');
+                    }
+                  }}
+                />
                 <span>Keep me signed in on this device</span>
               </label>
+              <button type="button" className="auth-forgot-link" onClick={() => setShowReset(true)}>
+                Forgot password?
+              </button>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={form.isSubmitting}>
-              {form.isSubmitting ? 'Signing In…' : cv.btn}
-            </button>
-
-            <button type="button" className="auth-forgot" onClick={() => setShowReset(true)}>
-              Forgot your password?
+            <button
+              type="submit"
+              className="btn btn-primary auth-submit-btn"
+              disabled={form.isSubmitting}
+            >
+              {form.isSubmitting
+                ? <><span className="auth-spinner" />Signing In…</>
+                : <EditableField field="btn">{cv.btn}</EditableField>
+              }
             </button>
           </form>
+
           <p className="auth-switch">
             <EditableField field="no_account">{cv.no_account}</EditableField>{' '}
             <Link to="/register"><EditableField field="create_link">{cv.create_link}</EditableField></Link>
