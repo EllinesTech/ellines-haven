@@ -6,7 +6,6 @@ import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder }
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
 import { bookPath } from '../utils/slugify';
-import { usePreloadScript } from '../hooks/usePreload';
 import './Cart.css';
 
 // Paystack public key — live key

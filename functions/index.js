@@ -957,17 +957,75 @@ exports.trackVisitor = onCall(
       let geo = {};
       if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
         try {
+          // Use HTTP instead of HTTPS to avoid 403 errors, add user agent
           const geoRes = await axios.get(
-            `https://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
-            { timeout: 4000 }
+            `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
+            { 
+              timeout: 6000,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)'
+              }
+            }
           );
           if (geoRes.data?.status === "success") {
             geo = geoRes.data;
           } else {
-            console.warn("[trackVisitor] ip-api fallback for", clientIp, ":", geoRes.data?.message);
+            console.warn("[trackVisitor] ip-api returned:", geoRes.data?.status, "-", geoRes.data?.message);
+            // Fallback: try ipapi.co as backup
+            try {
+              const fallbackRes = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
+                timeout: 4000,
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)' }
+              });
+              if (fallbackRes.data && !fallbackRes.data.error) {
+                geo = {
+                  status: "success",
+                  country: fallbackRes.data.country_name,
+                  countryCode: fallbackRes.data.country_code,
+                  region: fallbackRes.data.region_code,
+                  regionName: fallbackRes.data.region,
+                  city: fallbackRes.data.city,
+                  lat: fallbackRes.data.latitude,
+                  lon: fallbackRes.data.longitude,
+                  isp: fallbackRes.data.org || fallbackRes.data.isp,
+                  org: fallbackRes.data.org,
+                  timezone: fallbackRes.data.timezone,
+                  query: clientIp
+                };
+                console.log("[trackVisitor] Used ipapi.co fallback successfully for", clientIp);
+              }
+            } catch (fallbackErr) {
+              console.warn("[trackVisitor] Fallback geolocation also failed:", fallbackErr.message);
+            }
           }
         } catch (geoErr) {
-          console.warn("[trackVisitor] geolocation failed:", geoErr.message);
+          console.warn("[trackVisitor] Primary geolocation failed:", geoErr.message);
+          // Try backup service
+          try {
+            const backupRes = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
+              timeout: 4000,
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)' }
+            });
+            if (backupRes.data && !backupRes.data.error) {
+              geo = {
+                status: "success",
+                country: backupRes.data.country_name,
+                countryCode: backupRes.data.country_code,
+                region: backupRes.data.region_code,
+                regionName: backupRes.data.region,
+                city: backupRes.data.city,
+                lat: backupRes.data.latitude,
+                lon: backupRes.data.longitude,
+                isp: backupRes.data.org || backupRes.data.isp,
+                org: backupRes.data.org,
+                timezone: backupRes.data.timezone,
+                query: clientIp
+              };
+              console.log("[trackVisitor] Used backup service successfully for", clientIp);
+            }
+          } catch (backupErr) {
+            console.warn("[trackVisitor] Backup geolocation also failed:", backupErr.message);
+          }
         }
       }
 

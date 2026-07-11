@@ -351,7 +351,7 @@ function ForgotPasswordModal({ onClose }) {
 }
 
 export default function Login() {
-  const { setUser } = useApp();
+  const { setUser, user } = useApp();
   const navigate    = useNavigate();
   const loc         = useLocation();
   const from        = loc.state?.from?.pathname || '/';
@@ -360,7 +360,15 @@ export default function Login() {
   const [showReset, setShowReset] = useState(false);
   const { showError, showSuccess, ToastComponent } = useToast();
   const [navigationTimeout, setNavigationTimeout] = useState(null);
-  
+
+  // ── Redirect immediately if user is already logged in ─────────────────────
+  useEffect(() => {
+    if (user) {
+      const targetPath = from === '/login' ? '/' : from;
+      navigate(targetPath, { replace: true });
+    }
+  }, [user, from, navigate]);
+
   // Cleanup timeout on unmount to prevent navigation after unmount
   useEffect(() => {
     return () => {
@@ -391,24 +399,15 @@ export default function Login() {
     const message = `Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`;
     setSuccessMsg(message);
     showSuccess(message);
-    
-    // Enhanced navigation with fallback for all devices
-    console.log('[Login] Navigating after successful login to:', from);
-    
-    // Clear any existing navigation timeouts
+    // Navigation is handled by the useEffect that watches `user` state above.
+    // We keep a short timeout as a hard fallback for devices where the effect
+    // is slow to fire.
+    const targetPath = from === '/login' ? '/' : from;
     const timeoutId = setTimeout(() => {
-      try {
-        // Primary navigation attempt
-        navigate(from, { replace: true });
-        console.log('[Login] Navigation completed successfully');
-      } catch (navError) {
-        console.error('[Login] Navigation failed, using fallback:', navError);
-        // Fallback: direct window location change
-        window.location.href = from === '/login' ? '/' : from;
+      if (window.location.pathname === '/login') {
+        window.location.href = targetPath;
       }
-    }, 1000); // 1 second delay to show success message
-    
-    // Store timeout ID for cleanup
+    }, 2000);
     setNavigationTimeout(timeoutId);
     return timeoutId;
   };
