@@ -9,6 +9,7 @@ import { bookPath, readPath } from '../utils/slugify';
 import { getFallbackChapters } from '../data/bookChapters';
 import { usePageMeta } from '../hooks/usePageMeta';
 import ReferralDashboard from '../components/ReferralDashboard';
+import OrderReceiptModal from '../components/OrderReceiptModal';
 import './MyLibrary.css';
 
 // Helper: get a map of bookId -> progress for current user
@@ -708,6 +709,8 @@ export default function MyLibrary() {
   const [removingBook, setRemovingBook] = useState(null); // bookId being confirmed for removal
   // Track offline save state per-book: { [bookId]: 'saved' | 'saving' | false }
   const [offlineState, setOfflineState] = useState({});
+  // For receipt modal
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     if (!user?.email) {
@@ -1211,6 +1214,16 @@ export default function MyLibrary() {
                               style={{ background: statusBg, color: statusColor, border:`1px solid ${statusColor}40` }}>
                               {o.status}
                             </span>
+                            {o.status === 'Completed' && (
+                              <button 
+                                className="btn btn-sm btn-outline" 
+                                onClick={() => setSelectedOrder(o)}
+                                style={{ fontSize: '0.75rem', padding: '4px 12px', marginTop: '6px', whiteSpace: 'nowrap' }}
+                                title="View detailed receipt"
+                              >
+                                📄 Receipt
+                              </button>
+                            )}
                           </div>
                         </div>
                         {o.status === 'Pending' && (
@@ -1244,6 +1257,15 @@ export default function MyLibrary() {
         )}
 
       </div>
+
+      {/* Receipt Modal */}
+      {selectedOrder && (
+        <OrderReceiptModal
+          order={selectedOrder}
+          user={user}
+          onClose={() => setSelectedOrder(null)}
+        />
+      )}
     </main>
   );
 }

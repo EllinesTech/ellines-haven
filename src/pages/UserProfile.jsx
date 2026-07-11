@@ -149,6 +149,11 @@ export default function UserProfile() {
 
   const showToast = (msg, type='ok') => { setToast(msg); setToastType(type); setTimeout(()=>setToast(''),3500); };
 
+  /* Debug tab changes */
+  useEffect(() => {
+    console.log('[UserProfile] Tab changed to:', tab);
+  }, [tab]);
+
   useEffect(() => { if (!user) navigate('/login'); }, [user, navigate]);
 
   /* Load saved profile + avatar + pending deletion from Firestore */
@@ -689,8 +694,8 @@ export default function UserProfile() {
 
           {/* ── MESSAGES TAB ── */}
           {tab === 'messages' && (
-            <div className="up-panel" style={{ padding: 0, overflow: 'hidden' }}>
-              <UserMessages user={user} />
+            <div className="up-panel" style={{ padding: 0, overflow: 'hidden', minHeight: '500px' }}>
+              <UserMessages key="messages-tab" user={user} />
             </div>
           )}
 
@@ -703,8 +708,8 @@ export default function UserProfile() {
               </div>
 
               {/* Full two-way chat with admin */}
-              <div style={{ padding: '0 0 20px 0' }}>
-                <UserMessages user={user} />
+              <div style={{ padding: '0 0 20px 0', minHeight: '400px' }}>
+                <UserMessages key="contact-tab" user={user} />
               </div>
 
               {/* Contact cards */}
