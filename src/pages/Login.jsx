@@ -359,6 +359,16 @@ export default function Login() {
   const [successMsg,setSuccessMsg]= useState('');
   const [showReset, setShowReset] = useState(false);
   const { showError, showSuccess, ToastComponent } = useToast();
+  const [navigationTimeout, setNavigationTimeout] = useState(null);
+  
+  // Cleanup timeout on unmount to prevent navigation after unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeout) {
+        clearTimeout(navigationTimeout);
+      }
+    };
+  }, [navigationTimeout]);
   
   // Use our form validation hook
   const form = useAuthFormValidation('login', {
@@ -382,10 +392,25 @@ export default function Login() {
     setSuccessMsg(message);
     showSuccess(message);
     
-    // Ensure navigation happens after success message is shown
-    setTimeout(() => {
-      navigate(from, { replace: true });
+    // Enhanced navigation with fallback for all devices
+    console.log('[Login] Navigating after successful login to:', from);
+    
+    // Clear any existing navigation timeouts
+    const timeoutId = setTimeout(() => {
+      try {
+        // Primary navigation attempt
+        navigate(from, { replace: true });
+        console.log('[Login] Navigation completed successfully');
+      } catch (navError) {
+        console.error('[Login] Navigation failed, using fallback:', navError);
+        // Fallback: direct window location change
+        window.location.href = from === '/login' ? '/' : from;
+      }
     }, 1000); // 1 second delay to show success message
+    
+    // Store timeout ID for cleanup
+    setNavigationTimeout(timeoutId);
+    return timeoutId;
   };
   const editCtx = useEditMode();
 
