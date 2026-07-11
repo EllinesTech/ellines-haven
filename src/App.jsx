@@ -179,17 +179,19 @@ function VisitorTracker() {
     // Skip admin and reader pages — don't track admin browsing as site visitors
     if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
-    // One anonymous visit per browser session (prevents double-counting SPA navigation)
-    // But if a user logs in mid-session, re-track once to attach their info
-    const alreadyTracked = sessionStorage.getItem(VISITOR_SESSION_KEY);
-    const trackedEmail   = sessionStorage.getItem(VISITOR_SESSION_KEY + '_user') || '';
-    const currentEmail   = user?.email || '';
+    // Track visitors more liberally - only prevent obvious spam/duplicates within same session
+    const sessionKey = VISITOR_SESSION_KEY + '_' + (user?.email || 'anon');
+    const lastTracked = sessionStorage.getItem(sessionKey);
+    const now = Date.now();
+    
+    // Only skip if we tracked this exact user state very recently (within 5 minutes)
+    if (lastTracked && (now - parseInt(lastTracked)) < 300000) {
+      console.log('[VisitorTracker] Skipping - recently tracked this user state');
+      return;
+    }
 
-    // Skip if: already tracked as this user (or already tracked anonymously with no user)
-    if (alreadyTracked && trackedEmail === currentEmail) return;
-
-    sessionStorage.setItem(VISITOR_SESSION_KEY, '1');
-    sessionStorage.setItem(VISITOR_SESSION_KEY + '_user', currentEmail);
+    // Mark this tracking attempt
+    sessionStorage.setItem(sessionKey, now.toString());
 
     (async () => {
       try {
@@ -201,11 +203,19 @@ function VisitorTracker() {
         let device = 'Desktop';
         if (/Mobi|Android|iPhone|iPad/i.test(ua)) device = 'Mobile';
         else if (/Tablet|iPad/i.test(ua)) device = 'Tablet';
+        
         const referrer = document.referrer
           ? (() => { try { return new URL(document.referrer).hostname; } catch { return document.referrer.slice(0, 100); } })()
           : 'direct';
 
-        await trackFn({
+        console.log('[VisitorTracker] Tracking visit:', { 
+          pathname, 
+          userEmail: user?.email || 'anonymous', 
+          device,
+          referrer: referrer === location.hostname ? 'internal' : referrer
+        });
+        
+        const result = await trackFn({
           page: pathname,
           referrer,
           userAgent: ua.slice(0, 300),
@@ -213,7 +223,17 @@ function VisitorTracker() {
           userEmail: user?.email || null,
           userName:  user?.name  || null,
         });
-      } catch { /* silent — never block the page */ }
+        
+        if (result?.data?.ok) {
+          console.log('[VisitorTracker] Visit tracked successfully, IP:', result.data.ip);
+        } else {
+          console.warn('[VisitorTracker] Track result not ok:', result?.data);
+        }
+      } catch (error) {
+        console.error('[VisitorTracker] Failed to track visit:', error.message);
+        // Don't mark as successfully tracked if it failed
+        sessionStorage.removeItem(sessionKey);
+      }
     })();
   }, [pathname, user?.email]); // re-run when route or logged-in user changes
 
