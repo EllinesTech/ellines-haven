@@ -253,56 +253,18 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <!-- Service Worker: DISABLED — causes cache corruption across deploys -->
+    <!-- The site is hosted on Cloudflare Pages CDN which handles caching natively. -->
+    <!-- A faulty SW is worse than no SW. PWA install still works via manifest.json. -->
     <script>
-      // ── Service Worker — production only ──────────────────────────────────────
+      // Unregister any old service workers so users who had them get cleaned up
       if ('serviceWorker' in navigator) {
-        const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        if (isLocalhost) {
-          navigator.serviceWorker.getRegistrations().then(regs => {
-            regs.forEach(r => r.unregister());
-          });
-        } else {
-          const RELOAD_KEY = 'eh_sw_reloaded';
-
-          // When the new SW takes control, reload once to serve fresh assets.
-          // Skip reload if the user is actively reading — never interrupt a reader.
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            const isReading = location.pathname.startsWith('/read');
-            if (!sessionStorage.getItem(RELOAD_KEY) && !isReading) {
-              sessionStorage.setItem(RELOAD_KEY, '1');
-              window.location.reload();
-            }
-          });
-
-          window.addEventListener('load', () => {
-            sessionStorage.removeItem(RELOAD_KEY);
-
-            navigator.serviceWorker.register('/sw.js?v=BUILD_STAMP', { updateViaCache: 'none' })
-              .then(reg => {
-                const poll = () => reg.update().catch(() => {});
-                poll();
-                setInterval(poll, 30000);
-                document.addEventListener('visibilitychange', () => {
-                  if (document.visibilityState === 'visible') poll();
-                });
-                window.addEventListener('online', poll);
-
-                if (reg.waiting) {
-                  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                }
-
-                reg.addEventListener('updatefound', () => {
-                  const sw = reg.installing;
-                  if (!sw) return;
-                  sw.addEventListener('statechange', () => {
-                    if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                      sw.postMessage({ type: 'SKIP_WAITING' });
-                    }
-                  });
-                });
-              })
-              .catch(() => {});
-          });
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+        // Clear all SW caches
+        if ('caches' in window) {
+          caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
         }
       }
     </script>
