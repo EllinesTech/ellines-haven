@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc, serverTimestamp, addDoc, collection, query, where,
 import { db } from '../firebase';
 import UserMessages from '../components/UserMessages';
 import { UserNotificationsPanel } from '../components/UserNotifications';
+import OrderReceiptModal from '../components/OrderReceiptModal';
 import { readPath } from '../utils/slugify';
 import './UserProfile.css';
 
@@ -138,6 +139,7 @@ export default function UserProfile() {
   const [toastType,  setToastType]  = useState('ok');
   const [delStep,    setDelStep]    = useState(0); // 0=idle 1=warn 2=confirm
   const [delBusy,    setDelBusy]    = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null); // For receipt modal
 
   /* Pending deletion state */
   const [pendingDel, setPendingDel] = useState(null); // { scheduledAt, daysLeft }
@@ -558,7 +560,17 @@ export default function UserProfile() {
                           {fmtDate(order.date||order.createdAt)} · {order.method} · <strong style={{color:'var(--gold)'}}>KSh {order.total}</strong>
                         </div>
                       </div>
-                      <span className="up-order-row__status">✅ Completed</span>
+                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        <span className="up-order-row__status">✅ Completed</span>
+                        <button 
+                          className="btn btn-sm btn-outline" 
+                          onClick={() => setSelectedOrder(order)}
+                          style={{ fontSize: '0.75rem', padding: '4px 12px', whiteSpace: 'nowrap' }}
+                          title="View detailed receipt"
+                        >
+                          📄 Receipt
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -810,6 +822,15 @@ export default function UserProfile() {
 
         </div>
       </div>
+
+      {/* Receipt Modal */}
+      {selectedOrder && (
+        <OrderReceiptModal 
+          order={selectedOrder} 
+          user={user} 
+          onClose={() => setSelectedOrder(null)} 
+        />
+      )}
     </div>
   );
 }
