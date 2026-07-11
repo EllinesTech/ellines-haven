@@ -585,7 +585,25 @@ export default function BookDetail() {
     && !siteControls?.readOnlyMode
     && myPerms?.canPurchase !== false
     && !NO_PURCHASE_STATUSES.has(book.status);
-  const related = books.filter(b => b.id !== book.id && b.genre === book.genre).slice(0, 3);
+
+  // Smart recommendations: same genre first, then overlapping themes, then anything not owned
+  const related = (() => {
+    const others = books.filter(b => b.id !== book.id);
+    const scored = others.map(b => {
+      let score = 0;
+      if (b.genre === book.genre)  score += 3;
+      const bookThemes = new Set(book.themes || []);
+      (b.themes || []).forEach(t => { if (bookThemes.has(t)) score += 1; });
+      if ((b.genres || []).some(g => (book.genres || []).includes(g))) score += 1;
+      // Slight boost for same audience rating
+      if (b.audienceRating === book.audienceRating) score += 0.5;
+      return { b, score };
+    });
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4)
+      .map(x => x.b);
+  })();
 
   return (
     <main>
@@ -839,7 +857,12 @@ export default function BookDetail() {
         <section className="section">
           <div className="container">
             <h2 className="bd-related-title">You Might Also <span className="gold-text">Like</span></h2>
-            <div className="bd-related-grid" style={{marginTop:'28px'}}>{related.map(b => <BookCard key={b.id} book={b} />)}</div>
+            <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:24, marginTop:4 }}>
+              Based on genre, themes, and reading style
+            </p>
+            <div className="bd-related-grid" style={{ marginTop:'8px', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))' }}>
+              {related.map(b => <BookCard key={b.id} book={b} />)}
+            </div>
           </div>
         </section>
       )}

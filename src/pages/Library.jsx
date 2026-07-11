@@ -7,6 +7,7 @@ import EditableField from '../components/EditableField';
 import { GENRES } from '../data/books';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Library.css';
 
 const LIB_DEFAULTS = {
@@ -69,6 +70,10 @@ const PRIMARY_GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Sho
 
 export default function Library() {
   const { books: allBooks, myPerms } = useApp();
+  usePageMeta({
+    title: 'The Library',
+    description: 'Browse all novels and short stories by Elijah Mwangi M — original East African fiction. Buy, read online, and download.',
+  });
   const editCtx = useEditMode();
   const lc = useLibContent();
   // Merge edit context on top when editing

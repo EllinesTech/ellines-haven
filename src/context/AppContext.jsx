@@ -3,7 +3,7 @@ import { BOOKS as INITIAL_BOOKS } from '../data/books';
 import { titleToSlug } from '../utils/slugify';
 import {
   doc, getDoc, setDoc, updateDoc,
-  collection, onSnapshot, serverTimestamp,
+  collection, onSnapshot, serverTimestamp, getDocs,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -360,6 +360,109 @@ export function AppProvider({ children }) {
     const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
     setWishlistState(load(key, []));
   }, [user?.email]); // eslint-disable-line
+
+  // ── Referral System ─────────────────────────────────────────────────────────
+  // Each user gets a unique referral code (e.g., MARK25) which gives 10% off
+  // to the person who uses it, and 5% credit to the referrer when purchase completes.
+  const [referralData, setReferralData] = useState(null); // { code, earnings, referrals: [] }
+
+  // Generate referral code from user name/email (e.g., "Mark J" → "MARK25")
+  const generateReferralCode = (userName, userEmail) => {
+    const base = (userName || userEmail).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    const suffix = Math.floor(Math.random() * 100);
+    return `${base}${suffix}`;
+  };
+
+  // Load referral data from Firestore
+  useEffect(() => {
+    if (!user?.email) { setReferralData(null); return; }
+    const refDoc = doc(db, 'referrals', libDocId(user.email));
+    const unsub = onSnapshot(refDoc, (snap) => {
+      if (snap.exists()) {
+        setReferralData(snap.data());
+      } else {
+        // Create referral code on first load
+        const newCode = generateReferralCode(user.name, user.email);
+        const initial = {
+          code: newCode,
+          userEmail: user.email.toLowerCase(),
+          userName: user.name || user.email,
+          earnings: 0, // KSh credit earned
+          referrals: [], // [{ email, name, date, orderValue, credit }]
+          createdAt: serverTimestamp(),
+        };
+        setDoc(refDoc, initial).catch(() => {});
+        setReferralData(initial);
+      }
+    });
+    return () => unsub();
+  }, [user?.email]); // eslint-disable-line
+
+  // Apply referral code discount (called in Cart when user enters ref code)
+  const applyReferralDiscount = async (refCode) => {
+    try {
+      const allRefs = await getDocs(collection(db, 'referrals'));
+      const found = allRefs.docs.find(d => d.data().code?.toUpperCase() === refCode.toUpperCase());
+      if (!found) return { success: false, error: 'Invalid referral code' };
+      
+      const refData = found.data();
+      // Don't allow users to use their own code
+      if (user && refData.userEmail === user.email.toLowerCase()) {
+        return { success: false, error: "You can't use your own referral code" };
+      }
+
+      return {
+        success: true,
+        discount: 10, // 10% discount for the referee
+        referrerEmail: refData.userEmail,
+        referrerName: refData.userName,
+      };
+    } catch {
+      return { success: false, error: 'Failed to verify referral code' };
+    }
+  };
+
+  // Track referral conversion (called after successful purchase)
+  const trackReferralConversion = async (refCode, orderValue, buyerEmail, buyerName) => {
+    try {
+      const allRefs = await getDocs(collection(db, 'referrals'));
+      const found = allRefs.docs.find(d => d.data().code?.toUpperCase() === refCode.toUpperCase());
+      if (!found) return;
+
+      const refData = found.data();
+      const credit = Math.round(orderValue * 0.05); // 5% credit for referrer
+
+      const newReferral = {
+        email: buyerEmail,
+        name: buyerName,
+        date: new Date().toISOString(),
+        orderValue,
+        credit,
+      };
+
+      await updateDoc(found.ref, {
+        earnings: (refData.earnings || 0) + credit,
+        referrals: [...(refData.referrals || []), newReferral],
+        updatedAt: serverTimestamp(),
+      });
+
+      // Notify referrer
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        await trackActivity({
+          category: NOTIFICATION_CATEGORIES.REFERRAL_EARNED,
+          title: '💰 Referral Credit Earned',
+          message: `${refData.userName} earned KSh ${credit} credit from ${buyerName}'s purchase`,
+          userEmail: refData.userEmail,
+          userName: refData.userName,
+          metadata: { refCode, orderValue, credit, buyerEmail },
+          priority: 'normal',
+        });
+      } catch {}
+    } catch (err) {
+      console.error('[Referral tracking]', err);
+    }
+  };
 
   // ── Reload cart when user changes (login / logout) ────────────────────────
   // On login: merge any guest cart items into the user's saved cart
@@ -740,6 +843,8 @@ export function AppProvider({ children }) {
       siteControls, saveSiteControls,
       // Wishlist
       wishlist, toggleWishlist, isWishlisted,
+      // Referral system
+      referralData, applyReferralDiscount, trackReferralConversion,
       // Book lookup by slug or ID
       getBookBySlugOrId,
     }}>

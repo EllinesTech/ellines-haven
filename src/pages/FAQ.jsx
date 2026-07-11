@@ -4,6 +4,7 @@ import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './FAQ.css';
 
 const FAQS = [
@@ -165,6 +166,10 @@ function FAQItem({ q, a }) {
 }
 
 export default function FAQ() {
+  usePageMeta({
+    title: 'FAQ — Frequently Asked Questions',
+    description: 'Answers to common questions about payments, reading, downloads, account access, and more on Ellines Haven.',
+  });
   const [activeCategory, setActiveCategory] = useState('');
   const [search, setSearch] = useState('');
 

@@ -558,6 +558,56 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
               <button key={a.l} className="btn btn-ghost btn-sm" onClick={()=>setConfirmGate({label:a.l+'?',action:a.action})} style={{textAlign:'left'}}>{a.l}</button>
             ))}
           </div>
+
+          {/* ── Export Users CSV ── */}
+          <div className="card" style={{padding:20}}>
+            <h3 style={{fontSize:'0.92rem',marginBottom:8,color:'var(--gold)'}}>📊 Export Users CSV</h3>
+            <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>Download all registered users as a CSV spreadsheet.</p>
+            <button className="btn btn-outline btn-sm" onClick={()=>{
+              const rows = [
+                ['Name','Email','Role','Joined','Phone','Status'],
+                ...allUsers.map(u=>[
+                  u.name||'',
+                  u.email||'',
+                  u.role||'user',
+                  u.joined||u.createdAt||'',
+                  u.phone||'',
+                  isUserSuspended?.(u.email)?'Suspended':'Active',
+                ])
+              ];
+              const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+              const blob = new Blob([csv],{type:'text/csv'});
+              const url  = URL.createObjectURL(blob);
+              const a    = document.createElement('a');
+              a.href=url; a.download=`users-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+              URL.revokeObjectURL(url);
+              showToast?.('✅ Users exported');
+            }}>
+              ⬇ Download CSV ({allUsers.length} users)
+            </button>
+          </div>
+
+          {/* ── Transfer Book ── */}
+          <div className="card" style={{padding:20}}>
+            <h3 style={{fontSize:'0.92rem',marginBottom:8,color:'var(--gold)'}}>🎁 Gift Book to User</h3>
+            <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>Manually gift a book to any user (free unlock).</p>
+            <select className="field" value={selectedBook} onChange={e=>setSelectedBook(e.target.value)} style={{width:'100%',marginBottom:8}}>
+              <option value="">Select book…</option>
+              {(books||[]).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
+            </select>
+            <input className="field" value={transferEmail} onChange={e=>setTransferEmail(e.target.value)} placeholder="Recipient email address" style={{marginBottom:10}} />
+            <button className="btn btn-primary btn-sm" disabled={!selectedBook||!transferEmail.includes('@')}
+              onClick={async()=>{
+                const book=(books||[]).find(b=>b.id===selectedBook);
+                if(!book||!transferEmail) return;
+                await manualUnlock?.(transferEmail.trim().toLowerCase(), book.id);
+                showToast?.(`✅ "${book.title}" gifted to ${transferEmail}`);
+                setTransferEmail(''); setSelectedBook('');
+              }}>
+              🎁 Gift Book
+            </button>
+          </div>
+
           <div className="card" style={{padding:20,gridColumn:'1/-1'}}>
             <h3 style={{fontSize:'0.92rem',marginBottom:12,color:'var(--gold)'}}>📚 Bulk Unlock Book for All Users</h3>
             <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>This will unlock the selected book for every registered user — use for free releases or promotions.</p>

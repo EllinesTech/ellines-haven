@@ -7,6 +7,9 @@ import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProg
 import { isBookSavedOffline, saveBookOffline, removeOfflineBook } from '../hooks/useOfflineBook';
 import { bookPath, readPath } from '../utils/slugify';
 import { getFallbackChapters } from '../data/bookChapters';
+import { usePageMeta } from '../hooks/usePageMeta';
+import ReferralDashboard from '../components/ReferralDashboard';
+import OrderReceiptModal from '../components/OrderReceiptModal';
 import './MyLibrary.css';
 
 // Helper: get a map of bookId -> progress for current user
@@ -542,14 +545,172 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
   );
 }
 
+// -- Reading Leaderboard Panel -----------------------------------------------
+// Reads from user_profiles collection where users have opted in (showInLeaders pref)
+// Falls back to a local-only view showing just the current user's stats
+function ReadingLeaderboard({ user, catalog }) {
+  const [leaders,  setLeaders]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [myRank,   setMyRank]   = useState(null);
+
+  useEffect(() => {
+    // Opt-in check — user can disable via Account > Privacy > Reading leaderboard
+    const prefKey = 'eh_user_prefs_' + (user?.email || '');
+    const prefs = (() => { try { return JSON.parse(localStorage.getItem(prefKey) || '{}'); } catch { return {}; } })();
+    const showInLeaders = prefs.showInLeaders !== false; // default true
+
+    // Write current user's stats to user_profiles so they appear on leaderboard
+    const myStats  = getAllReadingStats(user.email);
+    const myBooks  = Object.keys(myStats).length;
+    const myChaps  = Object.values(myStats).reduce((s, v) => s + (v.chapter || 0), 0);
+    const myStreak = (() => {
+      const last7 = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - i);
+        return d.toLocaleDateString('en-KE');
+      });
+      const activeDays = new Set(Object.values(myStats).map(s => s.lastRead ? new Date(s.lastRead).toLocaleDateString('en-KE') : null).filter(Boolean));
+      return last7.filter(d => activeDays.has(d)).length;
+    })();
+
+    if (showInLeaders && user?.email) {
+      import('firebase/firestore').then(({ doc, setDoc, serverTimestamp }) => {
+        import('../firebase').then(({ db }) => {
+          setDoc(doc(db, 'user_profiles', user.email.toLowerCase()), {
+            name:         user.name,
+            email:        user.email.toLowerCase(),
+            booksStarted: myBooks,
+            chaptersRead: myChaps,
+            streakDays:   myStreak,
+            showInLeaders: true,
+            updatedAt:    serverTimestamp(),
+          }, { merge: true }).catch(() => {});
+        });
+      });
+    }
+
+    // Load leaderboard from Firestore
+    import('firebase/firestore').then(({ collection, query, where, orderBy, limit, getDocs }) => {
+      import('../firebase').then(({ db }) => {
+        getDocs(query(
+          collection(db, 'user_profiles'),
+          where('showInLeaders', '==', true),
+          orderBy('booksStarted', 'desc'),
+          limit(50)
+        )).then(snap => {
+          const rows = snap.docs.map((d, i) => ({
+            rank:   i + 1,
+            name:   d.data().name   || 'Reader',
+            email:  d.data().email  || '',
+            books:  d.data().booksStarted || 0,
+            chaps:  d.data().chaptersRead || 0,
+            streak: d.data().streakDays   || 0,
+            isMe:   d.data().email?.toLowerCase() === user?.email?.toLowerCase(),
+          }));
+          setLeaders(rows);
+          const rank = rows.find(r => r.isMe);
+          setMyRank(rank?.rank || null);
+          setLoading(false);
+        }).catch(() => setLoading(false));
+      });
+    });
+  }, [user?.email]); // eslint-disable-line
+
+  const medals = ['🥇','🥈','🥉'];
+
+  return (
+    <div style={{ maxWidth: 680, margin: '0 auto' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h2 style={{ fontSize:'1.15rem', color:'var(--gold)', marginBottom:6 }}>🏆 Reading Leaderboard</h2>
+        <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>
+          Top readers on Ellines Haven — ranked by books started. Your position is based on your reading activity.
+          {myRank && <strong style={{ color:'var(--gold)', marginLeft:6 }}>You are ranked #{myRank}.</strong>}
+        </p>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign:'center', padding:'40px 0', color:'var(--muted)' }}>Loading leaderboard…</div>
+      ) : leaders.length === 0 ? (
+        <div className="card" style={{ padding:'32px', textAlign:'center' }}>
+          <div style={{ fontSize:'2.5rem', marginBottom:12 }}>📚</div>
+          <h3>No leaderboard data yet</h3>
+          <p style={{ color:'var(--muted)', fontSize:'0.84rem' }}>Start reading to appear here. Enable leaderboard visibility in Account → Privacy.</p>
+        </div>
+      ) : (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:'1px solid var(--dim)' }}>
+                {['Rank','Reader','Books','Chapters','7-day Streak'].map(h => (
+                  <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontSize:'0.72rem', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', color:'var(--muted)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {leaders.map(l => (
+                <tr key={l.email} style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  background: l.isMe ? 'rgba(201,168,76,0.07)' : 'transparent',
+                  transition: 'background 0.15s',
+                }}>
+                  <td style={{ padding:'10px 14px', fontWeight:700, fontSize:'0.95rem', color: l.rank <= 3 ? 'var(--gold)' : 'var(--muted)' }}>
+                    {medals[l.rank - 1] || `#${l.rank}`}
+                  </td>
+                  <td style={{ padding:'10px 14px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <div style={{ width:32, height:32, borderRadius:'50%', background:'rgba(201,168,76,0.15)', border:'1px solid rgba(201,168,76,0.3)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'0.85rem', color:'var(--gold)', flexShrink:0 }}>
+                        {(l.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight:600, fontSize:'0.88rem', color: l.isMe ? 'var(--gold)' : 'var(--text)' }}>
+                          {l.isMe ? `${l.name} (You)` : l.name}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding:'10px 14px', fontWeight:700, color:'var(--text)' }}>{l.books}</td>
+                  <td style={{ padding:'10px 14px', color:'var(--muted)' }}>{l.chaps}</td>
+                  <td style={{ padding:'10px 14px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      {l.streak > 0 ? (
+                        <>
+                          <span style={{ fontSize:'0.9rem' }}>🔥</span>
+                          <span style={{ fontWeight:600, color: l.streak >= 5 ? '#e8832a' : 'var(--text)' }}>{l.streak}/7</span>
+                        </>
+                      ) : (
+                        <span style={{ color:'var(--muted)', fontSize:'0.82rem' }}>—</span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p style={{ fontSize:'0.74rem', color:'var(--muted)', marginTop:14, textAlign:'center' }}>
+        Your name only appears if you have "Reading leaderboard" turned on in Account → Privacy settings.
+      </p>
+    </div>
+  );
+}
+
 // -- Main MyLibrary Page -----------------------------------------------------
 export default function MyLibrary() {
-  const { user, library, books: catalog, myPerms, removeFromMyLibrary, siteControls } = useApp();
+  const { user, library, books: catalog, myPerms, removeFromMyLibrary, siteControls, wishlist } = useApp();
+  
+  usePageMeta({
+    title: 'My Library',
+    description: 'Access all your purchased books, orders, reading stats, and offline downloads — your personal digital library.',
+  });
+
   const [liveOrders, setLiveOrders] = useState([]);
   const [activeTab,  setActiveTab]  = useState('library');
   const [removingBook, setRemovingBook] = useState(null); // bookId being confirmed for removal
   // Track offline save state per-book: { [bookId]: 'saved' | 'saving' | false }
   const [offlineState, setOfflineState] = useState({});
+  // For receipt modal
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     if (!user?.email) {
@@ -633,10 +794,13 @@ export default function MyLibrary() {
   });
 
   const TABS = [
-    { k:'library', label:'My Books',  badge: library.length   || null  },
-    { k:'orders',  label:'Orders',    badge: myPending.length || null  },
-    { k:'stats',   label:'Stats',     badge: null                       },
-    { k:'account', label:'Account',   badge: null                       },
+    { k:'library',     label:'My Books',    badge: library.length   || null  },
+    { k:'wishlist',    label:'Wishlist',    badge: wishlist.length  || null  },
+    { k:'referral',    label:'Referrals',   badge: null                       },
+    { k:'orders',      label:'Orders',      badge: myPending.length || null  },
+    { k:'stats',       label:'Stats',       badge: null                       },
+    { k:'leaderboard', label:'Leaderboard', badge: null                       },
+    { k:'account',     label:'Account',     badge: null                       },
   ];
 
   return (
@@ -904,6 +1068,94 @@ export default function MyLibrary() {
           </>
         )}
 
+        {/* -- WISHLIST TAB -- */}
+        {activeTab === 'wishlist' && (
+          <>
+            {wishlist.length === 0 ? (
+              <div className="mylib-empty">
+                <div className="mylib-empty-icon">💛</div>
+                <h3>Your wishlist is empty</h3>
+                <p>Add books to your wishlist to save them for later. We'll notify you when they go on sale!</p>
+                <Link to="/library" className="btn btn-primary">Browse Books</Link>
+              </div>
+            ) : (
+              <div className="mylib-grid">
+                {wishlist.map(b => {
+                  const owned     = library.some(lib => lib.id === b.id);
+                  const sm        = STATUS_META[b.status || 'complete'] || STATUS_META.complete;
+                  return (
+                    <div key={b.id} className={'mylib-card card' + (owned ? ' mylib-card--owned' : '')}>
+                      <div className="mylib-card__cover-wrap">
+                        {b.coverType === 'photo' && b.cover
+                          ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
+                          : <div className="mylib-card__cover mylib-card__cover--styled"
+                              style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
+                              <span style={{ fontSize:'1.6rem', opacity:0.35 }}>&#128218;</span>
+                            </div>
+                        }
+                        {owned && (
+                          <div className="mylib-reading-badge" style={{ background: 'var(--ok)' }}>
+                            ✓ Owned
+                          </div>
+                        )}
+                        {b.status && b.status !== 'complete' && (
+                          <span className="mylib-card__status-badge" style={{ background: sm.bg, color: sm.color, border:`1px solid ${sm.color}40` }}>
+                            {sm.icon} {sm.label}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mylib-card__body">
+                        <span className="mylib-card__genre">{b.genre}</span>
+                        <h3 className="mylib-card__title">{b.title}</h3>
+                        <p className="mylib-card__author">by {b.author}</p>
+                        {(b.pages > 0 || b.readTime) && (
+                          <p className="mylib-card__meta">
+                            {b.pages > 0 ? `${b.pages} pages` : ''}
+                            {b.pages > 0 && b.readTime ? ' · ' : ''}
+                            {b.readTime}
+                          </p>
+                        )}
+                        
+                        {b.price > 0 && (
+                          <div style={{ 
+                            fontSize: '1.1rem', 
+                            fontWeight: 700, 
+                            color: 'var(--gold)', 
+                            marginTop: 8,
+                            marginBottom: 8 
+                          }}>
+                            KSh {b.price.toLocaleString()}
+                          </div>
+                        )}
+
+                        <div className="mylib-card__actions">
+                          {owned ? (
+                            <>
+                              <Link to={readPath(b)} className="btn btn-primary btn-sm">Read Now</Link>
+                              <Link to={bookPath(b)} className="btn btn-ghost btn-sm">View</Link>
+                            </>
+                          ) : (
+                            <>
+                              <Link to={bookPath(b)} className="btn btn-primary btn-sm">Buy Now</Link>
+                              <Link to={bookPath(b)} className="btn btn-ghost btn-sm">Details</Link>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* -- REFERRAL TAB -- */}
+        {activeTab === 'referral' && (
+          <ReferralDashboard user={user} />
+        )}
+
         {/* -- ORDERS TAB -- */}
         {activeTab === 'orders' && (
           <div className="mylib-orders">
@@ -962,6 +1214,16 @@ export default function MyLibrary() {
                               style={{ background: statusBg, color: statusColor, border:`1px solid ${statusColor}40` }}>
                               {o.status}
                             </span>
+                            {o.status === 'Completed' && (
+                              <button 
+                                className="btn btn-sm btn-outline" 
+                                onClick={() => setSelectedOrder(o)}
+                                style={{ fontSize: '0.75rem', padding: '4px 12px', marginTop: '6px', whiteSpace: 'nowrap' }}
+                                title="View detailed receipt"
+                              >
+                                📄 Receipt
+                              </button>
+                            )}
                           </div>
                         </div>
                         {o.status === 'Pending' && (
@@ -989,7 +1251,21 @@ export default function MyLibrary() {
           />
         )}
 
+        {/* -- LEADERBOARD TAB -- */}
+        {activeTab === 'leaderboard' && (
+          <ReadingLeaderboard user={user} catalog={catalog} />
+        )}
+
       </div>
+
+      {/* Receipt Modal */}
+      {selectedOrder && (
+        <OrderReceiptModal
+          order={selectedOrder}
+          user={user}
+          onClose={() => setSelectedOrder(null)}
+        />
+      )}
     </main>
   );
 }

@@ -11,6 +11,7 @@ import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAllReadingStats } from '../hooks/useReadingProgress';
 import { bookPath, readPath } from '../utils/slugify';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Home.css';
 
 /* ── Firestore-backed site content (editable via Page Editor) ── */
@@ -329,6 +330,10 @@ function PersonalisedSection({ user, library, books }) {
 
 export default function Home() {
   const { books, user, library } = useApp();
+  usePageMeta({
+    title: "Kenya's Premier Literary Platform",
+    description: 'Original novels and short stories by Elijah Mwangi M — drawn from real lives, real heartbreaks, and the soul of East Africa. Buy once. Read forever.',
+  });
   const editCtx = useEditMode();
   const c = useHomeContent();
 
