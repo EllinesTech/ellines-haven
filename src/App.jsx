@@ -268,20 +268,28 @@ function VisitorTracker() {
   const { user } = useApp();
 
   useEffect(() => {
+    console.log('[VisitorTracker] Component mounted/updated, pathname:', pathname);
+    
     // Skip admin and reader pages — don't track admin browsing as site visitors
-    if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
+    if (pathname.startsWith('/admin') || pathname.startsWith('/read')) {
+      console.log('[VisitorTracker] Skipping - admin or read page');
+      return;
+    }
 
-    // Track page visits with reduced cooldown for better capture
+    // Track page visits with VERY short cooldown for testing (10 seconds instead of 60)
     const sessionKey = 'eh_visitor_' + pathname + '_' + (user?.email || 'anon');
     const lastTracked = sessionStorage.getItem(sessionKey);
     const now = Date.now();
     
-    // Only skip if we tracked this exact page very recently (within 60 seconds)
-    if (lastTracked && (now - parseInt(lastTracked)) < 60000) {
-      console.log('[VisitorTracker] Skipping - recently tracked this page');
+    // Only skip if we tracked this exact page very recently (within 10 seconds FOR TESTING)
+    if (lastTracked && (now - parseInt(lastTracked)) < 10000) {
+      console.log('[VisitorTracker] Skipping - recently tracked this page', {
+        lastTracked, now, diff: now - parseInt(lastTracked)
+      });
       return;
     }
 
+    console.log('[VisitorTracker] Will track this page visit');
     // Mark this tracking attempt
     sessionStorage.setItem(sessionKey, now.toString());
 
@@ -289,6 +297,7 @@ function VisitorTracker() {
       try {
         // Import the tracking utility
         const { trackVisitorReliable } = await import('./utils/visitorTracker');
+        console.log('[VisitorTracker] trackVisitorReliable imported successfully');
 
         const ua = navigator.userAgent || '';
         let device = 'Desktop';
@@ -308,13 +317,15 @@ function VisitorTracker() {
           userName:  user?.name  || null,
         };
 
-        console.log('[VisitorTracker] Tracking page visit:', pathname);
+        console.log('[VisitorTracker] About to track with data:', trackData);
         
         // Use reliable tracking with retry queue
         const result = await trackVisitorReliable(trackData);
         
+        console.log('[VisitorTracker] trackVisitorReliable returned:', result);
+        
         if (result.success) {
-          console.log('[VisitorTracker] ✅ Visit tracked');
+          console.log('[VisitorTracker] ✅ Visit tracked successfully');
           // Cache full geo data for PresenceTracker heartbeats
           try {
             sessionStorage.setItem('eh_last_ip_data', JSON.stringify(result.data));
@@ -323,7 +334,12 @@ function VisitorTracker() {
           console.error('[VisitorTracker] ❌ Failed to track:', result.error);
         }
       } catch (error) {
-        console.error('[VisitorTracker] ❌ Unexpected error:', error.message);
+        console.error('[VisitorTracker] ❌ Unexpected error:', error);
+        console.error('[VisitorTracker] Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack?.substring(0, 500)
+        });
       }
     })();
   }, [pathname, user?.email]);
