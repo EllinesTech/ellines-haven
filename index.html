@@ -281,7 +281,7 @@
               .then(reg => {
                 const poll = () => reg.update().catch(() => {});
                 poll();
-                setInterval(poll, 60000);
+                setInterval(poll, 30000);
                 document.addEventListener('visibilitychange', () => {
                   if (document.visibilityState === 'visible') poll();
                 });
