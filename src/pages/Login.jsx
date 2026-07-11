@@ -354,7 +354,6 @@ export default function Login() {
   const { setUser, user } = useApp();
   const navigate    = useNavigate();
   const loc         = useLocation();
-  const from        = loc.state?.from?.pathname || '/';
   const [showPw,    setShowPw]    = useState(false);
   const [successMsg,setSuccessMsg]= useState('');
   const [showReset, setShowReset] = useState(false);
@@ -363,11 +362,14 @@ export default function Login() {
 
   // ── Redirect immediately if user is already logged in ─────────────────────
   useEffect(() => {
-    if (user) {
-      const targetPath = from === '/login' ? '/' : from;
-      navigate(targetPath, { replace: true });
-    }
-  }, [user, from, navigate]);
+    if (!user) return;
+    // Determine where to go — avoid redirect loops
+    const raw = loc.state?.from?.pathname;
+    const safe = raw && raw !== '/login' && raw !== '/register' ? raw : '/';
+    // Use window.location for guaranteed navigation (React Router navigate
+    // can silently fail inside nested route layouts on some deployments)
+    window.location.replace(safe);
+  }, [user]); // eslint-disable-line
 
   // Cleanup timeout on unmount to prevent navigation after unmount
   useEffect(() => {
@@ -396,18 +398,16 @@ export default function Login() {
   }, [form.setValue]);
 
   const showLoginSuccess = (name) => {
-    const message = `Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`;
+    const message = `Login successful — welcome back${name ? ', ' + name : ''}!`;
     setSuccessMsg(message);
     showSuccess(message);
-    // Navigation is handled by the useEffect that watches `user` state above.
-    // We keep a short timeout as a hard fallback for devices where the effect
-    // is slow to fire.
-    const targetPath = from === '/login' ? '/' : from;
+    // Navigate immediately via window.location — bypasses any React Router quirks
+    // Small delay (400ms) so the success message is briefly visible
+    const raw = loc.state?.from?.pathname;
+    const targetPath = raw && raw !== '/login' && raw !== '/register' ? raw : '/';
     const timeoutId = setTimeout(() => {
-      if (window.location.pathname === '/login') {
-        window.location.href = targetPath;
-      }
-    }, 2000);
+      window.location.replace(targetPath);
+    }, 400);
     setNavigationTimeout(timeoutId);
     return timeoutId;
   };
