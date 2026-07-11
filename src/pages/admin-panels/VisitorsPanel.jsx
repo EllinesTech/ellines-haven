@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, limit, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const fmtDate = ts => {
@@ -88,25 +88,38 @@ export default function VisitorsPanel({ showToast }) {
 
   useEffect(() => {
     setLoading(true);
-    // No orderBy — sort client-side so docs without visitedAt are still included.
-    // Firestore silently excludes documents that lack the ordered field.
-    const q = query(collection(db, 'site_visitors'), limit(500));
+    console.log('[VisitorsPanel] Setting up listener for site_visitors collection...');
+    
+    // Order by visitedAtMs (most recent first) so we get the newest visitors
+    const q = query(
+      collection(db, 'site_visitors'), 
+      orderBy('visitedAtMs', 'desc'),
+      limit(500)
+    );
+    
     const unsub = onSnapshot(q, snap => {
-      const data = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        // Sort newest-first client-side; handle Timestamp, ms number, or missing
-        .sort((a, b) => {
-          const ta = a.visitedAt?.toMillis?.() ?? (typeof a.visitedAt === 'number' ? a.visitedAt : a.visitedAtMs || 0);
-          const tb = b.visitedAt?.toMillis?.() ?? (typeof b.visitedAt === 'number' ? b.visitedAt : b.visitedAtMs || 0);
-          return tb - ta;
-        });
+      console.log(`[VisitorsPanel] Received ${snap.docs.length} visitors`);
+      const data = snap.docs.map(d => {
+        const docData = d.data();
+        console.log('[VisitorsPanel] Visitor doc:', { id: d.id, ...docData });
+        return { id: d.id, ...docData };
+      });
+      
       setVisitors(data);
       calcStats(data);
       setLoading(false);
+      
+      if (data.length === 0) {
+        console.warn('[VisitorsPanel] ⚠️ No visitor data found — check if trackVisitor is working');
+      } else {
+        console.log('[VisitorsPanel] ✅ Successfully loaded', data.length, 'visitors');
+      }
     }, err => {
-      console.error('[VisitorsPanel]', err);
+      console.error('[VisitorsPanel] ❌ Listener error:', err);
+      console.error('[VisitorsPanel] Error details:', { code: err.code, message: err.message });
       setLoading(false);
     });
+    
     return () => unsub();
   }, []);
 

@@ -263,8 +263,6 @@ function ScrollToTop() {
 }
 
 /* ── Visitor Tracker — server-side real IP via Cloud Function (callable) ── */
-const VISITOR_SESSION_KEY = 'eh_visitor_logged';
-
 function VisitorTracker() {
   const { pathname } = useLocation();
   const { user } = useApp();
@@ -273,14 +271,14 @@ function VisitorTracker() {
     // Skip admin and reader pages — don't track admin browsing as site visitors
     if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
-    // Track more liberally - reduce cooldown to 2 minutes for better capture
-    const sessionKey = VISITOR_SESSION_KEY + '_' + (user?.email || 'anon');
+    // Track page visits with reduced cooldown for better capture
+    const sessionKey = 'eh_visitor_' + pathname + '_' + (user?.email || 'anon');
     const lastTracked = sessionStorage.getItem(sessionKey);
     const now = Date.now();
     
-    // Only skip if we tracked this exact user state very recently (within 2 minutes)
-    if (lastTracked && (now - parseInt(lastTracked)) < 120000) {
-      console.log('[VisitorTracker] Skipping - recently tracked this user state');
+    // Only skip if we tracked this exact page very recently (within 60 seconds)
+    if (lastTracked && (now - parseInt(lastTracked)) < 60000) {
+      console.log('[VisitorTracker] Skipping - recently tracked this page');
       return;
     }
 
@@ -289,10 +287,8 @@ function VisitorTracker() {
 
     (async () => {
       try {
-        console.log('[VisitorTracker] Starting tracking attempt...');
-        
-        // Use the centralized firebase import
-        const { callTrackVisitor } = await import('./firebase');
+        // Import the tracking utility
+        const { trackVisitorReliable } = await import('./utils/visitorTracker');
 
         const ua = navigator.userAgent || '';
         let device = 'Desktop';
@@ -312,36 +308,44 @@ function VisitorTracker() {
           userName:  user?.name  || null,
         };
 
-        console.log('[VisitorTracker] Tracking data:', trackData);
-        console.log('[VisitorTracker] Calling Cloud Function...');
+        console.log('[VisitorTracker] Tracking page visit:', pathname);
         
-        const result = await callTrackVisitor(trackData);
+        // Use reliable tracking with retry queue
+        const result = await trackVisitorReliable(trackData);
         
-        console.log('[VisitorTracker] Cloud Function result:', result);
-        
-        if (result?.data?.ok) {
-          console.log('[VisitorTracker] ✅ Visit tracked successfully, IP:', result.data.ip);
+        if (result.success) {
+          console.log('[VisitorTracker] ✅ Visit tracked');
           // Cache full geo data for PresenceTracker heartbeats
           try {
-            const { ok: _ok, ...geoData } = result.data;
-            sessionStorage.setItem('eh_last_ip_data', JSON.stringify(geoData));
+            sessionStorage.setItem('eh_last_ip_data', JSON.stringify(result.data));
           } catch {}
         } else {
-          console.error('[VisitorTracker] ❌ Track result not ok:', result?.data);
+          console.error('[VisitorTracker] ❌ Failed to track:', result.error);
         }
       } catch (error) {
-        console.error('[VisitorTracker] ❌ Failed to track visit:', error);
-        console.error('[VisitorTracker] Error details:', {
-          name: error.name,
-          message: error.message,
-          code: error.code,
-          stack: error.stack?.substring(0, 500)
-        });
-        // Don't mark as successfully tracked if it failed
-        sessionStorage.removeItem(sessionKey);
+        console.error('[VisitorTracker] ❌ Unexpected error:', error.message);
       }
     })();
-  }, [pathname, user?.email]); // re-run when route or logged-in user changes
+  }, [pathname, user?.email]);
+
+  return null;
+}
+
+/* ── Initialize visitor tracking queue on app start ── */
+function VisitorQueueProcessor() {
+  useEffect(() => {
+    (async () => {
+      try {
+        const { processVisitorQueue } = await import('./utils/visitorTracker');
+        const result = await processVisitorQueue();
+        if (result.processed > 0) {
+          console.log('[VisitorQueueProcessor] ✅ Processed', result.processed, 'queued visitor tracking attempts');
+        }
+      } catch (e) {
+        console.warn('[VisitorQueueProcessor] Failed to process queue:', e);
+      }
+    })();
+  }, []); // Run once on mount
 
   return null;
 }
@@ -816,6 +820,7 @@ export default function App() {
         <EditModeProvider>
           <BrowserRouter>
             <ScrollToTop />
+            <VisitorQueueProcessor />
             <VisitorTracker />
             <ActivityTracker />
             <PresenceTracker />
