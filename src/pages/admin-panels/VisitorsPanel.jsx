@@ -39,10 +39,8 @@ export default function VisitorsPanel({ showToast }) {
   const simulateVisit = async () => {
     setSimulating(true);
     try {
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const fns = getFunctions(undefined, 'us-central1');
-      const trackFn = httpsCallable(fns, 'trackVisitor');
-      await trackFn({
+      const { callTrackVisitor } = await import('../../firebase');
+      const result = await callTrackVisitor({
         page: '/library',
         referrer: 'admin-test',
         userAgent: navigator.userAgent,
@@ -50,8 +48,14 @@ export default function VisitorsPanel({ showToast }) {
         userEmail: null,
         userName: null,
       });
-      showToast?.('✅ Test visit recorded — should appear below shortly');
+      
+      if (result?.data?.ok) {
+        showToast?.('✅ Test visit recorded — should appear below shortly');
+      } else {
+        throw new Error('Cloud Function returned error: ' + JSON.stringify(result?.data));
+      }
     } catch (err) {
+      console.error('Test visit failed:', err);
       // Fallback: write directly to Firestore with dummy data
       try {
         const visitId = 'v_test_' + Date.now();

@@ -196,9 +196,9 @@ function VisitorTracker() {
     (async () => {
       try {
         console.log('[VisitorTracker] Starting tracking attempt...');
-        const { getFunctions, httpsCallable } = await import('firebase/functions');
-        const fns = getFunctions(undefined, 'us-central1');
-        const trackFn = httpsCallable(fns, 'trackVisitor');
+        
+        // Use the centralized firebase import
+        const { callTrackVisitor } = await import('../firebase');
 
         const ua = navigator.userAgent || '';
         let device = 'Desktop';
@@ -221,7 +221,7 @@ function VisitorTracker() {
         console.log('[VisitorTracker] Tracking data:', trackData);
         console.log('[VisitorTracker] Calling Cloud Function...');
         
-        const result = await trackFn(trackData);
+        const result = await callTrackVisitor(trackData);
         
         console.log('[VisitorTracker] Cloud Function result:', result);
         

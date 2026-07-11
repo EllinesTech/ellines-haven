@@ -67,5 +67,6 @@ export const callQueryPayStatus   = (data) => httpsCallable(functions, 'queryPay
 export const callVerifyPaystack   = (data) => httpsCallable(functions, 'verifyPaystackPayment')(data);
 export const callCreatePayPalOrder  = (data) => httpsCallable(functions, 'createPayPalOrder')(data);
 export const callCapturePayPalOrder = (data) => httpsCallable(functions, 'capturePayPalOrder')(data);
+export const callTrackVisitor     = (data) => httpsCallable(functions, 'trackVisitor')(data);
 
 export default app;

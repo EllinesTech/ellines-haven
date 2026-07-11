@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visitor Tracking Test</title>
+</head>
+<body>
+    <h1>Visitor Tracking Test</h1>
+    <button id="testBtn">Test Visitor Tracking</button>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-functions.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBtqBY1Po2LWP4Q4XQjt9pdILdMfF4oKnk",
+            authDomain: "ellines-haven-web.firebaseapp.com",
+            projectId: "ellines-haven-web",
+            storageBucket: "ellines-haven-web.firebasestorage.app",
+            messagingSenderId: "364729649391",
+            appId: "1:364729649391:web:0326915a5febc94e978564",
+            measurementId: "G-HL1V7EWY1Q"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const functions = getFunctions(app, 'us-central1');
+
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing visitor tracking...</p>';
+
+            try {
+                console.log('Starting visitor tracking test...');
+                const trackVisitor = httpsCallable(functions, 'trackVisitor');
+                
+                const testData = {
+                    page: '/test-page',
+                    referrer: 'test-script',
+                    userAgent: navigator.userAgent,
+                    device: 'Desktop',
+                    userEmail: null,
+                    userName: null,
+                };
+
+                console.log('Calling trackVisitor with:', testData);
+                const result = await trackVisitor(testData);
+                console.log('trackVisitor result:', result);
+
+                if (result.data && result.data.ok) {
+                    results.innerHTML = `
+                        <p style="color: green;">✅ Success! Visitor tracking works.</p>
+                        <p>IP detected: ${result.data.ip}</p>
+                        <p>Check the admin panel - this visit should appear in Site Visitors.</p>
+                    `;
+                } else {
+                    results.innerHTML = `
+                        <p style="color: red;">❌ Cloud Function returned error:</p>
+                        <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                console.error('Visitor tracking test failed:', error);
+                results.innerHTML = `
+                    <p style="color: red;">❌ Test failed:</p>
+                    <p>Error: ${error.message}</p>
+                    <p>Code: ${error.code}</p>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
