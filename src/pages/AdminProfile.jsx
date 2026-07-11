@@ -72,7 +72,7 @@ export default function AdminProfile() {
       await setDoc(doc(db,'user_profiles',user.email.toLowerCase()),{name:form.name,bio:form.bio,updatedAt:serverTimestamp()},{merge:true});
       showToast('✅ Profile saved');
     } catch(e){ showToast('❌ '+e.message); }
-    setSaving(false);
+    finally { setSaving(false); } // Added finally to ensure state is always cleared
   };
 
   const changePw = () => {

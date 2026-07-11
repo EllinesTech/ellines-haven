@@ -225,8 +225,9 @@ export default function UserProfile() {
           priority: 'low',
         })
       ).catch(() => {});
+      // Keep user on the same tab/position after save (don't navigate away)
     } catch { showToast('✅ Saved locally'); }
-    setSaving(false);
+    finally { setSaving(false); }
   };
 
   /* ── Change password ── */
