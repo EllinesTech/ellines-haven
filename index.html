@@ -2,6 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- CRITICAL: Kill any service worker IMMEDIATELY before anything else loads -->
+    <!-- This prevents stale SW cache from breaking JS chunk loading -->
+    <script>
+      (function(){
+        try {
+          if ('serviceWorker' in navigator) {
+            // Synchronously check and unregister SWs
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { r.unregister(); });
+            });
+            // Nuke all caches
+            if ('caches' in self) {
+              caches.keys().then(function(keys) {
+                keys.forEach(function(k) { caches.delete(k); });
+              });
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
     <link rel="icon" type="image/png" sizes="512x512" href="/pwa-icon-512.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/pwa-icon-192.png" />
     <link rel="icon" type="image/png" sizes="32x32"   href="/logo-icon.png" />

@@ -1,5 +1,8 @@
-// v202607091920 — force cache bust
-const _BUILD = '202607091920';
+// v20260711-GODMODE — SW killed, chunk cache busted
+// This string changes every build to force new chunk filename hashes
+if (typeof window !== 'undefined' && window.__EH_BUILD__ === undefined) {
+  window.__EH_BUILD__ = '20260711-T132900-GODMODE';
+}
 import { createRoot } from 'react-dom/client';
 import { Component } from 'react';
 import './index.css';
