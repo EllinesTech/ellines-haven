@@ -378,7 +378,14 @@ export default function Login() {
   }, [form.setValue]);
 
   const showLoginSuccess = (name) => {
-    setSuccessMsg(`Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`);
+    const message = `Login successful — welcome back${name ? ', ' + name : ''}! Taking you to Ellines Haven…`;
+    setSuccessMsg(message);
+    showSuccess(message);
+    
+    // Ensure navigation happens after success message is shown
+    setTimeout(() => {
+      navigate(from, { replace: true });
+    }, 1000); // 1 second delay to show success message
   };
   const editCtx = useEditMode();
 
@@ -461,11 +468,13 @@ export default function Login() {
         finalizeSession(sessionUser);
         await logLogin(fsUser.email, fsUser.name);
         showLoginSuccess(fsUser.name);
+        
         if (fsUser.mustChangePassword) {
-          navigate('/change-password', { replace: true });
+          // For password change, navigate immediately without success message delay
+          setTimeout(() => navigate('/change-password', { replace: true }), 1000);
           return { success: true };
         }
-        navigate(from, { replace: true });
+        // Navigation handled by showLoginSuccess
         return { success: true };
       }
 
@@ -477,7 +486,7 @@ export default function Login() {
         finalizeSession(sessionUser);
         await logLogin(adminAccount.email, adminAccount.name);
         showLoginSuccess(adminAccount.name || 'Admin');
-        navigate(from, { replace: true });
+        // Navigation handled by showLoginSuccess
         return { success: true };
       }
 
@@ -541,7 +550,7 @@ export default function Login() {
             finalizeSession(sessionUser);
             await logLogin(emailKey, regUser.name);
             showLoginSuccess(regUser.name);
-            navigate(from, { replace: true });
+            // Navigation handled by showLoginSuccess
             return { success: true };
           }
         }
@@ -574,7 +583,7 @@ export default function Login() {
         finalizeSession(sessionUser);
         await logLogin(legacyAccount.email, legacyAccount.name);
         showLoginSuccess(legacyAccount.name);
-        navigate(from, { replace: true });
+        // Navigation handled by showLoginSuccess
         return { success: true };
       }
 
