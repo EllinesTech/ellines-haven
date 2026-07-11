@@ -52,14 +52,18 @@ function stampPublicAssets() {
         /\/sw\.js(\?v=[\w]+)?/g,
         `/sw.js?v=${BUILD_STAMP}`
       );
-      // ── Inject unique build stamp comment so Firebase always uploads fresh index.html ──
-      // Without this Firebase deduplicates the file and serves an old version
+      // ── Inject unique build stamp comment so Cloudflare always serves fresh index.html ──
       html = html.replace(
         '</head>',
         `<!-- build:${BUILD_STAMP} -->\n  </head>`
       );
       fs.writeFileSync(indexPath, html);
       console.log(`[stamp-public-assets] Stamped public asset URLs with ?v=${BUILD_STAMP}`);
+
+      // ── Stamp version.json — lets the app poll for new deploys ─────────────
+      const versionPath = path.resolve('dist', 'version.json');
+      fs.writeFileSync(versionPath, JSON.stringify({ v: BUILD_STAMP, built: new Date().toISOString() }));
+      console.log(`[stamp-version] version.json → ${BUILD_STAMP}`);
     },
   };
 }

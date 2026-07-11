@@ -573,12 +573,63 @@ function CookieConsent() {
 }
 
 
-/* ── Service Worker — auto-reload on update (no banner needed) ──────────────
-   The SW registration in index.html handles this automatically.
-   When a new SW activates, controllerchange fires → page reloads.
+/* ── Service Worker update poller ───────────────────────────────────────────
+   Polls /version.json every 2 minutes. When a new build is detected it
+   clears all caches and reloads — silently for most pages, skipped on /read/.
+   This guarantees users always get fresh code within 2 minutes of a deploy,
+   even if the SW update flow fails for any reason.
 ────────────────────────────────────────────────────────────────────────── */
 function SWUpdateBanner() {
-  // Kept as a no-op — auto-reload is handled in index.html SW registration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (isLocalhost) return;
+
+    let currentVersion = null;
+
+    const checkVersion = async () => {
+      try {
+        const res = await fetch('/version.json?_=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const latest = data?.v;
+        if (!latest) return;
+
+        if (!currentVersion) {
+          // First load — remember what version we started on
+          currentVersion = latest;
+          return;
+        }
+
+        if (latest !== currentVersion) {
+          // New deploy detected — don't interrupt readers
+          const isReading = location.pathname.startsWith('/read');
+          if (isReading) return;
+
+          // Clear all caches then reload to serve the new version
+          if ('caches' in window) {
+            await caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+          }
+          window.location.reload();
+        }
+      } catch {
+        // Network error — ignore, will retry next interval
+      }
+    };
+
+    // Check immediately, then every 2 minutes
+    checkVersion();
+    const timer = setInterval(checkVersion, 2 * 60 * 1000);
+    // Also check when the tab comes back into focus
+    const onVisible = () => { if (document.visibilityState === 'visible') checkVersion(); };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   return null;
 }
 
