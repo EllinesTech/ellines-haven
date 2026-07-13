@@ -1,1 +1,6 @@
+# SPA fallback — ALL routes serve index.html EXCEPT /assets/
+# If an /assets/ file is missing (stale browser cache pointing to old hash),
+# return a proper 404 instead of serving index.html with text/html MIME type.
+# Serving index.html for a .js request causes: "Expected JS module but got text/html" → black screen.
+/assets/* /assets/:splat 404
 /* /index.html 200

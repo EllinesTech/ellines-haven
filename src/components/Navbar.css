@@ -147,8 +147,30 @@
 }
 .nav__dropdown-logout:hover { background: rgba(231,76,60,0.1) !important; color: #e74c3c !important; }
 
-/* ── Auth buttons (desktop only) ── */
-.nav__auth { display: flex; gap: 8px; }
+/* ── PWA Install pill in navbar ── */
+.nav__install-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border-radius: 20px;
+  border: 1px solid rgba(201,168,76,0.5);
+  background: rgba(201,168,76,0.08);
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.nav__install-btn:hover {
+  background: rgba(201,168,76,0.18);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+
+
 
 /* ── Burger ── */
 .nav__burger { display: none; flex-direction: column; gap: 5px; padding: 6px; cursor: pointer; }

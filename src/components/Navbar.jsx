@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import UserNotificationsBell from './UserNotifications';
 import AdminNotificationsBell from './AdminNotificationsBell';
+import { usePWAInstall, triggerPWAInstall } from './PWAInstallPrompt';
 import './Navbar.css';
 
 const isAdmin = (role) => role === 'admin' || role === 'superadmin';
@@ -48,6 +49,21 @@ export default function Navbar() {
   const [dropdown, setDropdown]   = useState(false);   // avatar dropdown
   const dropRef                   = useRef(null);
   const navigate                  = useNavigate();
+  const { deferredPrompt, isInstalled } = usePWAInstall();
+
+  // Re-check sessionStorage on every render so the button appears after "Later" is clicked
+  // (PWAInstallPrompt sets this flag in the same session)
+  const [sessionDismissed, setSessionDismissed] = useState(false);
+  useEffect(() => {
+    const check = () => setSessionDismissed(!!sessionStorage.getItem('eh_pwa_prompt_dismissed'));
+    check();
+    // Poll every 500ms in case the user just clicked "Later" in the banner
+    const t = setInterval(check, 500);
+    return () => clearInterval(t);
+  }, []);
+
+  // Show the "Install" pill: app not installed + Chrome prompt captured + user clicked "Later"
+  const showNavInstall = !isInstalled && !!deferredPrompt && sessionDismissed;
 
   // Logo: cache in sessionStorage so mobile/desktop see the same logo instantly (no flash)
   const [navLogo, setNavLogo] = useState(() => {
@@ -224,6 +240,17 @@ export default function Navbar() {
             </div>
           )}
 
+          {/* Install app pill — shows after user clicks "Later" on the PWA banner */}
+          {showNavInstall && (
+            <button
+              className="nav__install-btn nav__hide-mobile"
+              onClick={() => triggerPWAInstall()}
+              title="Install Ellines Haven app"
+            >
+              ⬇ Install App
+            </button>
+          )}
+
           {/* Burger — mobile only */}
           <button
             className={`nav__burger${open ? ' open' : ''}`}
@@ -255,6 +282,16 @@ export default function Navbar() {
               </div>
               <div className="nav__mobile-divider" />
             </>
+          )}
+
+          {/* Install app — mobile drawer, shown after "Later" */}
+          {showNavInstall && (
+            <button
+              onClick={() => { triggerPWAInstall(); closeAll(); }}
+              style={{ color: 'var(--gold)', fontWeight: 600 }}
+            >
+              ⬇ Install Ellines Haven App
+            </button>
           )}
 
           {/* Main nav links */}

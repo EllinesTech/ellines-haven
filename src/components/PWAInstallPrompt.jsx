@@ -2,78 +2,151 @@ import { useState, useEffect } from 'react';
 import './PWAInstallPrompt.css';
 
 /**
- * PWA Install Prompt Component
- * Shows users they can install Ellines Haven as an app
- * Also displays notification permissions guide
+ * PWA Install Prompt
+ *
+ * Rules:
+ * - Shows to EVERYONE (guests + logged-in) who hasn't installed the app
+ * - Uses `beforeinstallprompt` (Chrome/Android) OR a manual iOS fallback
+ * - Does NOT show on page reload within the same session (sessionStorage flag)
+ * - "Later" dismisses for the entire session; next fresh session it may appear again
+ * - Exposes a `usePWAInstall` hook so the Navbar can show an "Install" button
+ *   for users who previously clicked "Later"
  */
+
+// ── Shared state so Navbar can read install availability ──────────────────────
+let _deferredPrompt = null;
+let _isInstalled    = false;
+let _subscribers    = [];
+
+export function subscribePWA(fn) {
+  _subscribers.push(fn);
+  return () => { _subscribers = _subscribers.filter(s => s !== fn); };
+}
+
+function notifySubscribers() {
+  _subscribers.forEach(fn => fn({ deferredPrompt: _deferredPrompt, isInstalled: _isInstalled }));
+}
+
+// ── Hook for Navbar / other components ───────────────────────────────────────
+export function usePWAInstall() {
+  const [state, setState] = useState({ deferredPrompt: _deferredPrompt, isInstalled: _isInstalled });
+  useEffect(() => subscribePWA(setState), []);
+  return state;
+}
+
+// ── Trigger install from anywhere (e.g. Navbar button) ───────────────────────
+export async function triggerPWAInstall() {
+  if (!_deferredPrompt) return false;
+  _deferredPrompt.prompt();
+  const { outcome } = await _deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    _isInstalled = true;
+    _deferredPrompt = null;
+    notifySubscribers();
+  }
+  return outcome === 'accepted';
+}
+
+// ── Is iOS? (no beforeinstallprompt support) ─────────────────────────────────
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+// ── Is app already installed? ─────────────────────────────────────────────────
+function isStandalone() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
+}
+
+// ── Session key — once dismissed per session, don't re-show ──────────────────
+const SESSION_DISMISSED_KEY = 'eh_pwa_prompt_dismissed';
+
 export default function PWAInstallPrompt() {
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [showNotificationGuide, setShowNotificationGuide] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [visible,       setVisible]       = useState(false);
+  const [hasDeferred,   setHasDeferred]   = useState(false);
+  const [showIOSGuide,  setShowIOSGuide]  = useState(false);
 
   useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
+    // Already installed as PWA — never show
+    if (isStandalone()) {
+      _isInstalled = true;
+      notifySubscribers();
       return;
     }
 
-    // Listen for install prompt
-    const handleBeforeInstallPrompt = (e) => {
+    // Dismissed this session — don't re-show the banner, but still capture the prompt
+    const dismissedThisSession = sessionStorage.getItem(SESSION_DISMISSED_KEY);
+
+    // Capture beforeinstallprompt (Chrome / Android / Edge)
+    const onBeforeInstall = (e) => {
       e.preventDefault();
-      setDeferredPrompt(e);
-      // Show install prompt after 3 seconds on first visit
-      setTimeout(() => {
-        setShowInstallPrompt(true);
-      }, 3000);
+      _deferredPrompt = e;
+      setHasDeferred(true);
+      notifySubscribers();
+
+      // Only auto-show after 3s on first load of a fresh session
+      if (!dismissedThisSession) {
+        setTimeout(() => setVisible(true), 3000);
+      }
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('beforeinstallprompt', onBeforeInstall);
 
-    // Check if install was successful
-    window.addEventListener('appinstalled', () => {
-      console.log('✅ PWA installed successfully');
-      setIsInstalled(true);
-      setShowInstallPrompt(false);
-    });
+    // iOS fallback — show a manual "Add to Home Screen" guide
+    if (isIOS() && !dismissedThisSession) {
+      // Only show on first visit of session, with a 3s delay
+      setTimeout(() => setVisible(true), 3000);
+    }
+
+    // Detect successful install
+    const onInstalled = () => {
+      _isInstalled = true;
+      _deferredPrompt = null;
+      setVisible(false);
+      setHasDeferred(false);
+      notifySubscribers();
+    };
+    window.addEventListener('appinstalled', onInstalled);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+      window.removeEventListener('appinstalled', onInstalled);
     };
   }, []);
 
-  const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    console.log(`User response to install prompt: ${outcome}`);
-    
-    if (outcome === 'accepted') {
-      setShowInstallPrompt(false);
-      setIsInstalled(true);
-    } else {
-      setShowInstallPrompt(false);
+  const handleInstall = async () => {
+    if (isIOS()) {
+      setShowIOSGuide(true);
+      return;
     }
-
-    setDeferredPrompt(null);
+    if (!_deferredPrompt) return;
+    _deferredPrompt.prompt();
+    const { outcome } = await _deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      _isInstalled = true;
+      _deferredPrompt = null;
+      notifySubscribers();
+    }
+    setVisible(false);
+    sessionStorage.setItem(SESSION_DISMISSED_KEY, '1');
   };
 
-  const handleDismiss = () => {
-    setShowInstallPrompt(false);
+  const handleLater = () => {
+    setVisible(false);
+    // Mark dismissed for this session — won't re-appear on reload
+    sessionStorage.setItem(SESSION_DISMISSED_KEY, '1');
   };
 
-  if (isInstalled && !showNotificationGuide) {
-    return null;
-  }
+  // Don't render if installed
+  if (_isInstalled) return null;
 
   return (
     <>
-      {/* Install Prompt */}
-      {showInstallPrompt && !isInstalled && (
-        <div className="pwa-install-prompt">
+      {/* ── Main install banner ─────────────────────────────────── */}
+      {visible && (
+        <div className="pwa-install-prompt" role="dialog" aria-label="Install Ellines Haven">
           <div className="pwa-install-content">
             <div className="pwa-install-icon">📱</div>
             <div className="pwa-install-text">
@@ -86,10 +159,10 @@ export default function PWAInstallPrompt() {
               </div>
             </div>
             <div className="pwa-install-actions">
-              <button className="pwa-btn-install" onClick={handleInstallClick}>
+              <button className="pwa-btn-install" onClick={handleInstall}>
                 Install
               </button>
-              <button className="pwa-btn-dismiss" onClick={handleDismiss}>
+              <button className="pwa-btn-dismiss" onClick={handleLater}>
                 Later
               </button>
             </div>
@@ -97,87 +170,45 @@ export default function PWAInstallPrompt() {
         </div>
       )}
 
-      {/* Notification Guide */}
-      {isInstalled && showNotificationGuide && (
-        <div className="notification-guide">
-          <div className="notification-guide-content">
+      {/* ── iOS "Add to Home Screen" guide ─────────────────────── */}
+      {showIOSGuide && (
+        <div className="notification-guide" onClick={() => setShowIOSGuide(false)}>
+          <div className="notification-guide-content" onClick={e => e.stopPropagation()}>
             <div className="notification-guide-header">
-              <h3>🔔 Enable Notifications</h3>
-              <button 
-                className="close-btn"
-                onClick={() => setShowNotificationGuide(false)}
-              >
-                ✕
-              </button>
+              <h3>📲 Add to Home Screen</h3>
+              <button className="close-btn" onClick={() => setShowIOSGuide(false)} aria-label="Close">✕</button>
             </div>
-            
             <div className="notification-guide-body">
-              <p className="guide-intro">
-                Get notified about new releases and special offers!
-              </p>
-
+              <p className="guide-intro">Install Ellines Haven on your iPhone/iPad in two taps:</p>
               <div className="guide-steps">
                 <div className="step">
                   <div className="step-number">1</div>
                   <div className="step-content">
-                    <h4>Look for the Notification Icon</h4>
-                    <p>In the top right of your screen, tap the bell icon 🔔</p>
+                    <h4>Tap the Share button</h4>
+                    <p>At the bottom of Safari, tap the Share icon <strong>⬆</strong></p>
                   </div>
                 </div>
-
                 <div className="step">
                   <div className="step-number">2</div>
                   <div className="step-content">
-                    <h4>Tap "Allow"</h4>
-                    <p>When asked for permission, tap "Allow" to receive notifications</p>
+                    <h4>Tap "Add to Home Screen"</h4>
+                    <p>Scroll down in the share menu and tap <strong>Add to Home Screen</strong></p>
                   </div>
                 </div>
-
                 <div className="step">
                   <div className="step-number">3</div>
                   <div className="step-content">
-                    <h4>You're All Set!</h4>
-                    <p>You'll now receive notifications about new books and special announcements</p>
+                    <h4>Tap "Add"</h4>
+                    <p>Confirm by tapping <strong>Add</strong> in the top right corner</p>
                   </div>
                 </div>
               </div>
-
-              <div className="notification-benefits">
-                <h4>What you'll get notified about:</h4>
-                <ul>
-                  <li>📚 New book releases</li>
-                  <li>🎉 Special promotions & discounts</li>
-                  <li>📣 Important announcements</li>
-                  <li>✨ Author updates</li>
-                </ul>
-              </div>
-
-              <div className="guide-footer">
-                <p className="text-muted">
-                  You can change notification settings anytime in your app or browser settings
-                </p>
-              </div>
             </div>
-
-            <button 
-              className="btn-close-guide"
-              onClick={() => setShowNotificationGuide(false)}
-            >
+            <button className="btn-close-guide" onClick={() => { setShowIOSGuide(false); setVisible(false); sessionStorage.setItem(SESSION_DISMISSED_KEY, '1'); }}>
               Got It
             </button>
           </div>
         </div>
-      )}
-
-      {/* Notification Button (when installed) */}
-      {isInstalled && (
-        <button 
-          className="notification-guide-toggle"
-          onClick={() => setShowNotificationGuide(!showNotificationGuide)}
-          title="How to enable notifications"
-        >
-          🔔
-        </button>
       )}
     </>
   );
