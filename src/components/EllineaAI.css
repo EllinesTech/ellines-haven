@@ -71,13 +71,16 @@
   right: 20px;
   z-index: 8600;
   width: 360px;
-  max-height: 600px;
+  /* Height: grow with content, but never taller than viewport minus FAB area */
+  max-height: calc(100dvh - 110px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #0f0f22;
   border: 1px solid rgba(201,168,76,0.3);
   border-radius: 20px;
   box-shadow: 0 16px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.1);
+  /* overflow visible on the wrapper so inner scroll areas work */
   overflow: hidden;
   animation: ellinea-in 0.22s cubic-bezier(.34,1.56,.64,1);
 }
@@ -157,7 +160,7 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  min-height: 0;
+  min-height: 0; /* required for flex children to shrink and scroll */
 }
 .ellinea-lc-messages::-webkit-scrollbar { width: 3px; }
 .ellinea-lc-messages::-webkit-scrollbar-thumb { background: rgba(74,158,255,0.3); border-radius: 2px; }
@@ -234,6 +237,7 @@
   flex-direction: column;
   gap: 10px;
   scroll-behavior: smooth;
+  min-height: 0; /* required for flex children to shrink and scroll */
 }
 .ellinea-messages::-webkit-scrollbar { width: 3px; }
 .ellinea-messages::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 2px; }
@@ -376,10 +380,14 @@
     right: 0;
     left: 0;
     bottom: 0;
-    width: 100vw;
-    max-height: 88vh;
+    width: 100%;
+    /* Fill viewport minus FAB row at bottom — use dvh for accuracy on mobile */
+    max-height: calc(100dvh - 80px);
+    height: calc(100dvh - 80px);
     border-radius: 20px 20px 0 0;
     border-bottom: none;
+    /* Safe area for notched phones */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .ellinea-fab {
     bottom: 16px;
@@ -394,7 +402,7 @@
     right: 12px;
     bottom: 84px;
     width: calc(100vw - 24px);
-    max-height: 72vh;
+    max-height: calc(100dvh - 110px);
     border-radius: 16px;
   }
   .ellinea-fab {
