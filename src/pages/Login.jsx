@@ -557,7 +557,14 @@ export default function Login() {
               console.warn('[Login] Auto-migration to users collection failed:', e.message);
             });
             
-            localStorage.setItem('eh_registered_users', JSON.stringify(regData.registered));
+            // Sync registered list back to localStorage — always filter deleted emails
+            const loginDeletedSet = new Set([
+              ...(regData.deletedEmails || []),
+              ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+            ].map(e => String(e).toLowerCase()));
+            localStorage.setItem('eh_registered_users', JSON.stringify(
+              (regData.registered || []).filter(r => !loginDeletedSet.has((r.email || '').toLowerCase()))
+            ));
             const localPwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
             localPwOverrides[emailKey] = fsPw;
             localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));

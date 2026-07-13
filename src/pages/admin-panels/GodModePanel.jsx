@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, serverTimestamp, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, serverTimestamp, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
@@ -334,6 +334,23 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
     ];
     await Promise.all(deletes);
 
+    // 1b. Also query-delete by email field — catches docs where the ID is u_TIMESTAMP
+    //     (users created via Register.jsx or admin "Add User" have timestamp IDs)
+    try {
+      const byEmail = await getDocs(query(collection(db, 'users'), where('email', '==', emailKey)));
+      await Promise.all(byEmail.docs.map(d => deleteDoc(d.ref).catch(() => {})));
+    } catch {}
+
+    // 1c. Delete user_presence and user_sessions so they vanish from online/visitor panels
+    try {
+      const presenceId = 'presence_' + emailKey.replace(/[^a-z0-9]/g, '_');
+      await deleteDoc(doc(db, 'user_presence', presenceId)).catch(() => {});
+    } catch {}
+    try {
+      const sessSnap = await getDocs(query(collection(db, 'user_sessions'), where('userEmail', '==', emailKey)));
+      await Promise.all(sessSnap.docs.map(d => deleteDoc(d.ref).catch(() => {})));
+    } catch {}
+
     // 2. Remove from site_data/registered_users (both the array and deletedEmails blocklist)
     try {
       const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
@@ -371,9 +388,13 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
     } catch {}
 
     // 5. Sync deletedEmails blocklist to user_permissions doc too (belt + suspenders)
+    // IMPORTANT: read existing array first and APPEND — never overwrite with just [emailKey]
     try {
+      const permSnap2 = await getDoc(doc(db, 'site_data', 'user_permissions'));
+      const existingDeleted = permSnap2.exists() ? (permSnap2.data().deletedEmails || []) : [];
+      const mergedDeleted = [...new Set([...existingDeleted.map(e => e.toLowerCase()), emailKey])];
       await setDoc(doc(db, 'site_data', 'user_permissions'), {
-        deletedEmails: [emailKey],
+        deletedEmails: mergedDeleted,
         updatedAt: serverTimestamp(),
       }, { merge: true });
     } catch {}

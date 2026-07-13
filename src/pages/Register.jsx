@@ -209,12 +209,24 @@ export default function Register() {
     } catch (err) {
       console.error('[Register]', err);
       // Fallback: save to localStorage only if Firestore fails
+      // Check deleted users blocklist even in fallback — never re-add a deleted email
+      const lsDeletedFb = new Set(JSON.parse(localStorage.getItem('eh_deleted_users') || '[]').map(e => String(e).toLowerCase()));
+      if (lsDeletedFb.has(emailKey)) {
+        setErr('⚠️ This email cannot be used to register.');
+        setBusy(false);
+        return;
+      }
       const legacyUsers = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
-      const userId = 'u_' + Date.now();
-      const joined = new Date().toISOString().slice(0, 10);
-      const userEntry = { id: userId, name: form.name.trim(), email: emailKey, password: form.password, role: 'user', joined };
-      localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, userEntry]));
-      setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
+      // Also never re-add if already present (deduplication)
+      if (!legacyUsers.find(u => (u.email || '').toLowerCase() === emailKey)) {
+        const userId = 'u_' + Date.now();
+        const joined = new Date().toISOString().slice(0, 10);
+        const userEntry = { id: userId, name: form.name.trim(), email: emailKey, password: form.password, role: 'user', joined };
+        localStorage.setItem('eh_registered_users', JSON.stringify([...legacyUsers, userEntry]));
+        setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
+      } else {
+        setUser({ ...legacyUsers.find(u => (u.email || '').toLowerCase() === emailKey) });
+      }
       
       // ── Track registration even in fallback path ──
       const regDeviceFb = getDeviceTypeForReg();

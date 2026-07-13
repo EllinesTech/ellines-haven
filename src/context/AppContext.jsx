@@ -160,7 +160,14 @@ export function AppProvider({ children }) {
       if (!snap.exists()) return;
       const data = snap.data();
       if (data.registered) {
-        localStorage.setItem('eh_registered_users', JSON.stringify(data.registered));
+        // CRITICAL: always filter out deleted emails before writing to localStorage
+        // Without this, every page load re-adds deleted users to the local cache
+        const deletedSet = new Set([
+          ...(data.deletedEmails || []),
+          ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+        ].map(e => String(e).toLowerCase()));
+        const filtered = data.registered.filter(r => !deletedSet.has((r.email || '').toLowerCase()));
+        localStorage.setItem('eh_registered_users', JSON.stringify(filtered));
       }
       if (data.pwOverrides) {
         const local = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
