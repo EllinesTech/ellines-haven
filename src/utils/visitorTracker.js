@@ -14,16 +14,26 @@ export async function trackVisitorReliable(trackData, options = {}) {
   const { isRetry = false } = options;
   
   try {
-    console.log('[visitorTracker] 📤 Tracking visitor directly via Firestore:', trackData.page);
+    console.log('[visitorTracker] 📤 Tracking visitor:', trackData.page);
     
-    // Import Firebase directly — write to Firestore from client
-    // Firestore rules allow: match /site_visitors/{d} { allow create: if true; }
     const { db } = await import('../firebase');
-    const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+    const { collection, addDoc, serverTimestamp, updateDoc, doc } = await import('firebase/firestore');
     
     const ua = trackData.userAgent || '';
+
+    // Step 1: Get real IP from client (fast, free service)
+    let clientIp = '';
+    let geo = {};
+    try {
+      const ipRes = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+      const ipData = await ipRes.json();
+      clientIp = ipData.ip || '';
+    } catch { /* silent — still record visit without IP */ }
+
+    // Step 2: Write visit to Firestore immediately (with IP if available)
     const visitData = {
-      ip:          '',            // IP not available client-side (Cloud Function was for this)
+      ip:          clientIp,
+      rawIp:       clientIp,
       city:        '',
       region:      '',
       country:     '',
@@ -37,49 +47,51 @@ export async function trackVisitorReliable(trackData, options = {}) {
       referrer:    (trackData.referrer || 'direct').slice(0, 200),
       userAgent:   ua.slice(0, 300),
       device:      trackData.device || 'Desktop',
-      rawIp:       '',
       ...(trackData.userEmail ? { userEmail: trackData.userEmail, userName: trackData.userName || '' } : {}),
       visitedAt:   serverTimestamp(),
       visitedAtMs: Date.now(),
-      // Flag so we can run a background geo-enrichment later
-      _needsGeo:   true,
+      _needsGeo:   !!clientIp,  // only needs geo if we got an IP
     };
     
     const docRef = await addDoc(collection(db, 'site_visitors'), visitData);
-    console.log('[visitorTracker] ✅ Visit written to Firestore:', docRef.id);
+    console.log('[visitorTracker] ✅ Visit recorded:', docRef.id, clientIp ? `(IP: ${clientIp})` : '(no IP)');
     
-    // Now try to enrich with geo data via Cloud Function (non-blocking, best-effort)
-    enrichVisitorGeo(docRef.id, trackData).catch(() => {});
+    // Step 3: Enrich with geo data if we have an IP (non-blocking)
+    if (clientIp) {
+      (async () => {
+        try {
+          const geoRes = await fetch(
+            `https://ip-api.com/json/${clientIp}?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,timezone,query`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          const geoData = await geoRes.json();
+          if (geoData.status === 'success') {
+            await updateDoc(doc(db, 'site_visitors', docRef.id), {
+              ip:          geoData.query || clientIp,
+              city:        geoData.city || '',
+              region:      geoData.regionName || '',
+              country:     geoData.country || '',
+              countryCode: geoData.countryCode || '',
+              lat:         geoData.lat || null,
+              lon:         geoData.lon || null,
+              isp:         geoData.isp || geoData.org || '',
+              org:         geoData.org || '',
+              timezone:    geoData.timezone || '',
+              _needsGeo:   false,
+            });
+            console.log('[visitorTracker] 🌍 Geo enriched:', geoData.city, geoData.country);
+          }
+        } catch { /* silent — geo is best-effort */ }
+      })();
+    }
     
-    // Clear retry queue
     clearVisitorQueue();
-    
-    return { success: true, data: { ok: true, docId: docRef.id } };
+    return { success: true, data: { ok: true, docId: docRef.id, ip: clientIp } };
     
   } catch (error) {
-    console.error('[visitorTracker] ❌ Firestore write failed:', error.message);
+    console.error('[visitorTracker] ❌ Failed:', error.message);
     queueForRetry(trackData, isRetry ? 1 : 0);
     return { success: false, error: error.message };
-  }
-}
-
-/**
- * Enrich a visitor doc with geo data via Cloud Function (non-blocking, best-effort)
- * Called after the initial Firestore write so the visitor is recorded regardless
- */
-async function enrichVisitorGeo(docId, trackData) {
-  try {
-    const { callTrackVisitorHttp } = await import('../firebase');
-    const result = await callTrackVisitorHttp({
-      ...trackData,
-      _docId: docId,  // Cloud Function can update this doc with geo data
-    });
-    if (result?.data?.ok) {
-      console.log('[visitorTracker] 🌍 Geo enrichment successful:', result.data.country);
-    }
-  } catch (e) {
-    // Silently ignore — visitor is already recorded without geo
-    console.log('[visitorTracker] ℹ️ Geo enrichment unavailable (visitor still recorded)');
   }
 }
 
