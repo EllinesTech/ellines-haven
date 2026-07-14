@@ -1,0 +1,176 @@
+/* ── Chapter Grants Panel Styles ─────────────────────────────────────────────── */
+
+.admin-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ap-header {
+  border-bottom: 2px solid var(--border, #ddd);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+
+.ap-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  color: var(--text, #222);
+}
+
+.ap-header p {
+  margin: 0;
+  color: var(--muted, #666);
+  font-size: 0.9rem;
+}
+
+.ap-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.ap-tab {
+  padding: 10px 16px;
+  background: var(--subtle-bg, #f5f5f5);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--muted, #666);
+  transition: all 0.2s ease;
+}
+
+.ap-tab:hover {
+  background: var(--subtle-hover, #eee);
+  border-color: var(--primary, #007bff);
+  color: var(--primary, #007bff);
+}
+
+.ap-tab.active {
+  background: var(--primary, #007bff);
+  color: white;
+  border-color: var(--primary, #007bff);
+}
+
+.ap-content {
+  background: var(--card-bg, white);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text, #222);
+  font-size: 0.95rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="datetime-local"],
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: var(--input-bg, white);
+  color: var(--text, #222);
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary, #007bff);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 150px;
+  font-family: 'Courier New', monospace;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.radio-group input[type="radio"] {
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+/* Buttons */
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #ddd);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  background: white;
+  color: var(--text, #222);
+}
+
+.btn-primary {
+  background: var(--primary, #007bff);
+  color: white;
+  border-color: var(--primary, #007bff);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark, #0056b3);
+  border-color: var(--primary-dark, #0056b3);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+  .ap-tabs {
+    gap: 5px;
+  }
+
+  .ap-tab {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .ap-content {
+    padding: 15px;
+  }
+}
