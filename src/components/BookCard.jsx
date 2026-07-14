@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import WishlistButton from './WishlistButton';
 import { bookPath, readPath } from '../utils/slugify';
 import { handlePurchaseAction, getLoginPromptConfig } from '../utils/purchaseHelpers';
+import { getReadingTimeDisplay } from '../utils/readingTime';
 import './BookCard.css';
 
 // Statuses where buying is not applicable
@@ -438,7 +439,7 @@ export default function BookCard({ book }) {
                   </span>
                 );
               })()
-            : <span className="bcard__time">{book.readTime}</span>
+            : <span className="bcard__time">{getReadingTimeDisplay(book)}</span>
           }
         </div>
         <div className="bcard__footer">

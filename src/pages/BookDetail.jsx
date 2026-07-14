@@ -7,6 +7,7 @@ import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
+import { getReadingTimeDisplay } from '../utils/readingTime';
 import './BookDetail.css';
 
 // Statuses that block purchase entirely — only Notify Me
@@ -967,7 +968,7 @@ export default function BookDetail() {
               <div className="bd-badges">
                 {book.isNew && <span className="badge badge-gold">New Release</span>}
                 <span className="badge badge-blue">{book.type === 'novel' ? 'Novel' : 'Short Story'}</span>
-                {book.status && book.status !== 'complete' && (
+                {book.status && (
                   <BookStatusBadge status={book.status} />
                 )}
               </div>
@@ -1044,11 +1045,11 @@ export default function BookDetail() {
                         <small>Status</small>
                         <strong style={{ color:'#4a9eff' }}>Releasing</strong>
                       </div>
-                      <div><small>Read Time</small><strong>{book.readTime}</strong></div>
+                      <div><small>Read Time</small><strong>{getReadingTimeDisplay(book)}</strong></div>
                     </>
                   : <>
                       <div><small>Pages</small><strong>{book.pages > 0 ? book.pages : '—'}</strong></div>
-                      <div><small>Read Time</small><strong>{book.readTime}</strong></div>
+                      <div><small>Read Time</small><strong>{getReadingTimeDisplay(book)}</strong></div>
                       {(book.chapterCount > 0 || book.tableOfContents?.length > 0) && (
                         <div>
                           <small>Chapters</small>

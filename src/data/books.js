@@ -29,6 +29,7 @@ export const BOOKS = [
     type:'novel',
     price:400,
     pages:250,
+    wordCount: 62500, // ~250 words per page
     chapterCount: 28,
     rating:4.8,
     reviews:187,
