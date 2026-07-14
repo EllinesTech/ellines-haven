@@ -155,11 +155,13 @@ function NotifyMeBtn({ book, user }) {
     );
   }
 
+  const label = book.status === 'ongoing' ? '🔔 Notify When Complete' : '🔔 Notify Me';
+
   return (
     <button className="btn btn-sm" onClick={handleNotify} disabled={state === 'loading'}
-      title="Get an email when this book is available"
+      title={book.status === 'ongoing' ? 'Get notified when all chapters are ready' : 'Get an email when this book is available'}
       style={{ background:'rgba(201,168,76,0.1)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.3)', fontSize:'0.72rem' }}>
-      {state === 'loading' ? '⏳' : '🔔 Notify Me'}
+      {state === 'loading' ? '⏳' : label}
     </button>
   );
 }

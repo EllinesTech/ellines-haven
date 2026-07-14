@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import BookCard, { waOrderLink, BookStatusBadge } from '../components/BookCard';
@@ -58,15 +58,23 @@ function NotifyMeDetailBtn({ book }) {
       <span style={{ fontSize:'1.4rem' }}>🔔</span>
       <div>
         <strong style={{ color:'var(--ok)', display:'block' }}>You're on the list!</strong>
-        <span style={{ fontSize:'0.8rem', color:'var(--muted)' }}>We'll notify you the moment "{book.title}" is available.</span>
+        <span style={{ fontSize:'0.8rem', color:'var(--muted)' }}>
+          {book.status === 'ongoing'
+            ? `We'll notify you when all chapters of "${book.title}" are complete.`
+            : `We'll notify you the moment "${book.title}" is available.`}
+        </span>
       </div>
     </div>
   );
 
+  const btnLabel = book.status === 'ongoing'
+    ? '🔔 Notify Me When All Chapters Are Ready'
+    : '🔔 Notify Me When Available';
+
   return (
     <div>
       <button className="btn btn-primary" style={{ width:'100%', marginBottom:10 }} onClick={handle} disabled={state === 'loading'}>
-        {state === 'loading' ? '⏳ Saving…' : '🔔 Notify Me When Available'}
+        {state === 'loading' ? '⏳ Saving…' : btnLabel}
       </button>
       <p style={{ fontSize:'0.76rem', color:'var(--muted)', textAlign:'center' }}>
         {!user ? 'Sign in to get notified' : 'Free — no spam. One email when it launches.'}
@@ -315,7 +323,8 @@ function FreeSample({ book }) {
    OR purchase individual chapters (price ÷ totalChapters).
 ─────────────────────────────────────────────────────────── */
 function OngoingSeriesPurchase({ book, owned, libLoaded }) {
-  const { addToCart, cart, user, myPerms, siteControls, isChapterOwned, ownedChapters } = useApp();
+  const { addToCart, cart, user, myPerms, siteControls, isChapterOwned } = useApp();
+  const navigate = useNavigate();
 
   // Derive chapter counts from available data
   const isPart = (s) => /^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(s);
@@ -332,54 +341,45 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
   if (book.status !== 'ongoing' || releasedCount <= 2) return null;
 
   const wholeBookInCart = cart.some(b => b.id === book.id && !b.isChapter);
-  const canAdd = libLoaded
-    && !siteControls?.readOnlyMode
-    && myPerms?.canPurchase !== false;
+  const siteReadOnly = siteControls?.readOnlyMode;
 
   // Per-chapter price (round up to nearest 5 KES)
   const chapterPrice = book.price > 0
     ? Math.ceil((book.price / totalPlanned) / 5) * 5
-    : 50; // fallback KES 50 per chapter
+    : 50;
 
-  // Check which individual chapters the user has in cart or owns
-  const ownedChapterIds = new Set(
-    cart.filter(b => b.isChapter && b.bookId === book.id).map(b => b.chapterId)
-  );
-
-  const [mode, setMode] = useState('all'); // 'all' | 'individual'
+  const [mode, setMode] = useState('all');
   const [addedMsg, setAddedMsg] = useState('');
 
-  const flashMsg = (msg) => {
-    setAddedMsg(msg);
-    setTimeout(() => setAddedMsg(''), 2200);
+  const flashMsg = (msg) => { setAddedMsg(msg); setTimeout(() => setAddedMsg(''), 2200); };
+
+  // Redirect to login if not signed in; returns true when redirected
+  const requireLogin = () => {
+    if (!user) { navigate('/login', { state: { from: window.location.pathname } }); return true; }
+    return false;
   };
 
   const addWholeBook = () => {
+    if (requireLogin()) return;
     addToCart(book);
     flashMsg('📚 All chapters added to cart!');
   };
 
   const addChapter = (idx) => {
+    if (requireLogin()) return;
     const tocTitle = realToc[idx] || `Chapter ${idx + 1}`;
     const chapterId = `${book.id}_ch_${idx + 1}`;
     if (cart.some(b => b.chapterId === chapterId)) return;
     addToCart({
-      id: chapterId,           // unique cart key
-      bookId: book.id,         // parent book
-      chapterId,
-      chapterNum: idx + 1,
-      isChapter: true,
+      id: chapterId, bookId: book.id, chapterId, chapterNum: idx + 1, isChapter: true,
       title: `${book.title} — Chapter ${idx + 1}`,
       chapterTitle: tocTitle.replace(/^(Chapter \d+|Day \d+) — /, ''),
-      cover: book.cover,
-      coverType: book.coverType,
-      price: chapterPrice,
-      genre: book.genre,
+      cover: book.cover, coverType: book.coverType, price: chapterPrice, genre: book.genre,
     });
     flashMsg(`Ch. ${idx + 1} added to cart`);
   };
 
-  if (owned) return null; // Reader already owns it
+  if (owned) return null;
 
   return (
     <div id="bd-series-purchase" style={{
@@ -459,23 +459,24 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                 Includes all {releasedCount} chapters now + every new chapter as it releases. Best value.
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              {wholeBookInCart
-                ? <Link to="/cart" className="btn btn-primary" style={{ background: '#4a9eff', color: '#000' }}>
-                    Go to Cart →
-                  </Link>
-                : canAdd
-                  ? <button
+            {siteReadOnly ? (
+              <p style={{ fontSize: '0.82rem', color: 'var(--muted)', fontStyle: 'italic' }}>
+                Orders are temporarily paused. Check back soon.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                {wholeBookInCart
+                  ? <Link to="/cart" className="btn btn-primary" style={{ background: '#4a9eff', color: '#000' }}>
+                      Go to Cart →
+                    </Link>
+                  : <button
                       className="btn btn-primary"
                       style={{ background: '#4a9eff', color: '#000' }}
                       onClick={addWholeBook}
                     >
-                      Add All Chapters — KSh {book.price}
+                      {user ? `Add All Chapters — KSh ${book.price}` : '🔒 Sign In to Buy'}
                     </button>
-                  : <span className="btn btn-primary" style={{ opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none', background: '#4a9eff', color: '#000' }}>
-                      Purchasing Restricted
-                    </span>
-              }
+                }
               <a
                 href={waOrderLink(book.title, book.price)}
                 target="_blank" rel="noopener noreferrer"
@@ -485,6 +486,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                 Order via WhatsApp
               </a>
             </div>
+            )}
             {addedMsg && (
               <div style={{ marginTop: 10, fontSize: '0.82rem', color: '#4a9eff', fontWeight: 600 }}>
                 {addedMsg}
@@ -520,7 +522,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                     <span style={{ flex: 1, fontSize: '0.85rem', color: 'var(--text)' }}>{chapTitle}</span>
                     {alreadyOwned ? (
                       <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 600, padding: '3px 10px' }}>✓ Owned</span>
-                    ) : (
+                    ) : siteReadOnly ? null : (
                       <>
                         <span style={{ fontSize: '0.78rem', color: 'var(--gold)', fontWeight: 600, marginRight: 6 }}>
                           KSh {chapterPrice}
@@ -529,15 +531,13 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                           ? <Link to="/cart" className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem', padding: '4px 10px' }}>
                               In Cart
                             </Link>
-                          : canAdd
-                            ? <button
-                                className="btn btn-primary btn-sm"
-                                style={{ fontSize: '0.72rem', padding: '4px 12px' }}
-                                onClick={() => addChapter(idx)}
-                              >
-                                + Add
-                              </button>
-                            : null
+                          : <button
+                              className="btn btn-primary btn-sm"
+                              style={{ fontSize: '0.72rem', padding: '4px 12px' }}
+                              onClick={() => addChapter(idx)}
+                            >
+                              {user ? '+ Add' : '🔒 Sign In'}
+                            </button>
                         }
                       </>
                     )}
