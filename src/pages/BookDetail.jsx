@@ -883,7 +883,7 @@ export default function BookDetail() {
     });
     return scored
       .sort((a, b) => b.score - a.score)
-      .slice(0, 4)
+      .slice(0, 12)
       .map(x => x.b);
   })();
 
@@ -1155,11 +1155,11 @@ export default function BookDetail() {
       {related.length > 0 && (
         <section className="section">
           <div className="container">
-            <h2 className="bd-related-title">You Might Also <span className="gold-text">Like</span></h2>
+            <h2 className="bd-related-title">Readers Like You Also <span className="gold-text">Love</span></h2>
             <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:24, marginTop:4 }}>
-              Based on genre, themes, and reading style
+              {related.length} recommendations based on genre, themes, and your reading style
             </p>
-            <div className="bd-related-grid" style={{ marginTop:'8px', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))' }}>
+            <div className="bd-related-grid" style={{ marginTop:'8px', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))' }}>
               {related.map(b => <BookCard key={b.id} book={b} />)}
             </div>
           </div>

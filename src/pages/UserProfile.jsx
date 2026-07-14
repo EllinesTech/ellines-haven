@@ -582,22 +582,22 @@ export default function UserProfile() {
                 </div>
               ) : (
                 <div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:14,marginBottom:20}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:10,marginBottom:20}}>
                     {offlineBooks.map(b => (
                       <div key={b.bookId} style={{
-                        borderRadius:'var(--r-sm)',overflow:'hidden',background:'var(--card)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',transition:'all 0.15s'
+                        borderRadius:'var(--r-sm)',overflow:'hidden',background:'var(--card)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',transition:'all 0.15s',height:'100%'
                       }} onMouseEnter={e=>e.currentTarget.style.borderColor='var(--gold)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
                         {b.cover ? (
-                          <img src={b.cover} alt={b.title} style={{width:'100%',height:160,objectFit:'cover'}} />
+                          <img src={b.cover} alt={b.title} style={{width:'100%',height:120,objectFit:'cover'}} />
                         ) : (
-                          <div style={{width:'100%',height:160,background:'linear-gradient(145deg,#0f0f22,#1a1a3a)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--muted)',fontSize:'2rem'}}>📖</div>
+                          <div style={{width:'100%',height:120,background:'linear-gradient(145deg,#0f0f22,#1a1a3a)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--muted)',fontSize:'1.5rem'}}>📖</div>
                         )}
-                        <div style={{flex:1,padding:12,display:'flex',flexDirection:'column'}}>
-                          <span style={{fontSize:'0.82rem',fontWeight:600,color:'var(--text)',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',title:b.title}}>{b.title}</span>
-                          <span style={{fontSize:'0.7rem',color:'var(--muted)',marginBottom:8}}>{b.chapters} ch{b.chapters!==1?'s':''}</span>
-                          <span style={{fontSize:'0.68rem',color:'var(--muted)',marginBottom:10}}>📅 {new Date(b.savedAt).toLocaleDateString('en-KE')}</span>
-                          <div style={{display:'flex',gap:6,marginTop:'auto'}}>
-                            <Link to={`/read/${b.bookId}`} className="btn btn-primary btn-sm" style={{flex:1,fontSize:'0.7rem',padding:'4px 6px',textAlign:'center'}}>Read</Link>
+                        <div style={{flex:1,padding:8,display:'flex',flexDirection:'column',minHeight:0}}>
+                          <span style={{fontSize:'0.75rem',fontWeight:600,color:'var(--text)',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',title:b.title}}>{b.title}</span>
+                          <span style={{fontSize:'0.65rem',color:'var(--muted)',marginBottom:3}}>{b.chapters} ch</span>
+                          <span style={{fontSize:'0.6rem',color:'var(--muted)',marginBottom:6,flex:1}}>📅 {new Date(b.savedAt).toLocaleDateString('en-KE')}</span>
+                          <div style={{display:'flex',gap:4,marginTop:'auto'}}>
+                            <Link to={`/read/${b.bookId}`} className="btn btn-primary btn-sm" style={{flex:1,fontSize:'0.65rem',padding:'3px 4px',textAlign:'center'}}>Read</Link>
                             <button 
                               className="btn btn-ghost btn-sm" 
                               style={{fontSize:'0.7rem',padding:'4px 6px',color:'#e74c3c'}}
