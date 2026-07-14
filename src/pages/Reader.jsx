@@ -1,4 +1,4 @@
-﻿import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -15,12 +15,12 @@ import {
 import { getFallbackChapters } from '../data/bookChapters';
 import './Reader.css';
 
-/* ─────────────────────────────────────────────
-   Audio Book Player — Web Speech API
+/* ---------------------------------------------
+   Audio Book Player � Web Speech API
    Reads chapter text aloud with voice settings
-───────────────────────────────────────────── */
+--------------------------------------------- */
 
-// SVG icons — render correctly on every device/browser (no emoji font needed)
+// SVG icons � render correctly on every device/browser (no emoji font needed)
 const IcoHeadphones = () => (
   <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
     <path d="M12 3C7.03 3 3 7.03 3 12v4a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H5.07A7 7 0 0 1 12 5a7 7 0 0 1 6.93 6H18a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-4c0-4.97-4.03-9-9-9z"/>
@@ -80,14 +80,14 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
   const chapterText = chapters[currentChapter]?.text || '';
 
-  // ── Neural voice detection ────────────────────────────────────────────────
+  // -- Neural voice detection ------------------------------------------------
   // Returns true for voices that are genuinely high-quality / neural
   function isNeuralVoice(v) {
     const n = v.name.toLowerCase();
     // Microsoft neural (Windows/Edge/Chrome on desktop + Android)
     if (/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi|clara|liam|natasha|william|william|william|olivia|james|luna|william)/i.test(v.name)) return true;
     // Google neural (Android Chrome / Chrome OS)
-    if (/google (uk english female|uk english male|us english|日本語|français|deutsch|español)/i.test(v.name)) return true;
+    if (/google (uk english female|uk english male|us english|???|fran�ais|deutsch|espa�ol)/i.test(v.name)) return true;
     // iOS/macOS Siri-quality voices (marked local=false are server neural on iOS 16+)
     if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|junior|frederica|joana|mariana|luciana|Isabel|paola|soledad|monica|jorge|juan|pablo|diego|enrique|carlos|ximena|angelica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
     // Samsung / Android built-in neural (appear as "Samsung" prefix)
@@ -97,12 +97,12 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
     return false;
   }
 
-  // ── Google neural badge helper ────────────────────────────────────────────
+  // -- Google neural badge helper --------------------------------------------
   function isGoogleNeural(v) {
     return /^google /i.test(v.name);
   }
 
-  // Load available voices — auto-select best neural English voice
+  // Load available voices � auto-select best neural English voice
   useEffect(() => {
     const load = () => {
       const v = synth.getVoices();
@@ -112,8 +112,8 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
       // Priority order: Microsoft Neural > Google Neural > iOS enhanced >
       //                 any en-US/en-GB local > any English > first voice
       const NEURAL_PRIORITY = [
-        // ── Microsoft Neural (Windows / Edge / Android WebView) ──────────
-        'Microsoft Jenny',   // en-US female ★ top pick
+        // -- Microsoft Neural (Windows / Edge / Android WebView) ----------
+        'Microsoft Jenny',   // en-US female ? top pick
         'Microsoft Aria',    // en-US female
         'Microsoft Emma',    // en-GB female
         'Microsoft Sonia',   // en-GB female
@@ -126,11 +126,11 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         'Microsoft Brian',   // en-US male
         'Microsoft Andrew',  // en-US male
         'Microsoft Ryan',    // en-GB male
-        // ── Google Neural (Android Chrome / Chrome OS) ───────────────────
+        // -- Google Neural (Android Chrome / Chrome OS) -------------------
         'Google UK English Female',
         'Google US English',
         'Google UK English Male',
-        // ── iOS / macOS enhanced voices ──────────────────────────────────
+        // -- iOS / macOS enhanced voices ----------------------------------
         'Ava',          // en-US female (iOS enhanced)
         'Allison',      // en-US female (iOS enhanced)
         'Samantha',     // en-US female (classic iOS, good quality)
@@ -139,7 +139,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         'Tessa',        // en-ZA female
         'Fiona',        // en-Scotland female
         'Victoria',     // en-US female
-        // ── Samsung Internet neural ──────────────────────────────────────
+        // -- Samsung Internet neural --------------------------------------
         'Samsung English Female',
         'Samsung English Male',
       ];
@@ -209,7 +209,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
       if (filter === 'female') {
         // Explicit "female" or "woman" in the name
         if (n.includes('female') || n.includes('woman') || n.includes('femme')) return true;
-        // Named female voices — Windows, macOS, iOS, Android, Samsung
+        // Named female voices � Windows, macOS, iOS, Android, Samsung
         if (/\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia|almudena|marta|zosia|ewa|ioana|laila|fatima|tamar|leila|hessa|linh|naayf|yan|meijia|tingting|sinji|milena|yelena|irina|katya|anna|vicki|alice|amelie|julie|aurelie|petra|katrin|hanna|lotte|claire|ellen|nora|carmit|tamar|lekha|kalpana|sara|yuna|kyoko|otoya)\b/.test(n)) return true;
         // iOS "Ava" en-US, "Allison" en-US without explicit gender tag
         if (/^(ava|allison|victoria|fiona|karen|moira|tessa|samantha|nicky|frederica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
@@ -341,7 +341,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   const available = typeof window !== 'undefined' && 'speechSynthesis' in window;
   if (!available) return (
     <div className="audio-player audio-player--unsupported">
-      🔇 Text-to-speech is not supported in this browser. Try Chrome or Edge.
+      ?? Text-to-speech is not supported in this browser. Try Chrome or Edge.
     </div>
   );
 
@@ -355,7 +355,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         <div className="audio-player__info">
           <span className="audio-player__icon"><IcoHeadphones /></span>
           <div>
-            <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
+            <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening�'}</strong>
             <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
           </div>
         </div>
@@ -400,7 +400,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         </div>
       </div>
 
-      {/* Speed pills row — always visible */}
+      {/* Speed pills row � always visible */}
       <div className="audio-player__right">
         <div className="audio-speed-pills">
           {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
@@ -408,9 +408,9 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               key={r}
               className={'audio-speed-pill' + (rate === r ? ' on' : '')}
               onClick={() => { setRate(r); if (playing) { speak(charRef.current); } }}
-              title={`${r}× speed`}
+              title={`${r}� speed`}
             >
-              {r === 1.0 ? '1×' : `${r}×`}
+              {r === 1.0 ? '1�' : `${r}�`}
             </button>
           ))}
         </div>
@@ -425,7 +425,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
               {['all','female','male'].map(f => (
                 <button key={f} className={'audio-filter-btn' + (filter === f ? ' on' : '')}
                   onClick={() => { setFilter(f); setVoiceIdx(0); }}>
-                  {f === 'female' ? '♀ Female' : f === 'male' ? '♂ Male' : '🌐 All'}
+                  {f === 'female' ? '? Female' : f === 'male' ? '? Male' : '?? All'}
                 </button>
               ))}
             </div>
@@ -441,14 +441,14 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                 <span>
                   {dispVoices[safeIdx]?.name || 'Select voice'}
                   {dispVoices[safeIdx] && isGoogleNeural(dispVoices[safeIdx]) && (
-                    <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                    <span className="audio-neural-badge audio-neural-badge--google">?? Neural</span>
                   )}
                   {dispVoices[safeIdx] && !isGoogleNeural(dispVoices[safeIdx]) && isNeuralVoice(dispVoices[safeIdx]) && (
-                    <span className="audio-neural-badge">✨ Neural</span>
+                    <span className="audio-neural-badge">? Neural</span>
                   )}
                   {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
                 </span>
-                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
+                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>?</span>
               </button>
               {voiceDdOpen && (
                 <div className="audio-custom-dd__list">
@@ -469,10 +469,10 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                       <span className="audio-custom-dd__name">
                         {v.name}
                         {isGoogleNeural(v) && (
-                          <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                          <span className="audio-neural-badge audio-neural-badge--google">?? Neural</span>
                         )}
                         {!isGoogleNeural(v) && isNeuralVoice(v) && (
-                          <span className="audio-neural-badge">✨ Neural</span>
+                          <span className="audio-neural-badge">? Neural</span>
                         )}
                       </span>
                       <span className="audio-custom-dd__lang">{v.lang}</span>
@@ -483,7 +483,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
             </div>
           </div>
           <div className="audio-settings__row">
-            <label>Speed — {rate}×</label>
+            <label>Speed � {rate}�</label>
             <div className="audio-speed-pills">
               {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
                 <button
@@ -491,19 +491,19 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                   className={'audio-speed-pill' + (rate === r ? ' on' : '')}
                   onClick={() => { setRate(r); if (playing) speak(charRef.current); }}
                 >
-                  {r}×
+                  {r}�
                 </button>
               ))}
             </div>
           </div>
           <div className="audio-settings__row">
-            <label>Pitch — {pitch.toFixed(1)}</label>
+            <label>Pitch � {pitch.toFixed(1)}</label>
             <input type="range" min="0.5" max="2" step="0.1" value={pitch}
               className="audio-slider"
               onChange={e => { setPitch(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
           </div>
           <p className="audio-settings__note">
-            Available voices depend on your device and browser. Chrome / Edge on Windows or Android give the most choices. On iPhone/iPad use Safari for the best iOS voices. Voices marked ✨ or 🔵 are high-quality neural voices.
+            Available voices depend on your device and browser. Chrome / Edge on Windows or Android give the most choices. On iPhone/iPad use Safari for the best iOS voices. Voices marked ? or ?? are high-quality neural voices.
           </p>
         </div>
       )}
@@ -511,7 +511,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   );
 }
 
-/* ─────────────────────────────────────────────
+/* ---------------------------------------------
    Google Drive URL converter
    Accepts any of these formats from the admin:
      https://drive.google.com/file/d/FILE_ID/view
@@ -520,9 +520,9 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
      https://drive.google.com/uc?export=download&id=FILE_ID
    Returns the embed URL:
      https://drive.google.com/file/d/FILE_ID/preview
-   which renders the PDF inline — no download button visible,
+   which renders the PDF inline � no download button visible,
    no raw URL exposed to the user.
-───────────────────────────────────────────── */
+--------------------------------------------- */
 function toDriveEmbed(url) {
   if (!url) return null;
   try {
@@ -540,9 +540,9 @@ function toDriveEmbed(url) {
   return null;
 }
 
-/* ─────────────────────────────────────────────
+/* ---------------------------------------------
    Main Reader Component
-───────────────────────────────────────────── */
+--------------------------------------------- */
 export default function Reader() {
   const { id } = useParams();
   const location = useLocation();
@@ -559,12 +559,14 @@ export default function Reader() {
   const [mode,      setMode]      = useState('pdf');
   const [drmBlock,  setDrmBlock]  = useState(false);
   const [resumeBanner, setResumeBanner] = useState(false);
-  // These MUST be here (before any early return) — React requires all hooks
+  // These MUST be here (before any early return) � React requires all hooks
   // to be called unconditionally on every render (Rules of Hooks)
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 900 : true);
   const [isMobileNav, setIsMobileNav] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 769 : false);
+  // Gate modal � shown when guest tries to access chapter 2+
+  const [chapterGate, setChapterGate] = useState(false);
 
-  // ── Offline reading state ─────────────────────────────────────────────────
+  // -- Offline reading state -------------------------------------------------
   const [isOffline,       setIsOffline]       = useState(!navigator.onLine);
   const [offlineSaved,    setOfflineSaved]     = useState(false);
   const [offlineSaving,   setOfflineSaving]    = useState(false);
@@ -594,15 +596,15 @@ export default function Reader() {
     }
   }, [user?.email, book?.id]); // eslint-disable-line
 
-  // ── Chapters: serve from IndexedDB cache instantly, then live-update ──────
-  // Phase 1: getDocFromCache → zero network latency, renders immediately
-  // Phase 2: onSnapshot → picks up admin edits in real-time, no page refresh needed
+  // -- Chapters: serve from IndexedDB cache instantly, then live-update ------
+  // Phase 1: getDocFromCache ? zero network latency, renders immediately
+  // Phase 2: onSnapshot ? picks up admin edits in real-time, no page refresh needed
   const [liveChapters, setLiveChapters] = useState(null);
   useEffect(() => {
     if (!book?.id) return;
     const ref = doc(db, 'book_chapters', String(book.id));
 
-    // Serve from IndexedDB cache first (instant — no network)
+    // Serve from IndexedDB cache first (instant � no network)
     getDocFromCache(ref)
       .then(snap => {
         if (snap.exists() && snap.data().chapters?.length > 0) {
@@ -621,10 +623,10 @@ export default function Reader() {
     return () => unsub();
   }, [book?.id]); // eslint-disable-line
 
-  // ── Reading progress ──────────────────────────────────────────────────────
+  // -- Reading progress ------------------------------------------------------
   const { getProgress, saveProgress } = useReadingProgress(user?.email, book?.id);
 
-  // Support deep-linking to a specific chapter — switch to text mode automatically
+  // Support deep-linking to a specific chapter � switch to text mode automatically
   useEffect(() => {
     if (location.state?.chapter !== undefined) {
       setMode('text');
@@ -656,18 +658,21 @@ export default function Reader() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapter]);
 
-  // Ownership check — uses Firestore-backed library state from AppContext
+  // Ownership check � uses Firestore-backed library state from AppContext
   const checkOwned = useCallback(() => {
     if (!user) return false;
     return isOwned(book?.id ?? id);
   }, [user, isOwned, book?.id, id]);
 
-  // Check if a specific chapter can be accessed (owned or free first chapter)
+  // Check if a specific chapter can be accessed (owned, free-preview ch0, or freeFirstChapter)
   const canAccessChapter = useCallback((chapterNum) => {
-    if (checkOwned()) return true; // User owns the full book
-    if (book?.freeFirstChapter && chapterNum === 0) return true; // Free first chapter
+    if (checkOwned()) return true; // owns the full book
+    // Chapter 0 is always free for free-preview books (no login needed)
+    if (book?.status === 'free-preview' && chapterNum === 0) return true;
+    // Explicit freeFirstChapter flag (ongoing series etc.)
+    if (book?.freeFirstChapter && chapterNum === 0) return true;
     return false;
-  }, [book?.freeFirstChapter, checkOwned]);
+  }, [book?.status, book?.freeFirstChapter, checkOwned]);
 
   // Get the owned book entry (includes driveUrl set at unlock time)
   const getOwnedBook = useCallback(() => {
@@ -675,7 +680,7 @@ export default function Reader() {
     return library.find(x => x.id === (book?.id ?? id)) || null;
   }, [user, library, book?.id, id]);
 
-  /* ── DRM: block right-click, copy, print on the reader element ── */
+  /* -- DRM: block right-click, copy, print on the reader element -- */
   useEffect(() => {
     const el = readerRef.current;
     if (!el || !user) return;
@@ -707,7 +712,7 @@ export default function Reader() {
     };
   }, [user?.id, siteControls]); // eslint-disable-line
 
-  /* ── DRM: block print ── */
+  /* -- DRM: block print -- */
   useEffect(() => {
     if ((siteControls || {}).disablePrint === false) return; // admin disabled this protection
     const before = () => { setDrmBlock(true); };
@@ -715,10 +720,10 @@ export default function Reader() {
     return () => window.removeEventListener('beforeprint', before);
   }, [siteControls]);
 
-  /* ── Gates ── */
+  /* -- Gates -- */
   if (!book) return (
     <div className="reader-error">
-      <div className="reader-error__icon">📚</div>
+      <div className="reader-error__icon">??</div>
       <h2>Book not found</h2>
       <Link to="/library" className="btn btn-primary">Back to Library</Link>
     </div>
@@ -726,7 +731,7 @@ export default function Reader() {
 
   if (!user) return (
     <div className="reader-error">
-      <div className="reader-error__icon">🔒</div>
+      <div className="reader-error__icon">??</div>
       <h2>Sign in to read</h2>
       <p>You need to be logged in to access this book.</p>
       <Link to="/login" className="btn btn-primary">Sign In</Link>
@@ -734,24 +739,25 @@ export default function Reader() {
   );
 
   if (!checkOwned()) {
-    // Allow free reading of chapter 1 if enabled
-    const canReadFreeChapter = book?.freeFirstChapter && chapter === 0;
-    
+    // Chapter 0 is always free for free-preview books � no login required
+    const isFreePreviewCh0 = book?.status === 'free-preview' && chapter === 0;
+    // Allow free first chapter if explicitly enabled on the book
+    const canReadFreeChapter = isFreePreviewCh0 || (book?.freeFirstChapter && chapter === 0);
+
     if (!canReadFreeChapter) {
-      // Still waiting for Firestore library snapshot — show loading briefly.
-      // Hard cap: if libLoaded is still false after 3s, unblock and show purchase screen.
-      if (!libLoaded) return (
+      // Still waiting for Firestore library snapshot � show loading briefly.
+      if (user && !libLoaded) return (
         <div className="reader-error">
-          <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
-          <p style={{ color:'var(--muted)' }}>Verifying access…</p>
+          <div style={{ fontSize:'2rem', marginBottom:16 }}>?</div>
+          <p style={{ color:'var(--muted)' }}>Verifying access�</p>
         </div>
       );
       return (
         <div className="reader-error">
-          <div className="reader-error__icon">🛒</div>
+          <div className="reader-error__icon">??</div>
           <h2>Purchase required</h2>
           <p>Buy this book to unlock reading and download access.</p>
-          <Link to={bookPath(book)} className="btn btn-primary">Buy — KSh {book.price}</Link>
+          <Link to={bookPath(book)} className="btn btn-primary">Buy � KSh {book.price}</Link>
         </div>
       );
     }
@@ -759,7 +765,7 @@ export default function Reader() {
 
   if (user && myPerms && myPerms.canReadOnline === false) return (
     <div className="reader-error">
-      <div className="reader-error__icon">🔒</div>
+      <div className="reader-error__icon">??</div>
       <h2>Reading Restricted</h2>
       <p>You don't have permission to read books online. Contact support.</p>
       <Link to="/my-library" className="btn btn-primary">My Library</Link>
@@ -772,7 +778,7 @@ export default function Reader() {
     const reason = ownedEntry?.deactivationReason || 'Access to this book has been restricted by the administrator.';
     return (
       <div className="reader-error">
-        <div className="reader-error__icon">⚠️</div>
+        <div className="reader-error__icon">??</div>
         <h2>Book Deactivated</h2>
         <p style={{ maxWidth:400, textAlign:'center' }}>{reason}</p>
         <Link to="/my-library" className="btn btn-primary">My Library</Link>
@@ -782,7 +788,7 @@ export default function Reader() {
 
   if (drmBlock) return (
     <div className="reader-error">
-      <div className="reader-error__icon">⛔</div>
+      <div className="reader-error__icon">?</div>
       <h2>Printing not allowed</h2>
       <p>This content is protected. Printing and sharing are not permitted.</p>
       <button className="btn btn-ghost btn-sm" onClick={() => setDrmBlock(false)}>Continue Reading</button>
@@ -794,7 +800,7 @@ export default function Reader() {
   // Per-book admin deactivation check
   if (ownedBook?.readDeactivated === true) return (
     <div className="reader-error">
-      <div className="reader-error__icon">⛔</div>
+      <div className="reader-error__icon">?</div>
       <h2>Reading Access Restricted</h2>
       <p style={{ color:'var(--muted)', maxWidth:400, textAlign:'center' }}>
         Online reading for this book has been restricted on your account.
@@ -806,10 +812,10 @@ export default function Reader() {
   const rawUrl     = ownedBook?.driveUrl || book.driveUrl || '';
   const embedUrl   = toDriveEmbed(rawUrl);
   const hasPdf     = !!embedUrl;
-  // Chapters: prefer live Firestore → offline cache → fallback static content
+  // Chapters: prefer live Firestore ? offline cache ? fallback static content
   const chapters   = liveChapters || offlineChapters || getFallbackChapters(book);
 
-  // ── Save for offline handler ──────────────────────────────────────────────
+  // -- Save for offline handler ----------------------------------------------
   const handleSaveOffline = async () => {
     if (!user?.email || !book?.id) return;
     setOfflineSaving(true);
@@ -819,9 +825,9 @@ export default function Reader() {
     if (ok) {
       setOfflineSaved(true);
       setOfflineChapters(chapters);
-      setOfflineSaveMsg('✅ Saved for offline reading');
+      setOfflineSaveMsg('? Saved for offline reading');
     } else {
-      setOfflineSaveMsg('❌ Could not save — storage may be full');
+      setOfflineSaveMsg('? Could not save � storage may be full');
     }
     setTimeout(() => setOfflineSaveMsg(''), 3500);
   };
@@ -831,11 +837,11 @@ export default function Reader() {
     removeOfflineBook(user.email, book.id);
     setOfflineSaved(false);
     setOfflineChapters(null);
-    setOfflineSaveMsg('🗑 Removed from offline library');
+    setOfflineSaveMsg('?? Removed from offline library');
     setTimeout(() => setOfflineSaveMsg(''), 3000);
   };
 
-  // Download URL — uses Google Drive's export endpoint for direct PDF download
+  // Download URL � uses Google Drive's export endpoint for direct PDF download
   const downloadUrl = rawUrl ? (() => {
     try {
       const fileMatch = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -861,17 +867,89 @@ export default function Reader() {
       ref={readerRef}
     >
 
-      {/* ── Sidebar overlay (mobile) ── */}
+      {/* ── Chapter gate modal — shown when guest tries chapter 2+ ── */}
+      {chapterGate && (
+        <div
+          style={{
+            position:'fixed', inset:0, zIndex:9999,
+            background:'rgba(0,0,0,0.75)', backdropFilter:'blur(6px)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            padding:20,
+          }}
+          onClick={() => setChapterGate(false)}
+        >
+          <div
+            style={{
+              background:'var(--surface, #13132a)',
+              border:'1px solid rgba(201,168,76,0.35)',
+              borderRadius:16, padding:'32px 28px', maxWidth:420, width:'100%',
+              textAlign:'center', boxShadow:'0 24px 80px rgba(0,0,0,0.7)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Lock icon */}
+            <div style={{ fontSize:'3rem', marginBottom:12 }}>🔒</div>
+            <h2 style={{ margin:'0 0 8px', fontSize:'1.25rem', color:'var(--text,#f0ece2)' }}>
+              You've finished the free preview
+            </h2>
+            <p style={{ margin:'0 0 20px', fontSize:'0.9rem', color:'var(--muted,#8b8aa0)', lineHeight:1.6 }}>
+              You've read the free first chapter of <strong style={{ color:'var(--gold,#c9a84c)' }}>{book?.title}</strong>.
+              {' '}To continue reading, create a free account or log in and purchase the full book.
+            </p>
+
+            {/* Book price callout */}
+            <div style={{
+              display:'inline-flex', alignItems:'baseline', gap:4,
+              background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.3)',
+              borderRadius:8, padding:'8px 20px', marginBottom:20,
+            }}>
+              <small style={{ color:'var(--muted,#8b8aa0)', fontSize:'0.8rem' }}>KSh</small>
+              <strong style={{ color:'var(--gold,#c9a84c)', fontSize:'1.5rem' }}>{book?.price}</strong>
+              <small style={{ color:'var(--muted,#8b8aa0)', fontSize:'0.8rem' }}>full book</small>
+            </div>
+
+            {/* CTAs */}
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+              <Link
+                to={`/register?returnTo=${encodeURIComponent(bookPath(book))}`}
+                className="btn btn-primary"
+                style={{ width:'100%', padding:'12px', fontSize:'0.95rem', fontWeight:700 }}
+              >
+                Create Free Account & Buy
+              </Link>
+              <Link
+                to={`/login?returnTo=${encodeURIComponent(bookPath(book))}`}
+                className="btn btn-outline"
+                style={{ width:'100%', padding:'12px', fontSize:'0.95rem' }}
+              >
+                Sign In
+              </Link>
+            </div>
+
+            <p style={{ fontSize:'0.72rem', color:'var(--muted,#8b8aa0)', margin:0, opacity:0.7 }}>
+              Free account · Instant access after payment · M-Pesa, Card, PayPal
+            </p>
+            <button
+              onClick={() => setChapterGate(false)}
+              style={{ background:'none', border:'none', color:'var(--muted,#8b8aa0)', fontSize:'0.75rem', marginTop:14, cursor:'pointer', textDecoration:'underline', padding:0 }}
+            >
+              Go back to free chapter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* -- Sidebar overlay (mobile) -- */}
       {sidebarOpen && (
         <div className="reader__sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* ══════════════════════════════
-          LEFT SIDEBAR — book info + TOC
-      ══════════════════════════════ */}
+      {/* ------------------------------
+          LEFT SIDEBAR � book info + TOC
+      ------------------------------ */}
       <aside className={'reader__sidebar' + (sidebarOpen ? ' open' : '')}>
         {/* Close button (mobile) */}
-        <button className="reader__sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">✕</button>
+        <button className="reader__sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close menu">?</button>
 
         {/* Book cover */}
         {book.cover && (
@@ -914,7 +992,7 @@ export default function Reader() {
                   className={'reader__sidebar-ch' + (i === chapter ? ' on' : '')}
                   onClick={() => {
                     if (!canAccessChapter(i)) {
-                      alert('You need to purchase this book to read Chapter ' + (i + 1));
+                      setChapterGate(true);
                       return;
                     }
                     setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false);
@@ -928,26 +1006,26 @@ export default function Reader() {
         </nav>
       </aside>
 
-      {/* ── Main content wrapper (shifts right when sidebar open on desktop) ── */}
+      {/* -- Main content wrapper (shifts right when sidebar open on desktop) -- */}
       <div className={'reader__main' + (sidebarOpen ? ' sidebar-open' : '')}>
 
-      {/* ── Top navigation bar ── */}
+      {/* -- Top navigation bar -- */}
       <div className={`reader__nav${isMobileNav ? ' reader__nav--wrap' : ''}`}>
 
         {isMobileNav ? (
-          /* ════ MOBILE: Two-row layout ════ */
+          /* ---- MOBILE: Two-row layout ---- */
           <>
             {/* Row 1: toggle | back | title | offline badge */}
             <div className="reader__nav-row1">
               <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
                 <span /><span /><span />
               </button>
-              <Link to="/my-library" className="reader__back">← Library</Link>
+              <Link to="/my-library" className="reader__back">? Library</Link>
               <div className="reader__info">
                 <strong>{book.title}</strong>
               </div>
               {isOffline && (
-                <span className="reader__offline-badge" title="You are offline — reading from local cache">📵</span>
+                <span className="reader__offline-badge" title="You are offline � reading from local cache">??</span>
               )}
             </div>
 
@@ -961,7 +1039,7 @@ export default function Reader() {
                     style={{padding:'3px 9px',fontSize:'0.7rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71',whiteSpace:'nowrap'}}
                     title="Remove from offline library"
                     onClick={handleRemoveOffline}
-                  >✅ Offline</button>
+                  >? Offline</button>
                 ) : (
                   <button
                     className="reader__font-btn"
@@ -969,20 +1047,20 @@ export default function Reader() {
                     title="Save book for offline reading"
                     onClick={handleSaveOffline}
                     disabled={offlineSaving}
-                  >{offlineSaving ? '⏳' : '📥 Save'}</button>
+                  >{offlineSaving ? '?' : '?? Save'}</button>
                 )
               )}
 
               {/* Mode toggle */}
               <div className="reader__mode-toggle">
-                <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>📖 Read</button>
-                <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>🎧 Listen</button>
+                <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>?? Read</button>
+                <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>?? Listen</button>
               </div>
 
               {/* Zoom / font size */}
               {(viewMode === 'text' || viewMode === 'listen') && (
                 <div className="reader__zoom-group">
-                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))}>A−</button>
+                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))}>A-</button>
                   <span className="reader__zoom-label">{fontSize}px</span>
                   <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))}>A+</button>
                 </div>
@@ -990,20 +1068,20 @@ export default function Reader() {
             </div>
           </>
         ) : (
-          /* ════ DESKTOP/TABLET: Single-row layout ════ */
+          /* ---- DESKTOP/TABLET: Single-row layout ---- */
           <>
             <button className="reader__sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle chapters">
               <span /><span /><span />
             </button>
-            <Link to="/my-library" className="reader__back">← My Library</Link>
+            <Link to="/my-library" className="reader__back">? My Library</Link>
             <div className="reader__info">
               <strong>{book.title}</strong>
               <span>by {book.author}</span>
             </div>
             <div className="reader__nav-right">
               {isOffline && (
-                <span className="reader__offline-badge" title="You are offline — reading from local cache">
-                  📵 Offline
+                <span className="reader__offline-badge" title="You are offline � reading from local cache">
+                  ?? Offline
                 </span>
               )}
               {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
@@ -1013,7 +1091,7 @@ export default function Reader() {
                     style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71'}}
                     title="Remove from offline library"
                     onClick={handleRemoveOffline}
-                  >✅ Saved Offline</button>
+                  >? Saved Offline</button>
                 ) : (
                   <button
                     className="reader__font-btn"
@@ -1021,20 +1099,20 @@ export default function Reader() {
                     title="Save book for offline reading (stored in your browser)"
                     onClick={handleSaveOffline}
                     disabled={offlineSaving}
-                  >{offlineSaving ? '⏳ Saving…' : '📥 Save Offline'}</button>
+                  >{offlineSaving ? '? Saving�' : '?? Save Offline'}</button>
                 )
               )}
               {offlineSaveMsg && (
                 <span style={{fontSize:'0.75rem',color:'var(--muted)',flexShrink:0}}>{offlineSaveMsg}</span>
               )}
-              {/* Mode toggle — PDF + Text + Listen */}
+              {/* Mode toggle � PDF + Text + Listen */}
               <div className="reader__mode-toggle">
-                <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>📖 Read</button>
-                <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>🎧 Listen</button>
+                <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>?? Read</button>
+                <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>?? Listen</button>
               </div>
               {(viewMode === 'text' || viewMode === 'listen') && (
                 <div className="reader__zoom-group">
-                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A−</button>
+                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A-</button>
                   <span className="reader__zoom-label">{fontSize}px</span>
                   <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))} title="Larger text">A+</button>
                 </div>
@@ -1044,7 +1122,7 @@ export default function Reader() {
         )}
       </div>
 
-      {/* ── Offline reading banner ── */}
+      {/* -- Offline reading banner -- */}
       {isOffline && offlineSaved && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
@@ -1053,8 +1131,8 @@ export default function Reader() {
           borderBottom: '1px solid rgba(46,204,113,0.2)',
           fontSize: '0.82rem', color: '#2ecc71',
         }}>
-          <span>📵</span>
-          <span>Reading from offline cache — no internet required.</span>
+          <span>??</span>
+          <span>Reading from offline cache � no internet required.</span>
         </div>
       )}
       {isOffline && !offlineSaved && (
@@ -1065,12 +1143,12 @@ export default function Reader() {
           borderBottom: '1px solid rgba(231,76,60,0.2)',
           fontSize: '0.82rem', color: '#e74c3c',
         }}>
-          <span>⚠️</span>
+          <span>??</span>
           <span>You are offline. This book was not saved for offline reading. Connect to the internet to continue.</span>
         </div>
       )}
 
-      {/* ── Resume reading banner ── */}
+      {/* -- Resume reading banner -- */}
       {resumeBanner && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
@@ -1079,7 +1157,7 @@ export default function Reader() {
           borderBottom: '1px solid rgba(201,168,76,0.25)',
           fontSize: '0.85rem', flexWrap: 'wrap',
         }}>
-          <span style={{ color: 'var(--gold)' }}>📖 You were reading this book. Resume where you left off?</span>
+          <span style={{ color: 'var(--gold)' }}>?? You were reading this book. Resume where you left off?</span>
           <button
             className="btn btn-primary btn-sm"
             style={{ padding: '4px 14px', fontSize: '0.78rem' }}
@@ -1097,23 +1175,23 @@ export default function Reader() {
         </div>
       )}
 
-      {/* ── Watermark strip ── */}
+      {/* -- Watermark strip -- */}
       <div className="reader__watermark">
-        🔒 Licensed to &bull;<strong>{user.name}</strong> &bull; {user.email} — Personal use only. Sharing or redistribution is prohibited.
+        ?? Licensed to &bull;<strong>{user.name}</strong> &bull; {user.email} � Personal use only. Sharing or redistribution is prohibited.
       </div>
 
-      {/* ══════════════════════════════
+      {/* ------------------------------
           PDF EMBED MODE
           Google Drive renders the PDF
           inside an iframe on our page.
           User sees the book, not the URL.
-      ══════════════════════════════ */}
+      ------------------------------ */}
 
-      {/* ══════════════════════════════
+      {/* ------------------------------
           TEXT / CHAPTER MODE
           Fallback when no PDF, or user
           switches to text view.
-      ══════════════════════════════ */}
+      ------------------------------ */}
       {viewMode === 'text' && (
         <div className="reader__body">
           <div className="reader__page reader__page--drm">
@@ -1121,7 +1199,7 @@ export default function Reader() {
             {/* Ghost watermark tiled in background */}
             <div className="reader__ghost-wm" aria-hidden="true">
               {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i}>{user.name} · Ellines Haven · {user.email}</span>
+                <span key={i}>{user.name} � Ellines Haven � {user.email}</span>
               ))}
             </div>
 
@@ -1148,11 +1226,11 @@ export default function Reader() {
                   .filter(p => p.length > 0);
 
                 return rawParas.map((p, i) => {
-                  // Scene break lines — render as a centred ornament
-                  if (/^(\*{1,3}|—{1,3}|-{3,}|#{1,3}|\u2605|\u00b7{1,3})$/.test(p)) {
+                  // Scene break lines � render as a centred ornament
+                  if (/^(\*{1,3}|�{1,3}|-{3,}|#{1,3}|\u2605|\u00b7{1,3})$/.test(p)) {
                     return (
                       <p key={i} style={{ textAlign: 'center', textIndent: 0, margin: '1.4em 0', color: '#c9a84c', letterSpacing: '0.3em', fontSize: '0.85em' }}>
-                        ✦ ✦ ✦
+                        ? ? ?
                       </p>
                     );
                   }
@@ -1165,14 +1243,14 @@ export default function Reader() {
 
             {/* Inline licence watermark */}
             <p className="reader__inline-mark" aria-hidden="true">
-              🔒 Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
+              ?? Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
             </p>
 
             {/* Chapter navigation */}
             <div className="reader__page-nav">
               {chapter > 0 && (
                 <button className="btn btn-ghost btn-sm" onClick={() => { setChapter(c => c - 1); window.scrollTo(0, 0); }}>
-                  ← Previous
+                  ? Previous
                 </button>
               )}
               {chapter < chapters.length - 1 && (
@@ -1180,30 +1258,30 @@ export default function Reader() {
                   onClick={() => {
                     const nextCh = chapter + 1;
                     if (!canAccessChapter(nextCh)) {
-                      alert('You need to purchase this book to read Chapter ' + (nextCh + 1));
+                      setChapterGate(true);
                       return;
                     }
                     setChapter(nextCh); window.scrollTo(0, 0);
                   }}>
-                  Next →
+                  Next ?
                 </button>
               )}
             </div>
 
-            {/* End-of-chapter marker — auto-generates from chapter data, admin-editable */}
+            {/* End-of-chapter marker � auto-generates from chapter data, admin-editable */}
             <div className="reader__end">
-              <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
+              <p>{chapters[chapter]?.endMessage || `� End of Chapter ${chapter + 1} �`}</p>
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
                   onClick={() => {
                     const nextCh = chapter + 1;
                     if (!canAccessChapter(nextCh)) {
-                      alert('You need to purchase this book to read Chapter ' + (nextCh + 1));
+                      setChapterGate(true);
                       return;
                     }
                     setChapter(nextCh); window.scrollTo(0, 0);
                   }}>
-                  Continue to Chapter {chapter + 2} →
+                  Continue to Chapter {chapter + 2} ?
                 </button>
               )}
             </div>
@@ -1211,11 +1289,11 @@ export default function Reader() {
         </div>
       )}
 
-      {/* ══════════════════════════════
+      {/* ------------------------------
           LISTEN MODE
           Text-to-speech audio player
           + text display for follow-along
-      ══════════════════════════════ */}
+      ------------------------------ */}
       {viewMode === 'listen' && (
         <div className="reader__body">
           <div className="reader__page reader__page--drm">
@@ -1223,7 +1301,7 @@ export default function Reader() {
             {/* Ghost watermark */}
             <div className="reader__ghost-wm" aria-hidden="true">
               {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i}>{user.name} · Ellines Haven · {user.email}</span>
+                <span key={i}>{user.name} � Ellines Haven � {user.email}</span>
               ))}
             </div>
 
@@ -1257,10 +1335,10 @@ export default function Reader() {
                   .filter(p => p.length > 0);
 
                 return rawParas.map((p, i) => {
-                  if (/^(\*{1,3}|—{1,3}|-{3,}|#{1,3}|\u2605|\u00b7{1,3})$/.test(p)) {
+                  if (/^(\*{1,3}|�{1,3}|-{3,}|#{1,3}|\u2605|\u00b7{1,3})$/.test(p)) {
                     return (
                       <p key={i} style={{ textAlign: 'center', textIndent: 0, margin: '1.4em 0', color: '#c9a84c', letterSpacing: '0.3em', fontSize: '0.85em' }}>
-                        ✦ ✦ ✦
+                        ? ? ?
                       </p>
                     );
                   }
@@ -1272,13 +1350,13 @@ export default function Reader() {
             </div>
 
             <p className="reader__inline-mark" aria-hidden="true">
-              🔒 Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
+              ?? Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
             </p>
 
             <div className="reader__page-nav">
               {chapter > 0 && (
                 <button className="btn btn-ghost btn-sm" onClick={() => { setChapter(c => c - 1); window.scrollTo(0, 0); }}>
-                  ← Previous
+                  ? Previous
                 </button>
               )}
               {chapter < chapters.length - 1 && (
@@ -1286,23 +1364,23 @@ export default function Reader() {
                   onClick={() => {
                     const nextCh = chapter + 1;
                     if (!canAccessChapter(nextCh)) {
-                      alert('You need to purchase this book to read Chapter ' + (nextCh + 1));
+                      setChapterGate(true);
                       return;
                     }
                     setChapter(nextCh); window.scrollTo(0, 0);
                   }}>
-                  Next →
+                  Next ?
                 </button>
               )}
             </div>
 
             {/* End-of-chapter marker for listen mode */}
             <div className="reader__end">
-              <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
+              <p>{chapters[chapter]?.endMessage || `� End of Chapter ${chapter + 1} �`}</p>
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
-                  Continue to Chapter {chapter + 2} →
+                  Continue to Chapter {chapter + 2} ?
                 </button>
               )}
             </div>

@@ -29,6 +29,7 @@ const DeviceSettingsPanel    = lazy(() => import('./admin-panels/DeviceSettingsP
 const OnlineUsersPanel       = lazy(() => import('./admin-panels/OnlineUsersPanel'));
 const AdminOrdersPanel       = lazy(() => import('./admin-panels/AdminOrdersPanel'));
 const SeriesPanel            = lazy(() => import('./admin-panels/SeriesPanel'));
+const ChapterGrantsPanel     = lazy(() => import('./admin-panels/ChapterGrantsPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -5426,6 +5427,13 @@ export default function Admin() {
         {tab === 'godmode' && isSuper && (
           <Suspense fallback={<PanelLoader />}>
             <GodModePanel showToast={showToast} books={books} saveBook={saveBook} users={users} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- CHAPTER GRANTS — admin only -- */}
+        {tab === 'chaptergrants' && (
+          <Suspense fallback={<PanelLoader />}>
+            <ChapterGrantsPanel showToast={showToast} books={books} isSuper={isSuper} />
           </Suspense>
         )}
 

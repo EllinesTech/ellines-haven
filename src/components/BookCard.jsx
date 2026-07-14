@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import WishlistButton from './WishlistButton';
 import { bookPath, readPath } from '../utils/slugify';
+import { handlePurchaseAction, getLoginPromptConfig } from '../utils/purchaseHelpers';
+import { getReadingTimeDisplay } from '../utils/readingTime';
 import './BookCard.css';
 
 // Statuses where buying is not applicable
@@ -20,7 +22,8 @@ const STATUS_META = {
 };
 
 export function BookStatusBadge({ status, style = {} }) {
-  if (!status || status === 'complete') return null; // don't clutter card with default
+  if (!status) return null;
+  // Note: 'complete' IS shown — callers decide whether to render this badge
   const meta = STATUS_META[status];
   if (!meta) return null;
   return (
@@ -106,8 +109,7 @@ function NotifyMeBtn({ book, user }) {
 
   const handleNotify = async () => {
     if (!user) {
-      // Not logged in — redirect hint
-      window.location.href = '/login';
+      window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
     setState('loading');
@@ -147,6 +149,38 @@ function NotifyMeBtn({ book, user }) {
     }
   };
 
+  // If not logged in, show professional login prompt for any notify-type status
+  if (!user) {
+    const colors = {
+      'coming-soon': { bg:'rgba(232,131,42,0.08)', border:'rgba(232,131,42,0.25)', text:'#ffb366', label:'Coming Soon' },
+      'limited':     { bg:'rgba(231,76,60,0.08)',  border:'rgba(231,76,60,0.25)',  text:'#ff8a80', label:'Limited Edition' },
+      'ongoing':     { bg:'rgba(74,158,255,0.08)', border:'rgba(74,158,255,0.25)', text:'#7ec8ff', label:'Ongoing' },
+    };
+    const c = colors[book.status] || colors['coming-soon'];
+    return (
+      <div style={{
+        display:'flex', flexDirection:'column', gap:6,
+        background: c.bg, border:`1px solid ${c.border}`,
+        borderRadius:'6px', padding:'10px 12px', fontSize:'0.7rem',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+          <span>🔐</span>
+          <strong style={{ color: c.text }}>{c.label}</strong>
+        </div>
+        <p style={{ margin:'0 0 8px 0', fontSize:'0.65rem', color: c.text, opacity:0.85, lineHeight:1.4 }}>
+          Login or register to get notified when this book becomes available.
+        </p>
+        <Link
+          to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+          className="btn btn-primary btn-sm"
+          style={{ fontSize:'0.65rem', padding:'6px 10px', textAlign:'center' }}
+        >
+          Login or Register
+        </Link>
+      </div>
+    );
+  }
+
   if (state === 'done') {
     return (
       <span className="btn btn-sm" style={{ background:'rgba(46,204,113,0.1)', color:'var(--ok)', border:'1px solid rgba(46,204,113,0.3)', cursor:'default', fontSize:'0.72rem' }}>
@@ -163,6 +197,172 @@ function NotifyMeBtn({ book, user }) {
       style={{ background:'rgba(201,168,76,0.1)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.3)', fontSize:'0.72rem' }}>
       {state === 'loading' ? '⏳' : label}
     </button>
+  );
+}
+
+// ── Login Required Message Card ──────────────────────────────────────────────
+function LoginRequiredCard({ bookStatus, isPremium = false, compact = false }) {
+  const config = getLoginPromptConfig(bookStatus, isPremium);
+  
+  if (compact) {
+    // Compact inline version for card footer
+    return (
+      <div style={{
+        display:'flex', flexDirection:'column', gap:6,
+        background:'rgba(168,85,247,0.08)',
+        border:'1px solid rgba(168,85,247,0.25)',
+        borderRadius:'6px',
+        padding:'10px 12px',
+        fontSize:'0.7rem',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.9rem' }}>
+          <span>{config.icon}</span>
+          <strong style={{ color:'#d4b5ff' }}>{config.title}</strong>
+        </div>
+        <p style={{ margin:'0 0 8px 0', fontSize:'0.65rem', color:'rgba(212,181,255,0.8)', lineHeight:1.4 }}>
+          {config.message}
+        </p>
+        <Link 
+          to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+          className="btn btn-primary btn-sm"
+          style={{ fontSize:'0.65rem', padding:'6px 10px', textAlign:'center' }}
+        >
+          {config.ctaText}
+        </Link>
+      </div>
+    );
+  }
+  
+  return (
+    <div style={{
+      display:'flex', flexDirection:'column', gap:8,
+      background:'rgba(100,116,139,0.08)',
+      border:'1px solid rgba(100,116,139,0.25)',
+      borderRadius:'8px',
+      padding:'12px 14px',
+      fontSize:'0.72rem',
+    }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <span style={{ fontSize:'1.2rem' }}>{config.icon}</span>
+        <strong style={{ color:'var(--muted)' }}>{config.title}</strong>
+      </div>
+      <p style={{ margin:'0 0 8px 0', fontSize:'0.7rem', color:'var(--muted)', lineHeight:1.4 }}>
+        {config.message}
+      </p>
+      <Link 
+        to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+        className="btn btn-primary btn-sm"
+        style={{ fontSize:'0.7rem', textAlign:'center' }}
+      >
+        {config.ctaText}
+      </Link>
+      <small style={{ textAlign:'center', color:'var(--muted)', fontSize:'0.65rem', opacity:0.7 }}>
+        {config.subtext}
+      </small>
+    </div>
+  );
+}
+
+// ── Purchase UI for Complete & Free Preview books ──────────────────────────
+function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
+  if (owned) {
+    return <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>;
+  }
+
+  if (user && myPerms?.canPurchase === false) {
+    return <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>;
+  }
+
+  if (inCart) {
+    return <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
+  }
+
+  if (!user) {
+    // Free-preview: guests CAN read chapter 1 — show that clearly
+    if (book.status === 'free-preview') {
+      return (
+        <Link
+          to={readPath(book)}
+          className="btn btn-outline btn-sm"
+          style={{ color:'#d4b5ff', borderColor:'rgba(168,85,247,0.5)' }}
+          title="Read the first chapter free — no login needed"
+        >
+          👀 Read Free Chapter
+        </Link>
+      );
+    }
+    return (
+      <Link
+        to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+        className="btn btn-primary btn-sm"
+        title="Login or register to get this book"
+      >
+        🔐 Get Book
+      </Link>
+    );
+  }
+
+  return (
+    <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)} title="Add to cart">
+      Add to Cart
+    </button>
+  );
+}
+
+// ── Purchase UI for Premium books ────────────────────────────────────────────
+function PurchaseUiPremium({ book, owned, inCart, user, myPerms, addToCart }) {
+  if (owned) {
+    return <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>;
+  }
+
+  if (user && myPerms?.canPurchase === false) {
+    return <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>;
+  }
+
+  if (inCart) {
+    return <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
+  }
+
+  if (!user) {
+    return (
+      <Link
+        to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+        className="btn btn-primary btn-sm"
+        style={{ background:'rgba(201,168,76,0.25)', borderColor:'rgba(201,168,76,0.6)' }}
+        title="Login or register to access premium content"
+      >
+        🔐 Get Book
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      className="btn btn-primary btn-sm"
+      onClick={() => addToCart(book)}
+      title="Premium content — add to cart"
+      style={{ background:'rgba(201,168,76,0.25)', borderColor:'rgba(201,168,76,0.6)' }}
+    >
+      Add to Cart
+    </button>
+  );
+}
+
+// ── Free Preview message card ────────────────────────────────────────────────
+function FreePreviewMessage() {
+  return (
+    <div style={{
+      background:'rgba(168,85,247,0.08)',
+      border:'1px solid rgba(168,85,247,0.3)',
+      borderRadius:'8px',
+      padding:'10px 12px',
+      fontSize:'0.72rem',
+      color:'#d4b5ff',
+      textAlign:'center',
+      fontStyle:'italic',
+    }}>
+      👀 Read first chapter for free — get the full book to continue
+    </div>
   );
 }
 
@@ -215,6 +415,10 @@ export default function BookCard({ book }) {
         {book.inspired && book.inspiredNote && (
           <p className="bcard__inspired-note">✦ {book.inspiredNote}</p>
         )}
+        
+        {/* Show free preview message for free-preview status */}
+        {book.status === 'free-preview' && <FreePreviewMessage />}
+        
         <div className="bcard__meta">
           <span className="bcard__stars">{'★'.repeat(Math.floor(book.rating))}<span className="bcard__rating"> {book.rating}</span></span>
           {book.status === 'ongoing'
@@ -238,7 +442,7 @@ export default function BookCard({ book }) {
                   </span>
                 );
               })()
-            : <span className="bcard__time">{book.readTime}</span>
+            : <span className="bcard__time">{getReadingTimeDisplay(book)}</span>
           }
         </div>
         <div className="bcard__footer">
@@ -253,24 +457,32 @@ export default function BookCard({ book }) {
               ? <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>
               : NO_PURCHASE_STATUSES.has(book.status)
                 ? <NotifyMeBtn book={book} user={user} />
-                : book.status === 'ongoing' && (() => {
-                    const released = book.chaptersReleased > 0
-                      ? book.chaptersReleased
-                      : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|SECTION|VOLUME)\s/i.test(t)).length || 0);
-                    return released > 2;
-                  })()
-                  ? inCart
-                    ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
-                    : !myPerms || myPerms.canPurchase !== false
-                      ? <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>
-                      : <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
-                : NOTIFY_STATUSES.has(book.status)
-                  ? <NotifyMeBtn book={book} user={user} />
-                  : inCart
-                    ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
-                    : !myPerms || myPerms.canPurchase !== false
-                      ? <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)}>Add to Cart</button>
-                      : <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                : book.status === 'complete' || book.status === 'free-preview'
+                  ? <PurchaseUiComplete book={book} owned={owned} inCart={inCart} user={user} myPerms={myPerms} addToCart={addToCart} />
+                  : book.status === 'premium'
+                    ? <PurchaseUiPremium book={book} owned={owned} inCart={inCart} user={user} myPerms={myPerms} addToCart={addToCart} />
+                    : book.status === 'ongoing' && (() => {
+                        const released = book.chaptersReleased > 0
+                          ? book.chaptersReleased
+                          : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|SECTION|VOLUME)\s/i.test(t)).length || 0);
+                        return released > 2;
+                      })()
+                      ? inCart
+                        ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
+                        : user && myPerms?.canPurchase === false
+                          ? <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                          : !user
+                            ? <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">🔐 Get Book</Link>
+                            : <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>
+                      : NOTIFY_STATUSES.has(book.status)
+                        ? <NotifyMeBtn book={book} user={user} />
+                        : inCart
+                          ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
+                          : user && myPerms?.canPurchase === false
+                            ? <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                            : !user
+                              ? <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">🔐 Get Book</Link>
+                              : <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)}>Add to Cart</button>
             }
             {!owned && !NO_PURCHASE_STATUSES.has(book.status) && (
               <a href={waOrderLink(book.title, book.price)} target="_blank" rel="noopener noreferrer"

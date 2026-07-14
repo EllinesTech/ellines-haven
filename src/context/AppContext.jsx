@@ -154,6 +154,27 @@ export function AppProvider({ children }) {
     return () => unsub();
   }, []); // eslint-disable-line
 
+  // ── Fetch user chapter grants on app load ─────────────────────────────────
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const grantsRef = doc(db, 'user_chapter_grants', libDocId(user.email));
+    const unsubGrants = onSnapshot(grantsRef, (snap) => {
+      if (snap.exists()) {
+        const grants = snap.data();
+        localStorage.setItem('eh_chapter_grants', JSON.stringify(grants || {}));
+      } else {
+        localStorage.setItem('eh_chapter_grants', JSON.stringify({}));
+      }
+    }, () => {
+      // Silently fall back to localStorage on error
+      const cached = JSON.parse(localStorage.getItem('eh_chapter_grants') || '{}');
+      console.log('[Grants] loaded from cache:', Object.keys(cached).length, 'books');
+    });
+
+    return () => unsubGrants();
+  }, [user?.email]); // eslint-disable-line
+
   // One-time fetch for admin-created users — syncs to localStorage (no persistent listener needed)
   useEffect(() => {
     getDoc(USERS_DOC()).then(snap => {
@@ -366,6 +387,26 @@ export function AppProvider({ children }) {
     if (!user?.email) { setWishlistState([]); return; }
     const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
     setWishlistState(load(key, []));
+  }, [user?.email]); // eslint-disable-line
+
+  // ── Chapter Grants (admin-granted access) ─────────────────────────────────
+  // Admin can grant specific chapters or full books to users
+  const [chapterGrants, setChapterGrantsState] = useState([]);
+
+  useEffect(() => {
+    if (!user?.email) { setChapterGrantsState([]); return; }
+    const grantDocId = user.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const ref = doc(db, 'user_chapter_grants', grantDocId);
+    
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setChapterGrantsState(snap.data().grants || []);
+      } else {
+        setChapterGrantsState([]);
+      }
+    }, () => setChapterGrantsState([]));
+    
+    return () => unsub();
   }, [user?.email]); // eslint-disable-line
 
   // ── Referral System ─────────────────────────────────────────────────────────
@@ -608,10 +649,21 @@ export function AppProvider({ children }) {
 
   // Check if a specific chapter is owned (either the full book or the individual chapter or granted by admin)
   const isChapterOwned = (bookId, chapterNum) => {
-    if (library.some(b => b.id === bookId)) return true; // full book → all chapters unlocked
+    // 1. Full book ownership
+    if (library.some(b => b.id === bookId)) return true;
+    
+    // 2. Individual chapter purchase
     const chapterId = `${bookId}_ch_${chapterNum}`;
-    return library.some(b => b.id === chapterId);
-    // NOTE: Admin grants are checked in BookDetail component when rendering
+    if (library.some(b => b.id === chapterId)) return true;
+    
+    // 3. Admin grants (real-time from Firestore via useEffect above)
+    const grant = chapterGrants.find(g => g.bookId === bookId);
+    if (grant) {
+      if (grant.chapters === 'all') return true;
+      if (Array.isArray(grant.chapters) && grant.chapters.includes(chapterNum)) return true;
+    }
+    
+    return false;
   };
 
   // Get all owned chapter numbers for a book (for ongoing series)
@@ -858,7 +910,7 @@ export function AppProvider({ children }) {
       user, setUser, logout,
       cart, addToCart, removeFromCart, clearCart,
       library, addToLibrary, isOwned, canDownload, libLoaded,
-      isChapterOwned, ownedChapters,
+      isChapterOwned, ownedChapters, chapterGrants,
       books, saveBook, deleteBook, resetBooks,
       orders, setOrdersState, placeOrder, confirmOrder, rejectOrder,
       syncOrders, manualUnlock, unlockBooksForBuyer,

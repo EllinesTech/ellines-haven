@@ -1,0 +1,121 @@
+/* ─────────────────────────────────────────────────────────────
+   Book Edit Panel Styles
+   ───────────────────────────────────────────────────────────── */
+
+.bep-panel {
+  max-width: 700px;
+}
+
+.bep-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bep-section {
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.bep-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bep-section label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bep-section input[type="text"],
+.bep-section input[type="number"],
+.bep-section select,
+.bep-section textarea {
+  width: 100%;
+  font-family: inherit;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  font-size: 0.85rem;
+  transition: all 0.15s;
+}
+
+.bep-section input[type="text"]:hover,
+.bep-section input[type="number"]:hover,
+.bep-section select:hover,
+.bep-section textarea:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bep-section input[type="text"]:focus,
+.bep-section input[type="number"]:focus,
+.bep-section select:focus,
+.bep-section textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.1);
+}
+
+.bep-section input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.bep-section input[type="checkbox"] {
+  width: auto;
+  margin-right: 6px;
+  cursor: pointer;
+  accent-color: var(--gold);
+}
+
+/* Grid layouts */
+.bep-section > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Reading metrics section highlight */
+.bep-section[style*="rgba(168,85,247"] {
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.bep-section[style*="rgba(168,85,247"] label {
+  color: #d4b5ff;
+}
+
+/* Pricing section */
+.bep-section[style*="rgba(201,168,76"] {
+  border-color: rgba(201, 168, 76, 0.25);
+}
+
+.bep-section[style*="rgba(201,168,76"] label {
+  color: var(--gold);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .bep-panel {
+    max-width: 100%;
+  }
+
+  .bep-section > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
