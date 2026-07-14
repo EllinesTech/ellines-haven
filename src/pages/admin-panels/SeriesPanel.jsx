@@ -74,6 +74,7 @@ export default function SeriesPanel({ showToast }) {
       chapterCount: book.chapterCount || 0,
       tableOfContents: book.tableOfContents || [],
       allowIndividualPurchase: book.allowIndividualPurchase !== false, // default true
+      freeFirstChapter: book.freeFirstChapter === true, // default false
       chapterPriceOverride: book.chapterPriceOverride || 0, // 0 = auto
       autoChapterPrice: autoPrice,
       releasedTocIndices: book.releasedTocIndices
@@ -104,6 +105,7 @@ export default function SeriesPanel({ showToast }) {
         totalChapters: Number(draft.totalChapters),
         chapterCount: Number(draft.chapterCount) || Number(draft.totalChapters),
         allowIndividualPurchase: draft.allowIndividualPurchase,
+        freeFirstChapter: draft.freeFirstChapter,
         chapterPriceOverride: Number(draft.chapterPriceOverride) || 0,
         releasedTocIndices: draft.releasedTocIndices,
       };
@@ -119,6 +121,7 @@ export default function SeriesPanel({ showToast }) {
           chaptersReleased: Number(draft.chaptersReleased),
           totalChapters: Number(draft.totalChapters),
           allowIndividualPurchase: draft.allowIndividualPurchase,
+          freeFirstChapter: draft.freeFirstChapter,
           chapterPriceOverride: Number(draft.chapterPriceOverride) || 0,
           releasedTocIndices: draft.releasedTocIndices,
           updatedAt: serverTimestamp(),
@@ -342,6 +345,20 @@ export default function SeriesPanel({ showToast }) {
 
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 14 }}>
                 <input type="checkbox"
+                  checked={draft.freeFirstChapter}
+                  onChange={e => set('freeFirstChapter', e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <div>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>🎁 Free First Chapter</span>
+                  <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--muted)' }}>
+                    Let readers read Chapter 1 for free before buying the full series
+                  </span>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 14 }}>
+                <input type="checkbox"
                   checked={draft.allowIndividualPurchase}
                   onChange={e => set('allowIndividualPurchase', e.target.checked)}
                   style={{ width: 16, height: 16, cursor: 'pointer' }}
@@ -463,6 +480,19 @@ export default function SeriesPanel({ showToast }) {
               >
                 {sendingNotify ? '⏳ Queuing…' : '📢 Queue Notification'}
               </button>
+            </div>
+
+            {/* ── User Chapter Access ── */}
+            <div className="card" style={{ padding: '16px 20px' }}>
+              <h3 style={{ fontSize: '0.88rem', color: 'var(--gold)', marginBottom: 12 }}>👥 Per-User Chapter Access</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: 12 }}>
+                Admin can manually override chapter access for individual readers — grant early access, unlock chapters without purchase, or restrict chapters.
+              </p>
+              <div style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(201,168,76,0.2)', textAlign: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  💡 User access management coming in next update — use the Messages panel to contact readers in the meantime
+                </span>
+              </div>
             </div>
 
             {/* ── Save bar ── */}

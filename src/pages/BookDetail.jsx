@@ -416,6 +416,13 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
         </div>
       </div>
 
+      {/* Free first chapter banner — show if enabled and not owned */}
+      {book.freeFirstChapter && !owned && (
+        <div style={{ padding: '12px 18px', background: 'rgba(74,158,255,0.08)', borderBottom: '1px solid rgba(74,158,255,0.2)', textAlign: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: '#4a9eff', fontWeight: 600 }}>🎁 Read the first chapter free — no login or purchase required</span>
+        </div>
+      )}
+
       {/* Mode toggle */}
       <div style={{ display: 'flex', gap: 0, padding: '12px 18px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <button
@@ -452,6 +459,18 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
         {/* ── Buy All mode ── */}
         {mode === 'all' && (
           <div>
+            {/* Free first chapter offer */}
+            {book.freeFirstChapter && !owned && !(cart.some(b => b.id === book.id && !b.isChapter)) && (
+              <div style={{ marginBottom: 16, padding: '12px 14px', background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.25)', borderRadius: 8 }}>
+                <div style={{ fontSize: '0.82rem', color: '#4a9eff', fontWeight: 600, marginBottom: 8 }}>🎁 Start with Chapter 1 — Free</div>
+                <button className="btn btn-ghost btn-sm"
+                  onClick={() => addChapter(0)}
+                  style={{ fontSize: '0.78rem' }}
+                >
+                  Read Chapter 1 Free (No Purchase)
+                </button>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>Full access price</div>
@@ -1071,7 +1090,21 @@ export default function BookDetail() {
                 if (isOngoingSeries) {
                   return (
                     <div id="bd-purchase-section">
-                      <OngoingSeriesPurchase book={book} owned={owned} libLoaded={libLoaded} />
+                      {/* If already owned, show Read button prominently */}
+                      {owned && libLoaded && (
+                        <div className="bd-purchase" style={{ marginBottom: 8 }}>
+                          <div className="bd-price">
+                            <small>Status</small>
+                            <div style={{ color: 'var(--ok)', fontWeight: 700, fontSize: '1rem' }}>✓ Owned</div>
+                          </div>
+                          <div className="bd-actions">
+                            <Link to={readPath(book)} className="btn btn-primary">📖 Read Here</Link>
+                          </div>
+                        </div>
+                      )}
+                      {(!owned || !libLoaded) && (
+                        <OngoingSeriesPurchase book={book} owned={owned} libLoaded={libLoaded} />
+                      )}
                     </div>
                   );
                 }
@@ -1114,9 +1147,10 @@ export default function BookDetail() {
                 </div>
               )}
               <div className="bd-trust">
-                <span>✓ Instant access after payment</span>
-                <span>✓ M-Pesa · Card · PayPal accepted</span>
-                <span>✓ Download or read online</span>
+                {!owned && <span>✓ Instant access after payment</span>}
+                {!owned && <span>✓ M-Pesa · Card · PayPal accepted</span>}
+                {!owned && <span>✓ Download or read online</span>}
+                {owned && <span>✓ You own this book — read anytime</span>}
               </div>
               {/* Wishlist button */}
               <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
