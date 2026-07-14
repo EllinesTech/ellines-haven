@@ -7,6 +7,7 @@ import UserMessages from '../components/UserMessages';
 import { UserNotificationsPanel } from '../components/UserNotifications';
 import OrderReceiptModal from '../components/OrderReceiptModal';
 import { readPath } from '../utils/slugify';
+import { listOfflineBooks, removeOfflineBook } from '../hooks/useOfflineBook';
 import './UserProfile.css';
 
 const WA = '254748255466';
@@ -147,6 +148,10 @@ export default function UserProfile() {
   /* Unread notification count */
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
+  /* Offline books */
+  const [offlineBooks, setOfflineBooks] = useState([]);
+  const [removingOffline, setRemovingOffline] = useState(null);
+
   const showToast = (msg, type='ok') => { setToast(msg); setToastType(type); setTimeout(()=>setToast(''),3500); };
 
   /* Debug tab changes */
@@ -185,6 +190,13 @@ export default function UserProfile() {
       setUnreadNotifs(snap.size);
     }, () => {});
     return () => unsub();
+  }, [user?.email]);
+
+  /* Load offline books */
+  useEffect(() => {
+    if (!user?.email) return;
+    const books = listOfflineBooks(user.email);
+    setOfflineBooks(books);
   }, [user?.email]);
 
   if (!user) return null;
@@ -288,6 +300,15 @@ export default function UserProfile() {
     } catch (e) { showToast('Error: ' + e.message,'err'); }
   };
 
+  /* ── Remove offline book ── */
+  const handleRemoveOffline = (bookId) => {
+    setRemovingOffline(bookId);
+    removeOfflineBook(user.email, bookId);
+    setOfflineBooks(books => books.filter(b => b.bookId !== bookId));
+    showToast('📥 Book removed from offline library');
+    setRemovingOffline(null);
+  };
+
   /* SVG icons — stroke-based, inherit currentColor */
   const NAV_ICONS = {
     account: (
@@ -335,6 +356,11 @@ export default function UserProfile() {
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
     ),
+    offline: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 10h8M8 14h8"/><path d="M9 18h6"/><circle cx="17" cy="6" r="2" fill="currentColor"/>
+      </svg>
+    ),
   };
 
   /* Stats strip icons */
@@ -364,6 +390,7 @@ export default function UserProfile() {
   const TABS = [
     ['account',       NAV_ICONS.account,       'Profile'],
     ['library',       NAV_ICONS.library,       'My Books'],
+    ['offline',       NAV_ICONS.offline,       'Offline Books'],
     ['activity',      NAV_ICONS.activity,      'Orders'],
     ['notifications', NAV_ICONS.notifications, unreadNotifs > 0 ? `Notifications (${unreadNotifs})` : 'Notifications'],
     ['messages',      NAV_ICONS.messages,      'Messages'],
@@ -533,6 +560,60 @@ export default function UserProfile() {
                       </div>
                     </Link>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── OFFLINE BOOKS TAB ── */}
+          {tab === 'offline' && (
+            <div className="up-panel">
+              <div className="up-panel__head">
+                <h2>📥 Offline Books</h2>
+                <span>{offlineBooks.length} book{offlineBooks.length!==1?'s':''} saved for offline reading</span>
+              </div>
+              {offlineBooks.length === 0 ? (
+                <div className="up-empty">
+                  <div className="up-empty__icon">📱</div>
+                  <h3>No offline books yet</h3>
+                  <p>When reading a book, click "Save Offline" to read it without an internet connection.</p>
+                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>Your offline books are stored in your browser and persist even if you reload the page.</p>
+                  <Link to="/library" className="btn btn-primary">Browse & Read Books →</Link>
+                </div>
+              ) : (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:14,marginBottom:20}}>
+                    {offlineBooks.map(b => (
+                      <div key={b.bookId} style={{
+                        borderRadius:'var(--r-sm)',overflow:'hidden',background:'var(--card)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',transition:'all 0.15s'
+                      }} onMouseEnter={e=>e.currentTarget.style.borderColor='var(--gold)'} onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
+                        {b.cover ? (
+                          <img src={b.cover} alt={b.title} style={{width:'100%',height:160,objectFit:'cover'}} />
+                        ) : (
+                          <div style={{width:'100%',height:160,background:'linear-gradient(145deg,#0f0f22,#1a1a3a)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--muted)',fontSize:'2rem'}}>📖</div>
+                        )}
+                        <div style={{flex:1,padding:12,display:'flex',flexDirection:'column'}}>
+                          <span style={{fontSize:'0.82rem',fontWeight:600,color:'var(--text)',marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',title:b.title}}>{b.title}</span>
+                          <span style={{fontSize:'0.7rem',color:'var(--muted)',marginBottom:8}}>{b.chapters} ch{b.chapters!==1?'s':''}</span>
+                          <span style={{fontSize:'0.68rem',color:'var(--muted)',marginBottom:10}}>📅 {new Date(b.savedAt).toLocaleDateString('en-KE')}</span>
+                          <div style={{display:'flex',gap:6,marginTop:'auto'}}>
+                            <Link to={`/read/${b.bookId}`} className="btn btn-primary btn-sm" style={{flex:1,fontSize:'0.7rem',padding:'4px 6px',textAlign:'center'}}>Read</Link>
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{fontSize:'0.7rem',padding:'4px 6px',color:'#e74c3c'}}
+                              onClick={() => handleRemoveOffline(b.bookId)}
+                              disabled={removingOffline === b.bookId}
+                            >
+                              {removingOffline === b.bookId ? '...' : '🗑'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{padding:'14px 16px',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',fontSize:'0.78rem',color:'var(--muted)'}}>
+                    <strong style={{color:'var(--gold)'}}>ℹ️ How it works:</strong> Offline books are stored in your browser's local storage. They persist even if you close the app or reload the page. To free up space, delete books you no longer need.
+                  </div>
                 </div>
               )}
             </div>
