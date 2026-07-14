@@ -356,20 +356,25 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
 
   // Load admin grants for this user's email if logged in
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email) {
+      // Even without login, show first chapter as free if enabled
+      if (book.freeFirstChapter) {
+        setGrantedChapters([0]);
+      }
+      return;
+    }
     const loadGrants = async () => {
       try {
-        const grantKey = `grant_${book.id}_${user.email.toLowerCase().replace(/[^a-z0-9]/gi, '_')}`;
-        // Simple check: if grant exists, user has access to those chapters
-        // In production, this would query the database
-        // For now, we'll fetch from the collection when rendering
-        setGrantedChapters([]); // will be populated by check below
+        // Automatically grant first chapter if enabled
+        const chapters = book.freeFirstChapter ? [0] : [];
+        setGrantedChapters(chapters);
+        // TODO: Could query user_chapter_grants collection here if needed
       } catch (e) {
         console.log('Could not load grants:', e);
       }
     };
     loadGrants();
-  }, [user?.email, book.id]);
+  }, [user?.email, book.id, book.freeFirstChapter]);
 
   const flashMsg = (msg) => { setAddedMsg(msg); setTimeout(() => setAddedMsg(''), 2200); };
 
@@ -565,7 +570,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                     <span style={{ flex: 1, fontSize: '0.85rem', color: 'var(--text)' }}>{chapTitle}</span>
                     {alreadyOwned || isGranted ? (
                       <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 600, padding: '3px 10px' }}>
-                        ✓ {isGranted && !alreadyOwned ? 'Granted' : 'Owned'}
+                        ✓ {isGranted && !alreadyOwned ? (idx === 0 ? '🎁 Free' : 'Granted') : 'Owned'}
                       </span>
                     ) : siteReadOnly ? null : (
                       <>

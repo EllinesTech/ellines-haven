@@ -662,6 +662,13 @@ export default function Reader() {
     return isOwned(book?.id ?? id);
   }, [user, isOwned, book?.id, id]);
 
+  // Check if a specific chapter can be accessed (owned or free first chapter)
+  const canAccessChapter = useCallback((chapterNum) => {
+    if (checkOwned()) return true; // User owns the full book
+    if (book?.freeFirstChapter && chapterNum === 0) return true; // Free first chapter
+    return false;
+  }, [book?.freeFirstChapter, checkOwned]);
+
   // Get the owned book entry (includes driveUrl set at unlock time)
   const getOwnedBook = useCallback(() => {
     if (!user) return null;
@@ -727,22 +734,27 @@ export default function Reader() {
   );
 
   if (!checkOwned()) {
-    // Still waiting for Firestore library snapshot — show loading briefly.
-    // Hard cap: if libLoaded is still false after 3s, unblock and show purchase screen.
-    if (!libLoaded) return (
-      <div className="reader-error">
-        <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
-        <p style={{ color:'var(--muted)' }}>Verifying access…</p>
-      </div>
-    );
-    return (
-      <div className="reader-error">
-        <div className="reader-error__icon">🛒</div>
-        <h2>Purchase required</h2>
-        <p>Buy this book to unlock reading and download access.</p>
-        <Link to={bookPath(book)} className="btn btn-primary">Buy — KSh {book.price}</Link>
-      </div>
-    );
+    // Allow free reading of chapter 1 if enabled
+    const canReadFreeChapter = book?.freeFirstChapter && chapter === 0;
+    
+    if (!canReadFreeChapter) {
+      // Still waiting for Firestore library snapshot — show loading briefly.
+      // Hard cap: if libLoaded is still false after 3s, unblock and show purchase screen.
+      if (!libLoaded) return (
+        <div className="reader-error">
+          <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
+          <p style={{ color:'var(--muted)' }}>Verifying access…</p>
+        </div>
+      );
+      return (
+        <div className="reader-error">
+          <div className="reader-error__icon">🛒</div>
+          <h2>Purchase required</h2>
+          <p>Buy this book to unlock reading and download access.</p>
+          <Link to={bookPath(book)} className="btn btn-primary">Buy — KSh {book.price}</Link>
+        </div>
+      );
+    }
   }
 
   if (user && myPerms && myPerms.canReadOnline === false) return (
@@ -900,7 +912,13 @@ export default function Reader() {
                 )}
                 <button
                   className={'reader__sidebar-ch' + (i === chapter ? ' on' : '')}
-                  onClick={() => { setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false); }}
+                  onClick={() => {
+                    if (!canAccessChapter(i)) {
+                      alert('You need to purchase this book to read Chapter ' + (i + 1));
+                      return;
+                    }
+                    setChapter(i); window.scrollTo(0, 0); if (window.innerWidth < 768) setSidebarOpen(false);
+                  }}
                 >
                   {ch.title}
                 </button>
@@ -1159,7 +1177,14 @@ export default function Reader() {
               )}
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginLeft:'auto' }}
-                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  onClick={() => {
+                    const nextCh = chapter + 1;
+                    if (!canAccessChapter(nextCh)) {
+                      alert('You need to purchase this book to read Chapter ' + (nextCh + 1));
+                      return;
+                    }
+                    setChapter(nextCh); window.scrollTo(0, 0);
+                  }}>
                   Next →
                 </button>
               )}
@@ -1170,7 +1195,14 @@ export default function Reader() {
               <p>{chapters[chapter]?.endMessage || `— End of Chapter ${chapter + 1} —`}</p>
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
-                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  onClick={() => {
+                    const nextCh = chapter + 1;
+                    if (!canAccessChapter(nextCh)) {
+                      alert('You need to purchase this book to read Chapter ' + (nextCh + 1));
+                      return;
+                    }
+                    setChapter(nextCh); window.scrollTo(0, 0);
+                  }}>
                   Continue to Chapter {chapter + 2} →
                 </button>
               )}
@@ -1251,7 +1283,14 @@ export default function Reader() {
               )}
               {chapter < chapters.length - 1 && (
                 <button className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}
-                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  onClick={() => {
+                    const nextCh = chapter + 1;
+                    if (!canAccessChapter(nextCh)) {
+                      alert('You need to purchase this book to read Chapter ' + (nextCh + 1));
+                      return;
+                    }
+                    setChapter(nextCh); window.scrollTo(0, 0);
+                  }}>
                   Next →
                 </button>
               )}
