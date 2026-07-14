@@ -12,18 +12,36 @@ const NO_PURCHASE_STATUSES = new Set(['coming-soon', 'draft']);
 // Statuses where a "Notify Me" button makes sense
 const NOTIFY_STATUSES = new Set(['coming-soon', 'ongoing', 'limited']);
 const STATUS_META = {
-  complete:     { label:'Complete',       icon:'✅', color:'#2ecc71', bg:'rgba(46,204,113,0.15)'  },
-  ongoing:      { label:'Ongoing',        icon:'📖', color:'#4a9eff', bg:'rgba(74,158,255,0.15)'  },
-  premium:      { label:'Premium',        icon:'⭐', color:'#c9a84c', bg:'rgba(201,168,76,0.15)'  },
-  'free-preview':{ label:'Free Preview',  icon:'👀', color:'#a855f7', bg:'rgba(168,85,247,0.15)'  },
-  'coming-soon':{ label:'Coming Soon',    icon:'🔜', color:'#e8832a', bg:'rgba(232,131,42,0.15)'  },
-  limited:      { label:'Limited',        icon:'⏳', color:'#e74c3c', bg:'rgba(231,76,60,0.15)'   },
-  draft:        { label:'Draft',          icon:'📝', color:'#64748b', bg:'rgba(100,116,139,0.15)' },
+  // ── Primary status badges ─────────────────────────────────────────────────
+  complete:        { label:'Complete',        icon:'✅', color:'#2ecc71', bg:'rgba(46,204,113,0.15)'   },
+  ongoing:         { label:'Ongoing',         icon:'📖', color:'#4a9eff', bg:'rgba(74,158,255,0.15)'   },
+  premium:         { label:'Premium',         icon:'⭐', color:'#c9a84c', bg:'rgba(201,168,76,0.15)'   },
+  'free-preview':  { label:'Free Preview',    icon:'👀', color:'#a855f7', bg:'rgba(168,85,247,0.15)'   },
+  'coming-soon':   { label:'Coming Soon',     icon:'🔜', color:'#e8832a', bg:'rgba(232,131,42,0.15)'   },
+  limited:         { label:'Limited',         icon:'⏳', color:'#e74c3c', bg:'rgba(231,76,60,0.15)'    },
+  draft:           { label:'Draft',           icon:'📝', color:'#64748b', bg:'rgba(100,116,139,0.15)'  },
+  // ── Extra/additional badges (can stack with status) ───────────────────────
+  bestseller:      { label:'Bestseller',      icon:'🏆', color:'#f59e0b', bg:'rgba(245,158,11,0.15)'   },
+  'award-winner':  { label:'Award Winner',    icon:'🥇', color:'#fbbf24', bg:'rgba(251,191,36,0.15)'   },
+  'staff-pick':    { label:'Staff Pick',      icon:'❤️', color:'#ec4899', bg:'rgba(236,72,153,0.15)'   },
+  'reader-fave':   { label:"Reader's Fave",   icon:'🌟', color:'#f97316', bg:'rgba(249,115,22,0.15)'   },
+  'new-release':   { label:'New Release',     icon:'🆕', color:'#06b6d4', bg:'rgba(6,182,212,0.15)'    },
+  'true-story':    { label:'True Story',      icon:'✦',  color:'#c9a84c', bg:'rgba(201,168,76,0.15)'   },
+  exclusive:       { label:'Exclusive',       icon:'💎', color:'#818cf8', bg:'rgba(129,140,248,0.15)'  },
+  'age-18':        { label:'18+',             icon:'🔞', color:'#ef4444', bg:'rgba(239,68,68,0.15)'    },
+  'age-16':        { label:'16+',             icon:'🔒', color:'#f97316', bg:'rgba(249,115,22,0.12)'   },
+  audiobook:       { label:'Audiobook',       icon:'🎧', color:'#22d3ee', bg:'rgba(34,211,238,0.15)'   },
+  translated:      { label:'Translated',      icon:'🌍', color:'#34d399', bg:'rgba(52,211,153,0.15)'   },
+  'short-read':    { label:'Short Read',      icon:'⚡', color:'#a3e635', bg:'rgba(163,230,53,0.15)'   },
+  series:          { label:'Series',          icon:'📚', color:'#38bdf8', bg:'rgba(56,189,248,0.15)'   },
+  'signed-copy':   { label:'Signed Copy',     icon:'✍️', color:'#e879f9', bg:'rgba(232,121,249,0.15)'  },
+  'kenya-made':    { label:'Kenya Made',      icon:'🇰🇪', color:'#16a34a', bg:'rgba(22,163,74,0.15)'   },
+  seasonal:        { label:'Seasonal',        icon:'🌸', color:'#f472b6', bg:'rgba(244,114,182,0.15)'  },
 };
 
+// Render one badge pill
 export function BookStatusBadge({ status, style = {} }) {
   if (!status) return null;
-  // Note: 'complete' IS shown — callers decide whether to render this badge
   const meta = STATUS_META[status];
   if (!meta) return null;
   return (
@@ -38,9 +56,27 @@ export function BookStatusBadge({ status, style = {} }) {
       WebkitBackdropFilter:'blur(4px)',
       textShadow:'0 1px 4px rgba(0,0,0,0.7)',
       boxShadow:`0 2px 8px rgba(0,0,0,0.4)`,
+      whiteSpace:'nowrap',
       ...style,
     }}>
       {meta.icon} {meta.label.toUpperCase()}
+    </span>
+  );
+}
+
+// Render all badges for a book (status + extra badges array)
+export function BookBadges({ book, style = {}, cardMode = false }) {
+  if (!book) return null;
+  // On cards we hide 'complete' to keep things clean — on detail pages we show everything
+  const showStatus = !cardMode || book.status !== 'complete';
+  const extraBadges = Array.isArray(book.badges) ? book.badges : [];
+
+  if (!showStatus && extraBadges.length === 0) return null;
+
+  return (
+    <span style={{ display:'inline-flex', flexWrap:'wrap', gap:4, alignItems:'center', ...style }}>
+      {showStatus && book.status && <BookStatusBadge status={book.status} />}
+      {extraBadges.map(b => <BookStatusBadge key={b} status={b} />)}
     </span>
   );
 }
@@ -385,7 +421,7 @@ export default function BookCard({ book }) {
         {/* Coming Soon / Draft overlay */}
         {NO_PURCHASE_STATUSES.has(book.status) && (
           <div style={{ position:'absolute', inset:0, background:'rgba(10,10,20,0.55)', backdropFilter:'blur(2px)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', zIndex:4, gap:8 }}>
-            <BookStatusBadge status={book.status} />
+            <BookBadges book={book} cardMode={false} />
             <Link to={bookPath(book)} className="btn btn-sm" style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)', fontSize:'0.72rem' }}>
               Preview →
             </Link>
@@ -393,8 +429,9 @@ export default function BookCard({ book }) {
         )}
         {book.isNew && <span className="badge badge-gold bcard__new">New</span>}
         {book.inspired && <span className="bcard__inspired-badge">✦ True Story</span>}
+        {/* Status + extra badges on cover (skip complete + coming-soon/draft which have overlays) */}
         {book.status && book.status !== 'complete' && !NO_PURCHASE_STATUSES.has(book.status) && (
-          <BookStatusBadge status={book.status} style={{ position:'absolute', bottom: book.inspired ? 36 : 10, left:10, zIndex:5 }} />
+          <BookBadges book={book} cardMode={true} style={{ position:'absolute', bottom: book.inspired ? 36 : 10, left:10, zIndex:5, flexDirection:'column', alignItems:'flex-start', gap:3 }} />
         )}
       </div>
       <div className="bcard__body">

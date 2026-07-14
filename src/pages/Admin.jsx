@@ -243,13 +243,33 @@ const EMPTY_BOOK = {
 };
 
 const BOOK_STATUSES = [
-  { value:'complete',     label:'✅ Complete',       color:'#2ecc71', bg:'rgba(46,204,113,0.12)',  desc:'Fully published, all content available'   },
-  { value:'ongoing',      label:'📖 Ongoing',        color:'#4a9eff', bg:'rgba(74,158,255,0.12)',  desc:'Releasing in chapters / being written'     },
-  { value:'premium',      label:'⭐ Premium',         color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Exclusive paid content, no free preview'   },
-  { value:'free-preview', label:'👀 Free Preview',    color:'#a855f7', bg:'rgba(168,85,247,0.12)',  desc:'First chapters free, rest requires purchase'},
-  { value:'coming-soon',  label:'🔜 Coming Soon',     color:'#e8832a', bg:'rgba(232,131,42,0.12)',  desc:'Announced, not yet available'              },
-  { value:'limited',      label:'⏳ Limited Edition', color:'#e74c3c', bg:'rgba(231,76,60,0.12)',   desc:'Available for a limited time only'         },
-  { value:'draft',        label:'📝 Draft',           color:'#64748b', bg:'rgba(100,116,139,0.12)', desc:'Work in progress — not shown publicly'     },
+  { value:'complete',     label:'✅ Complete',        color:'#2ecc71', bg:'rgba(46,204,113,0.12)',  desc:'Fully published, all content available'   },
+  { value:'ongoing',      label:'📖 Ongoing',         color:'#4a9eff', bg:'rgba(74,158,255,0.12)',  desc:'Releasing in chapters / being written'     },
+  { value:'premium',      label:'⭐ Premium',          color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Exclusive paid content, no free preview'   },
+  { value:'free-preview', label:'👀 Free Preview',     color:'#a855f7', bg:'rgba(168,85,247,0.12)',  desc:'First chapters free, rest requires purchase'},
+  { value:'coming-soon',  label:'🔜 Coming Soon',      color:'#e8832a', bg:'rgba(232,131,42,0.12)',  desc:'Announced, not yet available'              },
+  { value:'limited',      label:'⏳ Limited Edition',  color:'#e74c3c', bg:'rgba(231,76,60,0.12)',   desc:'Available for a limited time only'         },
+  { value:'draft',        label:'📝 Draft',            color:'#64748b', bg:'rgba(100,116,139,0.12)', desc:'Work in progress — not shown publicly'     },
+];
+
+// Extra badges that can stack on top of the primary status
+const EXTRA_BADGES = [
+  { value:'bestseller',   label:'🏆 Bestseller',      color:'#f59e0b', bg:'rgba(245,158,11,0.12)',  desc:'Top-selling book'                          },
+  { value:'award-winner', label:'🥇 Award Winner',    color:'#fbbf24', bg:'rgba(251,191,36,0.12)',  desc:'Has won a literary award'                  },
+  { value:'staff-pick',   label:"❤️ Staff Pick",      color:'#ec4899', bg:'rgba(236,72,153,0.12)',  desc:"Team's favourite pick"                     },
+  { value:'reader-fave',  label:"🌟 Reader's Fave",   color:'#f97316', bg:'rgba(249,115,22,0.12)',  desc:'Highly rated by readers'                   },
+  { value:'new-release',  label:'🆕 New Release',     color:'#06b6d4', bg:'rgba(6,182,212,0.12)',   desc:'Recently released'                         },
+  { value:'true-story',   label:'✦ True Story',       color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Inspired by true events'                   },
+  { value:'exclusive',    label:'💎 Exclusive',        color:'#818cf8', bg:'rgba(129,140,248,0.12)', desc:'Only on Ellines Haven'                     },
+  { value:'age-18',       label:'🔞 18+',              color:'#ef4444', bg:'rgba(239,68,68,0.12)',   desc:'Mature content — adults only'              },
+  { value:'age-16',       label:'🔒 16+',              color:'#f97316', bg:'rgba(249,115,22,0.12)',  desc:'Suitable for 16 and above'                 },
+  { value:'audiobook',    label:'🎧 Audiobook',        color:'#22d3ee', bg:'rgba(34,211,238,0.12)',  desc:'Has audio version available'               },
+  { value:'translated',   label:'🌍 Translated',       color:'#34d399', bg:'rgba(52,211,153,0.12)',  desc:'Available in multiple languages'           },
+  { value:'short-read',   label:'⚡ Short Read',       color:'#a3e635', bg:'rgba(163,230,53,0.12)',  desc:'Under 2 hours to read'                     },
+  { value:'series',       label:'📚 Series',           color:'#38bdf8', bg:'rgba(56,189,248,0.12)',  desc:'Part of a multi-book series'               },
+  { value:'signed-copy',  label:"✍️ Signed Copy",     color:'#e879f9', bg:'rgba(232,121,249,0.12)', desc:'Author-signed edition available'           },
+  { value:'kenya-made',   label:'🇰🇪 Kenya Made',     color:'#16a34a', bg:'rgba(22,163,74,0.12)',   desc:'Proudly Kenyan'                            },
+  { value:'seasonal',     label:'🌸 Seasonal',         color:'#f472b6', bg:'rgba(244,114,182,0.12)', desc:'Limited seasonal release'                 },
 ];
 
 // buildUserList — pulls from Firestore-synced localStorage + registered users
@@ -999,6 +1019,62 @@ function BookForm({ initial, onSave, onCancel }) {
                     {form.status===s.value && <span style={{color:s.color,fontSize:'0.8rem',flexShrink:0}}>✓</span>}
                   </button>
                 ))}
+              </div>
+
+              {/* ── Extra / Additional Badges ── */}
+              <div style={{marginTop:18,padding:'14px 16px',background:'rgba(168,85,247,0.05)',border:'1px solid rgba(168,85,247,0.2)',borderRadius:'var(--r-sm)'}}>
+                <div style={{fontSize:'0.82rem',fontWeight:700,color:'#d4b5ff',marginBottom:4}}>🏷️ Additional Badges <span style={{fontWeight:400,fontSize:'0.72rem',color:'var(--muted)',marginLeft:6}}>Optional — can combine with status above</span></div>
+                <p style={{fontSize:'0.72rem',color:'var(--muted)',marginBottom:10,lineHeight:1.5}}>
+                  Select as many as apply. These stack alongside the primary status badge everywhere on the site.
+                </p>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {EXTRA_BADGES.map(b => {
+                    const active = (form.badges||[]).includes(b.value);
+                    return (
+                      <button key={b.value} type="button"
+                        onClick={() => {
+                          const cur = form.badges||[];
+                          set('badges', active ? cur.filter(x=>x!==b.value) : [...cur, b.value]);
+                        }}
+                        style={{
+                          display:'inline-flex', alignItems:'center', gap:5,
+                          padding:'5px 12px', borderRadius:20, fontSize:'0.72rem', fontWeight:700,
+                          cursor:'pointer', transition:'all 0.15s', letterSpacing:0.3,
+                          border: active ? `1px solid ${b.color}` : '1px solid rgba(255,255,255,0.1)',
+                          background: active ? b.bg : 'rgba(255,255,255,0.02)',
+                          color: active ? b.color : 'var(--muted)',
+                        }}
+                        title={b.desc}
+                      >
+                        {active && <span style={{fontSize:'0.7rem'}}>✓</span>}
+                        {b.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(form.badges||[]).length > 0 && (
+                  <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <span style={{fontSize:'0.7rem',color:'var(--muted)'}}>Active ({(form.badges||[]).length}):</span>
+                    {(form.badges||[]).map(b => {
+                      const meta = EXTRA_BADGES.find(x=>x.value===b);
+                      return meta ? (
+                        <span key={b} style={{
+                          display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:20,
+                          fontSize:'0.68rem',fontWeight:700,color:meta.color,
+                          background:meta.bg,border:`1px solid ${meta.color}60`,
+                        }}>
+                          {meta.label}
+                          <button type="button" onClick={()=>set('badges',(form.badges||[]).filter(x=>x!==b))}
+                            style={{background:'none',border:'none',color:meta.color,cursor:'pointer',fontSize:'0.8rem',padding:'0 0 0 2px',lineHeight:1}}>×</button>
+                        </span>
+                      ) : null;
+                    })}
+                    <button type="button" onClick={()=>set('badges',[])}
+                      style={{fontSize:'0.68rem',color:'var(--muted)',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0}}>
+                      Clear all
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Chapter progress — only for Ongoing books */}

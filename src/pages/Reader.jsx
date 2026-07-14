@@ -1,4 +1,4 @@
-import { useParams, Link, useLocation } from 'react-router-dom';
+﻿import { useParams, Link, useLocation } from 'react-router-dom';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -729,38 +729,37 @@ export default function Reader() {
     </div>
   );
 
-  if (!user) return (
+  // Free-preview ch0 is always accessible without login
+  const isFreePreviewCh0 = (book?.status === 'free-preview' || book?.freeFirstChapter) && chapter === 0;
+
+  if (!user && !isFreePreviewCh0) return (
     <div className="reader-error">
-      <div className="reader-error__icon">??</div>
+      <div className="reader-error__icon">🔐</div>
       <h2>Sign in to read</h2>
       <p>You need to be logged in to access this book.</p>
-      <Link to="/login" className="btn btn-primary">Sign In</Link>
+      <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center', marginTop:12 }}>
+        <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary">Sign In</Link>
+        <Link to={`/register?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-outline">Create Account</Link>
+      </div>
     </div>
   );
 
-  if (!checkOwned()) {
-    // Chapter 0 is always free for free-preview books � no login required
-    const isFreePreviewCh0 = book?.status === 'free-preview' && chapter === 0;
-    // Allow free first chapter if explicitly enabled on the book
-    const canReadFreeChapter = isFreePreviewCh0 || (book?.freeFirstChapter && chapter === 0);
-
-    if (!canReadFreeChapter) {
-      // Still waiting for Firestore library snapshot � show loading briefly.
-      if (user && !libLoaded) return (
-        <div className="reader-error">
-          <div style={{ fontSize:'2rem', marginBottom:16 }}>?</div>
-          <p style={{ color:'var(--muted)' }}>Verifying access�</p>
-        </div>
-      );
-      return (
-        <div className="reader-error">
-          <div className="reader-error__icon">??</div>
-          <h2>Purchase required</h2>
-          <p>Buy this book to unlock reading and download access.</p>
-          <Link to={bookPath(book)} className="btn btn-primary">Buy � KSh {book.price}</Link>
-        </div>
-      );
-    }
+  if (!checkOwned() && !isFreePreviewCh0) {
+    // Still waiting for Firestore library snapshot
+    if (user && !libLoaded) return (
+      <div className="reader-error">
+        <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
+        <p style={{ color:'var(--muted)' }}>Verifying access…</p>
+      </div>
+    );
+    return (
+      <div className="reader-error">
+        <div className="reader-error__icon">🛒</div>
+        <h2>Purchase required</h2>
+        <p>Buy this book to unlock reading and download access.</p>
+        <Link to={bookPath(book)} className="btn btn-primary">Buy — KSh {book.price}</Link>
+      </div>
+    );
   }
 
   if (user && myPerms && myPerms.canReadOnline === false) return (

@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import BookCard, { waOrderLink, BookStatusBadge } from '../components/BookCard';
+import BookCard, { waOrderLink, BookStatusBadge, BookBadges } from '../components/BookCard';
 import BookReviews from '../components/BookReviews';
 import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -968,9 +968,7 @@ export default function BookDetail() {
               <div className="bd-badges">
                 {book.isNew && <span className="badge badge-gold">New Release</span>}
                 <span className="badge badge-blue">{book.type === 'novel' ? 'Novel' : 'Short Story'}</span>
-                {book.status && (
-                  <BookStatusBadge status={book.status} />
-                )}
+                <BookBadges book={book} cardMode={false} style={{ gap:5 }} />
               </div>
             </div>
             <div className="bd-right">
@@ -1009,7 +1007,7 @@ export default function BookDetail() {
                 if (!meta) return null;
                 return (
                   <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:'var(--r-sm)', background:`${meta.color}14`, border:`1px solid ${meta.color}40`, marginBottom:8, fontSize:'0.82rem' }}>
-                    <BookStatusBadge status={book.status} />
+                    <BookBadges book={book} cardMode={false} />
                     <span style={{ color:'var(--muted)' }}>{meta.msg}</span>
                   </div>
                 );
