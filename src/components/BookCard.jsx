@@ -278,6 +278,19 @@ function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
   }
 
   if (!user) {
+    // Free-preview: guests CAN read chapter 1 — show that clearly
+    if (book.status === 'free-preview') {
+      return (
+        <Link
+          to={readPath(book)}
+          className="btn btn-outline btn-sm"
+          style={{ color:'#d4b5ff', borderColor:'rgba(168,85,247,0.5)' }}
+          title="Read the first chapter free — no login needed"
+        >
+          👀 Read Free Chapter
+        </Link>
+      );
+    }
     return (
       <Link
         to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}

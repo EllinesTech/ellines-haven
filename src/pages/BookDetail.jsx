@@ -1152,14 +1152,30 @@ export default function BookDetail() {
                               : user && myPerms?.canPurchase === false
                                 ? <span className="btn btn-primary" style={{opacity:0.5,cursor:'not-allowed',pointerEvents:'none'}}>Purchasing Restricted</span>
                                 : !user
-                                  ? /* Guest — show login CTA */
-                                    <Link
-                                      to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
-                                      className="btn btn-primary"
-                                      style={{ display:'flex', alignItems:'center', gap:8 }}
-                                    >
-                                      🔐 Login or Register to Get This Book
-                                    </Link>
+                                  ? /* Guest — show login CTA (with free chapter link for free-preview) */
+                                    book.status === 'free-preview'
+                                      ? <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                                          <Link
+                                            to={readPath(book)}
+                                            className="btn btn-outline"
+                                            style={{ color:'#d4b5ff', borderColor:'rgba(168,85,247,0.5)', textAlign:'center' }}
+                                          >
+                                            👀 Read Free Chapter — No Login Needed
+                                          </Link>
+                                          <Link
+                                            to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+                                            className="btn btn-primary"
+                                          >
+                                            🔐 Login or Register to Get Full Book
+                                          </Link>
+                                        </div>
+                                      : <Link
+                                          to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+                                          className="btn btn-primary"
+                                          style={{ display:'flex', alignItems:'center', gap:8 }}
+                                        >
+                                          🔐 Login or Register to Get This Book
+                                        </Link>
                                   : /* Logged-in, can purchase */
                                     <>
                                       {book.status === 'ongoing'
