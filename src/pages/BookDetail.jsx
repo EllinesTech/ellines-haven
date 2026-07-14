@@ -343,10 +343,12 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
   const wholeBookInCart = cart.some(b => b.id === book.id && !b.isChapter);
   const siteReadOnly = siteControls?.readOnlyMode;
 
-  // Per-chapter price (round up to nearest 5 KES)
-  const chapterPrice = book.price > 0
-    ? Math.ceil((book.price / totalPlanned) / 5) * 5
-    : 50;
+  // Per-chapter price: respect admin override, otherwise auto-calculate
+  const chapterPrice = (book.chapterPriceOverride > 0)
+    ? book.chapterPriceOverride
+    : book.price > 0
+      ? Math.ceil((book.price / totalPlanned) / 5) * 5
+      : 50;
 
   const [mode, setMode] = useState('all');
   const [addedMsg, setAddedMsg] = useState('');
@@ -423,23 +425,26 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
             fontFamily: 'inherit', fontWeight: 600, fontSize: '0.82rem', transition: 'all 0.15s',
             background: mode === 'all' ? '#4a9eff' : 'transparent',
             color: mode === 'all' ? '#000' : 'var(--muted)',
-            borderRadius: '8px 0 0 0', borderBottom: mode === 'all' ? '2px solid #4a9eff' : '2px solid transparent',
+            borderRadius: book.allowIndividualPurchase === false ? '8px 8px 0 0' : '8px 0 0 0',
+            borderBottom: mode === 'all' ? '2px solid #4a9eff' : '2px solid transparent',
           }}
         >
           📦 Buy All ({releasedCount} Chapters)
         </button>
-        <button
-          onClick={() => setMode('individual')}
-          style={{
-            flex: 1, padding: '9px 14px', border: 'none', cursor: 'pointer',
-            fontFamily: 'inherit', fontWeight: 600, fontSize: '0.82rem', transition: 'all 0.15s',
-            background: mode === 'individual' ? 'rgba(201,168,76,0.12)' : 'transparent',
-            color: mode === 'individual' ? 'var(--gold)' : 'var(--muted)',
-            borderRadius: '0 8px 0 0', borderBottom: mode === 'individual' ? '2px solid var(--gold)' : '2px solid transparent',
-          }}
-        >
-          🎯 Buy Individual Chapters
-        </button>
+        {book.allowIndividualPurchase !== false && (
+          <button
+            onClick={() => setMode('individual')}
+            style={{
+              flex: 1, padding: '9px 14px', border: 'none', cursor: 'pointer',
+              fontFamily: 'inherit', fontWeight: 600, fontSize: '0.82rem', transition: 'all 0.15s',
+              background: mode === 'individual' ? 'rgba(201,168,76,0.12)' : 'transparent',
+              color: mode === 'individual' ? 'var(--gold)' : 'var(--muted)',
+              borderRadius: '0 8px 0 0', borderBottom: mode === 'individual' ? '2px solid var(--gold)' : '2px solid transparent',
+            }}
+          >
+            🎯 Buy Individual Chapters
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '16px 18px' }}>

@@ -28,6 +28,7 @@ const ContentProtectionPanel = lazy(() => import('./admin-panels/ContentProtecti
 const DeviceSettingsPanel    = lazy(() => import('./admin-panels/DeviceSettingsPanel'));
 const OnlineUsersPanel       = lazy(() => import('./admin-panels/OnlineUsersPanel'));
 const AdminOrdersPanel       = lazy(() => import('./admin-panels/AdminOrdersPanel'));
+const SeriesPanel            = lazy(() => import('./admin-panels/SeriesPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3246,6 +3247,7 @@ export default function Admin() {
     { k:'dashboard',     label:'Dashboard',        icon:'🏠', group:'admin' },
     { k:'activity',      label:'Activity Feed',    icon:'📊', group:'admin' },
     { k:'books',         label:'Books',             icon:'📚', group:'admin' },
+    { k:'series',        label:'Series Manager',    icon:'📖', group:'admin' },
     { k:'covers',        label:'Novel Covers',      icon:'🖼️', group:'admin' },
     { k:'photos',        label:'Site Photos',       icon:'📷', group:'admin' },
     { k:'orders',        label:'Orders' + (pendingCount > 0 ? ` (${pendingCount})` : ''), icon:'🛒', group:'admin' },
@@ -4068,6 +4070,12 @@ export default function Admin() {
         {/* NOVEL COVERS */}
         {tab === 'covers' && (
           <CoversTab books={books} saveBook={saveBook} showToast={showToast} />
+        )}
+        {/* SERIES MANAGER */}
+        {tab === 'series' && (
+          <Suspense fallback={<PanelLoader />}>
+            <SeriesPanel showToast={showToast} />
+          </Suspense>
         )}
         {/* SITE PHOTOS */}
         {tab === 'photos' && (
