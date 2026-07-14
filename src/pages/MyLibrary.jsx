@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
-import { isBookSavedOffline, saveBookOffline, removeOfflineBook } from '../hooks/useOfflineBook';
+import { isBookSavedOffline, saveBookOffline, removeOfflineBook, listOfflineBooks } from '../hooks/useOfflineBook';
 import { bookPath, readPath } from '../utils/slugify';
 import { getFallbackChapters } from '../data/bookChapters';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -545,6 +545,108 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
   );
 }
 
+// -- Offline Books Panel -----------------------------------------------
+function OfflineBooks({ user, catalog }) {
+  const [offlineBooks, setOfflineBooks] = useState([]);
+  const [removingBook, setRemovingBook] = useState(null);
+
+  useEffect(() => {
+    setOfflineBooks(listOfflineBooks(user.email));
+  }, [user.email]);
+
+  const handleRemove = (bookId) => {
+    removeOfflineBook(user.email, bookId);
+    setOfflineBooks(list => list.filter(b => b.bookId !== bookId));
+    setRemovingBook(null);
+  };
+
+  const formatDate = (timestamp) => {
+    return new Date(timestamp).toLocaleDateString('en-KE', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  };
+
+  const formatSize = (chapters) => {
+    // Rough estimate: ~5KB per chapter average
+    const bytes = chapters * 5000;
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
+
+  return (
+    <>
+      {offlineBooks.length === 0 ? (
+        <div className="mylib-empty">
+          <div className="mylib-empty-icon">📥</div>
+          <h3>No downloaded books</h3>
+          <p>Download books from the reader to read them offline. They'll appear here so you can access them anytime, anywhere.</p>
+          <Link to="/library" className="btn btn-primary">Browse Books</Link>
+        </div>
+      ) : (
+        <div className="mylib-grid">
+          {offlineBooks.map(book => {
+            const catalogBook = catalog.find(b => b.id === book.bookId);
+            return (
+              <div key={book.bookId} className="card mylib-book-item">
+                {book.cover && (
+                  <div className="mylib-book-cover" style={{ backgroundImage: `url(${book.cover})` }} />
+                )}
+                <div className="mylib-book-info">
+                  <h4>{book.title}</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>by {book.author}</p>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 8 }}>
+                    <p>📖 {book.chapters} chapter{book.chapters !== 1 ? 's' : ''}</p>
+                    <p>💾 ~{formatSize(book.chapters)}</p>
+                    <p>📅 Saved {formatDate(book.savedAt)}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  {catalogBook && (
+                    <Link to={readPath(catalogBook)} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
+                      Read Offline
+                    </Link>
+                  )}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setRemovingBook(book.bookId)}
+                    title="Delete offline copy"
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+
+                {/* Delete confirmation */}
+                {removingBook === book.bookId && (
+                  <div style={{
+                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: 'var(--radius)', zIndex: 1000
+                  }}>
+                    <div style={{ background: 'var(--card-bg)', padding: 16, borderRadius: 'var(--radius)', textAlign: 'center' }}>
+                      <p style={{ marginBottom: 12 }}>Delete offline copy?</p>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setRemovingBook(null)} style={{ flex: 1 }}>
+                          Cancel
+                        </button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleRemove(book.bookId)} style={{ flex: 1 }}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
 // -- Reading Leaderboard Panel -----------------------------------------------
 // Reads from user_profiles collection where users have opted in (showInLeaders pref)
 // Falls back to a local-only view showing just the current user's stats
@@ -796,6 +898,7 @@ export default function MyLibrary() {
   const TABS = [
     { k:'library',     label:'My Books',    badge: library.length   || null  },
     { k:'wishlist',    label:'Wishlist',    badge: wishlist.length  || null  },
+    { k:'offline',     label:'Downloaded',  badge: null                       },
     { k:'referral',    label:'Referrals',   badge: null                       },
     { k:'orders',      label:'Orders',      badge: myPending.length || null  },
     { k:'stats',       label:'Stats',       badge: null                       },
@@ -1149,6 +1252,11 @@ export default function MyLibrary() {
               </div>
             )}
           </>
+        )}
+
+        {/* -- OFFLINE BOOKS TAB -- */}
+        {activeTab === 'offline' && (
+          <OfflineBooks user={user} catalog={catalog} />
         )}
 
         {/* -- REFERRAL TAB -- */}
