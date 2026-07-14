@@ -486,12 +486,9 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
             {book.freeFirstChapter && !owned && !(cart.some(b => b.id === book.id && !b.isChapter)) && (
               <div style={{ marginBottom: 16, padding: '12px 14px', background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.25)', borderRadius: 8 }}>
                 <div style={{ fontSize: '0.82rem', color: '#4a9eff', fontWeight: 600, marginBottom: 8 }}>🎁 Start with Chapter 1 — Free</div>
-                <button className="btn btn-ghost btn-sm"
-                  onClick={() => addChapter(0)}
-                  style={{ fontSize: '0.78rem' }}
-                >
+                <Link to={readPath(book)} state={{ chapter: 0 }} className="btn btn-ghost btn-sm" style={{ fontSize: '0.78rem' }}>
                   Read Chapter 1 Free (No Purchase)
-                </button>
+                </Link>
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
