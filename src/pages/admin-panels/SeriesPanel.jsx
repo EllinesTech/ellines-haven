@@ -482,6 +482,120 @@ export default function SeriesPanel({ showToast }) {
               </button>
             </div>
 
+            {/* ── Bulk Grant Chapters ── */}
+            <div className="card" style={{ padding: '16px 20px' }}>
+              <h3 style={{ fontSize: '0.88rem', color: 'var(--gold)', marginBottom: 4 }}>📤 Bulk Grant Chapters</h3>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: 12 }}>
+                Grant chapters to multiple readers at once. Paste email addresses (one per line) or upload a file.
+              </p>
+              <div style={{ padding: '12px', background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.25)', borderRadius: 8 }}>
+                <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+                  📧 Reader Emails (one per line)
+                </label>
+                <textarea className="field"
+                  id={`bulk_emails_${draft.id}`}
+                  rows={4}
+                  placeholder="reader1@example.com&#10;reader2@example.com&#10;reader3@example.com"
+                  style={{ marginBottom: 12, fontFamily: 'monospace', fontSize: '0.85rem' }}
+                />
+                
+                <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+                  📖 Chapters to Grant
+                </label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="radio" name={`bulk_mode_${draft.id}`} value="all" defaultChecked onChange={(e) => {
+                      if (e.target.checked) {
+                        const sel = document.getElementById(`bulk_selection_${draft.id}`);
+                        if (sel) sel.style.display = 'none';
+                      }
+                    }} />
+                    <span style={{ fontSize: '0.78rem' }}>All Chapters</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="radio" name={`bulk_mode_${draft.id}`} value="selection" onChange={(e) => {
+                      if (e.target.checked) {
+                        const sel = document.getElementById(`bulk_selection_${draft.id}`);
+                        if (sel) sel.style.display = 'block';
+                      }
+                    }} />
+                    <span style={{ fontSize: '0.78rem' }}>Selection</span>
+                  </label>
+                </div>
+
+                <div id={`bulk_selection_${draft.id}`} style={{ maxHeight: 180, overflowY: 'auto', paddingRight: 4, marginBottom: 12, display: 'none' }}>
+                  {(() => {
+                    let chNum = 0;
+                    return (draft.tableOfContents || []).map((item, i) => {
+                      if (isPart(item)) return null;
+                      chNum++;
+                      const chapTitle = item.replace(/^(Chapter \d+|Day \d+|Story \d+) — /, '');
+                      return (
+                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}>
+                          <input type="checkbox"
+                            defaultChecked={false}
+                            style={{ width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
+                            id={`bulk_ch_${draft.id}_${i}`}
+                          />
+                          <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                            {String(chNum).padStart(2, '0')}. {chapTitle}
+                          </span>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
+
+                <button className="btn btn-primary btn-sm"
+                  onClick={async () => {
+                    const emailsEl = document.getElementById(`bulk_emails_${draft.id}`);
+                    const modeRadios = document.getElementsByName(`bulk_mode_${draft.id}`);
+                    const mode = Array.from(modeRadios).find(r => r.checked)?.value || 'all';
+                    
+                    const emails = emailsEl?.value
+                      ?.split('\n')
+                      .map(e => e.trim().toLowerCase())
+                      .filter(e => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) || [];
+
+                    let chapters = [];
+                    if (mode === 'all') {
+                      chapters = 'all';
+                    } else {
+                      const checkboxes = Array.from(document.querySelectorAll(`input[id^="bulk_ch_${draft.id}_"]`)).filter(el => el.checked);
+                      chapters = checkboxes.map(el => parseInt(el.id.split('_').pop()));
+                    }
+
+                    if (emails.length === 0 || (Array.isArray(chapters) && chapters.length === 0)) {
+                      showToast?.('⚠️ Enter valid emails and select chapters');
+                      return;
+                    }
+
+                    try {
+                      let granted = 0;
+                      for (const email of emails) {
+                        const key = `grant_${draft.id}_${email.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
+                        await setDoc(doc(db, 'user_chapter_grants', key), {
+                          bookId: draft.id,
+                          bookTitle: draft.title,
+                          email: email,
+                          chapters: chapters,
+                          grantedAt: serverTimestamp(),
+                          grantedBy: 'admin_bulk',
+                        });
+                        granted++;
+                      }
+                      showToast?.(`✅ Granted to ${granted} reader(s)`);
+                      emailsEl.value = '';
+                    } catch (e) {
+                      showToast?.('❌ ' + e.message);
+                    }
+                  }}
+                  style={{ width: '100%' }}>
+                  📤 Grant to All
+                </button>
+              </div>
+            </div>
+
             {/* ── User Chapter Access ── */}
             <div className="card" style={{ padding: '16px 20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
