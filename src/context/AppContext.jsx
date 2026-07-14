@@ -600,7 +600,27 @@ export function AppProvider({ children }) {
     setDoc(ref, { email: user.email.toLowerCase(), books: updated }, { merge: true });
     setLibState(updated);
   };
-  const isOwned     = id => library.some(b => b.id === id);
+  const isOwned     = id => {
+    // Direct ownership (whole book purchased)
+    if (library.some(b => b.id === id)) return true;
+    return false;
+  };
+
+  // Check if a specific chapter is owned (either the full book or the individual chapter)
+  const isChapterOwned = (bookId, chapterNum) => {
+    if (library.some(b => b.id === bookId)) return true; // full book → all chapters unlocked
+    const chapterId = `${bookId}_ch_${chapterNum}`;
+    return library.some(b => b.id === chapterId);
+  };
+
+  // Get all owned chapter numbers for a book (for ongoing series)
+  const ownedChapters = (bookId) => {
+    if (library.some(b => b.id === bookId)) return 'all';
+    return library
+      .filter(b => b.bookId === bookId && b.isChapter)
+      .map(b => b.chapterNum)
+      .filter(Boolean);
+  };
   const canDownload = id => {
     if (user && !myPerms.canDownload) return false;
     return library.some(b => b.id === id && b.downloadUnlocked);
@@ -837,6 +857,7 @@ export function AppProvider({ children }) {
       user, setUser, logout,
       cart, addToCart, removeFromCart, clearCart,
       library, addToLibrary, isOwned, canDownload, libLoaded,
+      isChapterOwned, ownedChapters,
       books, saveBook, deleteBook, resetBooks,
       orders, setOrdersState, placeOrder, confirmOrder, rejectOrder,
       syncOrders, manualUnlock, unlockBooksForBuyer,

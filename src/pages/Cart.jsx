@@ -1194,30 +1194,53 @@ export default function Cart() {
 
                 {cart.map(b => (
                   <div key={b.id} className="cart-item card">
-                    <Link to={bookPath(b)} className="cart-item__img-wrap">
-                      <img
-                        src={b.cover || '/logo-icon.png'}
-                        alt={b.title}
-                        className="cart-item__img"
-                        onError={e => { e.target.src = '/logo-icon.png'; }}
-                      />
-                    </Link>
+                    {b.isChapter ? (
+                      /* ── Chapter item ── */
+                      <div className="cart-item__img-wrap" style={{ display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(74,158,255,0.06)', border:'1px solid rgba(74,158,255,0.2)', borderRadius:8, minWidth:70, minHeight:80 }}>
+                        <div style={{ textAlign:'center', padding:'8px 6px' }}>
+                          <div style={{ fontSize:'0.65rem', fontWeight:800, color:'#4a9eff', letterSpacing:0.5, marginBottom:4 }}>CH.</div>
+                          <div style={{ fontSize:'1.5rem', fontWeight:800, color:'#4a9eff', lineHeight:1 }}>{b.chapterNum}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <Link to={bookPath(b)} className="cart-item__img-wrap">
+                        <img
+                          src={b.cover || '/logo-icon.png'}
+                          alt={b.title}
+                          className="cart-item__img"
+                          onError={e => { e.target.src = '/logo-icon.png'; }}
+                        />
+                      </Link>
+                    )}
                     <div className="cart-item__info">
-                      <span className="cart-item__genre">{b.genre}</span>
-                      <h3><Link to={bookPath(b)}>{b.title}</Link></h3>
-                      <p className="cart-item__author">by {b.author}</p>
-                      <p className="cart-item__meta">{b.pages} pages · {b.readTime}</p>
+                      {b.isChapter ? (
+                        <>
+                          <span className="cart-item__genre" style={{ color:'#4a9eff' }}>Chapter {b.chapterNum}</span>
+                          <h3 style={{ fontSize:'0.9rem' }}>{b.chapterTitle || b.title}</h3>
+                          <p className="cart-item__author" style={{ fontSize:'0.78rem', color:'var(--muted)' }}>
+                            from <em>{b.title.replace(/ — Chapter \d+$/, '')}</em>
+                          </p>
+                          <p className="cart-item__meta" style={{ color:'#4a9eff', fontSize:'0.72rem' }}>📖 Ongoing Series · Individual Chapter</p>
+                        </>
+                      ) : (
+                        <>
+                          <span className="cart-item__genre">{b.genre}</span>
+                          <h3><Link to={bookPath(b)}>{b.title}</Link></h3>
+                          <p className="cart-item__author">by {b.author}</p>
+                          <p className="cart-item__meta">{b.pages} pages · {b.readTime}</p>
+                        </>
+                      )}
                       <div className="cart-item__actions">
                         <button className="cart-item__rm" onClick={() => removeFromCart(b.id)}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                           Remove
                         </button>
-                        <Link to={bookPath(b)} className="cart-item__view">View details</Link>
+                        {!b.isChapter && <Link to={bookPath(b)} className="cart-item__view">View details</Link>}
                       </div>
                     </div>
                     <div className="cart-item__right">
                       <div className="cart-item__price">KSh {b.price.toLocaleString()}</div>
-                      <span className="cart-item__type">Digital book</span>
+                      <span className="cart-item__type">{b.isChapter ? 'Single chapter' : 'Digital book'}</span>
                     </div>
                   </div>
                 ))}
@@ -1227,7 +1250,7 @@ export default function Cart() {
               <div className="cart-sum card">
                 <h3>Order Summary</h3>
                 <div className="cart-sum__lines">
-                  {cart.map(b => (
+                {cart.map(b => (
                     <div key={b.id} className="cart-sum__row">
                       <span title={b.title}>{b.title.length > 26 ? b.title.slice(0, 26) + '…' : b.title}</span>
                       <span>KSh {b.price.toLocaleString()}</span>

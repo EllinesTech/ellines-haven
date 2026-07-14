@@ -308,6 +308,283 @@ function FreeSample({ book }) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────
+   OngoingSeriesPurchase — series-style chapter buy panel
+   Shows up when a book is 'ongoing' with > 2 chapters out.
+   Lets readers buy all released chapters (whole book price)
+   OR purchase individual chapters (price ÷ totalChapters).
+─────────────────────────────────────────────────────────── */
+function OngoingSeriesPurchase({ book, owned, libLoaded }) {
+  const { addToCart, cart, user, myPerms, siteControls, isChapterOwned, ownedChapters } = useApp();
+
+  // Derive chapter counts from available data
+  const isPart = (s) => /^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(s);
+  const realToc = (book.tableOfContents || []).filter(t => !isPart(t));
+  const releasedCount = book.chaptersReleased > 0
+    ? book.chaptersReleased
+    : realToc.length > 0
+      ? realToc.length
+      : book.chapterCount > 0 ? book.chapterCount : 0;
+  const totalPlanned = book.totalChapters > 0 ? book.totalChapters
+    : book.chapterCount > 0 ? book.chapterCount : releasedCount;
+
+  // Only render this component if ongoing & more than 2 chapters out
+  if (book.status !== 'ongoing' || releasedCount <= 2) return null;
+
+  const wholeBookInCart = cart.some(b => b.id === book.id && !b.isChapter);
+  const canAdd = libLoaded
+    && !siteControls?.readOnlyMode
+    && myPerms?.canPurchase !== false;
+
+  // Per-chapter price (round up to nearest 5 KES)
+  const chapterPrice = book.price > 0
+    ? Math.ceil((book.price / totalPlanned) / 5) * 5
+    : 50; // fallback KES 50 per chapter
+
+  // Check which individual chapters the user has in cart or owns
+  const ownedChapterIds = new Set(
+    cart.filter(b => b.isChapter && b.bookId === book.id).map(b => b.chapterId)
+  );
+
+  const [mode, setMode] = useState('all'); // 'all' | 'individual'
+  const [addedMsg, setAddedMsg] = useState('');
+
+  const flashMsg = (msg) => {
+    setAddedMsg(msg);
+    setTimeout(() => setAddedMsg(''), 2200);
+  };
+
+  const addWholeBook = () => {
+    addToCart(book);
+    flashMsg('📚 All chapters added to cart!');
+  };
+
+  const addChapter = (idx) => {
+    const tocTitle = realToc[idx] || `Chapter ${idx + 1}`;
+    const chapterId = `${book.id}_ch_${idx + 1}`;
+    if (cart.some(b => b.chapterId === chapterId)) return;
+    addToCart({
+      id: chapterId,           // unique cart key
+      bookId: book.id,         // parent book
+      chapterId,
+      chapterNum: idx + 1,
+      isChapter: true,
+      title: `${book.title} — Chapter ${idx + 1}`,
+      chapterTitle: tocTitle.replace(/^(Chapter \d+|Day \d+) — /, ''),
+      cover: book.cover,
+      coverType: book.coverType,
+      price: chapterPrice,
+      genre: book.genre,
+    });
+    flashMsg(`Ch. ${idx + 1} added to cart`);
+  };
+
+  if (owned) return null; // Reader already owns it
+
+  return (
+    <div id="bd-series-purchase" style={{
+      marginTop: 24,
+      border: '1px solid rgba(74,158,255,0.3)',
+      borderRadius: 'var(--r)',
+      overflow: 'hidden',
+      background: 'rgba(74,158,255,0.04)',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '14px 18px',
+        background: 'rgba(74,158,255,0.08)',
+        borderBottom: '1px solid rgba(74,158,255,0.2)',
+      }}>
+        <span style={{ fontSize: '1.3rem' }}>📖</span>
+        <div style={{ flex: 1 }}>
+          <strong style={{ color: '#4a9eff', fontSize: '0.92rem', display: 'block' }}>
+            Ongoing Series — {releasedCount} of {totalPlanned} Chapters Released
+          </strong>
+          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+            New chapters added regularly · Buy all or start with one
+          </span>
+        </div>
+        <div style={{
+          background: 'rgba(74,158,255,0.15)', border: '1px solid rgba(74,158,255,0.35)',
+          borderRadius: 20, padding: '3px 12px', fontSize: '0.7rem',
+          fontWeight: 800, color: '#4a9eff', letterSpacing: 0.5, whiteSpace: 'nowrap',
+        }}>
+          {releasedCount}/{totalPlanned} out
+        </div>
+      </div>
+
+      {/* Mode toggle */}
+      <div style={{ display: 'flex', gap: 0, padding: '12px 18px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <button
+          onClick={() => setMode('all')}
+          style={{
+            flex: 1, padding: '9px 14px', border: 'none', cursor: 'pointer',
+            fontFamily: 'inherit', fontWeight: 600, fontSize: '0.82rem', transition: 'all 0.15s',
+            background: mode === 'all' ? '#4a9eff' : 'transparent',
+            color: mode === 'all' ? '#000' : 'var(--muted)',
+            borderRadius: '8px 0 0 0', borderBottom: mode === 'all' ? '2px solid #4a9eff' : '2px solid transparent',
+          }}
+        >
+          📦 Buy All ({releasedCount} Chapters)
+        </button>
+        <button
+          onClick={() => setMode('individual')}
+          style={{
+            flex: 1, padding: '9px 14px', border: 'none', cursor: 'pointer',
+            fontFamily: 'inherit', fontWeight: 600, fontSize: '0.82rem', transition: 'all 0.15s',
+            background: mode === 'individual' ? 'rgba(201,168,76,0.12)' : 'transparent',
+            color: mode === 'individual' ? 'var(--gold)' : 'var(--muted)',
+            borderRadius: '0 8px 0 0', borderBottom: mode === 'individual' ? '2px solid var(--gold)' : '2px solid transparent',
+          }}
+        >
+          🎯 Buy Individual Chapters
+        </button>
+      </div>
+
+      <div style={{ padding: '16px 18px' }}>
+
+        {/* ── Buy All mode ── */}
+        {mode === 'all' && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>Full access price</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)' }}>
+                  <small style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--muted)', marginRight: 2 }}>KSh</small>
+                  {book.price}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--muted)', flex: 1 }}>
+                Includes all {releasedCount} chapters now + every new chapter as it releases. Best value.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {wholeBookInCart
+                ? <Link to="/cart" className="btn btn-primary" style={{ background: '#4a9eff', color: '#000' }}>
+                    Go to Cart →
+                  </Link>
+                : canAdd
+                  ? <button
+                      className="btn btn-primary"
+                      style={{ background: '#4a9eff', color: '#000' }}
+                      onClick={addWholeBook}
+                    >
+                      Add All Chapters — KSh {book.price}
+                    </button>
+                  : <span className="btn btn-primary" style={{ opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none', background: '#4a9eff', color: '#000' }}>
+                      Purchasing Restricted
+                    </span>
+              }
+              <a
+                href={waOrderLink(book.title, book.price)}
+                target="_blank" rel="noopener noreferrer"
+                className="btn btn-wa"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Order via WhatsApp
+              </a>
+            </div>
+            {addedMsg && (
+              <div style={{ marginTop: 10, fontSize: '0.82rem', color: '#4a9eff', fontWeight: 600 }}>
+                {addedMsg}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Individual chapters mode ── */}
+        {mode === 'individual' && (
+          <div>
+            <div style={{ marginBottom: 12, fontSize: '0.8rem', color: 'var(--muted)' }}>
+              Each chapter: <strong style={{ color: 'var(--gold)' }}>KSh {chapterPrice}</strong>
+              {' '}· {releasedCount} available now
+              {' '}· <span style={{ color: '#4a9eff' }}>Buying all individually costs KSh {chapterPrice * releasedCount} — save KSh {chapterPrice * releasedCount - book.price} with the full bundle</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+              {realToc.slice(0, releasedCount).map((tocItem, idx) => {
+                const chapterId = `${book.id}_ch_${idx + 1}`;
+                const inCart2 = cart.some(b => b.chapterId === chapterId);
+                const alreadyOwned = isChapterOwned ? isChapterOwned(book.id, idx + 1) : false;
+                const chapTitle = tocItem.replace(/^(Chapter \d+|Day \d+) — /, '');
+                return (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 12px', borderRadius: 8,
+                    background: alreadyOwned ? 'rgba(46,204,113,0.06)' : 'var(--card)',
+                    border: alreadyOwned ? '1px solid rgba(46,204,113,0.25)' : '1px solid var(--border)',
+                  }}>
+                    <span style={{ fontSize: '0.7rem', color: alreadyOwned ? 'var(--ok)' : 'var(--muted)', fontWeight: 700, minWidth: 28 }}>
+                      {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <span style={{ flex: 1, fontSize: '0.85rem', color: 'var(--text)' }}>{chapTitle}</span>
+                    {alreadyOwned ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 600, padding: '3px 10px' }}>✓ Owned</span>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--gold)', fontWeight: 600, marginRight: 6 }}>
+                          KSh {chapterPrice}
+                        </span>
+                        {inCart2
+                          ? <Link to="/cart" className="btn btn-ghost btn-sm" style={{ fontSize: '0.72rem', padding: '4px 10px' }}>
+                              In Cart
+                            </Link>
+                          : canAdd
+                            ? <button
+                                className="btn btn-primary btn-sm"
+                                style={{ fontSize: '0.72rem', padding: '4px 12px' }}
+                                onClick={() => addChapter(idx)}
+                              >
+                                + Add
+                              </button>
+                            : null
+                        }
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+              {/* Upcoming chapters (locked) */}
+              {Array.from({ length: Math.max(0, totalPlanned - releasedCount) }).map((_, idx) => (
+                <div key={`upcoming-${idx}`} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 12px', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  opacity: 0.45,
+                }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 700, minWidth: 28 }}>
+                    {String(releasedCount + idx + 1).padStart(2, '0')}
+                  </span>
+                  <span style={{ flex: 1, fontSize: '0.82rem', color: 'var(--muted)', fontStyle: 'italic' }}>
+                    Coming soon…
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>🔒</span>
+                </div>
+              ))}
+            </div>
+            {addedMsg && (
+              <div style={{ marginTop: 10, fontSize: '0.82rem', color: 'var(--gold)', fontWeight: 600 }}>
+                ✓ {addedMsg}
+              </div>
+            )}
+            {cart.some(b => b.isChapter && b.bookId === book.id) && (
+              <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <Link to="/cart" className="btn btn-outline btn-sm">
+                  View Cart ({cart.filter(b => b.isChapter && b.bookId === book.id).length} ch)
+                </Link>
+                <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                  Or switch to "Buy All" for the best deal
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Table of Contents section — with admin inline editor ── */
 function TocSection({ book, owned, libLoaded, user }) {
   const { setBooks, books } = useApp();
@@ -776,38 +1053,57 @@ export default function BookDetail() {
                   </div>
                   <NotifyMeDetailBtn book={book} />
                 </div>
-              ) : (
-              <div className="bd-purchase" id="bd-purchase-section">
-                <div className="bd-price">
-                  <small>Price</small>
-                  <div><span className="bd-curr">KSh</span><span className="bd-amt">{book.price}</span></div>
-                </div>
-                <div className="bd-actions">
-                  {owned
-                    ? <>
-                        <Link to={readPath(book)} className="btn btn-primary">Read Now</Link>
-                        {book.driveUrl && (
-                          <a href={book.driveUrl.replace('/view', '/export?format=pdf').replace('/preview', '/export?format=pdf')} target="_blank" rel="noopener noreferrer" className="btn btn-outline">Download PDF</a>
-                        )}
-                      </>
-                    : user && !libLoaded
-                      ? <button className="btn btn-primary" disabled style={{opacity:0.6}}>⏳ Verifying access…</button>
-                      : inCart
-                        ? <Link to="/cart" className="btn btn-primary">Go to Cart →</Link>
-                        : canAdd ? <>
-                          <button className="btn btn-primary" onClick={() => addToCart(book)}>Add to Cart — KSh {book.price}</button>
-                          <a href={waOrderLink(book.title, book.price)} target="_blank" rel="noopener noreferrer" className="btn btn-wa">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                            Order via WhatsApp
-                          </a>
-                        </>
-                      : <span className="btn btn-primary" style={{opacity:0.5,cursor:'not-allowed',pointerEvents:'none'}}>
-                          {siteControls?.readOnlyMode ? 'Site in Read-Only Mode' : 'Purchasing Restricted'}
-                        </span>
-                  }
-                </div>
-              </div>
-              )}
+              ) : (() => {
+                // Determine if this is an ongoing series with > 2 chapters
+                const isPart = (s) => /^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(s);
+                const realToc = (book.tableOfContents || []).filter(t => !isPart(t));
+                const releasedCount = book.chaptersReleased > 0
+                  ? book.chaptersReleased
+                  : realToc.length > 0 ? realToc.length
+                  : book.chapterCount > 0 ? book.chapterCount : 0;
+                const isOngoingSeries = book.status === 'ongoing' && releasedCount > 2;
+
+                if (isOngoingSeries) {
+                  return (
+                    <div id="bd-purchase-section">
+                      <OngoingSeriesPurchase book={book} owned={owned} libLoaded={libLoaded} />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="bd-purchase" id="bd-purchase-section">
+                    <div className="bd-price">
+                      <small>Price</small>
+                      <div><span className="bd-curr">KSh</span><span className="bd-amt">{book.price}</span></div>
+                    </div>
+                    <div className="bd-actions">
+                      {owned
+                        ? <>
+                            <Link to={readPath(book)} className="btn btn-primary">Read Now</Link>
+                            {book.driveUrl && (
+                              <a href={book.driveUrl.replace('/view', '/export?format=pdf').replace('/preview', '/export?format=pdf')} target="_blank" rel="noopener noreferrer" className="btn btn-outline">Download PDF</a>
+                            )}
+                          </>
+                        : user && !libLoaded
+                          ? <button className="btn btn-primary" disabled style={{opacity:0.6}}>⏳ Verifying access…</button>
+                          : inCart
+                            ? <Link to="/cart" className="btn btn-primary">Go to Cart →</Link>
+                            : canAdd ? <>
+                              <button className="btn btn-primary" onClick={() => addToCart(book)}>Add to Cart — KSh {book.price}</button>
+                              <a href={waOrderLink(book.title, book.price)} target="_blank" rel="noopener noreferrer" className="btn btn-wa">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                Order via WhatsApp
+                              </a>
+                            </>
+                          : <span className="btn btn-primary" style={{opacity:0.5,cursor:'not-allowed',pointerEvents:'none'}}>
+                              {siteControls?.readOnlyMode ? 'Site in Read-Only Mode' : 'Purchasing Restricted'}
+                            </span>
+                      }
+                    </div>
+                  </div>
+                );
+              })()}
               {/* Notify Me alongside purchase for ongoing/limited */}
               {NOTIFY_ALONGSIDE.has(book.status) && !owned && (
                 <div style={{ marginTop:12 }}>

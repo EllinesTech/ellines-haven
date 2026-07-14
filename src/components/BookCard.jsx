@@ -215,11 +215,27 @@ export default function BookCard({ book }) {
         )}
         <div className="bcard__meta">
           <span className="bcard__stars">{'★'.repeat(Math.floor(book.rating))}<span className="bcard__rating"> {book.rating}</span></span>
-          {book.status === 'ongoing' && (book.chaptersReleased > 0 || book.totalChapters > 0)
-            ? <span className="bcard__time" style={{ color:'#4a9eff' }}>
-                {book.chaptersReleased > 0 ? `${book.chaptersReleased} ch` : ''}
-                {book.totalChapters > 0 ? ` / ${book.totalChapters}` : book.chaptersReleased > 0 ? '+ ongoing' : 'Ongoing'}
-              </span>
+          {book.status === 'ongoing'
+            ? (() => {
+                // Auto-compute chapter count from available data sources
+                const released = book.chaptersReleased > 0
+                  ? book.chaptersReleased
+                  : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(t)).length || 0);
+                const total = book.totalChapters > 0 ? book.totalChapters
+                  : book.chapterCount > 0 ? book.chapterCount : 0;
+                if (released > 2) {
+                  return (
+                    <span className="bcard__time bcard__chapters-badge" style={{ color:'#4a9eff' }}>
+                      📖 {released} ch{total > 0 ? ` / ${total}` : ' + ongoing'}
+                    </span>
+                  );
+                }
+                return (
+                  <span className="bcard__time" style={{ color:'#4a9eff' }}>
+                    {released > 0 ? `${released} ch${total > 0 ? ` / ${total}` : ' ongoing'}` : 'Ongoing'}
+                  </span>
+                );
+              })()
             : <span className="bcard__time">{book.readTime}</span>
           }
         </div>
@@ -235,6 +251,17 @@ export default function BookCard({ book }) {
               ? <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>
               : NO_PURCHASE_STATUSES.has(book.status)
                 ? <NotifyMeBtn book={book} user={user} />
+                : book.status === 'ongoing' && (() => {
+                    const released = book.chaptersReleased > 0
+                      ? book.chaptersReleased
+                      : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|SECTION|VOLUME)\s/i.test(t)).length || 0);
+                    return released > 2;
+                  })()
+                  ? inCart
+                    ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
+                    : !myPerms || myPerms.canPurchase !== false
+                      ? <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>
+                      : <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
                 : NOTIFY_STATUSES.has(book.status)
                   ? <NotifyMeBtn book={book} user={user} />
                   : inCart
