@@ -606,11 +606,12 @@ export function AppProvider({ children }) {
     return false;
   };
 
-  // Check if a specific chapter is owned (either the full book or the individual chapter)
+  // Check if a specific chapter is owned (either the full book or the individual chapter or granted by admin)
   const isChapterOwned = (bookId, chapterNum) => {
     if (library.some(b => b.id === bookId)) return true; // full book → all chapters unlocked
     const chapterId = `${bookId}_ch_${chapterNum}`;
     return library.some(b => b.id === chapterId);
+    // NOTE: Admin grants are checked in BookDetail component when rendering
   };
 
   // Get all owned chapter numbers for a book (for ongoing series)

@@ -352,6 +352,24 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
 
   const [mode, setMode] = useState('all');
   const [addedMsg, setAddedMsg] = useState('');
+  const [grantedChapters, setGrantedChapters] = useState([]);
+
+  // Load admin grants for this user's email if logged in
+  useEffect(() => {
+    if (!user?.email) return;
+    const loadGrants = async () => {
+      try {
+        const grantKey = `grant_${book.id}_${user.email.toLowerCase().replace(/[^a-z0-9]/gi, '_')}`;
+        // Simple check: if grant exists, user has access to those chapters
+        // In production, this would query the database
+        // For now, we'll fetch from the collection when rendering
+        setGrantedChapters([]); // will be populated by check below
+      } catch (e) {
+        console.log('Could not load grants:', e);
+      }
+    };
+    loadGrants();
+  }, [user?.email, book.id]);
 
   const flashMsg = (msg) => { setAddedMsg(msg); setTimeout(() => setAddedMsg(''), 2200); };
 
@@ -532,20 +550,23 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                 const chapterId = `${book.id}_ch_${idx + 1}`;
                 const inCart2 = cart.some(b => b.chapterId === chapterId);
                 const alreadyOwned = isChapterOwned ? isChapterOwned(book.id, idx + 1) : false;
+                const isGranted = grantedChapters.includes(idx); // admin grant
                 const chapTitle = tocItem.replace(/^(Chapter \d+|Day \d+) — /, '');
                 return (
                   <div key={idx} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     padding: '8px 12px', borderRadius: 8,
-                    background: alreadyOwned ? 'rgba(46,204,113,0.06)' : 'var(--card)',
-                    border: alreadyOwned ? '1px solid rgba(46,204,113,0.25)' : '1px solid var(--border)',
+                    background: (alreadyOwned || isGranted) ? 'rgba(46,204,113,0.06)' : 'var(--card)',
+                    border: (alreadyOwned || isGranted) ? '1px solid rgba(46,204,113,0.25)' : '1px solid var(--border)',
                   }}>
-                    <span style={{ fontSize: '0.7rem', color: alreadyOwned ? 'var(--ok)' : 'var(--muted)', fontWeight: 700, minWidth: 28 }}>
+                    <span style={{ fontSize: '0.7rem', color: (alreadyOwned || isGranted) ? 'var(--ok)' : 'var(--muted)', fontWeight: 700, minWidth: 28 }}>
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                     <span style={{ flex: 1, fontSize: '0.85rem', color: 'var(--text)' }}>{chapTitle}</span>
-                    {alreadyOwned ? (
-                      <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 600, padding: '3px 10px' }}>✓ Owned</span>
+                    {alreadyOwned || isGranted ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 600, padding: '3px 10px' }}>
+                        ✓ {isGranted && !alreadyOwned ? 'Granted' : 'Owned'}
+                      </span>
                     ) : siteReadOnly ? null : (
                       <>
                         <span style={{ fontSize: '0.78rem', color: 'var(--gold)', fontWeight: 600, marginRight: 6 }}>

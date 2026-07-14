@@ -484,14 +484,88 @@ export default function SeriesPanel({ showToast }) {
 
             {/* ── User Chapter Access ── */}
             <div className="card" style={{ padding: '16px 20px' }}>
-              <h3 style={{ fontSize: '0.88rem', color: 'var(--gold)', marginBottom: 12 }}>👥 Per-User Chapter Access</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ fontSize: '0.88rem', color: 'var(--gold)' }}>👥 Per-User Chapter Access</h3>
+              </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: 12 }}>
-                Admin can manually override chapter access for individual readers — grant early access, unlock chapters without purchase, or restrict chapters.
+                Manually unlock specific chapters for individual readers or grant early access.
               </p>
-              <div style={{ padding: '14px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(201,168,76,0.2)', textAlign: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                  💡 User access management coming in next update — use the Messages panel to contact readers in the meantime
-                </span>
+              <div style={{ padding: '12px', background: 'rgba(74,158,255,0.06)', border: '1px solid rgba(74,158,255,0.25)', borderRadius: 8 }}>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                    📧 Reader Email
+                  </label>
+                  <input className="field" type="email"
+                    key={`email_${draft.id}`}
+                    defaultValue=""
+                    placeholder="e.g. reader@example.com"
+                    style={{ marginBottom: 8 }}
+                    id={`user_email_${draft.id}`}
+                  />
+                </div>
+                
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block', marginBottom: 6 }}>
+                    📖 Unlock Chapters
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto', paddingRight: 4 }}>
+                    {(() => {
+                      let chNum = 0;
+                      return (draft.tableOfContents || []).map((item, i) => {
+                        if (isPart(item)) return null;
+                        chNum++;
+                        const chapTitle = item.replace(/^(Chapter \d+|Day \d+|Story \d+) — /, '');
+                        return (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 6px', borderRadius: 4 }}>
+                            <input type="checkbox"
+                              defaultChecked={false}
+                              style={{ width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }}
+                              id={`ch_${draft.id}_${i}`}
+                            />
+                            <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                              {String(chNum).padStart(2, '0')}. {chapTitle}
+                            </span>
+                          </label>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+                
+                <button className="btn btn-primary btn-sm"
+                  onClick={async () => {
+                    const emailEl = document.getElementById(`user_email_${draft.id}`);
+                    const email = emailEl?.value?.trim();
+                    const checkboxes = Array.from(document.querySelectorAll(`input[id^="ch_${draft.id}_"]`)).filter(el => el.checked);
+                    const chapters = checkboxes.map(el => {
+                      const idx = el.id.split('_').pop();
+                      return parseInt(idx);
+                    });
+                    
+                    if (!email || chapters.length === 0) {
+                      showToast?.('⚠️ Select email and at least one chapter');
+                      return;
+                    }
+                    try {
+                      const key = `grant_${draft.id}_${email.toLowerCase().replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
+                      await setDoc(doc(db, 'user_chapter_grants', key), {
+                        bookId: draft.id,
+                        bookTitle: draft.title,
+                        email: email.toLowerCase(),
+                        unlockedChapters: chapters,
+                        grantedAt: serverTimestamp(),
+                        grantedBy: 'admin',
+                      });
+                      showToast?.(`✅ Granted access to ${chapters.length} chapter(s) for ${email}`);
+                      emailEl.value = '';
+                      checkboxes.forEach(el => el.checked = false);
+                    } catch (e) {
+                      showToast?.('❌ ' + e.message);
+                    }
+                  }}
+                  style={{ width: '100%' }}>
+                  ✓ Grant Chapter Access
+                </button>
               </div>
             </div>
 
