@@ -957,21 +957,11 @@ export default function Reader() {
 
               {/* Mode toggle */}
               <div className="reader__mode-toggle">
-                {hasPdf && (
-                  <button className={'reader__mode-btn' + (viewMode === 'pdf' ? ' on' : '')} onClick={() => setMode('pdf')}>PDF</button>
-                )}
                 <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>📖 Read</button>
                 <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>🎧 Listen</button>
               </div>
 
               {/* Zoom / font size */}
-              {viewMode === 'pdf' && hasPdf && (
-                <div className="reader__zoom-group">
-                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))}>−</button>
-                  <span className="reader__zoom-label">{zoom}%</span>
-                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.min(200, z + 10))}>+</button>
-                </div>
-              )}
               {(viewMode === 'text' || viewMode === 'listen') && (
                 <div className="reader__zoom-group">
                   <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))}>A−</button>
@@ -1021,20 +1011,9 @@ export default function Reader() {
               )}
               {/* Mode toggle — PDF + Text + Listen */}
               <div className="reader__mode-toggle">
-                {hasPdf && (
-                  <button className={'reader__mode-btn' + (viewMode === 'pdf' ? ' on' : '')} onClick={() => setMode('pdf')}>📄 PDF</button>
-                )}
                 <button className={'reader__mode-btn' + (viewMode === 'text' ? ' on' : '')} onClick={() => setMode('text')}>📖 Read</button>
                 <button className={'reader__mode-btn reader__mode-btn--listen' + (mode === 'listen' ? ' on' : '')} onClick={() => setMode('listen')}>🎧 Listen</button>
               </div>
-              {viewMode === 'pdf' && hasPdf && (
-                <div className="reader__zoom-group">
-                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.max(50, z - 10))} title="Zoom out">−</button>
-                  <span className="reader__zoom-label">{zoom}%</span>
-                  <button className="reader__font-btn" onClick={() => setZoom(z => Math.min(200, z + 10))} title="Zoom in">+</button>
-                  <button className="reader__font-btn" onClick={() => setZoom(100)} title="Reset zoom" style={{fontSize:'0.7rem'}}>↺</button>
-                </div>
-              )}
               {(viewMode === 'text' || viewMode === 'listen') && (
                 <div className="reader__zoom-group">
                   <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A−</button>
@@ -1111,44 +1090,6 @@ export default function Reader() {
           inside an iframe on our page.
           User sees the book, not the URL.
       ══════════════════════════════ */}
-      {viewMode === 'pdf' && hasPdf && (
-        <div className="reader__pdf-wrap">
-
-          {/* Invisible overlay blocks right-click on the iframe */}
-          <div className="reader__pdf-shield" onContextMenu={e => e.preventDefault()} />
-
-          {/* Ghost watermark tiles visible over the PDF */}
-          <div className="reader__pdf-wm" aria-hidden="true">
-            {Array.from({ length: 30 }).map((_, i) => (
-              <span key={i}>{user.name} · {user.email} · Ellines Haven</span>
-            ))}
-          </div>
-
-          {/* The actual PDF viewer — Google Drive embed, toolbar hidden */}
-          <div
-            className="reader__pdf-zoom-wrap"
-            style={{
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: 'top center',
-              width: `${10000 / zoom}%`,
-              marginLeft: `${(100 - 10000 / zoom) / 2}%`,
-            }}
-          >
-            <iframe
-              src={embedUrl + '?embedded=true#toolbar=0&navpanes=0&scrollbar=1'}
-              className="reader__pdf-frame"
-              title={book.title}
-              allow="autoplay"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            />
-          </div>
-
-          {/* Bottom licence note */}
-          <div className="reader__pdf-footer">
-            © {new Date().getFullYear()} Ellines Haven · This copy is licensed to {user.name} · Redistribution is prohibited
-          </div>
-        </div>
-      )}
 
       {/* ══════════════════════════════
           TEXT / CHAPTER MODE
@@ -1232,11 +1173,6 @@ export default function Reader() {
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
                   Continue to Chapter {chapter + 2} →
                 </button>
-              )}
-              {chapter === chapters.length - 1 && !hasPdf && (
-                <p style={{ marginTop: 8, fontSize: '.82rem', color: 'var(--muted)' }}>
-                  Full PDF will be available here once uploaded by the author.
-                </p>
               )}
             </div>
           </div>
@@ -1329,11 +1265,6 @@ export default function Reader() {
                   onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
                   Continue to Chapter {chapter + 2} →
                 </button>
-              )}
-              {chapter === chapters.length - 1 && !hasPdf && (
-                <p style={{ marginTop: 8, fontSize: '.82rem', color: 'var(--muted)' }}>
-                  Full PDF will be available here once uploaded by the author.
-                </p>
               )}
             </div>
           </div>
