@@ -22,7 +22,8 @@ const STATUS_META = {
 };
 
 export function BookStatusBadge({ status, style = {} }) {
-  if (!status || status === 'complete') return null; // don't clutter card with default
+  if (!status) return null;
+  // Note: 'complete' IS shown — callers decide whether to render this badge
   const meta = STATUS_META[status];
   if (!meta) return null;
   return (
@@ -108,8 +109,7 @@ function NotifyMeBtn({ book, user }) {
 
   const handleNotify = async () => {
     if (!user) {
-      // Not logged in — redirect hint
-      window.location.href = '/login';
+      window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
     setState('loading');
@@ -149,25 +149,28 @@ function NotifyMeBtn({ book, user }) {
     }
   };
 
-  // If not logged in on coming-soon book, show professional login message
-  if (!user && book.status === 'coming-soon') {
+  // If not logged in, show professional login prompt for any notify-type status
+  if (!user) {
+    const colors = {
+      'coming-soon': { bg:'rgba(232,131,42,0.08)', border:'rgba(232,131,42,0.25)', text:'#ffb366', label:'Coming Soon' },
+      'limited':     { bg:'rgba(231,76,60,0.08)',  border:'rgba(231,76,60,0.25)',  text:'#ff8a80', label:'Limited Edition' },
+      'ongoing':     { bg:'rgba(74,158,255,0.08)', border:'rgba(74,158,255,0.25)', text:'#7ec8ff', label:'Ongoing' },
+    };
+    const c = colors[book.status] || colors['coming-soon'];
     return (
       <div style={{
         display:'flex', flexDirection:'column', gap:6,
-        background:'rgba(232,131,42,0.08)',
-        border:'1px solid rgba(232,131,42,0.25)',
-        borderRadius:'6px',
-        padding:'10px 12px',
-        fontSize:'0.7rem',
+        background: c.bg, border:`1px solid ${c.border}`,
+        borderRadius:'6px', padding:'10px 12px', fontSize:'0.7rem',
       }}>
-        <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:'0.9rem' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
           <span>🔐</span>
-          <strong style={{ color:'#ffb366' }}>Coming Soon</strong>
+          <strong style={{ color: c.text }}>{c.label}</strong>
         </div>
-        <p style={{ margin:'0 0 8px 0', fontSize:'0.65rem', color:'rgba(255,179,102,0.8)', lineHeight:1.4 }}>
+        <p style={{ margin:'0 0 8px 0', fontSize:'0.65rem', color: c.text, opacity:0.85, lineHeight:1.4 }}>
           Login or register to get notified when this book becomes available.
         </p>
-        <Link 
+        <Link
           to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
           className="btn btn-primary btn-sm"
           style={{ fontSize:'0.65rem', padding:'6px 10px', textAlign:'center' }}
@@ -266,9 +269,7 @@ function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
     return <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>;
   }
 
-  const isRestricted = user && myPerms && myPerms.canPurchase === false;
-
-  if (isRestricted) {
+  if (user && myPerms?.canPurchase === false) {
     return <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>;
   }
 
@@ -276,28 +277,20 @@ function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
     return <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
   }
 
-  // Allow adding to cart even if not logged in (will redirect to login on checkout)
   if (!user) {
     return (
-      <button
+      <Link
+        to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
         className="btn btn-primary btn-sm"
-        onClick={() => {
-          addToCart(book);
-          // Optional: show a toast or redirect to cart
-        }}
-        title="Add to cart - you'll need to login to checkout"
+        title="Login or register to get this book"
       >
-        Add to Cart
-      </button>
+        🔐 Get Book
+      </Link>
     );
   }
 
   return (
-    <button
-      className="btn btn-primary btn-sm"
-      onClick={() => addToCart(book)}
-      title="Add this book to your cart"
-    >
+    <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)} title="Add to cart">
       Add to Cart
     </button>
   );
@@ -309,9 +302,7 @@ function PurchaseUiPremium({ book, owned, inCart, user, myPerms, addToCart }) {
     return <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>;
   }
 
-  const isRestricted = user && myPerms && myPerms.canPurchase === false;
-
-  if (isRestricted) {
+  if (user && myPerms?.canPurchase === false) {
     return <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>;
   }
 
@@ -319,17 +310,16 @@ function PurchaseUiPremium({ book, owned, inCart, user, myPerms, addToCart }) {
     return <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
   }
 
-  // Allow adding to cart even if not logged in (will redirect to login on checkout)
   if (!user) {
     return (
-      <button
+      <Link
+        to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
         className="btn btn-primary btn-sm"
-        onClick={() => addToCart(book)}
-        title="Premium content - add to cart to purchase"
         style={{ background:'rgba(201,168,76,0.25)', borderColor:'rgba(201,168,76,0.6)' }}
+        title="Login or register to access premium content"
       >
-        Add to Cart
-      </button>
+        🔐 Get Book
+      </Link>
     );
   }
 
@@ -337,7 +327,7 @@ function PurchaseUiPremium({ book, owned, inCart, user, myPerms, addToCart }) {
     <button
       className="btn btn-primary btn-sm"
       onClick={() => addToCart(book)}
-      title="Premium content — add to cart to purchase"
+      title="Premium content — add to cart"
       style={{ background:'rgba(201,168,76,0.25)', borderColor:'rgba(201,168,76,0.6)' }}
     >
       Add to Cart
@@ -466,16 +456,20 @@ export default function BookCard({ book }) {
                       })()
                       ? inCart
                         ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
-                        : !myPerms || myPerms.canPurchase !== false
-                          ? <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>
-                          : <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                        : user && myPerms?.canPurchase === false
+                          ? <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                          : !user
+                            ? <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">🔐 Get Book</Link>
+                            : <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>
                       : NOTIFY_STATUSES.has(book.status)
                         ? <NotifyMeBtn book={book} user={user} />
                         : inCart
                           ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
-                          : !myPerms || myPerms.canPurchase !== false
-                            ? <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)}>Add to Cart</button>
-                            : <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                          : user && myPerms?.canPurchase === false
+                            ? <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
+                            : !user
+                              ? <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">🔐 Get Book</Link>
+                              : <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)}>Add to Cart</button>
             }
             {!owned && !NO_PURCHASE_STATUSES.has(book.status) && (
               <a href={waOrderLink(book.title, book.price)} target="_blank" rel="noopener noreferrer"
