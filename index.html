@@ -30,6 +30,10 @@
     <link rel="apple-touch-icon" sizes="512x512" href="/pwa-icon-512.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/pwa-icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Force browser to never cache this HTML document -->
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Ellines Haven | Home For The Story Soul</title>
     <meta name="description" content="Discover original novels and short stories by Elijah Mwangi M — all inspired by true stories from East Africa. Buy once, read forever. Kenya's premier literary platform." />
     <meta name="keywords" content="Ellines Haven, Elijah Mwangi, Kenyan novels, African literature, East Africa books, online bookstore Kenya" />
@@ -278,10 +282,14 @@
     <script>
       (function(){
         var KEY = 'eh_preload_reload';
+        var MIME_KEY = 'eh_mime_reload';
+
+        // Handler for resource load errors (script/link tags)
         window.addEventListener('error', function(e) {
           var src = (e && e.target && (e.target.src || e.target.href)) || '';
+          var tag = e && e.target && e.target.tagName;
           // Detect failed JS/CSS module loads (assets/* or module scripts)
-          if (src && (src.includes('/assets/') || e.target.tagName === 'SCRIPT')) {
+          if (src && (src.includes('/assets/') || tag === 'SCRIPT' || tag === 'LINK')) {
             var last = parseInt(sessionStorage.getItem(KEY) || '0', 10);
             if (Date.now() - last > 30000) {
               sessionStorage.setItem(KEY, Date.now().toString());
@@ -289,13 +297,39 @@
               if ('caches' in window) {
                 caches.keys().then(function(keys) {
                   return Promise.all(keys.map(function(k){ return caches.delete(k); }));
-                }).then(function(){ window.location.reload(); }).catch(function(){ window.location.reload(); });
+                }).then(function(){ window.location.reload(true); }).catch(function(){ window.location.reload(true); });
               } else {
-                window.location.reload();
+                window.location.reload(true);
               }
             }
           }
         }, true); // capture phase to catch resource errors
+
+        // Handler for unhandled promise rejections (covers dynamic import failures
+        // and "Failed to load module script: MIME type text/html" errors)
+        window.addEventListener('unhandledrejection', function(e) {
+          var msg = (e && e.reason && (e.reason.message || String(e.reason))) || '';
+          var isChunk =
+            msg.includes('Failed to fetch dynamically imported module') ||
+            msg.includes('Importing a module script failed') ||
+            msg.includes('error loading dynamically imported module') ||
+            msg.includes('Expected a JavaScript') ||
+            msg.includes('MIME type') ||
+            (e && e.reason && e.reason.name === 'ChunkLoadError');
+          if (isChunk) {
+            var last = parseInt(sessionStorage.getItem(MIME_KEY) || '0', 10);
+            if (Date.now() - last > 30000) {
+              sessionStorage.setItem(MIME_KEY, Date.now().toString());
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  return Promise.all(keys.map(function(k){ return caches.delete(k); }));
+                }).then(function(){ window.location.reload(true); }).catch(function(){ window.location.reload(true); });
+              } else {
+                window.location.reload(true);
+              }
+            }
+          }
+        });
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>
