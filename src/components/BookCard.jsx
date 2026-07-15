@@ -39,19 +39,23 @@ const STATUS_META = {
   seasonal:        { label:'Seasonal',        icon:'🌸', color:'#f472b6', bg:'rgba(244,114,182,0.15)'  },
 };
 
-// Render one badge pill
-export function BookStatusBadge({ status, style = {} }) {
+// Render one badge pill — supports both built-in STATUS_META badges and custom badges
+export function BookStatusBadge({ status, customMeta, style = {} }) {
   if (!status) return null;
-  const meta = STATUS_META[status];
-  if (!meta) return null;
+  const meta = STATUS_META[status] || customMeta;
+  // For unknown badges not in STATUS_META and no customMeta provided, render a neutral pill
+  const color  = meta?.color  || '#a78bfa';
+  const bg     = meta?.bg     || 'rgba(167,139,250,0.12)';
+  const icon   = meta?.icon   || '🏷️';
+  const label  = meta?.label  || status;
   return (
     <span style={{
       display:'inline-flex', alignItems:'center', gap:4,
       fontSize:'0.65rem', fontWeight:800, letterSpacing:0.8,
       padding:'4px 10px', borderRadius:20,
-      background: meta.bg.replace(/[\d.]+\)$/, '0.55)'),
-      color: meta.color,
-      border:`1px solid ${meta.color}cc`,
+      background: bg.replace(/[\d.]+\)$/, '0.55)'),
+      color,
+      border:`1px solid ${color}cc`,
       backdropFilter:'blur(4px)',
       WebkitBackdropFilter:'blur(4px)',
       textShadow:'0 1px 4px rgba(0,0,0,0.7)',
@@ -59,9 +63,15 @@ export function BookStatusBadge({ status, style = {} }) {
       whiteSpace:'nowrap',
       ...style,
     }}>
-      {meta.icon} {meta.label.toUpperCase()}
+      {icon} {label.toUpperCase()}
     </span>
   );
+}
+
+// Build a lookup map from a book's _customBadges array
+function buildCustomBadgeMap(book) {
+  if (!Array.isArray(book?._customBadges)) return {};
+  return Object.fromEntries(book._customBadges.map(cb => [cb.value, cb]));
 }
 
 // Render all badges for a book (status + extra badges array)
@@ -70,13 +80,16 @@ export function BookBadges({ book, style = {}, cardMode = false }) {
   // On cards we hide 'complete' to keep things clean — on detail pages we show everything
   const showStatus = !cardMode || book.status !== 'complete';
   const extraBadges = Array.isArray(book.badges) ? book.badges : [];
+  const customMap = buildCustomBadgeMap(book);
 
   if (!showStatus && extraBadges.length === 0) return null;
 
   return (
     <span style={{ display:'inline-flex', flexWrap:'wrap', gap:4, alignItems:'center', ...style }}>
       {showStatus && book.status && <BookStatusBadge status={book.status} />}
-      {extraBadges.map(b => <BookStatusBadge key={b} status={b} />)}
+      {extraBadges.map(b => (
+        <BookStatusBadge key={b} status={b} customMeta={customMap[b] || undefined} />
+      ))}
     </span>
   );
 }

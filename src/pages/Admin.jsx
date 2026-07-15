@@ -1028,7 +1028,10 @@ function BookForm({ initial, onSave, onCancel }) {
                   Select as many as apply. These stack alongside the primary status badge everywhere on the site.
                 </p>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                  {EXTRA_BADGES.map(b => {
+                  {[...EXTRA_BADGES, ...(Array.isArray(form._customBadges) ? form._customBadges.map(cb => ({
+                    value: cb.value, label: cb.label, color: cb.color || '#a78bfa',
+                    bg: cb.bg || 'rgba(167,139,250,0.12)', desc: 'Custom badge', _custom: true,
+                  })) : [])].map(b => {
                     const active = (form.badges||[]).includes(b.value);
                     return (
                       <button key={b.value} type="button"
@@ -1048,26 +1051,101 @@ function BookForm({ initial, onSave, onCancel }) {
                       >
                         {active && <span style={{fontSize:'0.7rem'}}>✓</span>}
                         {b.label}
+                        {b._custom && !active && (
+                          <span
+                            style={{marginLeft:2,opacity:0.5,fontSize:'0.65rem'}}
+                            onClick={e=>{
+                              e.stopPropagation();
+                              setForm(f=>({
+                                ...f,
+                                _customBadges:(f._customBadges||[]).filter(x=>x.value!==b.value),
+                                badges:(f.badges||[]).filter(x=>x!==b.value),
+                              }));
+                            }}
+                          >×</span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
+
+                {/* ── Custom badge creator ── */}
+                <div style={{marginTop:12,padding:'10px 14px',background:'rgba(255,255,255,0.02)',border:'1px dashed rgba(255,255,255,0.12)',borderRadius:'var(--r-sm)'}}>
+                  <p style={{fontSize:'0.7rem',color:'var(--muted)',marginBottom:8}}>✏️ Create a custom badge — type a label, pick a colour, press <kbd style={{background:'rgba(255,255,255,0.08)',borderRadius:3,padding:'1px 5px',fontSize:'0.65rem'}}>Enter</kbd> or click Add</p>
+                  <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                    <input
+                      id="adm-cb-inp"
+                      className="field"
+                      style={{flex:'1 1 160px',fontSize:'0.82rem'}}
+                      placeholder="Badge label… e.g. Staff Pick 2025"
+                      onKeyDown={e=>{
+                        if(e.key==='Enter'){
+                          e.preventDefault();
+                          const inp=document.getElementById('adm-cb-inp');
+                          const col=document.getElementById('adm-cb-col');
+                          const v=inp.value.trim();
+                          if(!v)return;
+                          const slug=v.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+                          const key=`custom-${slug}`;
+                          const color=col?col.value:'#a78bfa';
+                          const bg=color+'20';
+                          const existing=[...EXTRA_BADGES,...(form._customBadges||[])];
+                          if(existing.find(x=>x.value===key))return;
+                          setForm(f=>({...f,
+                            _customBadges:[...(f._customBadges||[]),{value:key,label:v,color,bg}],
+                            badges:[...(f.badges||[]),key],
+                          }));
+                          inp.value='';
+                        }
+                      }}
+                    />
+                    <input
+                      id="adm-cb-col"
+                      type="color"
+                      defaultValue="#a78bfa"
+                      style={{width:36,height:36,border:'none',background:'none',cursor:'pointer',flexShrink:0}}
+                      title="Badge colour"
+                    />
+                    <button type="button" className="adm-tag-add-btn"
+                      onClick={()=>{
+                        const inp=document.getElementById('adm-cb-inp');
+                        const col=document.getElementById('adm-cb-col');
+                        const v=inp.value.trim();
+                        if(!v)return;
+                        const slug=v.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+                        const key=`custom-${slug}`;
+                        const color=col?col.value:'#a78bfa';
+                        const bg=color+'20';
+                        const existing=[...EXTRA_BADGES,...(form._customBadges||[])];
+                        if(existing.find(x=>x.value===key))return;
+                        setForm(f=>({...f,
+                          _customBadges:[...(f._customBadges||[]),{value:key,label:v,color,bg}],
+                          badges:[...(f.badges||[]),key],
+                        }));
+                        inp.value='';
+                      }}
+                    >+ Add</button>
+                  </div>
+                </div>
+
                 {(form.badges||[]).length > 0 && (
                   <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
                     <span style={{fontSize:'0.7rem',color:'var(--muted)'}}>Active ({(form.badges||[]).length}):</span>
                     {(form.badges||[]).map(b => {
-                      const meta = EXTRA_BADGES.find(x=>x.value===b);
-                      return meta ? (
+                      const meta = [...EXTRA_BADGES, ...(Array.isArray(form._customBadges)?form._customBadges:[])].find(x=>x.value===b);
+                      const color = meta?.color || '#a78bfa';
+                      const bg = meta?.bg || 'rgba(167,139,250,0.12)';
+                      const label = meta?.label || b;
+                      return (
                         <span key={b} style={{
                           display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:20,
-                          fontSize:'0.68rem',fontWeight:700,color:meta.color,
-                          background:meta.bg,border:`1px solid ${meta.color}60`,
+                          fontSize:'0.68rem',fontWeight:700,color,background:bg,border:`1px solid ${color}60`,
                         }}>
-                          {meta.label}
+                          {label}
                           <button type="button" onClick={()=>set('badges',(form.badges||[]).filter(x=>x!==b))}
-                            style={{background:'none',border:'none',color:meta.color,cursor:'pointer',fontSize:'0.8rem',padding:'0 0 0 2px',lineHeight:1}}>×</button>
+                            style={{background:'none',border:'none',color,cursor:'pointer',fontSize:'0.8rem',padding:'0 0 0 2px',lineHeight:1}}>×</button>
                         </span>
-                      ) : null;
+                      );
                     })}
                     <button type="button" onClick={()=>set('badges',[])}
                       style={{fontSize:'0.68rem',color:'var(--muted)',background:'none',border:'none',cursor:'pointer',textDecoration:'underline',padding:0}}>
