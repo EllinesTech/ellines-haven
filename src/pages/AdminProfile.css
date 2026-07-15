@@ -1,13 +1,13 @@
 /* ═══════════════════════════════════════
    ADMIN PROFILE — Command Center
 ═══════════════════════════════════════ */
-.ap-root { min-height:100vh; background:var(--bg); color:var(--text); padding-top:80px; }
+.ap-root { min-height:100vh; background:var(--bg); color:var(--text); padding-top:96px; }
 
 .ap-toast { position:fixed;top:20px;right:24px;z-index:9999;padding:11px 18px;border-radius:var(--r-sm);font-weight:600;font-size:0.85rem;background:rgba(46,204,113,0.12);color:var(--ok);border:1px solid rgba(46,204,113,0.35);box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:ap-slide .25s ease; }
 @keyframes ap-slide { from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)} }
 
 /* Top bar */
-.ap-topbar { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:80px;z-index:100; }
+.ap-topbar { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:96px;z-index:100; }
 .ap-topbar__brand { display:flex;align-items:center;gap:12px;font-weight:700;font-size:0.92rem;color:var(--gold); }
 .ap-topbar__right { display:flex;gap:8px;align-items:center; }
 

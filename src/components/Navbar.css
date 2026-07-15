@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 80px;
+  min-height: 96px;
   /* Never wider than viewport */
   width: 100%;
   overflow: visible;
@@ -42,7 +42,7 @@
   overflow: visible;
 }
 .nav__logo-img {
-  height: 72px;
+  height: 90px;
   width: auto;
   max-width: none;
   object-fit: contain;
