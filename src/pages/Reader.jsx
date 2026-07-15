@@ -1,4 +1,4 @@
-﻿import { useParams, Link, useLocation } from 'react-router-dom';
+﻿﻿import { useParams, Link, useLocation } from 'react-router-dom';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -1175,9 +1175,9 @@ export default function Reader() {
       )}
 
       {/* -- Watermark strip -- */}
-      <div className="reader__watermark">
-        ?? Licensed to &bull;<strong>{user.name}</strong> &bull; {user.email} � Personal use only. Sharing or redistribution is prohibited.
-      </div>
+      {user && (<div className="reader__watermark">
+        &bull;<strong>{user?.name || "Guest"}</strong> &bull; {user?.email || ""} &mdash; Personal use only. Sharing or redistribution is prohibited.
+      </div>)}
 
       {/* ------------------------------
           PDF EMBED MODE
@@ -1198,7 +1198,7 @@ export default function Reader() {
             {/* Ghost watermark tiled in background */}
             <div className="reader__ghost-wm" aria-hidden="true">
               {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i}>{user.name} � Ellines Haven � {user.email}</span>
+                <span key={i}>{user?.name || "Guest"} — Ellines Haven — {user?.email || ""}</span>
               ))}
             </div>
 
@@ -1242,7 +1242,7 @@ export default function Reader() {
 
             {/* Inline licence watermark */}
             <p className="reader__inline-mark" aria-hidden="true">
-              ?? Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
+              &bull; <strong>{user?.name || "Guest"}</strong> &bull; {user?.email || ""}
             </p>
 
             {/* Chapter navigation */}
@@ -1300,7 +1300,7 @@ export default function Reader() {
             {/* Ghost watermark */}
             <div className="reader__ghost-wm" aria-hidden="true">
               {Array.from({ length: 24 }).map((_, i) => (
-                <span key={i}>{user.name} � Ellines Haven � {user.email}</span>
+                <span key={i}>{user?.name || "Guest"} — Ellines Haven — {user?.email || ""}</span>
               ))}
             </div>
 
@@ -1349,7 +1349,7 @@ export default function Reader() {
             </div>
 
             <p className="reader__inline-mark" aria-hidden="true">
-              ?? Licensed to &bull; <strong>{user.name}</strong> &bull; {user.email}
+              &bull; <strong>{user?.name || "Guest"}</strong> &bull; {user?.email || ""}
             </p>
 
             <div className="reader__page-nav">
