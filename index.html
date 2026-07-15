@@ -276,60 +276,31 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Pre-React chunk-error guard: if the JS bundle fails to load (stale cached HTML
-         pointing to old hashed assets after a deploy), reload once to get fresh HTML.
-         This runs before React and catches the black-screen scenario. -->
+    <!-- CRITICAL: Stale deploy guard — runs synchronously before any module loads.
+         If this index.html was cached from a prior build, its chunk script tags
+         will reference old hashed filenames that no longer exist on the CDN.
+         Strategy: store the build stamp in sessionStorage. On next page load, if
+         the stamp has changed (new deploy), hard-reload with cache-bust to force
+         the browser to fetch a fresh index.html from the server.
+         This fires BEFORE <script type="module"> so it prevents the MIME error. -->
     <script>
       (function(){
-        var KEY = 'eh_preload_reload';
-        var MIME_KEY = 'eh_mime_reload';
-
-        // Handler for resource load errors (script/link tags)
-        window.addEventListener('error', function(e) {
-          var src = (e && e.target && (e.target.src || e.target.href)) || '';
-          var tag = e && e.target && e.target.tagName;
-          // Detect failed JS/CSS module loads (assets/* or module scripts)
-          if (src && (src.includes('/assets/') || tag === 'SCRIPT' || tag === 'LINK')) {
-            var last = parseInt(sessionStorage.getItem(KEY) || '0', 10);
-            if (Date.now() - last > 30000) {
-              sessionStorage.setItem(KEY, Date.now().toString());
-              // Clear caches then reload to get fresh index.html + new assets
-              if ('caches' in window) {
-                caches.keys().then(function(keys) {
-                  return Promise.all(keys.map(function(k){ return caches.delete(k); }));
-                }).then(function(){ window.location.reload(true); }).catch(function(){ window.location.reload(true); });
-              } else {
-                window.location.reload(true);
-              }
-            }
+        var STAMP = '__BUILD_STAMP__';
+        var KEY   = 'eh_build_v';
+        var stored = sessionStorage.getItem(KEY);
+        if (stored && stored !== STAMP) {
+          // Build changed — nuke everything and reload to get fresh HTML
+          sessionStorage.setItem(KEY, STAMP);
+          if ('caches' in window) {
+            caches.keys().then(function(k){ return Promise.all(k.map(function(n){ return caches.delete(n); })); })
+              .then(function(){ window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP); })
+              .catch(function(){ window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP); });
+          } else {
+            window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP);
           }
-        }, true); // capture phase to catch resource errors
-
-        // Handler for unhandled promise rejections (covers dynamic import failures
-        // and "Failed to load module script: MIME type text/html" errors)
-        window.addEventListener('unhandledrejection', function(e) {
-          var msg = (e && e.reason && (e.reason.message || String(e.reason))) || '';
-          var isChunk =
-            msg.includes('Failed to fetch dynamically imported module') ||
-            msg.includes('Importing a module script failed') ||
-            msg.includes('error loading dynamically imported module') ||
-            msg.includes('Expected a JavaScript') ||
-            msg.includes('MIME type') ||
-            (e && e.reason && e.reason.name === 'ChunkLoadError');
-          if (isChunk) {
-            var last = parseInt(sessionStorage.getItem(MIME_KEY) || '0', 10);
-            if (Date.now() - last > 30000) {
-              sessionStorage.setItem(MIME_KEY, Date.now().toString());
-              if ('caches' in window) {
-                caches.keys().then(function(keys) {
-                  return Promise.all(keys.map(function(k){ return caches.delete(k); }));
-                }).then(function(){ window.location.reload(true); }).catch(function(){ window.location.reload(true); });
-              } else {
-                window.location.reload(true);
-              }
-            }
-          }
-        });
+          throw new Error('Reloading for new build ' + STAMP); // stop further script execution
+        }
+        sessionStorage.setItem(KEY, STAMP);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

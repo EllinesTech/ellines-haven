@@ -26,7 +26,7 @@ function stampServiceWorker() {
 
 // ── Plugin 2: Inject BUILD_STAMP into index.html for image cache-busting ─────
 // Replaces every ?v=XXXXXXXX in the built index.html with the current stamp.
-// This means logo, favicon, og-image URLs in <head> are always fresh.
+// Also replaces __BUILD_STAMP__ placeholder used by the stale-deploy guard script.
 function stampPublicAssets() {
   return {
     name: 'stamp-public-assets',
@@ -34,6 +34,8 @@ function stampPublicAssets() {
       const indexPath = path.resolve('dist', 'index.html');
       if (!fs.existsSync(indexPath)) return;
       let html = fs.readFileSync(indexPath, 'utf-8');
+      // Replace __BUILD_STAMP__ placeholder in the stale-deploy guard script
+      html = html.replace(/__BUILD_STAMP__/g, BUILD_STAMP);
       // Replace any existing ?v= params on public asset refs
       html = html.replace(/\?v=\d{8,}/g, `?v=${BUILD_STAMP}`);
       // Also add ?v= to any logo/icon/og refs that don't have it yet

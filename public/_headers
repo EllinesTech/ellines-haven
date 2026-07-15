@@ -5,44 +5,30 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: frame-ancestors 'self'
 
-# HTML — NEVER cache under any circumstances (CDN + browser)
-/index.html
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0, s-maxage=0
+# ─────────────────────────────────────────────────────────────────────────────
+# CRITICAL: HTML document responses — NEVER cache at browser OR CDN level.
+# Cloudflare Pages serves index.html for ALL SPA routes (/, /login, /admin-profile, etc.)
+# The Cache-Control on /index.html only applies when the URL is literally /index.html.
+# The /* wildcard below ensures EVERY route that returns HTML is also no-cached.
+# /assets/* overrides this back to immutable caching for hashed JS/CSS bundles.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Catch-all: no-store for every HTML response (SPA routes served as index.html)
+/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Pragma: no-cache
   Expires: 0
-  Surrogate-Control: no-store
-  CF-Cache-Status: BYPASS
-
-# Root path — same as index.html
-/
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0, s-maxage=0
-  Pragma: no-cache
-  Expires: 0
-  Surrogate-Control: no-store
-  CF-Cache-Status: BYPASS
-
-# SPA routes — ALL non-asset HTML responses must never be CDN-cached
-# This catches /admin-profile, /login, /browse etc served as index.html
-/admin-profile
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0, s-maxage=0
-  Pragma: no-cache
-  Surrogate-Control: no-store
-
-/admin
-  Cache-Control: no-store, no-cache, must-revalidate, max-age=0, s-maxage=0
-  Pragma: no-cache
-  Surrogate-Control: no-store
 
 # SW — never cache
 /sw.js
-  Cache-Control: no-cache, no-store, must-revalidate, max-age=0
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Pragma: no-cache
 
-# Hashed JS/CSS bundles in /assets/ — safe to cache forever (hash = new URL on change)
+# Hashed JS/CSS bundles — safe to cache forever (content-hashed filenames)
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Images — cache 1 day, revalidate
+# Images — cache 1 day
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate
 
