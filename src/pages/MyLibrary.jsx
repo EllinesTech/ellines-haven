@@ -561,89 +561,179 @@ function OfflineBooks({ user, catalog }) {
   };
 
   const formatDate = (timestamp) => {
-    return new Date(timestamp).toLocaleDateString('en-KE', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
+    return new Date(timestamp).toLocaleDateString('en-KE', {
+      day: 'numeric', month: 'short', year: 'numeric',
     });
   };
 
   const formatSize = (chapters) => {
-    // Rough estimate: ~5KB per chapter average
     const bytes = chapters * 5000;
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  return (
-    <>
-      {offlineBooks.length === 0 ? (
-        <div className="mylib-empty">
-          <div className="mylib-empty-icon">📥</div>
-          <h3>No downloaded books</h3>
-          <p>Download books from the reader to read them offline. They'll appear here so you can access them anytime, anywhere.</p>
-          <Link to="/library" className="btn btn-primary">Browse Books</Link>
-        </div>
-      ) : (
-        <div className="mylib-grid">
-          {offlineBooks.map(book => {
-            const catalogBook = catalog.find(b => b.id === book.bookId);
-            return (
-              <div key={book.bookId} className="card mylib-book-item">
-                {book.cover && (
-                  <div className="mylib-book-cover" style={{ backgroundImage: `url(${book.cover})` }} />
-                )}
-                <div className="mylib-book-info">
-                  <h4>{book.title}</h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>by {book.author}</p>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 8 }}>
-                    <p>📖 {book.chapters} chapter{book.chapters !== 1 ? 's' : ''}</p>
-                    <p>💾 ~{formatSize(book.chapters)}</p>
-                    <p>📅 Saved {formatDate(book.savedAt)}</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-                  {catalogBook && (
-                    <Link to={readPath(catalogBook)} className="btn btn-primary btn-sm" style={{ flex: 1 }}>
-                      Read Offline
-                    </Link>
-                  )}
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setRemovingBook(book.bookId)}
-                    title="Delete offline copy"
-                  >
-                    🗑️ Delete
-                  </button>
-                </div>
+  if (offlineBooks.length === 0) return (
+    <div className="mylib-empty">
+      <div className="mylib-empty-icon">📥</div>
+      <h3>No downloaded books yet</h3>
+      <p>
+        While reading a book, tap <strong style={{ color:'var(--gold)' }}>Save Offline</strong> in
+        the reader toolbar. It'll appear here so you can read anytime — no internet needed.
+      </p>
+      <Link to="/library" className="btn btn-primary">Browse Books</Link>
+    </div>
+  );
 
-                {/* Delete confirmation */}
-                {removingBook === book.bookId && (
-                  <div style={{
-                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    borderRadius: 'var(--radius)', zIndex: 1000
-                  }}>
-                    <div style={{ background: 'var(--card-bg)', padding: 16, borderRadius: 'var(--radius)', textAlign: 'center' }}>
-                      <p style={{ marginBottom: 12 }}>Delete offline copy?</p>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setRemovingBook(null)} style={{ flex: 1 }}>
-                          Cancel
-                        </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleRemove(book.bookId)} style={{ flex: 1 }}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div>
+          <h2 style={{ fontSize:'1.1rem', margin:0 }}>
+            Downloaded Books
+            <span style={{ marginLeft:10, background:'rgba(201,168,76,0.15)', color:'var(--gold)', padding:'2px 10px', borderRadius:20, fontSize:'0.78rem', fontWeight:700 }}>
+              {offlineBooks.length}
+            </span>
+          </h2>
+          <p style={{ fontSize:'0.8rem', color:'var(--muted)', margin:'4px 0 0' }}>
+            Saved in your browser — available offline on this device
+          </p>
         </div>
-      )}
-    </>
+      </div>
+
+      {/* Cards grid */}
+      <div style={{
+        display:'grid',
+        gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))',
+        gap:16,
+      }}>
+        {offlineBooks.map(book => {
+          const catalogBook = catalog.find(b => b.id === book.bookId);
+          const accent      = catalogBook?.coverAccent || '#c9a84c';
+          return (
+            <div key={book.bookId} className="card" style={{ position:'relative', padding:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+
+              {/* Cover strip */}
+              <div style={{
+                height: 120,
+                background: book.cover
+                  ? `url(${book.cover}) center/cover no-repeat`
+                  : (catalogBook?.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)'),
+                position:'relative',
+                flexShrink: 0,
+              }}>
+                {/* Gradient overlay for readability */}
+                <div style={{
+                  position:'absolute', inset:0,
+                  background:'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%)',
+                }} />
+
+                {/* Offline badge */}
+                <span style={{
+                  position:'absolute', top:10, right:10,
+                  background:'rgba(46,204,113,0.9)', color:'#fff',
+                  fontSize:'0.65rem', fontWeight:800, padding:'3px 8px',
+                  borderRadius:12, letterSpacing:0.5, backdropFilter:'blur(4px)',
+                }}>
+                  ✓ OFFLINE
+                </span>
+
+                {/* Book title over cover */}
+                <div style={{ position:'absolute', bottom:10, left:12, right:12 }}>
+                  <h4 style={{ margin:0, fontSize:'0.95rem', fontWeight:700, color:'#fff', lineHeight:1.3,
+                    textShadow:'0 1px 4px rgba(0,0,0,0.8)',
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                  }}>
+                    {book.title}
+                  </h4>
+                  <p style={{ margin:'2px 0 0', fontSize:'0.72rem', color:'rgba(255,255,255,0.75)',
+                    textShadow:'0 1px 3px rgba(0,0,0,0.7)',
+                  }}>
+                    by {book.author}
+                  </p>
+                </div>
+              </div>
+
+              {/* Info row */}
+              <div style={{ padding:'12px 14px 6px', display:'flex', gap:16, flexWrap:'wrap' }}>
+                <span style={{ fontSize:'0.75rem', color:'var(--muted)', display:'flex', alignItems:'center', gap:4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ opacity:0.6 }}><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 14H8v-2h8v2zm0-4H8v-2h8v2zm-3-4H8V6h5v2z"/></svg>
+                  {book.chapters} chapter{book.chapters !== 1 ? 's' : ''}
+                </span>
+                <span style={{ fontSize:'0.75rem', color:'var(--muted)', display:'flex', alignItems:'center', gap:4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ opacity:0.6 }}><path d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.53 15.48 0 12 0S6 2.53 6 4.64c0 .48.11.92.18 1.36H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>
+                  {formatSize(book.chapters)}
+                </span>
+                <span style={{ fontSize:'0.75rem', color:'var(--muted)', display:'flex', alignItems:'center', gap:4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ opacity:0.6 }}><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.5z"/></svg>
+                  Saved {formatDate(book.savedAt)}
+                </span>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ padding:'8px 14px 14px', display:'flex', gap:8, marginTop:'auto' }}>
+                {catalogBook ? (
+                  <Link to={readPath(catalogBook)}
+                    className="btn btn-primary btn-sm"
+                    style={{ flex:1, textAlign:'center', fontWeight:700 }}
+                  >
+                    📖 Read Offline
+                  </Link>
+                ) : (
+                  <span className="btn btn-ghost btn-sm" style={{ flex:1, opacity:0.5, cursor:'not-allowed' }}>
+                    📖 Read Offline
+                  </span>
+                )}
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setRemovingBook(book.bookId)}
+                  style={{ color:'#e74c3c', borderColor:'rgba(231,76,60,0.3)' }}
+                  title="Remove offline copy"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                </button>
+              </div>
+
+              {/* Delete confirmation overlay */}
+              {removingBook === book.bookId && (
+                <div style={{
+                  position:'absolute', inset:0,
+                  background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)',
+                  display:'flex', flexDirection:'column',
+                  alignItems:'center', justifyContent:'center',
+                  gap:12, zIndex:10, borderRadius:'var(--r)',
+                }}>
+                  <p style={{ color:'#fff', fontWeight:600, fontSize:'0.9rem', margin:0 }}>
+                    Remove offline copy?
+                  </p>
+                  <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.78rem', margin:0, textAlign:'center', maxWidth:200 }}>
+                    You can re-save it from the reader anytime.
+                  </p>
+                  <div style={{ display:'flex', gap:10 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setRemovingBook(null)}>
+                      Cancel
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => handleRemove(book.bookId)}
+                      style={{ background:'rgba(231,76,60,0.9)', color:'#fff', border:'none' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Help note */}
+      <p style={{ fontSize:'0.75rem', color:'var(--muted)', marginTop:20, textAlign:'center' }}>
+        Downloads are stored in your browser. Clearing browser data will remove them.
+        Re-open any book in the reader to save it again.
+      </p>
+    </div>
   );
 }
 
