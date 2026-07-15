@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 96px;
+  min-height: 90px;
   /* Never wider than viewport */
   width: 100%;
   overflow: visible;
@@ -42,7 +42,7 @@
   overflow: visible;
 }
 .nav__logo-img {
-  height: 90px;
+  height: 82px;
   width: auto;
   max-width: none;
   object-fit: contain;
@@ -242,18 +242,17 @@
   /* Show burger */
   .nav__burger { display: flex; }
 
-  /* Tighter navbar height */
+  /* Tighter navbar height — must match .ap-root padding-top on mobile */
   .nav__inner { min-height: 60px; gap: 8px; }
 
-  /* Shrink logo */
-  .nav__logo-img { height: 44px; }
+  /* Shrink logo to fit compact mobile bar */
+  .nav__logo-img { height: 52px; }
 
   /* Shrink brand text */
   .nav__brand-tagline { display: none; }
   .nav__brand-name { font-size: 1.1rem; }
 
   /* Hide desktop-only action items — LanguageSwitcher, extra bells */
-  /* We use a class-based approach for clarity */
   .nav__hide-mobile { display: none !important; }
 
   /* Compact avatar button — show just the circle, no name/chevron */
@@ -270,14 +269,21 @@
     right: 0;
     left: auto;
     min-width: 200px;
-    /* If near left edge, shift right to stay inside viewport */
     max-width: calc(100vw - 16px);
   }
 }
 
+/* ── Tablets (769px – 1024px) ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .nav__logo-img { height: 72px; }
+  .nav__inner { min-height: 80px; }
+  .nav__links { gap: 18px; }
+  .nav__links a { font-size: .82rem; }
+}
+
 /* ── Very small phones (320–380px) ── */
 @media (max-width: 380px) {
-  .nav__logo-img { height: 38px; }
+  .nav__logo-img { height: 42px; }
   .nav__brand-name { font-size: 0.98rem; }
   .nav__inner { gap: 6px; }
   .nav__actions { gap: 2px; }

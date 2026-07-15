@@ -676,7 +676,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
                 <button key={f} className={'audio-filter-btn' + (filter === f ? ' on' : '')}
 
-                  onClick={() => { setFilter(f); setVoiceIdx(0); }}>
+                  onClick={() => { setFilter(f); setVoiceIdx(0); selectedNameRef.current = ''; }}>
 
                   {f === 'female' ? '♀ Female' : f === 'male' ? '♂ Male' : '👥 All'}
 
@@ -749,13 +749,10 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
                       className={'audio-custom-dd__item' + (i === safeIdx ? ' on' : '')}
 
                       onClick={() => {
-
                         setVoiceIdx(i);
-
+                        selectedNameRef.current = v.name || '';
                         setVoiceDdOpen(false);
-
                         if (playing) speak(charRef.current);
-
                       }}
 
                     >
