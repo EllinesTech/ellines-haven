@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { usePageMeta } from '../hooks/usePageMeta';
 import './Founder.css';
 
 /* ── Firestore key ── */
@@ -129,6 +130,13 @@ export default function Founder() {
   const [saving,  setSaving]  = useState(false);
   const [toast,   setToast]   = useState('');
   const [activePhoto, setActivePhoto] = useState(0);
+
+  usePageMeta({
+    title: 'Meet the Founder — Elijah Mwangi M',
+    description: 'Elijah Mwangi M is a Kenyan author, software engineer and AI developer — founder of Ellines Haven. Read his story, his books, and the inspiration behind East Africa\'s premier literary platform.',
+    image: '/mwangi.png',
+    url: '/founder',
+  });
 
   /* Navigate to a photo with a smooth crossfade */
   const goToPhoto = (idx) => {

@@ -2,9 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 
+  <!-- ═══════════════════════════════════
+       CORE PAGES
+  ════════════════════════════════════ -->
+
   <url>
     <loc>https://haven.ellines.co.ke/</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image>
@@ -15,84 +19,80 @@
 
   <url>
     <loc>https://haven.ellines.co.ke/library</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.95</priority>
   </url>
 
   <url>
     <loc>https://haven.ellines.co.ke/founder</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
     <image:image>
       <image:loc>https://haven.ellines.co.ke/mwangi.png</image:loc>
-      <image:title>Elijah Mwangi M — Founder of Ellines Haven</image:title>
+      <image:title>Elijah Mwangi M — Author and Founder of Ellines Haven</image:title>
     </image:image>
   </url>
 
   <url>
     <loc>https://haven.ellines.co.ke/about</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
     <loc>https://haven.ellines.co.ke/contact</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://haven.ellines.co.ke/login</loc>
-    <lastmod>2025-07-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://haven.ellines.co.ke/register</loc>
-    <lastmod>2025-07-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://haven.ellines.co.ke/my-library</loc>
-    <lastmod>2025-07-09</lastmod>
-    <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
     <loc>https://haven.ellines.co.ke/faq</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
+    <loc>https://haven.ellines.co.ke/login</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/register</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
     <loc>https://haven.ellines.co.ke/privacy</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.3</priority>
   </url>
 
   <url>
     <loc>https://haven.ellines.co.ke/terms</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>yearly</changefreq>
-    <priority>0.4</priority>
+    <priority>0.3</priority>
   </url>
 
-  <!-- Individual book pages -->
+  <!-- ═══════════════════════════════════
+       BOOK PAGES — Published & Available
+  ════════════════════════════════════ -->
+
   <url>
     <loc>https://haven.ellines.co.ke/book/marriage-is-a-scam</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
     <image:image>
       <image:loc>https://haven.ellines.co.ke/cover-marriage-is-a-scam.webp</image:loc>
       <image:title>Marriage Is a Scam — Novel by Elijah Mwangi M</image:title>
@@ -101,9 +101,9 @@
 
   <url>
     <loc>https://haven.ellines.co.ke/book/pain</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.9</priority>
     <image:image>
       <image:loc>https://haven.ellines.co.ke/cover-pain.webp</image:loc>
       <image:title>Pain — Novel by Elijah Mwangi M</image:title>
@@ -111,49 +111,139 @@
   </url>
 
   <url>
-    <loc>https://haven.ellines.co.ke/book/chasing-her-ghosts</loc>
-    <lastmod>2025-07-09</lastmod>
+    <loc>https://haven.ellines.co.ke/book/echoes-of-the-savanna</loc>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.85</priority>
     <image:image>
-      <image:loc>https://haven.ellines.co.ke/cover-chasing-her-ghosts.webp</image:loc>
-      <image:title>Chasing Her Ghosts — Novel by Elijah Mwangi M</image:title>
+      <image:loc>https://haven.ellines.co.ke/cover-echoes-savanna.svg</image:loc>
+      <image:title>Echoes of the Savanna — Historical Novel by Elijah Mwangi M</image:title>
     </image:image>
   </url>
 
   <url>
-    <loc>https://haven.ellines.co.ke/book/the-last-chapter</loc>
-    <lastmod>2025-07-09</lastmod>
+    <loc>https://haven.ellines.co.ke/book/seven-sunsets</loc>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
-    <loc>https://haven.ellines.co.ke/book/echoes-of-the-savanna</loc>
-    <lastmod>2025-07-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
-    <loc>https://haven.ellines.co.ke/book/nairobi-nights</loc>
-    <lastmod>2025-07-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-seven-sunsets.svg</image:loc>
+      <image:title>Seven Sunsets — Short Story Collection by Elijah Mwangi M</image:title>
+    </image:image>
   </url>
 
   <url>
     <loc>https://haven.ellines.co.ke/book/midnight-in-mombasa</loc>
-    <lastmod>2025-07-09</lastmod>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-midnight-mombasa.svg</image:loc>
+      <image:title>Midnight in Mombasa — Mystery Novel by Elijah Mwangi M</image:title>
+    </image:image>
   </url>
 
   <url>
-    <loc>https://haven.ellines.co.ke/book/seven-sunsets</loc>
-    <lastmod>2025-07-09</lastmod>
+    <loc>https://haven.ellines.co.ke/book/the-acacia-road</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-acacia-road.svg</image:loc>
+      <image:title>The Acacia Road — Romance Novel by Elijah Mwangi M</image:title>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/children-of-thunder</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-children-thunder.svg</image:loc>
+      <image:title>Children of Thunder — Fantasy Novel by Elijah Mwangi M</image:title>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/nairobi-nights</loc>
+    <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-nairobi-nights.svg</image:loc>
+      <image:title>Nairobi Nights — Short Story Collection by Elijah Mwangi M</image:title>
+    </image:image>
+  </url>
+
+  <!-- ═══════════════════════════════════
+       ONGOING / PREMIUM BOOKS
+  ════════════════════════════════════ -->
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/chasing-ghosts-and-supercars</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-chasing-her-ghosts.webp</image:loc>
+      <image:title>Chasing Ghosts and Supercars — Ongoing Novel by Elijah Mwangi M</image:title>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/19-days</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-19-days.webp</image:loc>
+      <image:title>19 Days — Premium Novel by Elijah Mwangi M</image:title>
+    </image:image>
+  </url>
+
+  <!-- ═══════════════════════════════════
+       COMING SOON BOOKS
+       (included so Google knows they exist)
+  ════════════════════════════════════ -->
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/the-last-chapter</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <image:image>
+      <image:loc>https://haven.ellines.co.ke/cover-the-last-chapter.webp</image:loc>
+      <image:title>The Last Chapter — Coming Soon from Elijah Mwangi M</image:title>
+    </image:image>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/letters-from-lamu</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/the-nairobi-hustle</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/roots-of-the-rift</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/book/a-sky-full-of-goodbyes</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 
 </urlset>

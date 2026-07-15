@@ -824,17 +824,28 @@ export default function BookDetail() {
       el.setAttribute('content', content);
     };
 
+    const bookDesc = book.description?.slice(0, 160) || `A ${book.genre} story by ${book.author} — available on Ellines Haven`;
+    const bookImg  = (book.coverType === 'photo' && book.cover)
+      ? `https://haven.ellines.co.ke${book.cover}`
+      : 'https://haven.ellines.co.ke/og-image.png';
+    const bookUrl  = `https://haven.ellines.co.ke${bookPath(book)}`;
+
     setMeta('og:title',       `${book.title} by ${book.author}`);
-    setMeta('og:description', book.description?.slice(0, 160) || `A ${book.genre} story by ${book.author} — available on Ellines Haven`);
+    setMeta('og:description', bookDesc);
     setMeta('og:type',        'book');
-    setMeta('og:url',         `${window.location.origin}${bookPath(book)}`);
-    if (book.coverType === 'photo' && book.cover) {
-      setMeta('og:image', book.cover);
-    }
+    setMeta('og:url',         bookUrl);
+    setMeta('og:image',       bookImg);
     setMeta('og:site_name',   'Ellines Haven');
+    setMetaName('description',         bookDesc);
     setMetaName('twitter:card',        'summary_large_image');
+
+    // Canonical URL — critical for Google indexing
+    let canon = document.querySelector('link[rel="canonical"]');
+    if (!canon) { canon = document.createElement('link'); canon.rel = 'canonical'; document.head.appendChild(canon); }
+    canon.href = bookUrl;
     setMetaName('twitter:title',       `${book.title} by ${book.author}`);
-    setMetaName('twitter:description', book.description?.slice(0, 160) || '');
+    setMetaName('twitter:description', bookDesc);
+    setMetaName('twitter:image',       bookImg);
 
     // ── Book JSON-LD structured data (no price — may change) ──────────────
     const schemaId = 'eh-book-schema';
