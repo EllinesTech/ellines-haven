@@ -1138,6 +1138,13 @@ export default function Reader() {
 
     if (chapter > 0) saveProgress(chapter, 0);
 
+    // ── Track chapter analytics ──────────────────────────────────────────
+    if (user?.email && book?.id) {
+      import('../utils/chapterAnalytics')
+        .then(({ trackChapterRead }) => trackChapterRead(user.email, book.id, book.title, chapter))
+        .catch(() => {});
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
 
   }, [chapter]);

@@ -600,6 +600,21 @@ export function AppProvider({ children }) {
         setBooksState(merged);
         save('eh_books', merged);
         save('eh_books_savedAt', Date.now());
+
+        // ── Auto-unlock scheduled chapter releases ──────────────────────
+        // Runs once on load; silently unlocks any chapters whose scheduled
+        // release date has now passed and saves updated book to Firestore.
+        import('../utils/chapterAnalytics')
+          .then(({ processScheduledReleases }) =>
+            processScheduledReleases(saveBook, merged)
+              .then(released => {
+                if (released.length) {
+                  console.log('[Scheduler] Auto-released chapters for books:', released);
+                }
+              })
+          )
+          .catch(() => {});
+
       } catch (e) { console.warn('[Books] Firestore load failed:', e.message); }
     })();
   }, []); // eslint-disable-line

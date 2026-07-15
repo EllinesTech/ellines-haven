@@ -30,6 +30,7 @@ const OnlineUsersPanel       = lazy(() => import('./admin-panels/OnlineUsersPane
 const AdminOrdersPanel       = lazy(() => import('./admin-panels/AdminOrdersPanel'));
 const SeriesPanel            = lazy(() => import('./admin-panels/SeriesPanel'));
 const ChapterGrantsPanel     = lazy(() => import('./admin-panels/ChapterGrantsPanel'));
+const ChapterAnalyticsPanel  = lazy(() => import('./admin-panels/ChapterAnalyticsPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3441,8 +3442,10 @@ export default function Admin() {
     { k:'logs',          label:'System Logs',       icon:'📋', group:'power' },
     { k:'backup',        label:'Backup & Restore',  icon:'💾', group:'power' },
     /* ── Super admin only ── */
-    { k:'admins',        label:'Admin Control',     icon:'🛡️', group:'super' },
-    { k:'godmode',       label:'God Mode',          icon:'⚡', group:'super' },
+    { k:'admins',           label:'Admin Control',      icon:'🛡️', group:'super' },
+    { k:'godmode',          label:'God Mode',           icon:'⚡', group:'super' },
+    { k:'chaptergrants',    label:'Chapter Grants',     icon:'🔓', group:'super' },
+    { k:'chapteranalytics', label:'Chapter Analytics',  icon:'📊', group:'super' },
   ];
 
   return (
@@ -5588,6 +5591,13 @@ export default function Admin() {
         {tab === 'chaptergrants' && (
           <Suspense fallback={<PanelLoader />}>
             <ChapterGrantsPanel showToast={showToast} books={books} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- CHAPTER ANALYTICS — admin only -- */}
+        {tab === 'chapteranalytics' && (
+          <Suspense fallback={<PanelLoader />}>
+            <ChapterAnalyticsPanel showToast={showToast} />
           </Suspense>
         )}
 
