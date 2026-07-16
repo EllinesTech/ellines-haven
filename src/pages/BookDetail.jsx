@@ -4,10 +4,11 @@ import { useApp } from '../context/AppContext';
 import BookCard, { waOrderLink, BookStatusBadge, BookBadges } from '../components/BookCard';
 import BookReviews from '../components/BookReviews';
 import WishlistButton from '../components/WishlistButton';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
-import { getReadingTimeDisplay } from '../utils/readingTime';
+import { getReadingTimeDisplay, countWordsFromChapters, formatWordCount, calculateReadingTime } from '../utils/readingTime';
+import { getFallbackChapters } from '../data/bookChapters';
 import './BookDetail.css';
 
 // Statuses that block purchase entirely — only Notify Me
@@ -808,6 +809,54 @@ export default function BookDetail() {
 
   const book = findBookBySlugOrId(books, id);
 
+  // ── Live word count from Firestore chapters ────────────────────────────────
+  const [liveWordCount, setLiveWordCount] = useState(null); // null = not loaded yet
+
+  useEffect(() => {
+    if (!book?.id) return;
+    let cancelled = false;
+
+    const computeFromChapters = (chapters) => {
+      if (!chapters?.length) return null;
+      const wc = countWordsFromChapters(chapters);
+      return wc > 0 ? wc : null;
+    };
+
+    (async () => {
+      try {
+        // Try Firestore first (admin-uploaded full text)
+        const snap = await getDoc(doc(db, 'book_chapters', String(book.id)));
+        if (!cancelled) {
+          if (snap.exists() && snap.data().chapters?.length > 0) {
+            const wc = computeFromChapters(snap.data().chapters);
+            setLiveWordCount(wc);
+          } else {
+            // Fall back to static chapter content
+            const fallback = getFallbackChapters(book);
+            setLiveWordCount(computeFromChapters(fallback));
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          // Offline or error — use fallback content
+          const fallback = getFallbackChapters(book);
+          setLiveWordCount(computeFromChapters(fallback));
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [book?.id]); // eslint-disable-line
+
+  // Resolved word count: live (from Firestore) > static (from books.js) > pages estimate
+  const resolvedWordCount = liveWordCount
+    || (book?.wordCount > 0 ? book.wordCount : null)
+    || (book?.pages > 0 ? book.pages * 250 : null);
+
+  const resolvedReadTime = resolvedWordCount
+    ? calculateReadingTime(resolvedWordCount)
+    : (book?.readTime || '—');
+
   // ── Dynamic page title & OG meta for sharing ──────────────────────────────
   useEffect(() => {
     if (!book) return;
@@ -1057,31 +1106,23 @@ export default function BookDetail() {
                         <small>Status</small>
                         <strong style={{ color:'#4a9eff' }}>Releasing</strong>
                       </div>
-                      {(book.wordCount > 0 || book.pages > 0) && (
-                        <div>
+                      {resolvedWordCount && (
+                        <div title={resolvedWordCount ? `${resolvedWordCount.toLocaleString()} words` : ''}>
                           <small>Words</small>
-                          <strong>
-                            {book.wordCount > 0
-                              ? `${(book.wordCount / 1000).toFixed(0)}k`
-                              : `~${Math.round(book.pages * 250 / 1000)}k`}
-                          </strong>
+                          <strong>{formatWordCount(resolvedWordCount, 'compact')}{liveWordCount ? '' : '*'}</strong>
                         </div>
                       )}
-                      <div><small>Read Time</small><strong>{getReadingTimeDisplay(book)}</strong></div>
+                      <div><small>Read Time</small><strong>{resolvedReadTime}</strong></div>
                     </>
                   : <>
                       <div><small>Pages</small><strong>{book.pages > 0 ? book.pages : '—'}</strong></div>
-                      {(book.wordCount > 0 || book.pages > 0) && (
-                        <div>
+                      {resolvedWordCount && (
+                        <div title={resolvedWordCount ? `${resolvedWordCount.toLocaleString()} words` : ''}>
                           <small>Words</small>
-                          <strong>
-                            {book.wordCount > 0
-                              ? `${(book.wordCount / 1000).toFixed(0)}k`
-                              : `~${Math.round(book.pages * 250 / 1000)}k`}
-                          </strong>
+                          <strong>{formatWordCount(resolvedWordCount, 'compact')}{liveWordCount ? '' : '*'}</strong>
                         </div>
                       )}
-                      <div><small>Read Time</small><strong>{getReadingTimeDisplay(book)}</strong></div>
+                      <div><small>Read Time</small><strong>{resolvedReadTime}</strong></div>
                       {(book.chapterCount > 0 || book.tableOfContents?.length > 0) && (
                         <div>
                           <small>Chapters</small>

@@ -5,9 +5,11 @@
  * status, pricing, and other professional details
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getReadingStats, calculateReadingTime } from '../../utils/readingTime';
+import { getReadingStats, calculateReadingTime, countWordsFromChapters, formatWordCount } from '../../utils/readingTime';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 import './BookEditPanel.css';
 
 export default function BookEditPanel({ showToast, books = [] }) {
@@ -19,8 +21,24 @@ export default function BookEditPanel({ showToast, books = [] }) {
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  const [liveWc, setLiveWc] = useState(null); // word count from uploaded chapters
 
   const selectedBook = books.find(b => b.id === selectedBookId);
+
+  // Fetch live word count from Firestore chapters whenever a book is selected
+  useEffect(() => {
+    if (!selectedBookId) { setLiveWc(null); return; }
+    setLiveWc(null);
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'book_chapters', String(selectedBookId)));
+        if (snap.exists() && snap.data().chapters?.length > 0) {
+          const wc = countWordsFromChapters(snap.data().chapters);
+          setLiveWc(wc > 0 ? wc : null);
+        }
+      } catch { /* ignore — offline or no chapters */ }
+    })();
+  }, [selectedBookId]);
 
   const startEdit = (book) => {
     setSelectedBookId(book.id);
@@ -47,15 +65,16 @@ export default function BookEditPanel({ showToast, books = [] }) {
   };
 
   const autoCalculateReadingTime = () => {
-    if (editData.wordCount) {
-      const readingTime = calculateReadingTime(editData.wordCount);
-      showToast?.(`📚 Reading time: ${readingTime}`);
-      return readingTime;
-    }
-    if (editData.pages) {
-      const estimated = editData.pages * 250;
-      const readingTime = calculateReadingTime(estimated);
-      showToast?.(`📚 Estimated reading time (from pages): ${readingTime}`);
+    // Priority: live chapter word count > manual word count > pages estimate
+    const wc = liveWc || editData.wordCount || (editData.pages ? editData.pages * 250 : 0);
+    if (wc > 0) {
+      const readingTime = calculateReadingTime(wc);
+      const source = liveWc
+        ? `from ${liveWc.toLocaleString()} live chapter words`
+        : editData.wordCount
+          ? `from ${editData.wordCount.toLocaleString()} manual words`
+          : `estimated from ${editData.pages} pages`;
+      showToast?.(`📚 Reading time: ${readingTime} (${source})`);
       return readingTime;
     }
     showToast?.('❌ Need word count or pages to calculate reading time');
@@ -69,17 +88,16 @@ export default function BookEditPanel({ showToast, books = [] }) {
     try {
       const updated = books.map(b => {
         if (b.id === selectedBookId) {
-          // Auto-calculate reading time if word count provided
-          let newReadTime = b.readTime;
-          if (editData.wordCount && editData.wordCount !== b.wordCount) {
-            newReadTime = calculateReadingTime(editData.wordCount);
-          } else if (editData.pages && !editData.wordCount && editData.pages !== b.pages) {
-            newReadTime = calculateReadingTime(editData.pages * 250);
-          }
+          // Use live chapter count as the source of truth; fall back to manual entry
+          const effectiveWc = liveWc || editData.wordCount || b.wordCount || 0;
+          const newReadTime = effectiveWc
+            ? calculateReadingTime(effectiveWc)
+            : (editData.pages ? calculateReadingTime(editData.pages * 250) : b.readTime);
 
           return {
             ...b,
             ...editData,
+            wordCount: effectiveWc, // always store the best available count
             readTime: newReadTime,
             updatedAt: new Date().toISOString(),
             lastEditedBy: user?.email,
@@ -244,9 +262,37 @@ export default function BookEditPanel({ showToast, books = [] }) {
             <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: 12 }}>
               Word count is the industry standard. Calculates to ~8-10 hours automatically (250 WPM baseline).
             </p>
+
+            {/* Live word count from uploaded chapters */}
+            {liveWc ? (
+              <div style={{
+                padding: '10px 14px', marginBottom: 14,
+                background: 'rgba(46,204,113,0.08)',
+                border: '1px solid rgba(46,204,113,0.3)',
+                borderRadius: 8, fontSize: '0.82rem',
+              }}>
+                <strong style={{ color: 'var(--ok)' }}>✅ Live from uploaded chapters:</strong>
+                {' '}
+                <strong style={{ color: 'var(--text)', fontSize: '1rem' }}>
+                  {liveWc.toLocaleString()} words
+                </strong>
+                {' '}
+                <span style={{ color: 'var(--muted)' }}>
+                  · {calculateReadingTime(liveWc)} read time
+                </span>
+                <div style={{ marginTop: 6, fontSize: '0.72rem', color: 'var(--muted)' }}>
+                  This is the exact count from the full chapter text in Firestore.
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '8px 12px', marginBottom: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--dim)', borderRadius: 6, fontSize: '0.75rem', color: 'var(--muted)' }}>
+                No chapters uploaded yet — enter word count manually below.
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
-                <label>Word Count *</label>
+                <label>Word Count (manual override)</label>
                 <input
                   className="field"
                   type="number"
@@ -258,7 +304,9 @@ export default function BookEditPanel({ showToast, books = [] }) {
                   style={{ fontWeight: 600, color: editData.wordCount ? 'var(--ok)' : 'var(--text)' }}
                 />
                 <small style={{ color: 'var(--muted)', fontSize: '0.7rem', marginTop: 4, display: 'block' }}>
-                  Primary metric (250 WPM = ~1 hour per 15,000 words)
+                  {liveWc
+                    ? `Live chapters = ${liveWc.toLocaleString()} words. Override only if needed.`
+                    : 'Primary metric (250 WPM = ~1 hour per 15,000 words)'}
                 </small>
               </div>
               <div>
@@ -276,11 +324,18 @@ export default function BookEditPanel({ showToast, books = [] }) {
               </div>
             </div>
 
-            {/* Reading time preview */}
-            {(editData.wordCount || editData.pages) && (
+            {/* Reading time preview — uses live count if available */}
+            {(liveWc || editData.wordCount || editData.pages) && (
               <div style={{ padding: 10, background: 'var(--card)', borderRadius: 6, marginBottom: 12, fontSize: '0.8rem', color: 'var(--muted)' }}>
                 <strong style={{ color: 'var(--text)' }}>Estimated Reading Time:</strong>{' '}
-                {calculateReadingTime(editData.wordCount || editData.pages * 250)}
+                <strong style={{ color: 'var(--gold)' }}>
+                  {calculateReadingTime(liveWc || editData.wordCount || editData.pages * 250)}
+                </strong>
+                {liveWc && (
+                  <span style={{ color: 'var(--ok)', fontSize: '0.72rem', marginLeft: 8 }}>
+                    (from live chapters · {formatWordCount(liveWc, 'compact')} words)
+                  </span>
+                )}
               </div>
             )}
 

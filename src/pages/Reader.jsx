@@ -257,8 +257,13 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
     charRef.current = 0;
     setProgress(0);
     setElapsed(0);
-    const words = (chapterText || '').split(/\s+/).filter(Boolean).length;
-    setTotal(Math.round((words / 180) * 60));
+    // Count exact words in the chapter (title + subtitle + body)
+    const ch = chapters[currentChapter] || {};
+    const fullText = [(ch.title || ''), (ch.subtitle || ''), (chapterText || '')].join(' ');
+    const words = fullText.split(/\s+/).filter(Boolean).length;
+    // Use the current playback rate for the estimate
+    const wpm = Math.round(180 * (rate || 1.0));
+    setTotal(Math.round((words / wpm) * 60));
   }, [currentChapter, chapterText]); // eslint-disable-line
 
   // Cleanup on unmount
