@@ -87,6 +87,7 @@ export const BOOKS = [
     type:'novel',
     price:320,
     pages:278,
+    wordCount: 69500, // ~250 words per page
     chapterCount: 24,
     rating:4.8,
     reviews:143,
@@ -140,6 +141,7 @@ export const BOOKS = [
     type:'novel',
     price:250,
     pages:342,
+    wordCount: 85500, // ~250 words per page
     chapterCount: 30,
     rating:4.8,
     reviews:124,
@@ -178,6 +180,7 @@ export const BOOKS = [
     type:'short-story',
     price:150,
     pages:98,
+    wordCount: 24500, // ~250 words per page
     chapterCount: 7,
     rating:4.9,
     reviews:201,
@@ -213,6 +216,7 @@ export const BOOKS = [
     type:'novel',
     price:280,
     pages:289,
+    wordCount: 72250, // ~250 words per page
     chapterCount: 26,
     rating:4.6,
     reviews:89,
@@ -248,6 +252,7 @@ export const BOOKS = [
     type:'novel',
     price:230,
     pages:310,
+    wordCount: 77500, // ~250 words per page
     chapterCount: 27,
     rating:4.7,
     reviews:156,
@@ -283,6 +288,7 @@ export const BOOKS = [
     type:'novel',
     price:300,
     pages:420,
+    wordCount: 105000, // ~250 words per page
     chapterCount: 38,
     rating:4.5,
     reviews:67,
@@ -407,6 +413,7 @@ export const BOOKS = [
     type:'short-story',
     price:120,
     pages:75,
+    wordCount: 18750, // ~250 words per page
     chapterCount: 3,
     rating:4.4,
     reviews:43,

@@ -1057,10 +1057,30 @@ export default function BookDetail() {
                         <small>Status</small>
                         <strong style={{ color:'#4a9eff' }}>Releasing</strong>
                       </div>
+                      {(book.wordCount > 0 || book.pages > 0) && (
+                        <div>
+                          <small>Words</small>
+                          <strong>
+                            {book.wordCount > 0
+                              ? `${(book.wordCount / 1000).toFixed(0)}k`
+                              : `~${Math.round(book.pages * 250 / 1000)}k`}
+                          </strong>
+                        </div>
+                      )}
                       <div><small>Read Time</small><strong>{getReadingTimeDisplay(book)}</strong></div>
                     </>
                   : <>
                       <div><small>Pages</small><strong>{book.pages > 0 ? book.pages : '—'}</strong></div>
+                      {(book.wordCount > 0 || book.pages > 0) && (
+                        <div>
+                          <small>Words</small>
+                          <strong>
+                            {book.wordCount > 0
+                              ? `${(book.wordCount / 1000).toFixed(0)}k`
+                              : `~${Math.round(book.pages * 250 / 1000)}k`}
+                          </strong>
+                        </div>
+                      )}
                       <div><small>Read Time</small><strong>{getReadingTimeDisplay(book)}</strong></div>
                       {(book.chapterCount > 0 || book.tableOfContents?.length > 0) && (
                         <div>

@@ -968,14 +968,29 @@ export default function MyLibrary() {
   const progressMap = useReadingProgressMap(user.email);
 
   const enrichedLibrary = library.map(lb => {
-    const cat = catalog.find(b => b.id === lb.id);
+    // For individual chapter purchases (id like "9_ch_1"), resolve the parent book
+    const chapterMatch = !lb.isChapter && typeof lb.id === 'string' ? null : (
+      lb.isChapter && lb.bookId
+        ? { bookId: lb.bookId, chapterNum: lb.chapterNum }
+        : (typeof lb.id === 'string' && /^(.+)_ch_(\d+)$/.test(lb.id))
+          ? { bookId: lb.id.replace(/_ch_\d+$/, ''), chapterNum: parseInt(lb.id.match(/_ch_(\d+)$/)[1]) }
+          : null
+    );
+    const cat = chapterMatch
+      ? catalog.find(b => b.id === chapterMatch.bookId)
+      : catalog.find(b => b.id === lb.id);
     return {
       ...lb,
+      // For chapters: store the resolved parent book reference so readPath works
+      _parentBook:  chapterMatch ? cat : null,
+      _chapterNum:  chapterMatch?.chapterNum ?? null,
       cover:       cat?.cover       ?? lb.cover,
       coverType:   cat?.coverType   ?? lb.coverType,
       coverColor:  cat?.coverColor  ?? lb.coverColor,
       coverAccent: cat?.coverAccent ?? lb.coverAccent,
-      title:       cat?.title       ?? lb.title,
+      title:       chapterMatch
+        ? `${cat?.title ?? lb.title} — Ch ${chapterMatch.chapterNum}`
+        : (cat?.title ?? lb.title),
       author:      cat?.author      ?? lb.author,
       genre:       cat?.genre       ?? lb.genre,
       pages:       cat?.pages       ?? lb.pages,
@@ -1153,9 +1168,15 @@ export default function MyLibrary() {
                         )}
 
                         <div className="mylib-card__actions">
-                          {/* Primary CTA */}
+                          {/* Primary CTA — for chapter items, link to the parent book reader at that chapter */}
                           {canRead
-                            ? <Link to={readPath(b)} className="btn btn-primary btn-sm">Read Now</Link>
+                            ? <Link
+                                to={b._parentBook ? readPath(b._parentBook) : readPath(b)}
+                                state={b._chapterNum != null ? { chapter: b._chapterNum - 1 } : undefined}
+                                className="btn btn-primary btn-sm"
+                              >
+                                {b._chapterNum != null ? `Read Ch ${b._chapterNum}` : 'Read Now'}
+                              </Link>
                             : <span className="btn btn-primary btn-sm mylib-disabled" title={reason}>Read Now</span>
                           }
                           {/* PDF download — only shown when a real file exists */}
@@ -1185,7 +1206,7 @@ export default function MyLibrary() {
                           {b.downloadUnlocked && !canDl && !isFullOff && (
                             <span className="btn btn-outline btn-sm mylib-disabled" title={reason}>Restricted</span>
                           )}
-                          <Link to={bookPath(b)} className="btn btn-ghost btn-sm">Details</Link>
+                          <Link to={b._parentBook ? bookPath(b._parentBook) : bookPath(b)} className="btn btn-ghost btn-sm">Details</Link>
                           {/* Trash — confirm inline */}
                           {removingBook === b.id ? (
                             <span className="mylib-remove-confirm">

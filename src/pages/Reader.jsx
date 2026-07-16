@@ -12,7 +12,7 @@ import { doc, getDocFromCache, onSnapshot } from 'firebase/firestore';
 
 import { db } from '../firebase';
 
-import { findBookBySlugOrId, bookPath } from '../utils/slugify';
+import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
 
 import {
 
@@ -1274,19 +1274,37 @@ export default function Reader() {
 
   /* -- Gates -- */
 
-  if (!book) return (
-
-    <div className="reader-error">
-
-      <div className="reader-error__icon">📚</div>
-
-      <h2>Book not found</h2>
-
-      <Link to="/library" className="btn btn-primary">Back to Library</Link>
-
-    </div>
-
-  );
+  if (!book) {
+    // Safety net: if id looks like a chapter ID (e.g. "9_ch_1"), redirect to the parent book
+    const chapterIdMatch = id && typeof id === 'string' ? id.match(/^(.+)_ch_(\d+)$/) : null;
+    if (chapterIdMatch) {
+      const parentBookId = chapterIdMatch[1];
+      const chapterNum   = parseInt(chapterIdMatch[2]);
+      const parentBook   = findBookBySlugOrId(books, parentBookId);
+      if (parentBook) {
+        return (
+          <div className="reader-error">
+            <div className="reader-error__icon">📖</div>
+            <h2>Opening chapter…</h2>
+            <Link
+              to={readPath(parentBook)}
+              state={{ chapter: chapterNum - 1 }}
+              className="btn btn-primary"
+            >
+              Open {parentBook.title} — Chapter {chapterNum}
+            </Link>
+          </div>
+        );
+      }
+    }
+    return (
+      <div className="reader-error">
+        <div className="reader-error__icon">📚</div>
+        <h2>Book not found</h2>
+        <Link to="/library" className="btn btn-primary">Back to Library</Link>
+      </div>
+    );
+  }
 
 
 
