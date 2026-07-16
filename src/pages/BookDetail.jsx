@@ -222,7 +222,9 @@ function CoverLightbox({ book, onClose }) {
       </div>
 
       <div className="lb-hint" onClick={e => e.stopPropagation()}>
-        Scroll to zoom · Drag to pan · Esc to close
+        {('ontouchstart' in window)
+          ? 'Pinch to zoom · Drag to pan · Tap × to close'
+          : 'Scroll to zoom · Drag to pan · Esc to close'}
       </div>
     </div>
   );
