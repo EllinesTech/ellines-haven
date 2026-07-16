@@ -122,6 +122,14 @@ service cloud.firestore {
     // ── Dev OTPs (temp, auto-expiring) ────────────────────────────────────────
     match /dev_otps/{d} { allow read, write: if true; }
 
+    // ── Chapter analytics (read tracking per chapter per day) ────────────────
+    match /chapter_analytics/{docId} {
+      allow read:   if true;
+      allow create: if true;
+      allow update: if true;   // merge increments read count
+      allow delete: if false;
+    }
+
     // ── Reading progress (per-user) ───────────────────────────────────────────
     match /reading_progress/{userDocId} {
       allow read, write: if true;

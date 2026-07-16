@@ -9,26 +9,36 @@
  *   site_data/chapter_schedules                → scheduled release dates
  */
 
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, increment, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // ── Track a chapter read ────────────────────────────────────────────────────
 /**
  * Call whenever the user switches to a chapter in Reader.
- * Merges into a date-keyed doc so counts accumulate without overwriting.
+ *
+ * Schema per doc (chapter_analytics/{bookId}_ch{chapterIndex}_{YYYY-MM-DD}):
+ *   bookId, bookTitle, chapter, date  — identifiers
+ *   reads        {number}  — total open events (increments every call)
+ *   readers      {string[]}— unique reader emails for this day (arrayUnion)
+ *   readAt       {timestamp} — last updated
  */
 export function trackChapterRead(userEmail, bookId, bookTitle, chapterIndex) {
   if (!userEmail || !bookId) return;
   try {
-    const dayKey = new Date().toISOString().slice(0, 10);        // YYYY-MM-DD
-    const docId  = `${bookId}_ch${chapterIndex}_${dayKey}`;
-    // Fire-and-forget
-    setDoc(doc(db, 'chapter_analytics', docId), {
+    const dayKey  = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const docId   = `${bookId}_ch${chapterIndex}_${dayKey}`;
+    const ref     = doc(db, 'chapter_analytics', docId);
+    const email   = userEmail.toLowerCase();
+
+    // setDoc with merge:true — creates on first read, increments on subsequent reads.
+    // increment(1) adds to reads each time; arrayUnion dedupes the readers list.
+    setDoc(ref, {
       bookId,
       bookTitle: bookTitle || '',
       chapter:   chapterIndex,
       date:      dayKey,
-      userEmail: userEmail.toLowerCase(),
+      reads:     increment(1),
+      readers:   arrayUnion(email),
       readAt:    serverTimestamp(),
     }, { merge: true }).catch(() => {});
   } catch { /* non-blocking */ }
@@ -114,29 +124,32 @@ export async function processScheduledReleases(saveBook, books) {
 export async function getChapterAnalytics(bookId, days = 30) {
   if (!bookId) return [];
   try {
-    const { getDocs, collection, query, where, orderBy } = await import('firebase/firestore');
+    const { getDocs, collection, query, where } = await import('firebase/firestore');
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
+    // Single-field where clause only — no compound orderBy (avoids needing a composite index)
     const q    = query(
       collection(db, 'chapter_analytics'),
       where('bookId', '==', bookId),
       where('date',   '>=', cutoffStr),
-      orderBy('date',    'desc'),
-      orderBy('chapter', 'asc'),
     );
     const snap = await getDocs(q);
 
-    // Aggregate by chapter — count unique readers per chapter
+    // Aggregate by chapter — count reads and unique readers per chapter
     const byChapter = {};
     snap.docs.forEach(d => {
-      const { chapter, userEmail } = d.data();
+      const { chapter, reads, readers } = d.data();
+      if (chapter === undefined || chapter === null) return;
       if (!byChapter[chapter]) byChapter[chapter] = { reads: 0, readers: new Set() };
-      byChapter[chapter].reads++;
-      byChapter[chapter].readers.add(userEmail);
+      // reads field is the total for that day; fallback to 1 for old docs
+      byChapter[chapter].reads += (reads || 1);
+      // readers is an array of unique emails for that day
+      (Array.isArray(readers) ? readers : []).forEach(e => byChapter[chapter].readers.add(e));
     });
 
+    // Sort by chapter number ascending (done in JS, no index needed)
     return Object.entries(byChapter)
       .map(([ch, v]) => ({
         chapter:       Number(ch),
