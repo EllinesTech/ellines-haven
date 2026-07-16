@@ -775,7 +775,7 @@
      Nav actual height: row1 ~40px + 4px gap + row2 ~34px + 8px top + 8px bottom = ~94px
      Adding extra headroom to prevent overlap on varying content */
   .reader {
-    --reader-nav-h: 104px; /* extra headroom for two-row nav */
+    --reader-nav-h: 110px; /* increased for better mobile spacing */
     --reader-wm-h: 24px;
   }
   .reader__nav {
@@ -802,22 +802,70 @@
     align-items: center;
     width: 100%;
     gap: 6px;
-    min-height: 38px;
-    padding-top: 6px;
+    min-height: 40px;
+    padding-top: 8px;
     border-top: 1px solid rgba(255,255,255,0.05);
     flex-wrap: wrap;
   }
 
-  .reader__info { display: flex; flex: 1; min-width: 0; overflow: hidden; } /* show title in row 1 */
-  .reader__info strong { font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .reader__info span { display: none; } /* hide author on small screens */
+  .reader__info { 
+    display: flex; 
+    flex: 1; 
+    min-width: 0; 
+    overflow: hidden;
+    flex-direction: column;
+    gap: 2px;
+  }
+  
+  .reader__info strong { 
+    font-size: .84rem; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
+  }
+  
+  .reader__info span { 
+    display: none; /* hide author on small screens */
+  }
 
-  .reader__page { padding: 28px 20px; }
-  .reader__body { padding: 10px 8px 80px; }
+  .reader__page { 
+    padding: 28px 20px 100px;
+    margin: 10px auto;
+    width: 100%;
+  }
+
+  .reader__body { 
+    padding: 8px 6px 100px;
+  }
+
+  .reader__text {
+    font-size: 1rem;
+  }
+
+  .reader__text p {
+    text-indent: 1.5em;
+    line-height: 1.85;
+    text-align: left;
+  }
+
+  .reader__text p:first-child {
+    text-indent: 0;
+  }
+
+  .reader__text p:first-child::first-letter { 
+    font-size: 2.2em;
+    margin: 0.05em 0.08em 0 0;
+  }
+
   .reader__pdf-frame,
-  .reader__pdf-zoom-wrap iframe { height: calc(100vh - var(--reader-offset) - 10px); }
-  .reader__mode-btn { padding: 5px 9px; font-size: 0.7rem; }
-  .reader__text p:first-child::first-letter { font-size: 2.4em; }
+  .reader__pdf-zoom-wrap iframe { 
+    height: calc(100vh - var(--reader-offset) - 20px);
+  }
+
+  .reader__mode-btn { 
+    padding: 5px 9px; 
+    font-size: 0.7rem;
+  }
 
   /* Old single-row right area — hide on mobile (controls moved to row2) */
   .reader__nav-right { display: none; }
@@ -841,8 +889,15 @@
     gap: 2px;
     flex-shrink: 0;
   }
-  .reader__zoom-label { min-width: 28px; font-size: 0.67rem; }
-  .reader__font-btn   { padding: 4px 7px; font-size: 0.7rem; }
+  .reader__zoom-label { 
+    min-width: 28px; 
+    font-size: 0.67rem;
+  }
+
+  .reader__font-btn { 
+    padding: 4px 7px; 
+    font-size: 0.7rem;
+  }
 
   /* Watermark strip — positioned exactly below the nav */
   .reader__watermark {
@@ -853,6 +908,18 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* Chapter tabs mobile optimization */
+  .reader__ch-tabs {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 24px;
+  }
+
+  .reader__ch-btn {
+    padding: 10px 12px;
+    font-size: 0.8rem;
   }
 }
 
@@ -902,20 +969,85 @@
 
 /* ── Landscape phone ── */
 @media (max-width: 900px) and (orientation: landscape) {
-  .reader { --reader-nav-h: 44px; --reader-wm-h: 22px; }
+  .reader { 
+    --reader-nav-h: 48px; 
+    --reader-wm-h: 22px;
+  }
+  
   .reader__nav {
     flex-wrap: nowrap;
-    height: 44px;
-    padding: 0 10px;
+    height: 48px;
+    padding: 0 12px;
+    align-items: center;
   }
-  .reader__nav-row1, .reader__nav-row2 { display: none; }
-  .reader__nav-right { display: flex; }
-  .reader__info { display: flex; }
-  .reader__info span { display: none; }
-  .reader__page { padding: 16px 16px; }
-  .reader__body { padding: 8px 6px 40px; }
+  
+  .reader__nav-row1, 
+  .reader__nav-row2 { 
+    display: none;
+  }
+  
+  .reader__nav-right { 
+    display: flex;
+    gap: 8px;
+  }
+  
+  .reader__info { 
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .reader__info span { 
+    display: none;
+  }
+  
+  .reader__page { 
+    padding: 16px 16px 60px;
+  }
+  
+  .reader__body { 
+    padding: 6px 4px 60px;
+  }
+  
+  .reader__text {
+    font-size: 0.98rem;
+    line-height: 1.8;
+  }
+
+  .reader__text p:first-child::first-letter { 
+    font-size: 2em;
+  }
+
   .reader__pdf-frame,
-  .reader__pdf-zoom-wrap iframe { height: calc(100vh - 70px); }
+  .reader__pdf-zoom-wrap iframe { 
+    height: calc(100vh - 70px);
+  }
+
+  /* Audio player in landscape — compact */
+  .audio-player {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+
+  .audio-player__icon {
+    font-size: 1.3rem;
+  }
+
+  .audio-player__title {
+    font-size: 0.75rem;
+  }
+
+  .audio-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .audio-btn--play {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -1347,12 +1479,47 @@
     padding: 16px 14px 14px;
     gap: 12px;
     align-items: stretch;
+    /* Important: prevent overflow of voice dropdown */
+    overflow: visible;
+    position: relative;
+    z-index: 100;
   }
 
   /* Header (info + gear) — stays as a single row */
   .audio-player__header {
     width: 100%;
     order: 0;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* Info section fits on one line on mobile */
+  .audio-player__info {
+    flex: 1;
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .audio-player__icon {
+    flex-shrink: 0;
+  }
+
+  /* Title and subtitle stack properly */
+  .audio-player__title {
+    display: block;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.2;
+  }
+
+  .audio-player__sub {
+    display: block;
+  }
+
+  /* Gear button positioned nicely in header */
+  .audio-btn--gear {
+    flex-shrink: 0;
+    align-self: center;
   }
 
   /* Transport controls + progress — full width */
@@ -1362,26 +1529,40 @@
     min-width: 0;
     order: 1;
     gap: 12px;
+    position: relative;
+    z-index: 50;
   }
 
   /* Controls row — centre the four transport buttons */
   .audio-player__controls {
     justify-content: center;
     gap: 10px;
+    flex-wrap: nowrap;
   }
 
   /* Slightly larger touch targets for transport buttons */
-  .audio-btn { width: 40px; height: 40px; font-size: 1rem; }
-  .audio-btn--play { width: 52px; height: 52px; font-size: 1.25rem; }
+  .audio-btn { 
+    width: 44px; 
+    height: 44px; 
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .audio-btn--play { 
+    width: 56px; 
+    height: 56px; 
+    font-size: 1.3rem;
+  }
 
   /* Speed pills row — full width */
   .audio-player__right {
     order: 2;
     flex-shrink: 0;
     width: 100%;
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    position: relative;
+    z-index: 50;
   }
 
   /* Speed pills always visible on mobile */
@@ -1389,6 +1570,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    justify-content: center;
   }
 
   /* Settings panel — full width */
@@ -1396,75 +1578,124 @@
     flex: 0 0 auto;
     width: 100%;
     order: 3;
+    position: relative;
+    z-index: 50;
+    overflow: visible;
   }
 
   /* Settings rows stack vertically */
   .audio-settings__row {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 8px;
+    position: relative;
+    z-index: 100;
   }
   .audio-settings__row label {
     min-width: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
   }
 
   /* Voice dropdown full width */
   .audio-custom-dd {
     width: 100%;
+    position: relative;
+    z-index: 1000;
+    overflow: visible;
+  }
+
+  .audio-custom-dd__trigger {
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    min-height: 48px;
+    border-radius: 8px;
+  }
+
+  .audio-custom-dd__trigger span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
   }
 
   /* Filter buttons wrap if needed */
   .audio-filter-group {
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .audio-filter-btn {
+    flex: 0 1 calc(33.333% - 6px);
+    min-width: 80px;
+    font-size: 0.75rem;
+    padding: 8px 12px;
+    min-height: 44px;
+    border-radius: 8px;
+    white-space: nowrap;
   }
 
   /* Speed pills in settings panel — full width, wrap */
   .audio-settings .audio-speed-pills {
     width: 100%;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+
+  .audio-speed-pill {
+    flex: 0 1 calc(20% - 5px);
+    min-width: 50px;
+    font-size: 0.73rem;
+    padding: 6px 10px;
+    text-align: center;
   }
 
   /* Pitch slider full width */
   .audio-slider {
     width: 100%;
     min-width: 0;
+    height: 24px;
+    cursor: pointer;
   }
 
   /* Voice dropdown list — open upward on mobile to avoid viewport clipping */
   .audio-custom-dd__list {
-    max-height: 220px;
+    max-height: 300px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: calc(100% + 6px);
-    top: auto;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: auto;
+    top: 50%;
+    transform: translateY(-50%);
     z-index: 10001;
     background: #1a1428;
-    border: 1px solid rgba(74,158,255,0.35);
-    border-radius: 8px;
-    box-shadow: 0 -4px 16px rgba(0,0,0,0.5);
+    border: 1.5px solid rgba(74,158,255,0.45);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 16px rgba(74,158,255,0.2);
   }
 
-  .audio-custom-dd__list-item {
-    padding: 10px 14px;
-    font-size: 0.78rem;
-    cursor: pointer;
-    transition: background 0.1s;
-    border-bottom: 1px solid rgba(74,158,255,0.1);
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .audio-custom-dd__list::-webkit-scrollbar {
+    width: 6px;
   }
 
-  .audio-custom-dd__list-item:last-child { border-bottom: none; }
-  .audio-custom-dd__list-item:hover { background: rgba(74,158,255,0.1); }
-  .audio-custom-dd__list-item.selected { 
-    background: rgba(74,158,255,0.2);
-    font-weight: 600;
+  .audio-custom-dd__list::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+  }
+
+  .audio-custom-dd__list::-webkit-scrollbar-thumb {
+    background: rgba(74,158,255,0.35);
+    border-radius: 3px;
   }
 
   /* Ensure the custom dropdown wrapper doesn't clip its list */
@@ -1475,13 +1706,48 @@
 
   /* Larger touch targets on the progress track */
   .audio-player__track {
-    padding: 14px 0;
-    margin: -14px 0;
+    padding: 16px 0;
+    margin: -16px 0;
+    height: 6px;
+  }
+
+  .audio-player__track:hover {
+    height: 8px;
   }
 
   /* Neural badge — keep visible on tablet */
   .audio-neural-badge {
     display: inline-block;
+    font-size: 0.65rem;
+  }
+
+  /* Time display better on mobile */
+  .audio-player__time {
+    font-size: 0.7rem;
+    min-width: 36px;
+  }
+
+  /* Voice name in dropdown needs proper styling */
+  .audio-custom-dd__name {
+    flex: 1;
+    font-size: 0.8rem;
+    word-break: break-word;
+  }
+
+  .audio-custom-dd__lang {
+    font-size: 0.68rem;
+    flex-shrink: 0;
+    margin-left: 8px;
+  }
+
+  /* Settings note improved visibility */
+  .audio-settings__note {
+    font-size: 0.71rem;
+    line-height: 1.6;
+    color: rgba(232,224,240,0.35);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(74,158,255,0.1);
   }
 }
 
@@ -1492,77 +1758,128 @@
     gap: 10px;
   }
 
-  .audio-player__icon { font-size: 1.5rem; }
-  .audio-player__title { font-size: 0.8rem; word-break: break-word; }
-  .audio-player__sub { font-size: 0.65rem; }
+  .audio-player__icon { 
+    font-size: 1.6rem;
+    width: 2.2rem;
+    height: 2.2rem;
+  }
+
+  .audio-player__title { 
+    font-size: 0.82rem; 
+    word-break: break-word;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .audio-player__sub { 
+    font-size: 0.67rem;
+    margin-top: 2px;
+  }
 
   /* Info section doesn't wrap on mobile */
   .audio-player__info {
     min-width: 0;
     flex: 1;
+    gap: 8px;
   }
 
-  /* Transport buttons slightly smaller on tiny screens */
-  .audio-btn { width: 38px; height: 38px; font-size: 0.95rem; }
-  .audio-btn--play { width: 50px; height: 50px; font-size: 1.2rem; }
+  /* Transport buttons optimized for small phones */
+  .audio-btn { 
+    width: 42px; 
+    height: 42px; 
+    font-size: 1.05rem;
+  }
+
+  .audio-btn--play { 
+    width: 54px; 
+    height: 54px; 
+    font-size: 1.25rem;
+  }
 
   /* Gear button */
   .audio-btn--gear {
-    width: 36px;
-    height: 36px;
-    font-size: 0.9rem;
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
     flex-shrink: 0;
   }
 
-  /* Speed pills compact */
+  /* Speed pills more readable */
   .audio-speed-pill {
-    padding: 5px 10px;
-    font-size: 0.7rem;
+    padding: 6px 11px;
+    font-size: 0.72rem;
+    min-height: 38px;
+    flex: 0 1 calc(25% - 5px);
   }
 
-  /* Filter buttons more compact for tiny screens */
+  /* Filter buttons optimized for touch */
   .audio-filter-btn {
-    font-size: 0.7rem;
-    padding: 6px 12px;
-    min-height: 32px;
+    font-size: 0.73rem;
+    padding: 8px 12px;
+    min-height: 42px;
+    flex: 0 1 calc(33.333% - 6px);
   }
 
   .audio-settings__row label {
-    font-size: 0.7rem;
+    font-size: 0.72rem;
+    font-weight: 600;
   }
 
-  /* Time labels compact */
+  /* Time labels readable */
   .audio-player__time {
-    font-size: 0.62rem;
-    min-width: 28px;
-  }
-
-  /* Neural badges hidden on tiny screens to save space */
-  .audio-neural-badge {
-    display: none;
-  }
-
-  /* Settings note smaller */
-  .audio-settings__note {
     font-size: 0.65rem;
+    min-width: 32px;
+    font-weight: 500;
   }
 
-  /* Voice dropdown trigger — ensure it's clickable on mobile */
+  /* Neural badges shown on small phones */
+  .audio-neural-badge {
+    display: inline-block;
+    font-size: 0.62rem;
+  }
+
+  /* Settings note improved */
+  .audio-settings__note {
+    font-size: 0.68rem;
+    line-height: 1.5;
+  }
+
+  /* Voice dropdown trigger — ensure it's clickable */
   .audio-custom-dd__trigger {
-    font-size: 0.76rem;
-    padding: 8px 12px;
-    min-height: 40px;
+    font-size: 0.78rem;
+    padding: 11px 13px;
+    min-height: 46px;
+    border-radius: 8px;
   }
 
   /* Settings row adjustments */
   .audio-settings__row {
-    gap: 6px;
+    gap: 8px;
   }
 
-  /* Slider full width */
+  /* Slider full width and accessible */
   .audio-slider {
     width: 100%;
     min-width: 0;
+    height: 22px;
+  }
+
+  /* Voice list positioning and sizing */
+  .audio-custom-dd__list {
+    max-height: 280px;
+    left: 8px;
+    right: 8px;
+    border-radius: 10px;
+  }
+
+  .audio-custom-dd__item {
+    padding: 12px 12px;
+    font-size: 0.77rem;
+    min-height: 46px;
+  }
+
+  .audio-player__progress-row {
+    gap: 10px;
   }
 }
 
@@ -1570,34 +1887,105 @@
 @media (max-width: 360px) {
   .audio-player {
     padding: 12px 10px;
+    gap: 10px;
   }
 
-  .audio-player__icon { font-size: 1.4rem; }
-  .audio-player__title { font-size: 0.75rem; }
-  .audio-player__sub { font-size: 0.62rem; }
+  .audio-player__icon { 
+    font-size: 1.5rem;
+    width: 2rem;
+    height: 2rem;
+  }
 
-  .audio-btn { width: 36px; height: 36px; font-size: 0.9rem; }
-  .audio-btn--play { width: 46px; height: 46px; font-size: 1.1rem; }
+  .audio-player__title { 
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .audio-player__sub { 
+    font-size: 0.63rem;
+  }
+
+  .audio-btn { 
+    width: 40px; 
+    height: 40px; 
+    font-size: 1rem;
+  }
+
+  .audio-btn--play { 
+    width: 50px; 
+    height: 50px; 
+    font-size: 1.2rem;
+  }
+
+  .audio-btn--gear {
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
 
   .audio-filter-btn {
-    font-size: 0.68rem;
-    padding: 5px 10px;
-    min-height: 30px;
+    font-size: 0.70rem;
+    padding: 7px 11px;
+    min-height: 38px;
+    flex: 0 1 calc(33.333% - 6px);
   }
 
   .audio-speed-pill {
-    padding: 4px 8px;
-    font-size: 0.68rem;
+    padding: 5px 9px;
+    font-size: 0.70rem;
+    min-height: 36px;
   }
 
   .audio-custom-dd__trigger {
-    font-size: 0.74rem;
-    padding: 7px 10px;
-    min-height: 38px;
+    font-size: 0.75rem;
+    padding: 10px 12px;
+    min-height: 44px;
+  }
+
+  .audio-custom-dd__item {
+    padding: 11px 11px;
+    font-size: 0.75rem;
+    min-height: 44px;
   }
 
   .audio-settings__note {
+    font-size: 0.66rem;
+    line-height: 1.4;
+  }
+
+  .audio-player__time {
     font-size: 0.62rem;
+    min-width: 30px;
+  }
+
+  /* Neural badges remain visible */
+  .audio-neural-badge {
+    display: inline-block;
+    font-size: 0.60rem;
+    padding: 1px 5px;
+  }
+
+  /* Settings label */
+  .audio-settings__row label {
+    font-size: 0.70rem;
+  }
+
+  /* Keep slider accessible */
+  .audio-slider {
+    height: 20px;
+    min-height: 20px;
+  }
+
+  /* Tighter progress row */
+  .audio-player__progress-row {
+    gap: 8px;
+  }
+
+  /* Voice list responsive */
+  .audio-custom-dd__list {
+    max-height: 250px;
+    left: 6px;
+    right: 6px;
   }
 }
 
