@@ -138,7 +138,7 @@ export default function Navbar() {
         {/* ── Desktop links ── */}
         <ul className="nav__links">
           <li><NavLink to="/">Home</NavLink></li>
-          <li><NavLink to="/library">Browse</NavLink></li>
+          <li><NavLink to="/library">Library</NavLink></li>
           <li><NavLink to="/about">About</NavLink></li>
           <li><NavLink to="/founder">Founder</NavLink></li>
           <li><NavLink to="/contact">Contact</NavLink></li>
@@ -297,7 +297,7 @@ export default function Navbar() {
           {/* Main nav links */}
           {[
             ['/',        '🏠 Home'],
-            ['/library', '📚 Browse Books'],
+            ['/library', '📚 Library'],
             ['/about',   '✨ About'],
             ['/founder', '👤 The Founder'],
             ['/contact', '📬 Contact'],
