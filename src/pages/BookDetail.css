@@ -33,19 +33,57 @@
   .bd-related-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
   .bd-title { font-size: clamp(1.5rem, 5vw, 2.2rem); }
 }
-@media (max-width: 480px) {
+@media (max-width:480px) {
   .bd-wrap { padding: 88px 0 32px; }
   .bd-back { font-size: 0.82rem; margin-bottom: 24px; }
   .bd-left { max-width: 220px; }
   .bd-amt { font-size: 1.6rem; }
-  .bd-meta { padding: 14px 14px; gap: 12px; }
-  .bd-actions { flex-direction: column; }
-  .bd-actions .btn { width: 100%; justify-content: center; }
+  .bd-meta { 
+    padding: 14px 14px; 
+    gap: 12px;
+    flex-direction: column;
+  }
+  .bd-meta div {
+    min-width: 0;
+    flex: none;
+  }
+  .bd-meta small {
+    white-space: normal;
+  }
+  .bd-actions { 
+    flex-direction: column;
+    width: 100%;
+  }
+  .bd-actions .btn { 
+    width: 100%;
+    justify-content: center;
+    font-size: 0.88rem;
+  }
   .bd-related-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bd-desc { font-size: 0.92rem; line-height: 1.7; }
+  .bd-purchase { 
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bd-price {
+    width: 100%;
+  }
 }
+
 @media (max-width: 380px) {
   .bd-wrap { padding: 82px 0 28px; }
   .bd-left { max-width: 190px; }
+  .bd-title { font-size: clamp(1.4rem, 4vw, 1.8rem); }
+  .bd-amt { font-size: 1.4rem; }
+  .bd-back { font-size: 0.78rem; margin-bottom: 18px; }
+  .bd-meta { 
+    padding: 12px 12px; 
+    gap: 10px;
+  }
+  .bd-actions .btn {
+    font-size: 0.82rem;
+    padding: 10px 16px;
+  }
 }
 
 /* Styled (CSS) cover on detail page */
