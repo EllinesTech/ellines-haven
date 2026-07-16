@@ -7,62 +7,67 @@
 }
 
 .ap-header {
-  border-bottom: 2px solid var(--border, #ddd);
-  padding-bottom: 20px;
-  margin-bottom: 20px;
+  border-bottom: 1px solid var(--dim);
+  padding-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .ap-header h2 {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
-  color: var(--text, #222);
+  margin: 0 0 6px 0;
+  font-size: 1.3rem;
+  color: var(--text);
 }
 
 .ap-header p {
   margin: 0;
-  color: var(--muted, #666);
-  font-size: 0.9rem;
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 
+/* ── Tabs ── */
 .ap-tabs {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
 
 .ap-tab {
-  padding: 10px 16px;
-  background: var(--subtle-bg, #f5f5f5);
-  border: 1px solid var(--border, #ddd);
-  border-radius: 4px;
+  padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--dim);
+  border-radius: var(--r-sm, 6px);
   cursor: pointer;
-  font-size: 0.9rem;
-  color: var(--muted, #666);
+  font-size: 0.875rem;
+  color: var(--muted);
   transition: all 0.2s ease;
+  font-family: inherit;
 }
 
 .ap-tab:hover {
-  background: var(--subtle-hover, #eee);
-  border-color: var(--primary, #007bff);
-  color: var(--primary, #007bff);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text);
 }
 
 .ap-tab.active {
-  background: var(--primary, #007bff);
-  color: white;
-  border-color: var(--primary, #007bff);
+  background: var(--primary, #4a9eff);
+  color: #fff;
+  border-color: var(--primary, #4a9eff);
+  font-weight: 600;
 }
 
+/* ── Content card ── */
 .ap-content {
-  background: var(--card-bg, white);
-  border: 1px solid var(--border, #ddd);
-  border-radius: 8px;
+  background: var(--card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--dim);
+  border-radius: var(--r-sm, 8px);
   padding: 20px;
 }
 
+/* ── Form groups ── */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .form-group:last-child {
@@ -71,10 +76,12 @@
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
   font-weight: 600;
-  color: var(--text, #222);
-  font-size: 0.95rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .form-group input[type="text"],
@@ -83,30 +90,50 @@
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border, #ddd);
-  border-radius: 4px;
-  font-size: 0.95rem;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-sm, 4px);
+  font-size: 0.9rem;
   font-family: inherit;
-  background: var(--input-bg, white);
-  color: var(--text, #222);
-  transition: border-color 0.2s ease;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  transition: border-color 0.2s ease, background 0.2s ease;
+  box-sizing: border-box;
 }
 
-.form-group input:focus,
+.form-group input[type="text"]:hover,
+.form-group input[type="email"]:hover,
+.form-group input[type="datetime-local"]:hover,
+.form-group select:hover,
+.form-group textarea:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group input[type="datetime-local"]:focus,
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: var(--primary, #007bff);
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  border-color: var(--primary, #4a9eff);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.12);
+}
+
+/* Make select options readable in dark mode */
+.form-group select option {
+  background: var(--bg, #0d0d1a);
+  color: var(--text);
 }
 
 .form-group textarea {
   resize: vertical;
-  min-height: 150px;
+  min-height: 120px;
   font-family: 'Courier New', monospace;
 }
 
+/* ── Radio group ── */
 .radio-group {
   display: flex;
   flex-direction: column;
@@ -119,58 +146,67 @@
   gap: 8px;
   margin: 0;
   font-weight: normal;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
 .radio-group input[type="radio"] {
   cursor: pointer;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary, #4a9eff);
 }
 
-/* Buttons */
-
+/* ── Buttons ── */
 .btn {
-  padding: 10px 16px;
-  border-radius: 4px;
-  border: 1px solid var(--border, #ddd);
+  padding: 9px 16px;
+  border-radius: var(--r-sm, 4px);
+  border: 1px solid var(--dim);
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   transition: all 0.2s ease;
-  background: white;
-  color: var(--text, #222);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-family: inherit;
+}
+
+.btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary {
-  background: var(--primary, #007bff);
-  color: white;
-  border-color: var(--primary, #007bff);
+  background: var(--primary, #4a9eff);
+  color: #fff;
+  border-color: var(--primary, #4a9eff);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-dark, #0056b3);
-  border-color: var(--primary-dark, #0056b3);
+  background: #3a8ef0;
+  border-color: #3a8ef0;
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* Responsive */
-
+/* ── Responsive ── */
 @media (max-width: 768px) {
   .ap-tabs {
-    gap: 5px;
+    gap: 6px;
   }
 
   .ap-tab {
-    padding: 8px 12px;
-    font-size: 0.85rem;
+    padding: 7px 11px;
+    font-size: 0.82rem;
   }
 
   .ap-content {
-    padding: 15px;
+    padding: 14px;
   }
 }
