@@ -30,6 +30,22 @@
   .bd-purchase { gap: 16px; }
   /* 90px navbar + breathing room */
   .bd-wrap { padding: 100px 0 40px; }
+  .bd-related-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+  .bd-title { font-size: clamp(1.5rem, 5vw, 2.2rem); }
+}
+@media (max-width: 480px) {
+  .bd-wrap { padding: 88px 0 32px; }
+  .bd-back { font-size: 0.82rem; margin-bottom: 24px; }
+  .bd-left { max-width: 220px; }
+  .bd-amt { font-size: 1.6rem; }
+  .bd-meta { padding: 14px 14px; gap: 12px; }
+  .bd-actions { flex-direction: column; }
+  .bd-actions .btn { width: 100%; justify-content: center; }
+  .bd-related-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
+@media (max-width: 380px) {
+  .bd-wrap { padding: 82px 0 28px; }
+  .bd-left { max-width: 190px; }
 }
 
 /* Styled (CSS) cover on detail page */

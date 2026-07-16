@@ -618,7 +618,18 @@
   .founder-books-grid { grid-template-columns: 1fr; }
   .founder-tl-rail { grid-template-columns: 1fr 1fr; }
   .founder-tl-rail::before { display: none; }
+  .founder-section { padding: 48px 0; }
+  .founder-inner { padding: 0 16px; }
 }
 @media (max-width: 420px) {
   .founder-tl-rail { grid-template-columns: 1fr; }
+  .founder-hero { padding-top: 82px; }
+  .founder-bio .founder-name { font-size: 1.75rem; }
+  .founder-stats-inner { grid-template-columns: 1fr 1fr; gap: 0; }
+  .founder-stat-item { padding: 12px 8px; }
+  .founder-stat-item strong { font-size: 1.4rem; }
+  .founder-contact-strip { gap: 6px; }
+  .founder-contact-item { font-size: 0.76rem; padding: 4px 10px; }
+  .founder-roles { gap: 6px; }
+  .founder-role-chip { font-size: 0.74rem; padding: 5px 10px; }
 }

@@ -201,6 +201,12 @@
    BOOKS GRID
 ════════════════════════════════════════ */
 .books-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(270px,1fr)); gap: 26px; }
+@media (max-width: 640px) {
+  .books-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+}
+@media (max-width: 400px) {
+  .books-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
 
 /* ════════════════════════════════════════
    AUTHOR SPOTLIGHT BANNER
@@ -575,6 +581,9 @@
   .hero__stats { gap: 8px; flex-wrap: wrap; justify-content: center; }
   .hero__stats strong { font-size: 1.1rem; }
   .hero__stat-bar { display: none; }
+  .promo-banner { padding: 48px 0; }
+  .cta-box { padding: 32px 16px; }
+  .cta-box h2 { font-size: 1.5rem; }
 }
 
 /* ════════════════════════════════════════

@@ -13,8 +13,23 @@
 @media (max-width: 768px) {
   .about-grid { grid-template-columns: 1fr; }
   .about-stats { grid-template-columns: 1fr 1fr; }
+  .about-copy h2 { font-size: 1.7rem; }
+  .about-section-title h2 { font-size: 1.6rem; }
+  .about-mv-card { padding: 28px 24px; }
+  .about-offer-grid { grid-template-columns: 1fr; }
+  .about-promise-inner { grid-template-columns: 1fr; gap: 32px; }
 }
-@media (max-width: 480px) { .about-stats { grid-template-columns: 1fr; } }
+@media (max-width: 480px) {
+  .about-stats { grid-template-columns: 1fr; }
+  .about-copy h2 { font-size: 1.4rem; }
+  .about-section-title h2 { font-size: 1.4rem; }
+  .apc-brand-main { font-size: 2.2rem; letter-spacing: 2px; }
+  .apc-brand-sub  { font-size: 0.88rem; letter-spacing: 5px; }
+  .about-poster-card { padding: 32px 22px; }
+  .about-founder-strip { padding: 28px 18px; }
+  .about-mv-card { padding: 22px 18px; }
+  .about-promise-quote { padding: 28px 22px; }
+}
 
 /* ── About Poster Card ─────────────────────────────────── */
 .about-poster-card {

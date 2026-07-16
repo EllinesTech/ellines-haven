@@ -882,6 +882,14 @@
   /* Keep rows displaying */
   .reader__nav-row1,
   .reader__nav-row2 { display: flex; }
+  /* Tighter page padding on tiny phones */
+  .reader__page { padding: 20px 14px 60px; }
+  .reader__body { padding: 6px 4px 80px; }
+  /* Smaller drop cap so it doesn't overflow */
+  .reader__text p:first-child::first-letter { font-size: 2rem; }
+  /* Chapter title smaller */
+  .reader__chapter { font-size: 1.1rem; }
+  .reader__title { font-size: 1.5rem; }
 }
 
 /* ── Landscape phone ── */
@@ -934,7 +942,8 @@
   position: relative;
   box-shadow: 0 4px 24px rgba(74,158,255,0.08), 0 2px 8px rgba(0,0,0,0.3);
   color: #e8e0f0;
-  overflow: visible;
+  overflow: visible; /* must stay visible so voice dropdown can escape the box */
+  z-index: 10;       /* ensure player sits above the text content below it */
 }
 
 .audio-player--unsupported {
@@ -1153,10 +1162,11 @@
   border: 1px solid rgba(255,255,255,0.12);
   color: rgba(232,224,240,0.55);
   border-radius: 20px;
-  padding: 4px 12px;
+  padding: 6px 14px;
   font-size: 0.72rem;
   cursor: pointer;
   transition: all 0.15s;
+  min-height: 36px; /* touch-friendly */
 }
 .audio-filter-btn.on {
   background: rgba(74,158,255,0.18);
@@ -1229,6 +1239,7 @@
   gap: 8px;
   transition: border-color 0.15s;
   text-align: left;
+  min-height: 44px; /* accessible touch target */
 }
 .audio-custom-dd__trigger:hover,
 .audio-custom-dd__trigger:focus {
@@ -1253,7 +1264,8 @@
   border-radius: 8px;
   max-height: 220px;
   overflow-y: auto;
-  z-index: 999;
+  -webkit-overflow-scrolling: touch;
+  z-index: 9999;
   box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
 }
 .audio-custom-dd__list::-webkit-scrollbar { width: 5px; }
@@ -1264,7 +1276,7 @@
   background: none;
   border: none;
   color: rgba(232,224,240,0.75);
-  padding: 9px 14px;
+  padding: 10px 14px;
   font-size: 0.78rem;
   cursor: pointer;
   display: flex;
@@ -1273,6 +1285,7 @@
   gap: 8px;
   transition: background 0.12s;
   text-align: left;
+  min-height: 44px; /* accessible touch target */
 }
 .audio-custom-dd__item:hover {
   background: rgba(74,158,255,0.12);
@@ -1414,6 +1427,8 @@
   /* Voice dropdown list — open upward on mobile to avoid viewport clipping */
   .audio-custom-dd__list {
     max-height: 200px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     position: absolute;
     left: 0;
     right: 0;

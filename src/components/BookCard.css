@@ -150,6 +150,22 @@
   color: var(--muted); font-size: .8rem; line-height: 1.5; margin-bottom: 8px;
   display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+
+/* ── Compact card (used in narrow grid columns on mobile) ── */
+@media (max-width: 640px) {
+  .bcard__img-wrap { height: 200px; }
+  .bcard__body { padding: 10px 12px 12px; }
+  .bcard__title { font-size: 0.88rem; }
+  .bcard__author { font-size: 0.74rem; }
+  .bcard__excerpt { display: none; }
+  .bcard__meta { margin-bottom: 10px; }
+}
+@media (max-width: 400px) {
+  .bcard__img-wrap { height: 180px; }
+  .bcard__body { padding: 8px 10px 10px; }
+  .bcard__title { font-size: 0.82rem; }
+  .bcard__footer { flex-direction: column; align-items: flex-start; gap: 6px; }
+}
 .bcard__inspired-note {
   font-size: 0.73rem;
   color: rgba(201,168,76,0.7);

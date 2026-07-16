@@ -957,7 +957,7 @@
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid rgba(255,255,255,0.06);
-  flex-wrap: nowrap;   /* keep badge + remove on one line */
+  flex-wrap: wrap;   /* allow wrap on very narrow screens */
 }
 
 .mylib-offline-badge {

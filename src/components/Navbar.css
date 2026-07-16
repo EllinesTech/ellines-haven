@@ -288,6 +288,8 @@
   .nav__inner { gap: 6px; }
   .nav__actions { gap: 2px; }
   .nav__cart { padding: 5px; }
+  /* Hide PWA install pill on very tight screens — too cramped */
+  .nav__install-btn { display: none; }
 }
 
 /* ════════════════════════════════════════
