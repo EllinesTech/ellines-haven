@@ -566,6 +566,15 @@
   .why-grid { grid-template-columns: 1fr; }
   .promo-banner { padding: 72px 0; }
   .new-releases-row { grid-template-columns: 1fr; }
+  /* Hero stats — compact on small phones */
+  .hero__stats { gap: 12px; }
+  .hero__stats strong { font-size: 1.25rem; }
+  .hero__stat-bar { height: 28px; }
+}
+@media (max-width: 380px) {
+  .hero__stats { gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .hero__stats strong { font-size: 1.1rem; }
+  .hero__stat-bar { display: none; }
 }
 
 /* ════════════════════════════════════════

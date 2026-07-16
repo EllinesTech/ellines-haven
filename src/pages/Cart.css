@@ -89,6 +89,28 @@
   .cart-layout, .pay-layout { grid-template-columns: 1fr; }
   .cart-sum, .pay-summary { position: static; }
   .cart-item__img { width: 64px; height: 88px; }
+  /* Ensure remove + view links have large enough touch targets */
+  .cart-item__rm, .cart-item__view {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 4px;
+  }
+  /* Cancelled notice wraps on narrow screens */
+  .cart-cancelled-notice {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cart-cancelled-notice span { width: 100%; }
+  /* Summary sticky top accounts for navbar */
+  .cart-sum { top: 100px; }
+}
+
+@media (max-width: 480px) {
+  .cart-item { padding: 14px 12px; gap: 12px; }
+  .cart-item__img { width: 54px; height: 74px; }
+  .cart-item__info h3 { font-size: 0.88rem; }
+  .cart-layout { gap: 16px; padding: 20px 0 60px; }
 }
 
 /* ── M-Pesa payment box ── */

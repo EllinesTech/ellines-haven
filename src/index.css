@@ -93,7 +93,8 @@ input, select, textarea { max-width: 100%; }
 @media (max-width: 768px) {
   .section { padding: 56px 0; }
   .container { padding: 0 16px; }
-  .page-header { padding: 88px 0 40px; }
+  /* page-header top padding: 90px navbar + 10px breathing room */
+  .page-header { padding: 100px 0 40px; }
 }
 @media (max-width: 600px) {
   .section { padding: 48px 0; }

@@ -234,7 +234,7 @@
 /* ── Main layout ── */
 .lib-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px 1fr;
   gap: 40px;
   padding-top: 40px;
   padding-bottom: 80px;
@@ -249,7 +249,8 @@
   padding: 20px;
   position: sticky;
   top: 148px;
-  max-height: calc(100vh - 168px);
+  /* stretch to fill all remaining space below the sticky bars */
+  height: calc(100vh - 160px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--dim) transparent;
@@ -399,37 +400,56 @@
   .lib-filter-toggle { display: inline-flex; }
   .lib-sidebar {
     position: fixed;
-    top: 0; right: -280px;
-    width: 280px;
-    height: 100vh;
-    max-height: 100vh;
+    top: 0;
+    right: -100%;
+    width: min(300px, calc(100vw - 40px));
+    height: 100dvh;
+    max-height: 100dvh;
     border-radius: 0;
     z-index: 100;
-    transition: right .3s ease;
+    transition: right .3s cubic-bezier(.4,0,.2,1);
     padding: 24px 20px;
+    overflow-y: auto;
   }
   .lib-sidebar--open { right: 0; }
   .lib-sidebar__close { display: flex; }
-  .lib-sidebar-backdrop { display: block; }
+  .lib-sidebar-backdrop {
+    display: block;
+  }
 
-  .lib-sort-select { display: none; }
+  /* Sort select stays visible on mobile — just full-width */
+  .lib-sort-select {
+    width: 100%;
+    font-size: 0.85rem;
+    padding: 10px 12px;
+    min-height: 44px;
+  }
 
-  /* Mobile nav is 64px, not 80px */
-  .lib-type-bar { top: 64px; }
-  .lib-sidebar { top: 64px; height: calc(100vh - 64px); }
+  /* Mobile nav is ~60px */
+  .lib-type-bar { top: 60px; }
 }
 
 @media (max-width: 640px) {
   .lib-hero { padding: 100px 0 44px; }
   .lib-hero__copy h1 { font-size: 2.2rem; }
   .lib-type-bar__inner { height: auto; padding: 10px 0; flex-wrap: wrap; gap: 8px; }
-  .lib-type-tab { height: auto; padding: 8px 16px; border-bottom: none; border-radius: 20px; border: 1px solid var(--dim); }
+  .lib-type-tab { height: auto; padding: 10px 16px; min-height: 44px; border-bottom: none; border-radius: 20px; border: 1px solid var(--dim); }
   .lib-type-tab--on { border-color: var(--gold); background: rgba(201,168,76,.08); }
   .lib-books-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
   .lib-layout { padding-top: 24px; }
-  .lib-genre-bar__inner { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
-  .lib-genre-bar__inner::-webkit-scrollbar { height: 3px; }
-  .lib-genre-bar__inner::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 3px; }
+  /* Genre bar — horizontal scroll on mobile with momentum */
+  .lib-genre-bar__inner {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .lib-genre-bar__inner::-webkit-scrollbar { display: none; }
+  /* Filter toggle + sort in a row */
+  .lib-controls-row { display: flex; gap: 8px; align-items: center; }
+  .lib-sort-select { flex: 1; }
 }
 
 @media (max-width: 400px) {

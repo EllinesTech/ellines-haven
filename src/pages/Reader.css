@@ -867,8 +867,9 @@
   }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - 100px); }
-  /* On tablet, hide the row-2 wrappers (single row is fine at 769+) */
+  /* On tablet keep row wrappers hidden but show the right-side controls row */
   .reader__nav-row1, .reader__nav-row2 { display: none; }
+  .reader__nav-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 }
 
 /* ── Very small phones (≤400px) ── */
@@ -933,6 +934,7 @@
   position: relative;
   box-shadow: 0 4px 24px rgba(74,158,255,0.08), 0 2px 8px rgba(0,0,0,0.3);
   color: #e8e0f0;
+  overflow: visible;
 }
 
 .audio-player--unsupported {
@@ -1126,6 +1128,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow: visible;
 }
 .audio-settings__row {
   display: flex;
@@ -1209,6 +1212,7 @@
 /* Custom voice dropdown */
 .audio-custom-dd {
   position: relative;
+  overflow: visible;
 }
 .audio-custom-dd__trigger {
   width: 100%;
@@ -1240,7 +1244,8 @@
 .audio-custom-dd__arrow.open { transform: rotate(180deg); }
 .audio-custom-dd__list {
   position: absolute;
-  top: calc(100% + 4px);
+  bottom: calc(100% + 4px);
+  top: auto;
   left: 0;
   right: 0;
   background: #1e1630;
@@ -1249,7 +1254,7 @@
   max-height: 220px;
   overflow-y: auto;
   z-index: 999;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
 }
 .audio-custom-dd__list::-webkit-scrollbar { width: 5px; }
 .audio-custom-dd__list::-webkit-scrollbar-track { background: transparent; }
@@ -1406,13 +1411,21 @@
     min-width: 0;
   }
 
-  /* Voice dropdown list — don't overflow viewport */
+  /* Voice dropdown list — open upward on mobile to avoid viewport clipping */
   .audio-custom-dd__list {
-    max-height: 220px;
+    max-height: 200px;
     position: absolute;
     left: 0;
     right: 0;
+    bottom: calc(100% + 4px);
+    top: auto;
     z-index: 9999;
+  }
+
+  /* Ensure the custom dropdown wrapper doesn't clip its list */
+  .audio-custom-dd {
+    position: relative;
+    overflow: visible;
   }
 
   /* Larger touch targets on the progress track */
