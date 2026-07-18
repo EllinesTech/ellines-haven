@@ -681,7 +681,7 @@ function CoversTab({books,saveBook,showToast}) {
                           ✓ Auto-Assign Cover
                         </button>
                       ) : (
-                        <button className="btn btn-ghost btn-sm" style={{width:'100%',fontSize:'0.78rem'}} onClick={()=>setAssignTo(null)}>
+                        <button className="btn btn-ghost btn-sm" style={{width:'100%',fontSize:'0.78rem'}} onClick={()=>{ document.querySelector('.adm-photo-grid')?.scrollIntoView({behavior:'smooth'}); }}>
                           Pick Cover…
                         </button>
                       )}
