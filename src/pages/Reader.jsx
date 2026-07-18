@@ -1198,9 +1198,20 @@ export default function Reader() {
 
     if (!user) return false;
 
-    return isOwned(book?.id ?? id);
+    const owned = isOwned(book?.id ?? id);
+    
+    // Additional validation: ensure the owned book entry has unlock metadata
+    if (owned) {
+      const entry = library.find(x => x.id === (book?.id ?? id));
+      // Warn if book is marked owned but lacks proper unlock data
+      if (!entry?.downloadUnlocked && !entry?.unlockedAt) {
+        console.warn('[Reader] Book marked owned but missing unlock metadata:', book?.id || id, entry);
+      }
+    }
+    
+    return owned;
 
-  }, [user, isOwned, book?.id, id]);
+  }, [user, isOwned, book?.id, id, library]);
 
 
 

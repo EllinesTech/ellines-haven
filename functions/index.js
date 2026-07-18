@@ -520,6 +520,22 @@ exports.paystackWebhook = onRequest(
       // Unlock books
       await unlockBooksForUser(order.userEmail || email, order.items || [], "paystack_auto");
       console.log("[paystackWebhook] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+      
+      // Verify unlock was successful — check that books were actually written to libraries
+      const libRef = db.collection("libraries").doc(libDocId(order.userEmail || email));
+      const libSnap = await libRef.get();
+      if (!libSnap.exists || !libSnap.data()?.books || libSnap.data().books.length === 0) {
+        console.error("[paystackWebhook] CRITICAL: Unlock verification failed for", order.userEmail, "order:", orderId);
+        // Log for admin debugging
+        await db.collection("unlock_failures").add({
+          userEmail: order.userEmail || email,
+          orderId,
+          reference,
+          reason: "books array empty after unlock",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          source: "paystackWebhook_post_unlock_check",
+        }).catch(() => {});
+      }
 
       // ── Send confirmation SMS/email to buyer ───────────────────────────────
       try {
@@ -670,7 +686,7 @@ exports.verifyPaystackPayment = onCall(
         if (!orderSnap.exists) {
           orderSnap = await db.collection("orders").doc(reference).get();
         }
-        if (orderSnap.exists && orderSnap.data().status !== "Completed") {
+      if (orderSnap.exists && orderSnap.data().status !== "Completed") {
           const order = orderSnap.data();
           await db.collection("orders").doc(orderSnap.id).update({
             status:          "Completed",
@@ -682,6 +698,23 @@ exports.verifyPaystackPayment = onCall(
           });
           await unlockBooksForUser(userEmail, order.items || [], "paystack_verify");
           console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderSnap.id);
+          
+          // Verify unlock was successful — check that books were actually written to libraries
+          const libRef = db.collection("libraries").doc(libDocId(userEmail));
+          const libSnap = await libRef.get();
+          if (!libSnap.exists || !libSnap.data()?.books || libSnap.data().books.length === 0) {
+            console.error("[verifyPaystack] CRITICAL: Unlock verification failed for", userEmail, "order:", orderSnap.id);
+            // Log for admin debugging
+            await db.collection("unlock_failures").add({
+              userEmail,
+              orderId: orderSnap.id,
+              reference,
+              reason: "books array empty after unlock",
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              source: "verifyPaystack_post_unlock_check",
+            }).catch(() => {});
+          }
+          
           // Send confirmation SMS/email to buyer
           try {
             await sendOrderConfirmationToUser(
@@ -1711,6 +1744,190 @@ exports.getUserLoginHistory = onCall(
       console.error("[getUserLoginHistory] error:", err.message);
       throw new HttpsError("internal", "Failed to fetch login history");
     }
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── Password Reset OTP — send reset code via email & SMS ─────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+exports.sendPasswordResetOtp = onCall(
+  {
+    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const nodemailer = require("nodemailer");
+    
+    const { email, phone, otp, name } = request.data;
+    if (!email || !otp) {
+      throw new HttpsError("invalid-argument", "email and otp are required");
+    }
+
+    const userName = name || "Valued Reader";
+    const otpCode = String(otp).slice(0, 6); // 6 digits
+
+    const smtpHost     = SMTP_HOST.value()      || "";
+    const smtpPort     = parseInt(SMTP_PORT.value() || "587", 10);
+    const smtpUser     = SMTP_USER.value()      || "";
+    const smtpPass     = SMTP_PASS.value()      || "";
+
+    const atApiKey   = AT_API_KEY.value()   || "";
+    const atUsername = AT_USERNAME.value()  || "";
+    const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
+
+    // ── Email HTML template ──────────────────────────────────────────────────
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0d0d1a;font-family:Georgia,serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d1a;padding:40px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#13132a;border-radius:12px;border:1px solid rgba(201,168,76,0.3);overflow:hidden;">
+        <tr><td style="background:linear-gradient(135deg,#1a1a0f,#2a2508);padding:28px 36px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
+          <h1 style="margin:0;color:#c9a84c;font-size:1.5rem;letter-spacing:1px;">🔐 Reset Your Password</h1>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <p style="margin:0 0 8px;color:#f0ece2;font-size:1rem;">Hi <strong>${userName}</strong>,</p>
+          <p style="margin:0 0 24px;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">
+            You requested a password reset for your Ellines Haven account. Use this code to reset your password. <strong style="color:#c9a84c;">This code expires in 15 minutes.</strong>
+          </p>
+          <div style="text-align:center;margin:28px 0;">
+            <div style="display:inline-block;background:#0d0d1a;border:2px solid #c9a84c;border-radius:12px;padding:20px 40px;">
+              <div style="color:#c9a84c;font-size:2rem;font-weight:700;letter-spacing:6px;font-family:monospace;">${otpCode}</div>
+              <div style="color:rgba(201,168,76,0.6);font-size:0.8rem;margin-top:8px;">6-digit reset code</div>
+            </div>
+          </div>
+          <p style="margin:28px 0 0;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;text-align:center;">
+            <strong>Didn't request a reset?</strong> Ignore this email. Your account remains secure.
+          </p>
+          <p style="margin:16px 0 0;color:rgba(240,236,226,0.5);font-size:0.82rem;line-height:1.6;">
+            Questions? Contact us at <a href="mailto:ellines.haven@gmail.com" style="color:#c9a84c;">ellines.haven@gmail.com</a> or WhatsApp: 0748 255 466.
+          </p>
+        </td></tr>
+        <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
+          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · ellines.haven@gmail.com</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+    const textBody = `🔐 Reset Your Password\n\nHi ${userName},\n\nYou requested a password reset. Use this code to reset your password:\n\n${otpCode}\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, ignore this email.\n\n— Ellines Haven Team`;
+
+    const smsBody = `Ellines Haven: Your password reset code is ${otpCode}. Valid for 15 min. Do not share.`;
+
+    let emailSent = false;
+    let smsSent = false;
+
+    // ── Send Email via SMTP ──────────────────────────────────────────────────
+    if (smtpHost && smtpUser && smtpPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host:   smtpHost,
+          port:   587,
+          secure: false,
+          auth:   { user: smtpUser, pass: smtpPass },
+          tls:    { rejectUnauthorized: false },
+          connectionTimeout: 10000,
+          greetingTimeout:   10000,
+          socketTimeout:     10000,
+        });
+        await transporter.sendMail({
+          from:    `"Ellines Haven" <${smtpUser}>`,
+          to:      email,
+          subject: "🔐 Password Reset Code — Ellines Haven",
+          text:    textBody,
+          html:    htmlBody,
+        });
+        emailSent = true;
+        console.log("[sendPasswordResetOtp] Email sent to", email);
+      } catch (e) {
+        console.warn("[sendPasswordResetOtp] SMTP email failed:", e.message);
+      }
+    } else {
+      console.warn("[sendPasswordResetOtp] SMTP not configured");
+    }
+
+    // ── Send SMS via Africa's Talking ────────────────────────────────────────
+    if (phone && atApiKey && atUsername) {
+      try {
+        let formattedPhone = String(phone).replace(/\D/g, "");
+        if (formattedPhone.startsWith("0"))   formattedPhone = "+254" + formattedPhone.slice(1);
+        else if (formattedPhone.startsWith("254")) formattedPhone = "+" + formattedPhone;
+        else if (!formattedPhone.startsWith("+"))  formattedPhone = "+254" + formattedPhone;
+
+        const isSandbox = atUsername === "sandbox";
+        const params = new URLSearchParams({
+          username: atUsername,
+          to:       formattedPhone,
+          message:  smsBody,
+        });
+        if (!isSandbox && atSenderId) params.append("from", atSenderId);
+
+        await axios.post(
+          "https://api.africastalking.com/version1/messaging",
+          params.toString(),
+          {
+            headers: {
+              apiKey:         atApiKey,
+              Accept:         "application/json",
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        smsSent = true;
+        console.log("[sendPasswordResetOtp] SMS sent to", formattedPhone);
+      } catch (e) {
+        console.warn("[sendPasswordResetOtp] SMS failed:", e.response?.data || e.message);
+      }
+    }
+
+    // ── Fallback: AT Email (production only) ─────────────────────────────────
+    if (!emailSent && atApiKey && atUsername && atUsername !== "sandbox") {
+      try {
+        const emailParams = new URLSearchParams({
+          username: atUsername,
+          to:       email,
+          from:     smtpUser || "noreply@ellines-haven.web.app",
+          subject:  "🔐 Password Reset Code — Ellines Haven",
+          message:  textBody,
+        });
+        await axios.post(
+          "https://api.africastalking.com/version1/messaging/email",
+          emailParams.toString(),
+          {
+            headers: {
+              apiKey:         atApiKey,
+              Accept:         "application/json",
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        emailSent = true;
+        console.log("[sendPasswordResetOtp] Fallback email sent via AT to", email);
+      } catch (e) {
+        console.warn("[sendPasswordResetOtp] AT email fallback failed:", e.response?.data || e.message);
+      }
+    }
+
+    if (!emailSent && !smsSent) {
+      // Log failure for debugging
+      try {
+        await db.collection("password_reset_failures").add({
+          email,
+          phone,
+          reason: "No email or SMS service configured",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch {}
+      throw new HttpsError("unavailable", "Could not send reset code. Please try again or contact support@ellines-haven.co.ke");
+    }
+
+    return { emailSent, smsSent };
   }
 );
 
