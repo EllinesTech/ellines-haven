@@ -39,6 +39,7 @@ const AdvancedSearchPanel    = lazy(() => import('./admin-panels/AdvancedSearchP
 const PreOrderPanel          = lazy(() => import('./admin-panels/PreOrderPanel'));
 const EmailNotificationPanel = lazy(() => import('./admin-panels/EmailNotificationPanel'));
 const CommentThreadsPanel    = lazy(() => import('./admin-panels/CommentThreadsPanel'));
+const ChallengesPanel        = lazy(() => import('./admin-panels/ChallengesPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3458,6 +3459,7 @@ export default function Admin() {
     { k:'preorder',      label:'Pre-Orders',        icon:'⏰', group:'content' },
     { k:'emailnotif',    label:'Email Notifications', icon:'📧', group:'content' },
     { k:'comments',      label:'Comments',          icon:'💬', group:'content' },
+    { k:'challenges',    label:'Reading Challenges', icon:'📖', group:'content' },
     /* ── Super admin only ── */
     { k:'admins',           label:'Admin Control',      icon:'🛡️', group:'super' },
     { k:'godmode',          label:'God Mode',           icon:'⚡', group:'super' },
@@ -5692,6 +5694,15 @@ export default function Admin() {
           <Suspense fallback={<PanelLoader />}>
             <CommentThreadsPanel showToast={showToast} books={books} isSuper={isSuper} />
           </Suspense>
+        )}
+
+        {/* -- READING CHALLENGES -- */}
+        {tab === 'challenges' && (
+          <div className="adm-main-scroll">
+            <Suspense fallback={<PanelLoader />}>
+              <ChallengesPanel />
+            </Suspense>
+          </div>
         )}
 
         {/* -- BACKUP & RESTORE -- */}

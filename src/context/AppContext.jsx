@@ -3,7 +3,7 @@ import { BOOKS as INITIAL_BOOKS } from '../data/books';
 import { titleToSlug } from '../utils/slugify';
 import {
   doc, getDoc, setDoc, updateDoc,
-  collection, onSnapshot, serverTimestamp, getDocs,
+  collection, onSnapshot, serverTimestamp, getDocs, query, where,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -387,6 +387,22 @@ export function AppProvider({ children }) {
     if (!user?.email) { setWishlistState([]); return; }
     const key = `eh_wishlist_${user.email.toLowerCase().replace(/[^a-z0-9]/g,'_')}`;
     setWishlistState(load(key, []));
+  }, [user?.email]); // eslint-disable-line
+
+  // ── Reading Challenges (Phase 5-6) ─────────────────────────────────────────
+  const [challenges, setChallengesState] = useState([]);
+
+  useEffect(() => {
+    if (!user?.email) { setChallengesState([]); return; }
+    const challengesRef = collection(db, 'challenges');
+    const q = query(challengesRef, where('userEmail', '==', user.email.toLowerCase()));
+    
+    const unsub = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setChallengesState(data);
+    }, () => setChallengesState([]));
+    
+    return () => unsub();
   }, [user?.email]); // eslint-disable-line
 
   // ── Chapter Grants (admin-granted access) ─────────────────────────────────
@@ -941,6 +957,8 @@ export function AppProvider({ children }) {
       wishlist, toggleWishlist, isWishlisted,
       // Referral system
       referralData, applyReferralDiscount, trackReferralConversion,
+      // Reading Challenges (Phase 5-6)
+      challenges,
       // Book lookup by slug or ID
       getBookBySlugOrId,
     }}>

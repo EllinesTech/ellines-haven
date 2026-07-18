@@ -42,6 +42,7 @@ import { initializeActivityLogger } from './utils/reliableActivityLogger';
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+
 import './App.css';
 
 /* ── Reliable reload helper — clears all SW caches then hard-reloads ─────────
@@ -871,6 +872,7 @@ export default function App() {
                           <Route path="/reader/:email" element={<PageErrorBoundary label="Reader Profile failed to load"><ReaderProfile /></PageErrorBoundary>} />
                           <Route path="/admin-profile" element={<PageErrorBoundary label="Admin Profile failed to load"><AdminProfile /></PageErrorBoundary>} />
                           <Route path="/recommendations" element={<PageErrorBoundary label="Recommendations failed to load"><Recommendations /></PageErrorBoundary>} />
+                          <Route path="/challenges"    element={<PageErrorBoundary label="Challenges failed to load"><Challenges /></PageErrorBoundary>} />
                           <Route path="/faq"           element={<FAQ />} />
                           <Route path="/terms"         element={<Terms />} />
                           <Route path="/privacy"       element={<Privacy />} />
