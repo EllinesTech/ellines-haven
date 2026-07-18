@@ -270,7 +270,7 @@
     </script>
     <!-- Block crawlers on non-production domains (e.g. pages.dev preview URLs) -->
     <!-- Production domain (haven.ellines.co.ke) is NOT blocked - it's allowed to be indexed -->
-    <!-- build: 20260718-fix-mime-cache-v2 -->
+    <!-- build: 20260718-stale-guard-in-head -->
     <script>
       if (location.hostname.includes('pages.dev') || location.hostname.includes('preview')) {
         var m = document.createElement('meta');
@@ -281,23 +281,15 @@
     </script>
     <!-- EXPLICIT ALLOW FOR PRODUCTION -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <!-- CRITICAL: Stale deploy guard — runs synchronously before any module loads.
-         If this index.html was cached from a prior build, its chunk script tags
-         will reference old hashed filenames that no longer exist on the CDN.
-         Strategy: store the build stamp in sessionStorage. On next page load, if
-         the stamp has changed (new deploy), hard-reload with cache-bust to force
-         the browser to fetch a fresh index.html from the server.
-         This fires BEFORE <script type="module"> so it prevents the MIME error. -->
+    <!-- CRITICAL: Stale deploy guard — MUST be in <head> BEFORE module scripts.
+         Vite moves <script type="module"> into <head> during build, so this guard
+         must also be in <head> to run first and redirect stale browsers. -->
     <script>
       (function(){
         var STAMP = '__BUILD_STAMP__';
         var KEY   = 'eh_build_v';
         var stored = sessionStorage.getItem(KEY);
         if (stored && stored !== STAMP) {
-          // Build changed — nuke everything and reload to get fresh HTML
           sessionStorage.setItem(KEY, STAMP);
           if ('caches' in window) {
             caches.keys().then(function(k){ return Promise.all(k.map(function(n){ return caches.delete(n); })); })
@@ -306,11 +298,14 @@
           } else {
             window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP);
           }
-          throw new Error('Reloading for new build ' + STAMP); // stop further script execution
+          throw new Error('Stale build — reloading for ' + STAMP);
         }
         sessionStorage.setItem(KEY, STAMP);
       })();
     </script>
+  </head>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <!-- Service Worker: DISABLED — causes cache corruption across deploys -->
     <!-- The site is hosted on Cloudflare Pages CDN which handles caching natively. -->
