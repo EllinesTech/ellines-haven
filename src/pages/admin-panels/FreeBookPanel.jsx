@@ -105,11 +105,21 @@ export default function FreeBookPanel({ showToast, books = [], isSuper }) {
     try {
       // Load all known users from Firestore
       const usersSnap = await getDocs(collection(db, 'users'));
+      
+      // ── Filter out deleted users ──
+      const deletedEmails = new Set([
+        ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+      ].map(e => String(e).toLowerCase()));
+      
       let done = 0, skipped = 0;
 
       for (const userDoc of usersSnap.docs) {
         const email = userDoc.data().email;
         if (!email) { skipped++; continue; }
+        
+        // ── Skip if user is deleted ──
+        if (deletedEmails.has(email.toLowerCase())) { skipped++; continue; }
+        
         const libRef  = doc(db, 'libraries', libDocId(email));
         const libSnap = await getDoc(libRef);
         const existing = libSnap.exists() ? (libSnap.data().books || []) : [];
@@ -151,9 +161,18 @@ export default function FreeBookPanel({ showToast, books = [], isSuper }) {
 
     setRevoking(true);
     try {
+      // ── Filter out deleted users ──
+      const deletedEmails = new Set([
+        ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+      ].map(e => String(e).toLowerCase()));
+      
       const snap = await getDocs(collection(db, 'libraries'));
       let done = 0;
       for (const d of snap.docs) {
+        // ── Skip if this is a deleted user's library ──
+        const libEmail = d.data().email;
+        if (libEmail && deletedEmails.has(libEmail.toLowerCase())) continue;
+        
         const bks = d.data().books || [];
         const filtered = bks.filter(
           b => !(b.id === selectedId &&

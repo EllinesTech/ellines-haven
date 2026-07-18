@@ -33,7 +33,14 @@ export default function SMSPanel({ showToast, users = [] }) {
 
   useEffect(() => {
     getDocs(collection(db, 'users')).then(snap => {
-      setFsUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      // ── Filter out deleted users ──
+      const deletedEmails = new Set([
+        ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
+      ].map(e => String(e).toLowerCase()));
+      const filtered = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => !deletedEmails.has((u.email || '').toLowerCase()));
+      setFsUsers(filtered);
     }).catch(() => {});
   }, []);
 
