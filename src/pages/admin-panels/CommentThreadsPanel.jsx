@@ -17,6 +17,7 @@ export default function CommentThreadsPanel({ showToast, books, isSuper }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, pending, approved, flagged
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, flagged: 0 });
+  const [actionInProgress, setActionInProgress] = useState(null);
 
   useEffect(() => {
     loadComments();
@@ -53,41 +54,80 @@ export default function CommentThreadsPanel({ showToast, books, isSuper }) {
     setLoading(false);
   };
 
-  const approveComment = async (commentId) => {
+  const updateStats = async () => {
     try {
+      const allSnap = await getDocs(collection(db, 'book_comments'));
+      const allDocs = allSnap.docs.map(d => d.data());
+      setStats({
+        total: allDocs.length,
+        pending: allDocs.filter(c => c.status === 'pending').length,
+        approved: allDocs.filter(c => c.status === 'approved').length,
+        flagged: allDocs.filter(c => c.status === 'flagged').length,
+      });
+    } catch (e) {
+      console.error('Failed to update stats:', e);
+    }
+  };
+
+  const approveComment = async (commentId) => {
+    setActionInProgress(commentId);
+    try {
+      // Optimistic update: remove from current view if filtering by status
+      setComments(prev => prev.filter(c => c.id !== commentId));
+      
       await updateDoc(doc(db, 'book_comments', commentId), {
         status: 'approved',
         updatedAt: serverTimestamp(),
       });
       showToast?.('✅ Comment approved');
-      loadComments();
+      await updateStats();
     } catch (e) {
       showToast?.('❌ Failed: ' + e.message);
+      // Reload on error to restore UI
+      await loadComments();
+    } finally {
+      setActionInProgress(null);
     }
   };
 
   const flagComment = async (commentId, reason) => {
+    setActionInProgress(commentId);
     try {
+      // Optimistic update: remove from current view if filtering by status
+      setComments(prev => prev.filter(c => c.id !== commentId));
+      
       await updateDoc(doc(db, 'book_comments', commentId), {
         status: 'flagged',
         flagReason: reason,
         updatedAt: serverTimestamp(),
       });
       showToast?.('✅ Comment flagged for review');
-      loadComments();
+      await updateStats();
     } catch (e) {
       showToast?.('❌ Failed: ' + e.message);
+      // Reload on error to restore UI
+      await loadComments();
+    } finally {
+      setActionInProgress(null);
     }
   };
 
   const deleteComment = async (commentId) => {
     if (!window.confirm('Delete this comment? This cannot be undone.')) return;
+    setActionInProgress(commentId);
     try {
+      // Optimistic update: remove from current view
+      setComments(prev => prev.filter(c => c.id !== commentId));
+      
       await deleteDoc(doc(db, 'book_comments', commentId));
       showToast?.('✅ Comment deleted');
-      loadComments();
+      await updateStats();
     } catch (e) {
       showToast?.('❌ Failed: ' + e.message);
+      // Reload on error to restore UI
+      await loadComments();
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -216,27 +256,45 @@ export default function CommentThreadsPanel({ showToast, books, isSuper }) {
                   {comment.status !== 'approved' && (
                     <button
                       className="btn btn-outline btn-sm"
-                      style={{ color: '#2ecc71', borderColor: 'rgba(46,204,113,0.3)' }}
+                      style={{ 
+                        color: '#2ecc71', 
+                        borderColor: 'rgba(46,204,113,0.3)',
+                        opacity: actionInProgress === comment.id ? 0.5 : 1,
+                        cursor: actionInProgress === comment.id ? 'not-allowed' : 'pointer'
+                      }}
                       onClick={() => approveComment(comment.id)}
+                      disabled={actionInProgress === comment.id}
                     >
-                      ✅ Approve
+                      {actionInProgress === comment.id ? '⏳ Approving…' : '✅ Approve'}
                     </button>
                   )}
                   {comment.status !== 'flagged' && (
                     <button
                       className="btn btn-outline btn-sm"
-                      style={{ color: '#e8832a', borderColor: 'rgba(232,131,42,0.3)' }}
+                      style={{ 
+                        color: '#e8832a', 
+                        borderColor: 'rgba(232,131,42,0.3)',
+                        opacity: actionInProgress === comment.id ? 0.5 : 1,
+                        cursor: actionInProgress === comment.id ? 'not-allowed' : 'pointer'
+                      }}
                       onClick={() => flagComment(comment.id, 'inappropriate')}
+                      disabled={actionInProgress === comment.id}
                     >
-                      🚩 Flag
+                      {actionInProgress === comment.id ? '⏳ Flagging…' : '🚩 Flag'}
                     </button>
                   )}
                   <button
                     className="btn btn-outline btn-sm"
-                    style={{ color: '#e74c3c', borderColor: 'rgba(231,76,60,0.3)' }}
+                    style={{ 
+                      color: '#e74c3c', 
+                      borderColor: 'rgba(231,76,60,0.3)',
+                      opacity: actionInProgress === comment.id ? 0.5 : 1,
+                      cursor: actionInProgress === comment.id ? 'not-allowed' : 'pointer'
+                    }}
                     onClick={() => deleteComment(comment.id)}
+                    disabled={actionInProgress === comment.id}
                   >
-                    🗑️ Delete
+                    {actionInProgress === comment.id ? '⏳ Deleting…' : '🗑️ Delete'}
                   </button>
                 </div>
               </div>
