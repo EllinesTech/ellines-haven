@@ -267,15 +267,18 @@
     }
     </script>
     <!-- Block crawlers on non-production domains (e.g. pages.dev preview URLs) -->
+    <!-- Production domain (haven.ellines.co.ke) is NOT blocked - it's allowed to be indexed -->
     <!-- build: 202607091920 -->
     <script>
-      if (location.hostname.includes('pages.dev')) {
+      if (location.hostname.includes('pages.dev') || location.hostname.includes('preview')) {
         var m = document.createElement('meta');
         m.name = 'robots';
         m.content = 'noindex, nofollow';
         document.head.appendChild(m);
       }
     </script>
+    <!-- EXPLICIT ALLOW FOR PRODUCTION -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   </head>
   <body>
     <div id="root"></div>
