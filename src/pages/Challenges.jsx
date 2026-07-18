@@ -20,7 +20,7 @@ import {
   doc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db } from '../firebase';
 import './Challenges.css';
 
 /**

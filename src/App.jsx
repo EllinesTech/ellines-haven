@@ -255,6 +255,7 @@ const Wishlist        = lazy(() => import('./pages/Wishlist'));
 const ChangePassword  = lazy(() => import('./pages/ChangePassword'));
 const ReaderProfile   = lazy(() => import('./pages/ReaderProfile'));
 const Recommendations = lazy(() => import('./pages/Recommendations'));
+const Challenges      = lazy(() => import('./pages/Challenges'));
 
 /* ── Scroll to top on route change ── */
 function ScrollToTop() {
