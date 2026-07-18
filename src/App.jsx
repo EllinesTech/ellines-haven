@@ -253,6 +253,7 @@ const Privacy      = lazy(() => import('./pages/Privacy'));
 const Wishlist        = lazy(() => import('./pages/Wishlist'));
 const ChangePassword  = lazy(() => import('./pages/ChangePassword'));
 const ReaderProfile   = lazy(() => import('./pages/ReaderProfile'));
+const Recommendations = lazy(() => import('./pages/Recommendations'));
 
 /* ── Scroll to top on route change ── */
 function ScrollToTop() {
@@ -869,6 +870,7 @@ export default function App() {
                           <Route path="/profile"       element={<PageErrorBoundary label="Profile failed to load"><UserProfile /></PageErrorBoundary>} />
                           <Route path="/reader/:email" element={<PageErrorBoundary label="Reader Profile failed to load"><ReaderProfile /></PageErrorBoundary>} />
                           <Route path="/admin-profile" element={<PageErrorBoundary label="Admin Profile failed to load"><AdminProfile /></PageErrorBoundary>} />
+                          <Route path="/recommendations" element={<PageErrorBoundary label="Recommendations failed to load"><Recommendations /></PageErrorBoundary>} />
                           <Route path="/faq"           element={<FAQ />} />
                           <Route path="/terms"         element={<Terms />} />
                           <Route path="/privacy"       element={<Privacy />} />

@@ -5,6 +5,7 @@ import BookCard, { waOrderLink, BookStatusBadge, BookBadges } from '../component
 import BookReviews from '../components/BookReviews';
 import BookComments from '../components/BookComments';
 import SocialShare from '../components/SocialShare';
+import SimilarBooksSlider from '../components/SimilarBooksSlider';
 import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -1362,6 +1363,13 @@ export default function BookDetail() {
       <section className="section">
         <div className="container">
           <BookComments bookId={book?.id} bookTitle={book?.title} />
+        </div>
+      </section>
+
+      {/* ── Similar Books ── */}
+      <section className="section">
+        <div className="container">
+          <SimilarBooksSlider bookId={book?.id} />
         </div>
       </section>
 
