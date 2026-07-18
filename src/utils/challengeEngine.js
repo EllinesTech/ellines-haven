@@ -1,7 +1,8 @@
 /**
- * Challenge Engine
+ * Challenge Engine - PHASE 5-6
  * Handles reading challenge logic: tracking progress, calculating points, managing leaderboards
  * Integrated with Firestore for real-time challenge data
+ * FIX: Challenges component now properly imported in App.jsx lazy imports
  */
 
 // Challenge types with their goals and reward points
