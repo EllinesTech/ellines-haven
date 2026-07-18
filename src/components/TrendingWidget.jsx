@@ -55,11 +55,26 @@ export default function TrendingWidget({ limit = 5, title = "🔥 Trending Now" 
               </span>
             </div>
             <div className="trending-cover">
-              <img
-                src={book.cover}
-                alt={book.title}
-                loading="lazy"
-              />
+              {book.coverType === 'photo' && book.cover ? (
+                <img
+                  src={book.cover}
+                  alt={book.title}
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  background: book.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                }}>
+                  📖
+                </div>
+              )}
             </div>
             <div className="trending-info">
               <h4 className="trending-title">{book.title}</h4>

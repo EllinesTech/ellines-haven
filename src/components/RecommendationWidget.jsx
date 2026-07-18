@@ -130,11 +130,28 @@ export default function RecommendationWidget({ limit = 8, title = "📚 Recommen
           <div key={book.id} className="rec-card">
             <Link to={`/book/${book.slug || book.id}`} className="rec-card-link">
               <div className="rec-cover">
-                <img 
-                  src={book.cover} 
-                  alt={book.title}
-                  loading="lazy"
-                />
+                {book.coverType === 'photo' && book.cover ? (
+                  <img 
+                    src={book.cover} 
+                    alt={book.title}
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: book.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'column',
+                    fontSize: '2rem',
+                    opacity: 0.6,
+                  }}>
+                    📖
+                  </div>
+                )}
                 {book.rating && (
                   <div className="rec-rating">⭐ {book.rating.toFixed(1)}</div>
                 )}
