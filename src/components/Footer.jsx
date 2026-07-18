@@ -1,18 +1,41 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import NewsletterSignup from './NewsletterSignup';
+import { getSocialLink } from '../utils/socialLinks';
 import './Footer.css';
 
 const GENRES = ['Romance', 'Mystery', 'Drama', 'Historical', 'Short Stories', 'Fantasy'];
 
+const SOCIAL_ICONS = {
+  facebook: '📘',
+  instagram: '📸',
+  twitter: '𝕏',
+  tiktok: '🎵',
+  youtube: '📺',
+  linkedin: '💼',
+  telegram: '✈️',
+  discord: '💬',
+  snapchat: '👻',
+  pinterest: '📌',
+  reddit: '🔴',
+  whatsapp: '💬',
+};
+
 export default function Footer() {
   const [navLogo, setNavLogo] = useState('/logo-nobg3.png');
+  const [socialHandles, setSocialHandles] = useState({});
+  
   useEffect(() => {
     import('../firebase').then(({ db }) => {
       import('firebase/firestore').then(({ doc, getDoc }) => {
-        getDoc(doc(db, 'site_data', 'design_settings')).then(snap => {
-          if (snap.exists() && snap.data().navLogo) setNavLogo(snap.data().navLogo);
-        }).catch(() => {});
+        Promise.all([
+          getDoc(doc(db, 'site_data', 'design_settings')).then(snap => {
+            if (snap.exists() && snap.data().navLogo) setNavLogo(snap.data().navLogo);
+          }).catch(() => {}),
+          getDoc(doc(db, 'site_data', 'site_controls')).then(snap => {
+            if (snap.exists() && snap.data().socialHandles) setSocialHandles(snap.data().socialHandles);
+          }).catch(() => {}),
+        ]);
       });
     });
   }, []);
@@ -58,6 +81,31 @@ export default function Footer() {
                 <span key={p} className="footer__pay-chip">{p}</span>
               ))}
             </div>
+            
+            {/* Social media handles */}
+            {Object.keys(socialHandles).length > 0 && (
+              <div className="footer__social">
+                <span className="footer__social-label">Follow us:</span>
+                <div className="footer__social-links">
+                  {Object.entries(socialHandles).map(([platform, handle]) => {
+                    if (!handle || !handle.trim()) return null;
+                    return (
+                      <a
+                        key={platform}
+                        href={getSocialLink(platform, handle)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`${platform.charAt(0).toUpperCase() + platform.slice(1)} — ${handle}`}
+                        className="footer__social-link"
+                        aria-label={`Visit Ellines Haven on ${platform}`}
+                      >
+                        {SOCIAL_ICONS[platform] || '🌐'}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Library column */}

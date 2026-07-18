@@ -23,6 +23,7 @@ const VisitorsPanel     = lazy(() => import('./admin-panels/VisitorsPanel'));
 const ActivityPanel     = lazy(() => import('./admin-panels/ActivityPanel'));
 const SMSPanel          = lazy(() => import('./admin-panels/SMSPanel'));
 const ChatSettingsPanel = lazy(() => import('./admin-panels/ChatSettingsPanel'));
+const SocialHandlesPanel = lazy(() => import('./admin-panels/SocialHandlesPanel'));
 const PaymentFeesPanel  = lazy(() => import('./admin-panels/PaymentFeesPanel'));
 const ContentProtectionPanel = lazy(() => import('./admin-panels/ContentProtectionPanel'));
 const DeviceSettingsPanel    = lazy(() => import('./admin-panels/DeviceSettingsPanel'));
@@ -3438,6 +3439,7 @@ export default function Admin() {
     { k:'livechat',      label:'Live Chat',          icon:'⚡', group:'admin' },
     { k:'chatsettings',  label:'Chat Settings',      icon:'💬', group:'admin' },
     { k:'sms',           label:'SMS Broadcast',      icon:'📱', group:'admin' },
+    { k:'social',        label:'Social Media',       icon:'🌐', group:'admin' },
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
     { k:'freebook',      label:'Free Book Gift',     icon:'🎁', group:'admin' },
@@ -3700,6 +3702,15 @@ export default function Admin() {
           </div>
         )}
 
+        {/* Social Media tab — scrollable */}
+        {tab === 'social' && (
+          <div className="adm-main-scroll">
+            <Suspense fallback={<PanelLoader />}>
+              <SocialHandlesPanel showToast={showToast} isSuper={isSuper} />
+            </Suspense>
+          </div>
+        )}
+
         {/* Chat Settings tab — scrollable */}
         {tab === 'chatsettings' && (
           <div className="adm-main-scroll">
@@ -3710,7 +3721,7 @@ export default function Admin() {
         )}
 
         {/* All other tabs — scrollable with padding */}
-        {tab !== 'messages' && tab !== 'livechat' && tab !== 'sms' && tab !== 'chatsettings' && (
+        {tab !== 'messages' && tab !== 'livechat' && tab !== 'sms' && tab !== 'social' && tab !== 'chatsettings' && (
           <div className="adm-main-scroll">
         {addUserModal && (
           <div className="adm-overlay">
