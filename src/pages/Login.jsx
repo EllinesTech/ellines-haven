@@ -736,34 +736,45 @@ export default function Login() {
 async function logLogin(email, userName) {
   try {
     const device = await getDeviceTypeForLog();
+    const SUPER_ADMIN_EMAIL = 'ellines.haven@gmail.com';
+    const isSuper = email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 
     // ── 1. Write to admin_notifications directly (guaranteed, cross-device) ──
     // This is the primary source for the admin Activity panel.
+    // NOTE: Super admin logins are NOT tracked - they are invisible (ghost mode)
     // The Cloud Function below adds IP/geolocation but is not required.
-    try {
-      const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
-      await trackActivity({
-        category: NOTIFICATION_CATEGORIES.USER_LOGIN,
-        title:    'User Login',
-        message:  `${userName || email} logged in`,
-        userEmail: email.toLowerCase(),
-        userName:  userName || email,
-        metadata:  { device, loginTime: new Date().toISOString() },
-        priority: 'low',
-      });
-    } catch (e) {
-      console.warn('[logLogin] trackActivity failed:', e.message);
+    if (!isSuper) {
+      // Only track non-super-admin logins
+      try {
+        const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
+        await trackActivity({
+          category: NOTIFICATION_CATEGORIES.USER_LOGIN,
+          title:    'User Login',
+          message:  `${userName || email} logged in`,
+          userEmail: email.toLowerCase(),
+          userName:  userName || email,
+          metadata:  { device, loginTime: new Date().toISOString() },
+          priority: 'low',
+        });
+      } catch (e) {
+        console.warn('[logLogin] trackActivity failed:', e.message);
+      }
+    } else {
+      console.log('[logLogin] Super admin login NOT tracked (ghost mode)');
     }
 
     // ── 2. Log to system_logs (admin raw log) ──
-    try {
-      const logsDoc = doc(db, 'site_data', 'system_logs');
-      const snap    = await getDoc(logsDoc);
-      const existing = snap.exists() ? (snap.data().logs || []) : [];
-      const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
-      await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
-    } catch (e) {
-      console.warn('[logLogin] system_logs failed:', e.message);
+    // NOTE: Super admin's logins are also not logged to system_logs
+    if (!isSuper) {
+      try {
+        const logsDoc = doc(db, 'site_data', 'system_logs');
+        const snap    = await getDoc(logsDoc);
+        const existing = snap.exists() ? (snap.data().logs || []) : [];
+        const entry = { time: new Date().toISOString().slice(0,16).replace('T',' '), type:'auth', event:'Login: '+email, user:email, ip:'browser', status:'success' };
+        await setDoc(logsDoc, { logs: [entry, ...existing].slice(0,500), updatedAt: serverTimestamp() }, { merge: true });
+      } catch (e) {
+        console.warn('[logLogin] system_logs failed:', e.message);
+      }
     }
 
     // ── 3. Cloud Function (adds real IP + geolocation to user_sessions) ──

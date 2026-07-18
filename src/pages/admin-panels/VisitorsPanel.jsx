@@ -226,7 +226,15 @@ export default function VisitorsPanel({ showToast }) {
       const ts = typeof v.visitedAtMs === 'number' ? v.visitedAtMs : v.visitedAt?.toMillis?.() || 0;
       if (Date.now() - ts >= 7 * 86400000) return false;
     }
-    if (!search) return true;
+    if (!search) {
+      // SUPER ADMIN GHOST MODE: Filter out super admin's visitor records
+      // Super admin's site visits should not be tracked/visible to other admins
+      const SUPER_ADMIN_EMAIL = 'ellines.haven@gmail.com';
+      if (v.userEmail?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        return false; // Hide super admin's visitor record
+      }
+      return true;
+    }
     const q = search.toLowerCase();
     return (
       v.ip?.includes(q) || v.rawIp?.includes(q) ||

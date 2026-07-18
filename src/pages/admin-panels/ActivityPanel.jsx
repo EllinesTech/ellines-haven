@@ -194,8 +194,18 @@ export default function ActivityPanel({ user, showToast }) {
       );
     }
     
+    // SUPER ADMIN GHOST MODE: Regular admins cannot see super admin's activities
+    // Super admin's own activities are NOT shown to other admins (they're invisible)
+    const SUPER_ADMIN_EMAIL = 'ellines.haven@gmail.com';
+    if (!isSuper) {
+      // Filter out any activities by the super admin
+      filtered = filtered.filter(n => 
+        n.userEmail?.toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase()
+      );
+    }
+    
     setFilteredNotifs(filtered);
-  }, [notifs, selectedCategory, showUnreadOnly, searchQuery, adminEmail]);
+  }, [notifs, selectedCategory, showUnreadOnly, searchQuery, adminEmail, isSuper]);
 
   const handleMarkRead = async (notifId) => {
     await markNotificationRead(notifId, adminEmail);

