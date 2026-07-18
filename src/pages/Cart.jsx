@@ -9,8 +9,9 @@ import { bookPath } from '../utils/slugify';
 import { usePageMeta } from '../hooks/usePageMeta';
 import './Cart.css';
 
-// Paystack public key — live key
-const PAYSTACK_PUBLIC_KEY = 'pk_live_081be2d1bdd05a16be4cc91b1267553a6444b463';
+// Paystack public key — loaded from environment variables
+// DO NOT hardcode API keys in source code
+const PAYSTACK_PUBLIC_KEY = __PAYSTACK_KEY__;
 
 // ── Paystack fee pass-through (customer bears the cost) ───────────────────────
 // Reverse-pricing formula: grossAmount = netPayout / (1 - feePercent)

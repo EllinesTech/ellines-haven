@@ -26,27 +26,25 @@ export default function CommentThreadsPanel({ showToast, books, isSuper }) {
   const loadComments = async () => {
     setLoading(true);
     try {
-      let q;
-      if (filter === 'all') {
-        q = query(collection(db, 'book_comments'), orderBy('createdAt', 'desc'));
-      } else {
-        q = query(
-          collection(db, 'book_comments'),
-          where('status', '==', filter),
-          orderBy('createdAt', 'desc')
-        );
-      }
+      // Fetch ALL comments without composite index requirement
+      // (orderBy alone doesn't need an index, only orderBy + where does)
+      const q = query(collection(db, 'book_comments'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
-      setComments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const allComments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter on client side to avoid composite index requirement
+      const filtered = filter === 'all' 
+        ? allComments 
+        : allComments.filter(c => c.status === filter);
+      
+      setComments(filtered);
 
       // Calculate stats
-      const allSnap = await getDocs(collection(db, 'book_comments'));
-      const allDocs = allSnap.docs.map(d => d.data());
       setStats({
-        total: allDocs.length,
-        pending: allDocs.filter(c => c.status === 'pending').length,
-        approved: allDocs.filter(c => c.status === 'approved').length,
-        flagged: allDocs.filter(c => c.status === 'flagged').length,
+        total: allComments.length,
+        pending: allComments.filter(c => c.status === 'pending').length,
+        approved: allComments.filter(c => c.status === 'approved').length,
+        flagged: allComments.filter(c => c.status === 'flagged').length,
       });
     } catch (e) {
       showToast?.('❌ Failed to load comments: ' + e.message);

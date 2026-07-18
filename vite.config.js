@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { loadEnv } from 'vite'
 
 // ── Build stamp — shared across plugins ──────────────────────────────────────
 const BUILD_STAMP = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
@@ -67,34 +68,42 @@ function stampPublicAssets() {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), stampServiceWorker(), stampPublicAssets()],
-  server: {
-    port: 5173,
-    strictPort: true,
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    chunkSizeWarningLimit: 600,
-    minify: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('firebase/auth') || id.includes('@firebase/auth'))
-            return 'vendor-firebase-auth';
-          if (id.includes('firebase/firestore') || id.includes('@firebase/firestore'))
-            return 'vendor-firebase-firestore';
-          if (id.includes('firebase/storage') || id.includes('@firebase/storage'))
-            return 'vendor-firebase-storage';
-          if (id.includes('firebase') || id.includes('@firebase'))
-            return 'vendor-firebase-core';
-          if (id.includes('react-dom') || id.includes('react-router'))
-            return 'vendor-react';
-          if (id.includes('node_modules'))
-            return 'vendor';
+export default defineConfig(({ command, mode }) => {
+  // Load environment variables for the current mode
+  const env = loadEnv(mode, process.cwd(), '')
+
+  return {
+    plugins: [react(), stampServiceWorker(), stampPublicAssets()],
+    define: {
+      '__PAYSTACK_KEY__': JSON.stringify(env.VITE_PAYSTACK_PUBLIC_KEY || ''),
+    },
+    server: {
+      port: 5173,
+      strictPort: true,
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      chunkSizeWarningLimit: 600,
+      minify: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('firebase/auth') || id.includes('@firebase/auth'))
+              return 'vendor-firebase-auth';
+            if (id.includes('firebase/firestore') || id.includes('@firebase/firestore'))
+              return 'vendor-firebase-firestore';
+            if (id.includes('firebase/storage') || id.includes('@firebase/storage'))
+              return 'vendor-firebase-storage';
+            if (id.includes('firebase') || id.includes('@firebase'))
+              return 'vendor-firebase-core';
+            if (id.includes('react-dom') || id.includes('react-router'))
+              return 'vendor-react';
+            if (id.includes('node_modules'))
+              return 'vendor';
+          },
         },
       },
     },
-  },
+  }
 })
