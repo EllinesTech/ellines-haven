@@ -32,6 +32,13 @@ const SeriesPanel            = lazy(() => import('./admin-panels/SeriesPanel'));
 const ChapterGrantsPanel     = lazy(() => import('./admin-panels/ChapterGrantsPanel'));
 const ChapterAnalyticsPanel  = lazy(() => import('./admin-panels/ChapterAnalyticsPanel'));
 const FreeBookPanel          = lazy(() => import('./admin-panels/FreeBookPanel'));
+const ResponsiveLayoutEditor = lazy(() => import('./admin-panels/ResponsiveLayoutEditor'));
+const AuthorBlogPanel        = lazy(() => import('./admin-panels/AuthorBlogPanel'));
+const BookSeriesPanel        = lazy(() => import('./admin-panels/BookSeriesPanel'));
+const AdvancedSearchPanel    = lazy(() => import('./admin-panels/AdvancedSearchPanel'));
+const PreOrderPanel          = lazy(() => import('./admin-panels/PreOrderPanel'));
+const EmailNotificationPanel = lazy(() => import('./admin-panels/EmailNotificationPanel'));
+const CommentThreadsPanel    = lazy(() => import('./admin-panels/CommentThreadsPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3437,12 +3444,20 @@ export default function Admin() {
     /* ── Power tools — visible to both admin & superadmin ── */
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
     { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
+    { k:'responsive',    label:'Responsive Layout',  icon:'📐', group:'power' },
     { k:'security',      label:'Security',          icon:'🔒', group:'power' },
     { k:'contentprotect', label:'Content Protection', icon:'🛡️', group:'power' },
     { k:'plugins',       label:'Plugins & Tools',   icon:'🧩', group:'power' },
     { k:'integrations',  label:'Integrations',      icon:'🔌', group:'power' },
     { k:'logs',          label:'System Logs',       icon:'📋', group:'power' },
     { k:'backup',        label:'Backup & Restore',  icon:'💾', group:'power' },
+    /* ── Content & Features ── */
+    { k:'authorblog',    label:'Author Blog',       icon:'📝', group:'content' },
+    { k:'bookseries',    label:'Book Series',       icon:'📚', group:'content' },
+    { k:'advancedsearch', label:'Advanced Search',   icon:'🔍', group:'content' },
+    { k:'preorder',      label:'Pre-Orders',        icon:'⏰', group:'content' },
+    { k:'emailnotif',    label:'Email Notifications', icon:'📧', group:'content' },
+    { k:'comments',      label:'Comments',          icon:'💬', group:'content' },
     /* ── Super admin only ── */
     { k:'admins',           label:'Admin Control',      icon:'🛡️', group:'super' },
     { k:'godmode',          label:'God Mode',           icon:'⚡', group:'super' },
@@ -3561,6 +3576,19 @@ export default function Admin() {
               ))}
             </div>
           )}
+
+          {/* ── Content & Features ── */}
+          <div className="adm-nav-divider" />
+          <div className="adm-nav-section adm-nav-section-content">
+            <span className="adm-nav-section-dot adm-nav-section-dot--content" />
+            <span className="adm-nav-label">Content & Features</span>
+          </div>
+          {navItems.filter(n => n.group === 'content').map(({ k, label, icon }) => (
+            <button key={k} className={'adm-nav-btn adm-nav-btn--content' + (tab === k ? ' active' : '')} onClick={() => setTab(k)} title={label}>
+              <span className="adm-nav-icon-emoji">{icon}</span>
+              <span className="adm-nav-label">{label}</span>
+            </button>
+          ))}
 
           {/* ── Power Tools — admin & superadmin ── */}
           <div className="adm-nav-divider" />
@@ -5614,6 +5642,55 @@ export default function Admin() {
         {tab === 'integrations' && (
           <Suspense fallback={<PanelLoader />}>
             <IntegrationsPanel showToast={showToast} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- RESPONSIVE LAYOUT EDITOR -- */}
+        {tab === 'responsive' && (
+          <Suspense fallback={<PanelLoader />}>
+            <ResponsiveLayoutEditor showToast={showToast} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- AUTHOR BLOG -- */}
+        {tab === 'authorblog' && (
+          <Suspense fallback={<PanelLoader />}>
+            <AuthorBlogPanel showToast={showToast} books={books} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- BOOK SERIES -- */}
+        {tab === 'bookseries' && (
+          <Suspense fallback={<PanelLoader />}>
+            <BookSeriesPanel showToast={showToast} books={books} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- ADVANCED SEARCH -- */}
+        {tab === 'advancedsearch' && (
+          <Suspense fallback={<PanelLoader />}>
+            <AdvancedSearchPanel showToast={showToast} books={books} />
+          </Suspense>
+        )}
+
+        {/* -- PRE-ORDERS -- */}
+        {tab === 'preorder' && (
+          <Suspense fallback={<PanelLoader />}>
+            <PreOrderPanel showToast={showToast} books={books} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- EMAIL NOTIFICATIONS -- */}
+        {tab === 'emailnotif' && (
+          <Suspense fallback={<PanelLoader />}>
+            <EmailNotificationPanel showToast={showToast} users={users} isSuper={isSuper} />
+          </Suspense>
+        )}
+
+        {/* -- COMMENT THREADS MODERATION -- */}
+        {tab === 'comments' && (
+          <Suspense fallback={<PanelLoader />}>
+            <CommentThreadsPanel showToast={showToast} books={books} isSuper={isSuper} />
           </Suspense>
         )}
 

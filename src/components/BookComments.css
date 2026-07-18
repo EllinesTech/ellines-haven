@@ -1,0 +1,50 @@
+/* Book Comments Component */
+
+.book-comments {
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.book-comments h2 {
+  margin: 0 0 24px 0;
+  font-size: 1.3rem;
+  color: var(--gold);
+}
+
+.book-comments-form {
+  background: rgba(201, 168, 76, 0.05);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  padding: 20px;
+  margin-bottom: 24px;
+  border-radius: var(--r);
+}
+
+.book-comments-form textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.1);
+}
+
+.book-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .book-comments {
+    margin-top: 30px;
+    padding-top: 30px;
+  }
+
+  .book-comments h2 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+  }
+
+  .book-comments-form {
+    padding: 16px;
+  }
+}

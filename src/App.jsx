@@ -252,6 +252,7 @@ const Terms        = lazy(() => import('./pages/Terms'));
 const Privacy      = lazy(() => import('./pages/Privacy'));
 const Wishlist        = lazy(() => import('./pages/Wishlist'));
 const ChangePassword  = lazy(() => import('./pages/ChangePassword'));
+const ReaderProfile   = lazy(() => import('./pages/ReaderProfile'));
 
 /* ── Scroll to top on route change ── */
 function ScrollToTop() {
@@ -866,6 +867,7 @@ export default function App() {
                           <Route path="/founder"       element={<Founder />} />
                           <Route path="/contact"       element={<Contact />} />
                           <Route path="/profile"       element={<PageErrorBoundary label="Profile failed to load"><UserProfile /></PageErrorBoundary>} />
+                          <Route path="/reader/:email" element={<PageErrorBoundary label="Reader Profile failed to load"><ReaderProfile /></PageErrorBoundary>} />
                           <Route path="/admin-profile" element={<PageErrorBoundary label="Admin Profile failed to load"><AdminProfile /></PageErrorBoundary>} />
                           <Route path="/faq"           element={<FAQ />} />
                           <Route path="/terms"         element={<Terms />} />

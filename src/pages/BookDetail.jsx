@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import BookCard, { waOrderLink, BookStatusBadge, BookBadges } from '../components/BookCard';
 import BookReviews from '../components/BookReviews';
+import BookComments from '../components/BookComments';
+import SocialShare from '../components/SocialShare';
 import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -10,6 +12,7 @@ import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
 import { getReadingTimeDisplay, countWordsFromChapters, formatWordCount, calculateReadingTime } from '../utils/readingTime';
 import { getFallbackChapters } from '../data/bookChapters';
 import './BookDetail.css';
+import '../components/BookComments.css';
 
 // Statuses that block purchase entirely — only Notify Me
 const NO_PURCHASE_STATUSES = new Set(['coming-soon', 'draft']);
@@ -1337,6 +1340,28 @@ export default function BookDetail() {
       <section className="section">
         <div className="container">
           <BookReviews book={book} />
+        </div>
+      </section>
+
+      {/* ── Social Sharing ── */}
+      <section className="section">
+        <div className="container">
+          <div style={{ marginBottom: 40 }}>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '1.3rem', color: 'var(--gold)' }}>📢 Share This Book</h2>
+            <SocialShare
+              title="Share on Social Media"
+              text={`Check out "${book.title}" on Ellines Haven - a great read!`}
+              url={typeof window !== 'undefined' ? window.location.href : ''}
+              variant="horizontal"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Reader Comments ── */}
+      <section className="section">
+        <div className="container">
+          <BookComments bookId={book?.id} bookTitle={book?.title} />
         </div>
       </section>
 
