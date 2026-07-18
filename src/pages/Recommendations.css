@@ -1,0 +1,264 @@
+.recommendations-page {
+  min-height: 100vh;
+}
+
+.rec-hero {
+  padding: 3rem 0;
+  background: linear-gradient(135deg, rgba(201, 168, 76, 0.05) 0%, rgba(201, 168, 76, 0.02) 100%);
+  border-bottom: 1px solid var(--border);
+}
+
+.rec-hero__content {
+  text-align: center;
+}
+
+.rec-hero__content h1 {
+  margin: 0 0 1rem 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rec-hero__subtitle {
+  margin: 0 0 1.5rem 0;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.rec-hero__note {
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  background: rgba(76, 175, 80, 0.08);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.rec-hero__note a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.rec-hero__note a:hover {
+  text-decoration: underline;
+}
+
+/* Controls */
+.rec-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+}
+
+.rec-count {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.rec-count strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.rec-sort {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.rec-sort label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rec-select {
+  padding: 0.5rem 1rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.rec-select:hover {
+  border-color: var(--accent);
+}
+
+.rec-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.1);
+}
+
+/* Error state */
+.rec-error {
+  padding: 2rem;
+  background: rgba(244, 67, 54, 0.08);
+  border: 1px solid rgba(244, 67, 54, 0.2);
+  border-radius: var(--r-md);
+  text-align: center;
+  color: var(--muted);
+}
+
+.rec-error p {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+}
+
+.rec-error p:last-child {
+  margin: 0;
+}
+
+.rec-error a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.rec-error a:hover {
+  text-decoration: underline;
+}
+
+/* Empty state */
+.rec-empty {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.rec-empty p {
+  margin: 0 0 2rem 0;
+  font-size: 1.1rem;
+  color: var(--muted);
+}
+
+/* Loading skeleton */
+.book-card-loading {
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.book-cover-placeholder {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 0%,
+    var(--border) 50%,
+    var(--bg-muted) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--r-sm);
+  animation: pulse 1.5s infinite;
+}
+
+.book-text-placeholder {
+  height: 40px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 0%,
+    var(--border) 50%,
+    var(--bg-muted) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--r-xs);
+  margin-top: 0.75rem;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    background-position: 200% 0;
+  }
+  50% {
+    background-position: -200% 0;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .rec-hero {
+    padding: 2rem 0;
+  }
+
+  .rec-hero__content h1 {
+    font-size: 1.5rem;
+  }
+
+  .rec-hero__subtitle {
+    font-size: 0.9rem;
+  }
+
+  .rec-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .rec-count {
+    text-align: center;
+  }
+
+  .rec-sort {
+    justify-content: space-between;
+  }
+
+  .rec-empty {
+    padding: 2rem 1rem;
+  }
+
+  .rec-empty p {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .rec-hero {
+    padding: 1.5rem 0;
+  }
+
+  .rec-hero__content h1 {
+    font-size: 1.25rem;
+  }
+
+  .rec-hero__subtitle {
+    font-size: 0.85rem;
+  }
+
+  .rec-hero__note {
+    font-size: 0.8rem;
+  }
+
+  .rec-controls {
+    padding: 1rem;
+  }
+
+  .rec-count {
+    font-size: 0.85rem;
+  }
+
+  .rec-sort {
+    gap: 0.5rem;
+  }
+
+  .rec-sort label {
+    font-size: 0.8rem;
+  }
+
+  .rec-select {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+  }
+}

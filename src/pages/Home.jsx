@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import BookCard, { BookStatusBadge } from '../components/BookCard';
+import RecommendationWidget from '../components/RecommendationWidget';
+import TrendingWidget from '../components/TrendingWidget';
 import { useApp } from '../context/AppContext';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
@@ -691,6 +693,21 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          RECOMMENDATIONS & TRENDING
+      ══════════════════════════════════════ */}
+      <section className="section">
+        <div className="container">
+          <RecommendationWidget limit={8} />
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container" style={{ maxWidth:'400px', margin:'0 auto' }}>
+          <TrendingWidget limit={5} />
         </div>
       </section>
 
