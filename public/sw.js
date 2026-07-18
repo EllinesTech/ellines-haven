@@ -22,11 +22,19 @@ self.addEventListener('activate', (event) => {
     ]).then(() => {
       // Unregister this service worker from all clients
       return self.registration.unregister();
+    }).catch(() => {
+      // Silently fail if unregister isn't available
     })
   );
+});
+
+// Silently handle any messages to prevent "message channel closed" errors
+self.addEventListener('message', (event) => {
+  // Don't send async responses - just ignore all messages
 });
 
 // Pass ALL requests through without interception
 self.addEventListener('fetch', () => {
   // Do nothing — let browser handle everything natively
 });
+
