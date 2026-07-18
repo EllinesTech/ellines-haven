@@ -165,6 +165,22 @@ service cloud.firestore {
       allow delete: if false; // Don't allow deletion
     }
 
+    // ── Reading Challenges (Phase 5-6) ───────────────────────────────────────
+    // Users can create/read their own challenges, Cloud Functions update/complete
+    // Leaderboards are public read, written by Cloud Functions only
+    match /challenges/{challengeId} {
+      allow read:   if true;  // Read any challenge (for admin / stats)
+      allow create: if true;  // Users can create challenges (Cloud Function does this)
+      allow update: if true;  // Cloud Functions update progress + completion
+      allow delete: if false; // No client-side deletes
+    }
+    match /challenge_leaderboards/{leaderboardId} {
+      allow read:   if true;  // Public leaderboards — anyone reads
+      allow create: if true;  // Cloud Function creates leaderboards
+      allow update: if true;  // Cloud Function updates rankings
+      allow delete: if false; // No deletes
+    }
+
     // ── Catch-all: READ yes, WRITE no for anything not explicitly covered ─────
     // This prevents accidental write exposure on new collections.
     match /{collection}/{document} {

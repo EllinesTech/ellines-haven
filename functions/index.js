@@ -2092,3 +2092,276 @@ exports.sendAdminPasswordResetNotification = onCall(
     return { emailSent };
   }
 );
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PHASE 5-6: READING CHALLENGES — Auto-create Collections on First Challenge
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * startChallenge — Callable function to start a reading challenge
+ * Auto-creates challenges and challenge_leaderboards collections if needed
+ * Called from frontend: ChallengesPage.jsx
+ */
+exports.startChallenge = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { userEmail, userName, challengeType } = request.data;
+
+    if (!userEmail || !userName || !challengeType) {
+      throw new HttpsError("invalid-argument", "Missing: userEmail, userName, or challengeType");
+    }
+
+    const CHALLENGE_TYPES = {
+      "7day": { goal: 1, reward: 50, duration: 7 },
+      "30day": { goal: 3, reward: 150, duration: 30 },
+      "100day": { goal: 5, reward: 300, duration: 100 },
+      "annual": { goal: 12, reward: 1000, duration: 365 },
+    };
+
+    const typeData = CHALLENGE_TYPES[challengeType];
+    if (!typeData) {
+      throw new HttpsError("invalid-argument", `Invalid challenge type: ${challengeType}`);
+    }
+
+    try {
+      const now = new Date();
+      const period = challengeType === "annual" ? now.getFullYear() : `${now.getFullYear()}_${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const challengeId = `ch_${libDocId(userEmail)}_${challengeType}_${period}`;
+
+      // ── Create challenge document in challenges collection ──────────────────
+      const challengeRef = db.collection("challenges").doc(challengeId);
+      await challengeRef.set({
+        id: challengeId,
+        userEmail: userEmail.toLowerCase(),
+        userName: userName,
+        type: challengeType,
+        goal: typeData.goal,
+        progress: 0,
+        startedAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedAt: null,
+        status: "active",
+        books: [],
+        reward_points: typeData.reward,
+        metadata: {
+          year: now.getFullYear(),
+          month: now.getMonth() + 1,
+          duration: typeData.duration,
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log("[startChallenge] created challenge:", challengeId);
+
+      // ── Ensure challenge_leaderboards collection exists ────────────────────
+      // Initialize leaderboard for this type if it doesn't exist
+      const leaderboardId = `lb_${challengeType}_${period}`;
+      const lbRef = db.collection("challenge_leaderboards").doc(leaderboardId);
+      const lbSnap = await lbRef.get();
+
+      if (!lbSnap.exists) {
+        await lbRef.set({
+          id: leaderboardId,
+          type: challengeType,
+          period: period,
+          rankings: [],
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log("[startChallenge] created leaderboard:", leaderboardId);
+      }
+
+      return {
+        success: true,
+        challengeId,
+        message: `Challenge "${challengeType}" started successfully!`,
+      };
+    } catch (err) {
+      console.error("[startChallenge] error:", err.message);
+      throw new HttpsError("internal", err.message);
+    }
+  }
+);
+
+/**
+ * completeChallenge — Callable function to mark challenge as completed
+ * Updates challenge status and adds user to leaderboard
+ */
+exports.completeChallenge = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { challengeId, userEmail, userName } = request.data;
+
+    if (!challengeId || !userEmail) {
+      throw new HttpsError("invalid-argument", "Missing: challengeId or userEmail");
+    }
+
+    try {
+      const challengeRef = db.collection("challenges").doc(challengeId);
+      const snap = await challengeRef.get();
+
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Challenge not found");
+      }
+
+      const challenge = snap.data();
+
+      // Check if already completed
+      if (challenge.status === "completed") {
+        return { success: false, message: "Challenge already completed" };
+      }
+
+      // Update challenge to completed
+      const now = new Date();
+      await challengeRef.update({
+        status: "completed",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // ── Update leaderboard with user's ranking ────────────────────────────
+      const lbId = `lb_${challenge.type}_${challenge.metadata.year}_${String(challenge.metadata.month).padStart(2, "0")}`;
+      const lbRef = db.collection("challenge_leaderboards").doc(lbId);
+      const lbSnap = await lbRef.get();
+
+      const rankings = lbSnap.exists ? (lbSnap.data().rankings || []) : [];
+      const timeToComplete = Math.floor((now - challenge.startedAt.toDate()) / (1000 * 60 * 60 * 24));
+
+      // Add user to rankings and sort by time
+      const newRanking = {
+        rank: rankings.length + 1,
+        userEmail: userEmail.toLowerCase(),
+        userName: userName || userEmail,
+        progress: challenge.progress,
+        completedAt: now.toISOString(),
+        timeToComplete: timeToComplete,
+      };
+
+      rankings.push(newRanking);
+      rankings.sort((a, b) => a.timeToComplete - b.timeToComplete);
+      rankings.forEach((r, idx) => { r.rank = idx + 1; });
+
+      await lbRef.set({
+        id: lbId,
+        type: challenge.type,
+        period: `${challenge.metadata.year}_${String(challenge.metadata.month).padStart(2, "0")}`,
+        rankings: rankings,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      console.log("[completeChallenge] challenge completed:", challengeId, "leaderboard updated:", lbId);
+
+      // ── Notify user of completion (optional) ─────────────────────────────
+      try {
+        const notifId = `notif_challenge_${challengeId}_${Date.now()}`;
+        await db.collection("user_notifications").doc(notifId).set({
+          userEmail: userEmail.toLowerCase(),
+          type: "challenge_complete",
+          title: "🏆 Challenge Complete!",
+          message: `You completed the ${challenge.type} challenge and earned ${challenge.reward_points} points!`,
+          icon: "🏆",
+          challengeId,
+          reward_points: challenge.reward_points,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        console.warn("[completeChallenge] user notification failed:", e.message);
+      }
+
+      return {
+        success: true,
+        message: "Challenge completed!",
+        rank: newRanking.rank,
+        reward_points: challenge.reward_points,
+      };
+    } catch (err) {
+      console.error("[completeChallenge] error:", err.message);
+      throw new HttpsError("internal", err.message);
+    }
+  }
+);
+
+/**
+ * updateChallengeProgress — Callable function to update challenge progress
+ * Called when user completes a book
+ */
+exports.updateChallengeProgress = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { challengeId, bookId, bookTitle } = request.data;
+
+    if (!challengeId || !bookId) {
+      throw new HttpsError("invalid-argument", "Missing: challengeId or bookId");
+    }
+
+    try {
+      const challengeRef = db.collection("challenges").doc(challengeId);
+      const snap = await challengeRef.get();
+
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Challenge not found");
+      }
+
+      const challenge = snap.data();
+
+      // Check if already completed
+      if (challenge.status === "completed") {
+        return { success: false, message: "Challenge already completed" };
+      }
+
+      // Add book to challenge books list
+      const books = challenge.books || [];
+      if (!books.find(b => b.id === bookId)) {
+        books.push({
+          id: bookId,
+          title: bookTitle || "Unknown Book",
+          completed_at: new Date().toISOString(),
+        });
+      }
+
+      const newProgress = books.length;
+      const isCompleted = newProgress >= challenge.goal;
+
+      // Update challenge
+      const updateData = {
+        progress: newProgress,
+        books: books,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (isCompleted) {
+        updateData.status = "completed";
+        updateData.completedAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+
+      await challengeRef.update(updateData);
+
+      console.log("[updateChallengeProgress] challenge updated:", challengeId, "progress:", newProgress);
+
+      return {
+        success: true,
+        progress: newProgress,
+        goal: challenge.goal,
+        completed: isCompleted,
+        message: isCompleted ? "Challenge completed!" : `${challenge.goal - newProgress} book${challenge.goal - newProgress !== 1 ? "s" : ""} to go!`,
+      };
+    } catch (err) {
+      console.error("[updateChallengeProgress] error:", err.message);
+      throw new HttpsError("internal", err.message);
+    }
+  }
+);
+
+console.log("[CloudFunctions] ✅ Reading Challenges system initialized - Phase 5-6");

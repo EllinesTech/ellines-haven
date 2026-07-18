@@ -69,6 +69,11 @@ export const callCreatePayPalOrder  = (data) => httpsCallable(functions, 'create
 export const callCapturePayPalOrder = (data) => httpsCallable(functions, 'capturePayPalOrder')(data);
 export const callTrackVisitor     = (data) => httpsCallable(functions, 'trackVisitor')(data);
 
+// Reading Challenges Cloud Functions (Phase 5-6)
+export const callStartChallenge      = (data) => httpsCallable(functions, 'startChallenge')(data);
+export const callCompleteChallenge   = (data) => httpsCallable(functions, 'completeChallenge')(data);
+export const callUpdateChallengeProgress = (data) => httpsCallable(functions, 'updateChallengeProgress')(data);
+
 // HTTP endpoints (as fallback if callable functions fail)
 export async function callTrackVisitorHttp(data) {
   const regionUrl = 'https://us-central1-ellines-haven-web.cloudfunctions.net';

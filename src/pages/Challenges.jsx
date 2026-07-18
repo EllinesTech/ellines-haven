@@ -20,7 +20,7 @@ import {
   doc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, callStartChallenge } from '../firebase';
 import './Challenges.css';
 
 /**
@@ -92,21 +92,28 @@ export default function Challenges() {
     }
 
     try {
-      const challenge = createChallenge(user.email, user.name, type);
-      const ref = doc(db, 'challenges', challenge.id);
-      
-      await setDoc(ref, {
-        ...challenge,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      // Call Cloud Function to create challenge and auto-create collections
+      const result = await callStartChallenge({
+        userEmail: user.email,
+        userName: user.name || user.email,
+        challengeType: type,
       });
 
-      setUserChallenges(prev => [...prev, challenge]);
-      setShowStartModal(false);
-      setSelectedType(null);
+      if (result.data.success) {
+        // Refresh challenges from Firestore
+        const ref = collection(db, 'challenges');
+        const q = query(ref, where('userEmail', '==', user.email.toLowerCase()));
+        const snapshot = await getDocs(q);
+        const challenges = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUserChallenges(challenges);
+
+        setShowStartModal(false);
+        setSelectedType(null);
+        console.log('[Challenges] Challenge started successfully:', result.data.challengeId);
+      }
     } catch (err) {
       console.error('[Start Challenge] Failed:', err);
-      setError('Failed to start challenge');
+      setError(`Failed to start challenge: ${err.message}`);
     }
   };
 
