@@ -6,7 +6,7 @@ import './TrendingWidget.css';
 
 /* ── Styled cover (mirrors RecommendationWidget) ── */
 function BookCover({ book }) {
-  if (book.coverType === 'photo' && book.cover) {
+  if (book.cover) {
     return (
       <img
         src={book.cover}

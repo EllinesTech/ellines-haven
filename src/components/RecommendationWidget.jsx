@@ -11,7 +11,7 @@ function BookCover({ book, size = 'md' }) {
   const w = size === 'lg' ? 120 : 90;
   const h = size === 'lg' ? 168 : 126;
 
-  if (book.coverType === 'photo' && book.cover) {
+  if (book.cover) {
     return (
       <img
         src={book.cover}

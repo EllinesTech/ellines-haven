@@ -207,7 +207,7 @@ function CoverLightbox({ book, onClose }) {
           className="lb-img-wrap"
           style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
         >
-          {book.coverType === 'photo' && book.cover
+          {book.cover
             ? <picture>
                 <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
                 <img src={book.cover} alt={book.title} className="lb-img" draggable="false" decoding="async" />
@@ -1003,7 +1003,7 @@ export default function BookDetail() {
           <Link to="/library" className="bd-back">← Back to Library</Link>
           <div className="bd-grid">
             <div className="bd-left">
-              {book.coverType === 'photo' && book.cover
+              {book.cover
                 ? <picture>
                     <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
                     <img

@@ -1106,7 +1106,7 @@ export default function MyLibrary() {
                   return (
                     <div key={b.id} className={'mylib-card card' + (anyOff ? ' mylib-card--restricted' : '') + (isReading ? ' mylib-card--reading' : '')}>
                       <div className="mylib-card__cover-wrap">
-                        {b.coverType === 'photo' && b.cover
+                        {b.cover
                           ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
                           : <div className="mylib-card__cover mylib-card__cover--styled"
                               style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
@@ -1300,7 +1300,7 @@ export default function MyLibrary() {
                   return (
                     <div key={b.id} className={'mylib-card card' + (owned ? ' mylib-card--owned' : '')}>
                       <div className="mylib-card__cover-wrap">
-                        {b.coverType === 'photo' && b.cover
+                        {b.cover
                           ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
                           : <div className="mylib-card__cover mylib-card__cover--styled"
                               style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>

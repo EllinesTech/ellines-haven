@@ -135,7 +135,7 @@ const TAGLINES = [
 
 /* ─── Animated book covers carousel (right side of author banner) ─── */
 function BookStack({ books }) {
-  const pool = books.filter(b => b.coverType === 'photo' && b.cover);
+  const pool = books.filter(b => b.cover);
   const [idx, setIdx] = useState(0);
   const [fade, setFade] = useState(true);
 
@@ -249,7 +249,7 @@ function PersonalisedSection({ user, library, books }) {
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.2)'}
                 >
                   {/* Cover */}
-                  {b.coverType === 'photo' && b.cover
+                  {b.cover
                     ? <img src={b.cover} alt={b.title} style={{ width:44, height:60, objectFit:'cover', borderRadius:4, flexShrink:0 }} />
                     : <div style={{ width:44, height:60, borderRadius:4, flexShrink:0, background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem' }}>📖</div>
                   }
@@ -296,7 +296,7 @@ function PersonalisedSection({ user, library, books }) {
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.35)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dim)'}
                 >
-                  {b.coverType === 'photo' && b.cover
+                  {b.cover
                     ? <img src={b.cover} alt={b.title} style={{ width:36, height:50, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
                     : <div style={{ width:36, height:50, borderRadius:3, flexShrink:0, background: b.coverColor || '#1a1a3a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem' }}>📖</div>
                   }
@@ -425,8 +425,8 @@ export default function Home() {
     .filter(b => b.isNew)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Hero spotlight = most recently dated new release WITH a real photo cover
-  const spotlight = newReleases.find(b => b.coverType === 'photo' && b.cover) || null;
+  // Hero spotlight = most recently dated new release with any cover
+  const spotlight = newReleases.find(b => b.cover) || null;
 
   const [tagIdx, setTagIdx] = useState(0);
   const [fade,   setFade]   = useState(true);
@@ -567,7 +567,7 @@ export default function Home() {
                 <Link key={b.id} to={bookPath(b)} className={`cs-card${i === 0 ? ' cs-card--hero' : ''}`}>
                   {/* cover / art */}
                   <div className="cs-card__art">
-                    {b.coverType === 'photo' && b.cover
+                    {b.cover
                       ? <img src={b.cover} alt={b.title} className="cs-card__cover-img" />
                       : <div className="cs-card__cover-styled" style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
                           <div className="cs-card__cover-deco" style={{ borderColor: b.coverAccent || '#c9a84c' }} />
@@ -621,7 +621,7 @@ export default function Home() {
               {newReleases.map(b => (
                 <Link key={b.id} to={bookPath(b)} className="new-release-card card">
                   <div className="new-release-card__img-wrap">
-                    {b.coverType === 'photo' && b.cover
+                    {b.cover
                       ? <img src={b.cover} alt={b.title} className="new-release-card__img" />
                       : <div className="new-release-card__img new-release-card__img--styled"
                              style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
