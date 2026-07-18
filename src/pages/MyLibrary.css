@@ -124,7 +124,7 @@
   background: var(--surface);
   border-bottom: 1px solid var(--dim);
   position: sticky;
-  top: 86px;
+  top: 90px; /* desktop navbar height */
   z-index: 20;
   /* allow horizontal scroll on mobile so all tabs are reachable */
   overflow-x: auto;
