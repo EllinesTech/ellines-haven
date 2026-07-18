@@ -36,7 +36,7 @@
   grid-template-columns: 1.05fr 0.95fr;
   align-items: center;
   gap: 56px;
-  padding-top: 110px;
+  padding-top: 24px;
   padding-bottom: 72px;
   position: relative;
   z-index: 1;
@@ -551,7 +551,7 @@
   .why-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 900px) {
-  .hero__inner { grid-template-columns: 1fr; padding-top: 120px; text-align: center; }
+  .hero__inner { grid-template-columns: 1fr; padding-top: 32px; text-align: center; }
   .hero__copy { align-items: center; }
   .hero__sub { text-align: center; }
   .hero__stats { justify-content: center; }

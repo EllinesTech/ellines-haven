@@ -1,0 +1,128 @@
+/* Reading Preferences Panel */
+
+.reading-prefs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.rpp-header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+
+.rpp-header h2 {
+  font-size: 1.3rem;
+  color: var(--text);
+  margin: 0 0 6px 0;
+}
+
+.rpp-header p {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Section styling */
+.rpp-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 18px;
+}
+
+.rpp-section h3 {
+  font-size: 0.95rem;
+  color: var(--gold);
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+.rpp-section h4 {
+  font-size: 0.85rem;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+/* Note text */
+.rpp-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+/* Form fields */
+.rpp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.rpp-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rpp-field input[type='text'],
+.rpp-field input[type='number'],
+.rpp-field select {
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.rpp-field input[type='text']:focus,
+.rpp-field input[type='number']:focus,
+.rpp-field select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(201, 168, 76, 0.1);
+}
+
+.rpp-field input[type='range'] {
+  width: 100%;
+  cursor: pointer;
+  accent-color: var(--gold);
+}
+
+/* Calibration form */
+.rpp-calibration-form {
+  background: rgba(201, 168, 76, 0.05);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: var(--r-sm);
+  padding: 14px;
+  margin: 12px 0;
+}
+
+.rpp-calibration-form h4 {
+  margin-top: 0;
+  color: var(--gold);
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .reading-prefs-panel {
+    gap: 16px;
+  }
+
+  .rpp-section {
+    padding: 14px;
+  }
+
+  .rpp-field {
+    margin-bottom: 8px;
+  }
+}

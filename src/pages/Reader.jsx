@@ -251,6 +251,22 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
     return () => clearInterval(keepAliveRef.current);
   }, [playing]); // eslint-disable-line
 
+  // -- Close voice dropdown on outside click ---------------------------------
+  useEffect(() => {
+    if (!voiceDdOpen) return;
+    
+    const handleClickOutside = (e) => {
+      // Close dropdown if click is outside of it
+      const ddElement = document.querySelector('.audio-custom-dd');
+      if (ddElement && !ddElement.contains(e.target)) {
+        setVoiceDdOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [voiceDdOpen]); // eslint-disable-line
+
   // -- Reset on chapter change -----------------------------------------------
   useEffect(() => {
     stopSpeech();
@@ -681,7 +697,11 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
                 <button key={f} className={'audio-filter-btn' + (filter === f ? ' on' : '')}
 
-                  onClick={() => { setFilter(f); setVoiceIdx(0); selectedNameRef.current = ''; }}>
+                  onClick={() => {
+                    setFilter(f);
+                    // Try to keep the previously selected voice if available in new filter
+                    if (!selectedNameRef.current) setVoiceIdx(0);
+                  }}>
 
                   {f === 'female' ? '♀ Female' : f === 'male' ? '♂ Male' : '👥 All'}
 
@@ -705,7 +725,23 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
                 onClick={() => setVoiceDdOpen(o => !o)}
 
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setVoiceDdOpen(o => !o);
+                  } else if (e.key === 'Escape') {
+                    setVoiceDdOpen(false);
+                  } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !voiceDdOpen) {
+                    e.preventDefault();
+                    setVoiceDdOpen(true);
+                  }
+                }}
+
                 type="button"
+
+                aria-expanded={voiceDdOpen}
+
+                aria-label="Select voice"
 
               >
 
@@ -751,11 +787,14 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
                       type="button"
 
-                      className={'audio-custom-dd__item' + (i === safeIdx ? ' on' : '')}
+                      className={'audio-custom-dd__item' + (selectedNameRef.current === v.name ? ' on' : '')}
 
-                      onClick={() => {
-                        setVoiceIdx(i);
+                      onClick={(e) => {
+                        e.preventDefault();
                         selectedNameRef.current = v.name || '';
+                        // Find the voice in the full voices array to set correct voiceIdx
+                        const fullIdx = voices.findIndex(voice => voice.name === v.name);
+                        if (fullIdx >= 0) setVoiceIdx(fullIdx);
                         setVoiceDdOpen(false);
                         if (playing) speak(charRef.current);
                       }}

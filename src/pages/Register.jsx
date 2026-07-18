@@ -184,7 +184,48 @@ export default function Register() {
       localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });
-      
+
+      // ── Grant free registration book if configured ────────────────────────
+      try {
+        const permsSnap = await getDoc(doc(db, 'site_data', 'user_permissions'));
+        const freeBook  = permsSnap.exists()
+          ? (permsSnap.data().siteControls?.freeBook || {})
+          : {};
+
+        if (freeBook.enabled && freeBook.bookId) {
+          // Fetch the book details from the catalogue
+          const catSnap   = await getDoc(doc(db, 'site_data', 'books_catalogue'));
+          const catalogue = catSnap.exists() ? (catSnap.data().books || []) : [];
+          const bookData  = catalogue.find(b => b.id === freeBook.bookId);
+
+          if (bookData) {
+            const libRef  = doc(db, 'libraries', emailKey.replace(/[^a-z0-9]/g, '_'));
+            const libSnap = await getDoc(libRef);
+            const existingBooks = libSnap.exists() ? (libSnap.data().books || []) : [];
+
+            // Only add if not already in their library
+            if (!existingBooks.some(b => b.id === bookData.id)) {
+              await setDoc(libRef, {
+                email: emailKey,
+                books: [
+                  ...existingBooks,
+                  {
+                    ...bookData,
+                    downloadUnlocked: true,
+                    unlockedAt:       new Date().toISOString(),
+                    unlockedBy:       'registration_gift',
+                  },
+                ],
+              }, { merge: true });
+            }
+          }
+        }
+      } catch (giftErr) {
+        // Non-fatal — registration still succeeds even if gift grant fails
+        console.warn('[Register] free book grant failed:', giftErr.message);
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // ── Track registration in admin activity panel (direct + cloud function) ──
       const regDevice = getDeviceTypeForReg();
       try {

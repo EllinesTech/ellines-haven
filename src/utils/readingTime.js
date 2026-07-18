@@ -31,15 +31,17 @@ export function countWordsFromChapters(chapters) {
  * Based on average adult silent reading speed
  * Industry standard: 238-275 WPM for non-fiction
  * We use 250 WPM as baseline (middle ground for fiction + non-fiction)
+ * Can be overridden with user's personalized WPM
  *
  * @param {number} wordCount - Total words in the book
  * @param {Object} options - Optional settings
  * @param {number} options.wpm - Words per minute (default: 250)
  * @param {string} options.format - Return format: 'minutes' | 'readable' (default: 'readable')
+ * @param {boolean} options.showRange - Show range (±15 min) in readable format (default: true)
  * @returns {string|number} Reading time
  */
 export function calculateReadingTime(wordCount, options = {}) {
-  const { wpm = 250, format = 'readable' } = options;
+  const { wpm = 250, format = 'readable', showRange = true } = options;
 
   if (!wordCount || wordCount <= 0) {
     return format === 'readable' ? '< 1 min' : 0;
@@ -55,6 +57,10 @@ export function calculateReadingTime(wordCount, options = {}) {
 
   // Readable format: "8–10 hrs", "45 mins", "30 mins"
   if (hours > 0) {
+    if (!showRange) {
+      // Precise format without range
+      return `${hours} hr${hours !== 1 ? 's' : ''} ${remainingMinutes > 0 ? remainingMinutes + ' min' : ''}`.trim();
+    }
     const min = hours * 60 + (remainingMinutes - 15); // Start of range
     const max = hours * 60 + (remainingMinutes + 15); // End of range
     return `${Math.max(1, Math.floor(min / 60))}–${Math.ceil(max / 60)} hrs`;
@@ -165,4 +171,124 @@ export function isValidReadingTimeFormat(readTime) {
   if (!readTime || typeof readTime !== 'string') return false;
   // Match patterns: "45 mins", "8–10 hrs", "2 hrs", etc.
   return /^\d+(\–\d+)?\s(min|hr)s?$/.test(readTime.trim());
+}
+
+/**
+ * Calibrate user reading speed from a sample
+ * Estimates WPM based on a known word count and time spent reading
+ *
+ * @param {number} wordCount - Words in the sample
+ * @param {number} timeMinutes - Time spent reading in minutes
+ * @returns {number} Estimated WPM (bounded to 100-400 range)
+ */
+export function calibrateUserWPM(wordCount, timeMinutes) {
+  if (!wordCount || wordCount <= 0 || !timeMinutes || timeMinutes <= 0) return 250;
+  const calculated = Math.round(wordCount / timeMinutes);
+  // Bound to reasonable reading speeds (slow reader 100 WPM, speed reader 400 WPM)
+  return Math.max(100, Math.min(400, calculated));
+}
+
+/**
+ * Get user preferences from localStorage
+ * Includes reading speed, audio settings, theme, etc.
+ *
+ * @param {string} userEmail - User email
+ * @returns {Object} User preferences object
+ */
+export function getUserReadingPreferences(userEmail) {
+  if (!userEmail) return getDefaultReadingPreferences();
+  const key = `eh_reading_prefs_${(userEmail || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : getDefaultReadingPreferences();
+  } catch {
+    return getDefaultReadingPreferences();
+  }
+}
+
+/**
+ * Get default reading preferences
+ *
+ * @returns {Object} Default preferences
+ */
+export function getDefaultReadingPreferences() {
+  return {
+    wpm: 250,                    // Words per minute (baseline)
+    audioRate: 1.0,              // Playback speed for text-to-speech
+    audioPitch: 1.0,             // Voice pitch
+    selectedVoice: '',           // Preferred voice
+    audioSpeedPreset: 'normal',  // 'slow' (0.75x), 'normal' (1.0x), 'fast' (1.25x), 'faster' (1.5x)
+    fontSize: '1rem',            // Reading font size
+    lineHeight: 1.6,             // Line height for readability
+    theme: 'auto',               // 'light', 'dark', 'auto'
+    calibrationCount: 0,         // Number of times user has calibrated reading speed
+    lastCalibrationTime: null,   // When they last calibrated
+    calibrationSamples: [],      // Array of {wordCount, timeMinutes} for averaging
+  };
+}
+
+/**
+ * Save user reading preferences
+ *
+ * @param {string} userEmail - User email
+ * @param {Object} prefs - Preferences to save
+ */
+export function saveUserReadingPreferences(userEmail, prefs) {
+  if (!userEmail) return;
+  const key = `eh_reading_prefs_${(userEmail || '').toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  try {
+    const defaults = getDefaultReadingPreferences();
+    const merged = { ...defaults, ...prefs };
+    localStorage.setItem(key, JSON.stringify(merged));
+    return merged;
+  } catch (e) {
+    console.warn('[Reading Prefs] Save failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Update a single reading preference field
+ *
+ * @param {string} userEmail - User email
+ * @param {string} field - Preference field name
+ * @param {*} value - New value
+ */
+export function updateUserReadingPreference(userEmail, field, value) {
+  if (!userEmail) return;
+  const prefs = getUserReadingPreferences(userEmail);
+  prefs[field] = value;
+  return saveUserReadingPreferences(userEmail, prefs);
+}
+
+/**
+ * Record a reading calibration sample and update WPM
+ *
+ * @param {string} userEmail - User email
+ * @param {number} wordCount - Words in the sample
+ * @param {number} timeMinutes - Time spent reading
+ * @returns {Object} Updated preferences with new WPM
+ */
+export function recordReadingCalibration(userEmail, wordCount, timeMinutes) {
+  if (!userEmail || !wordCount || !timeMinutes) return null;
+
+  const prefs = getUserReadingPreferences(userEmail);
+  const newWPM = calibrateUserWPM(wordCount, timeMinutes);
+
+  // Keep last 5 calibration samples for averaging
+  const samples = prefs.calibrationSamples || [];
+  samples.push({ wordCount, timeMinutes, wpm: newWPM, timestamp: Date.now() });
+  if (samples.length > 5) samples.shift();
+
+  // Calculate average WPM from samples
+  const avgWPM = Math.round(
+    samples.reduce((sum, s) => sum + s.wpm, 0) / samples.length
+  );
+
+  prefs.wpm = avgWPM;
+  prefs.calibrationCount = (prefs.calibrationCount || 0) + 1;
+  prefs.lastCalibrationTime = Date.now();
+  prefs.calibrationSamples = samples;
+
+  return saveUserReadingPreferences(userEmail, prefs);
 }

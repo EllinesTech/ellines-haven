@@ -31,6 +31,7 @@ const AdminOrdersPanel       = lazy(() => import('./admin-panels/AdminOrdersPane
 const SeriesPanel            = lazy(() => import('./admin-panels/SeriesPanel'));
 const ChapterGrantsPanel     = lazy(() => import('./admin-panels/ChapterGrantsPanel'));
 const ChapterAnalyticsPanel  = lazy(() => import('./admin-panels/ChapterAnalyticsPanel'));
+const FreeBookPanel          = lazy(() => import('./admin-panels/FreeBookPanel'));
 
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
@@ -3431,6 +3432,7 @@ export default function Admin() {
     { k:'sms',           label:'SMS Broadcast',      icon:'📱', group:'admin' },
     { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
     { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
+    { k:'freebook',      label:'Free Book Gift',     icon:'🎁', group:'admin' },
     { k:'devicesettings', label:'Device & Phone',    icon:'📱', group:'admin' },
     /* ── Power tools — visible to both admin & superadmin ── */
     { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
@@ -5536,6 +5538,13 @@ export default function Admin() {
             showToast={showToast}
             isSuper={isSuper}
           />
+        )}
+
+        {/* -- FREE BOOK REGISTRATION GIFT -- */}
+        {tab === 'freebook' && (
+          <Suspense fallback={<PanelLoader />}>
+            <FreeBookPanel showToast={showToast} books={books} isSuper={isSuper} />
+          </Suspense>
         )}
 
         {/* -- DEVICE & PHONE SETTINGS -- */}
