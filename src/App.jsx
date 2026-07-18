@@ -236,6 +236,7 @@ function PageLoader() {
 /* ── Lazy page imports ── */
 const Home         = lazy(() => import('./pages/Home'));
 const Library      = lazy(() => import('./pages/Library'));
+const Trending     = lazy(() => import('./pages/Trending'));
 const BookDetail   = lazy(() => import('./pages/BookDetail'));
 const Cart         = lazy(() => import('./pages/Cart'));
 const Login        = lazy(() => import('./pages/Login'));
@@ -861,6 +862,7 @@ export default function App() {
                         <Routes>
                           <Route path="/"              element={<Home />} />
                           <Route path="/library"       element={<Library />} />
+                          <Route path="/trending"      element={<PageErrorBoundary label="Trending failed to load"><Trending /></PageErrorBoundary>} />
                           <Route path="/book/:id"      element={<BookDetail />} />
                           <Route path="/cart"          element={<Cart />} />
                           <Route path="/login"         element={<Login />} />

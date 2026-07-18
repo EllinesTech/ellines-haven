@@ -346,6 +346,57 @@ function generateRecommendationReason(book, genre, profile) {
 }
 
 /**
+ * Get trending books by category/genre
+ */
+export function getTrendingByCategory(genre, limit = 20) {
+  try {
+    const genreBooks = BOOKS.filter(book => {
+      if (book.genres) {
+        return book.genres.includes(genre);
+      }
+      return book.genre === genre;
+    });
+
+    const scoredBooks = genreBooks.map(book => {
+      let score = 0;
+
+      // Rating (0-30 points)
+      if (book.rating) {
+        score += (book.rating / 5) * 30;
+      }
+
+      // Reviews/engagement (0-30 points)
+      const engagementScore = Math.min(30, (book.reviews || 0) / 10);
+      score += engagementScore;
+
+      // Featured bonus (0-20 points)
+      if (book.featured) {
+        score += 20;
+      }
+
+      // New release bonus (0-15 points)
+      if (book.status === 'new' || book.type === 'series-starter') {
+        score += 15;
+      }
+
+      return { book, score };
+    });
+
+    return scoredBooks
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(item => ({
+        ...item.book,
+        trendingScore: Math.round(item.score),
+        genre
+      }));
+  } catch (error) {
+    console.error('Error getting trending books by category:', error);
+    return [];
+  }
+}
+
+/**
  * Generate trending scores for books
  */
 export function calculateTrendingScores(timeframe = '7d') {

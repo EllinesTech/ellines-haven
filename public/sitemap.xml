@@ -25,6 +25,20 @@
   </url>
 
   <url>
+    <loc>https://haven.ellines.co.ke/trending</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.92</priority>
+  </url>
+
+  <url>
+    <loc>https://haven.ellines.co.ke/recommendations</loc>
+    <lastmod>2026-07-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <url>
     <loc>https://haven.ellines.co.ke/founder</loc>
     <lastmod>2026-07-15</lastmod>
     <changefreq>monthly</changefreq>
