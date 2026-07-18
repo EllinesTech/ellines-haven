@@ -8,7 +8,6 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import EditableImage from '../components/EditableImage';
 import NewsletterSignup from '../components/NewsletterSignup';
-import { GENRES } from '../data/books';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAllReadingStats } from '../hooks/useReadingProgress';
@@ -330,6 +329,74 @@ function PersonalisedSection({ user, library, books }) {
   );
 }
 
+/* ─── Testimonials auto-carousel ─── */
+const TESTIMONIALS = [
+  { name:'Amina K.', loc:'Nairobi', stars:5, text:'"Chasing Ghosts and Supercars had me hooked from the first chapter. Finally, stories that feel like home."' },
+  { name:'David O.', loc:'Mombasa', stars:5, text:'"The writing is raw and honest. You can tell these stories come from a real place. Absolutely brilliant."'  },
+  { name:'Grace W.', loc:'Kisumu',  stars:5, text:'"I read Marriage is a Scam in one sitting. Every page felt like it was written about someone I know."'       },
+  { name:'Brian M.', loc:'Eldoret', stars:5, text:'"The reader app is incredible — smooth, beautiful, and works perfectly on my phone. 10/10."'                 },
+  { name:'Faith N.', loc:'Nyeri',   stars:5, text:'"Pain felt like it was written about my own life. I cried. I laughed. I finished it at 3am."'                 },
+  { name:'Kevin L.', loc:'Nakuru',  stars:5, text:'"Children of Thunder is the East African fantasy we\'ve been waiting for. Incredible world-building."'         },
+];
+
+function TestimonialsCarousel({ sub }) {
+  const [active, setActive] = useState(0);
+  const [animating, setAnimating] = useState(false);
+
+  const goTo = (idx) => {
+    if (animating) return;
+    setAnimating(true);
+    setTimeout(() => { setActive(idx); setAnimating(false); }, 300);
+  };
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      goTo((active + 1) % TESTIMONIALS.length);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [active]); // eslint-disable-line
+
+  // Show 2 at a time on desktop
+  const visible = [
+    TESTIMONIALS[active % TESTIMONIALS.length],
+    TESTIMONIALS[(active + 1) % TESTIMONIALS.length],
+  ];
+
+  return (
+    <section className="section testimonials-sec">
+      <div className="container">
+        <h2 className="text-c">What <span className="gold-text">Readers Say</span></h2>
+        <p className="text-c muted" style={{ marginBottom:'44px' }}>{sub}</p>
+        <div className="tcarousel">
+          <div className={`tcarousel__track${animating ? ' tcarousel__track--fade' : ''}`}>
+            {visible.map((t, i) => (
+              <div key={t.name + i} className="testimonial-card">
+                <div className="testimonial-card__stars">{'★'.repeat(t.stars)}</div>
+                <p className="testimonial-card__text">{t.text}</p>
+                <div className="testimonial-card__author">
+                  <div className="testimonial-card__avatar">{t.name[0]}</div>
+                  <div><strong>{t.name}</strong><span>{t.loc}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Dots */}
+          <div className="tcarousel__dots">
+            {TESTIMONIALS.map((_, i) => (
+              <button
+                key={i}
+                className={`tcarousel__dot${i === active ? ' tcarousel__dot--active' : ''}`}
+                onClick={() => goTo(i)}
+                aria-label={`Review ${i + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const { books, user, library } = useApp();
   usePageMeta({
@@ -634,10 +701,26 @@ export default function Home() {
       <section className="section genres-sec">
         <div className="container">
           <h2 className="text-c">Browse by <span className="gold-text">Genre</span></h2>
-          <p className="text-c muted" style={{ marginBottom:'36px' }}>{c.genres_sub}</p>
+          <p className="text-c muted" style={{ marginBottom:'40px' }}>{c.genres_sub}</p>
           <div className="genres-row">
-            {GENRES.map(g => (
-              <Link key={g} to={`/library?genre=${g}`} className="genre-pill">{g}</Link>
+            {[
+              { label:'Romance',          icon:'💕' },
+              { label:'Drama',            icon:'🎭' },
+              { label:'Mystery',          icon:'🔍' },
+              { label:'Fantasy',          icon:'✨' },
+              { label:'Historical',       icon:'📜' },
+              { label:'Short Stories',    icon:'📖' },
+              { label:'Thriller',         icon:'⚡' },
+              { label:'African Fiction',  icon:'🌍' },
+              { label:'Sci-Fi',           icon:'🚀' },
+              { label:'Adventure',        icon:'🗺️' },
+              { label:'Family Saga',      icon:'👨‍👩‍👧' },
+              { label:'Urban Fiction',    icon:'🏙️' },
+            ].map(g => (
+              <Link key={g.label} to={`/library?genre=${g.label}`} className="genre-pill">
+                <span className="genre-pill__icon">{g.icon}</span>
+                {g.label}
+              </Link>
             ))}
           </div>
         </div>
@@ -670,44 +753,23 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════
-          TESTIMONIALS
+          TESTIMONIALS — auto-carousel
       ══════════════════════════════════════ */}
-      <section className="section testimonials-sec">
-        <div className="container">
-          <h2 className="text-c">What <span className="gold-text">Readers Say</span></h2>
-          <p className="text-c muted" style={{ marginBottom:'44px' }}>{c.testimonials_sub}</p>
-          <div className="testimonials-grid">
-            {[
-              { name:'Amina K.', loc:'Nairobi', stars:5, text:'"Chasing Ghosts and Supercars had me hooked from the first chapter. Finally, stories that feel like home."' },
-              { name:'David O.', loc:'Mombasa', stars:5, text:'"The writing is raw and honest. You can tell these stories come from a real place. Absolutely brilliant."'  },
-              { name:'Grace W.', loc:'Kisumu',  stars:5, text:'"I read Marriage is a Scam in one sitting. Every page felt like it was written about someone I know."'       },
-              { name:'Brian M.', loc:'Eldoret', stars:5, text:'"The reader app is incredible — smooth, beautiful, and works perfectly on my phone. 10/10."'                 },
-            ].map(t => (
-              <div key={t.name} className="testimonial-card">
-                <div className="testimonial-card__stars">{'★'.repeat(t.stars)}</div>
-                <p className="testimonial-card__text">{t.text}</p>
-                <div className="testimonial-card__author">
-                  <div className="testimonial-card__avatar">{t.name[0]}</div>
-                  <div><strong>{t.name}</strong><span>{t.loc}</span></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <TestimonialsCarousel sub={c.testimonials_sub} />
 
       {/* ══════════════════════════════════════
-          RECOMMENDATIONS & TRENDING
+          RECOMMENDATIONS & TRENDING — two-column
       ══════════════════════════════════════ */}
-      <section className="section">
+      <section className="section rec-trending-sec">
         <div className="container">
-          <RecommendationWidget limit={8} />
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container" style={{ maxWidth:'400px', margin:'0 auto' }}>
-          <TrendingWidget limit={5} />
+          <div className="rec-trending-grid">
+            <div className="rec-trending-grid__main">
+              <RecommendationWidget limit={10} />
+            </div>
+            <div className="rec-trending-grid__side">
+              <TrendingWidget limit={6} />
+            </div>
+          </div>
         </div>
       </section>
 

@@ -1,33 +1,18 @@
 /* ── Trending Widget ─────────────────────────────────── */
-.tw {
-  margin: 0;
-}
+.tw { margin: 0; }
 
 .tw__head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
 }
-
-.tw__title {
-  margin: 0 0 0.2rem;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text);
-  font-family: 'Playfair Display', serif;
-}
-
-.tw__sub {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
+.tw__title { margin: 0 0 0.25rem; font-size: 1.2rem; font-weight: 700; color: var(--text); font-family: 'Playfair Display', serif; }
+.tw__sub { margin: 0; font-size: 0.8rem; color: var(--muted); }
 .tw__more {
   flex-shrink: 0;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--gold);
   text-decoration: none;
@@ -39,9 +24,9 @@
 /* ── Horizontal scroll strip ── */
 .tw__strip {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding-bottom: 12px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(201,168,76,0.3) transparent;
@@ -53,62 +38,56 @@
 /* ── Book card ── */
 .tw__card {
   flex-shrink: 0;
-  width: 110px;
+  width: 115px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
   color: inherit;
   transition: transform 0.2s;
 }
-.tw__card:hover { transform: translateY(-4px); }
+.tw__card:hover { transform: translateY(-5px); }
 .tw__card:hover .tw__book-title { color: var(--gold); }
 
 /* ── Cover wrapper ── */
 .tw__cover-wrap {
   position: relative;
-  width: 90px;
-  height: 126px;
-  border-radius: 6px;
+  width: 96px;
+  height: 138px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35), 2px 2px 0 rgba(0,0,0,0.2);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4), 3px 3px 0 rgba(0,0,0,0.25);
   transition: box-shadow 0.2s;
 }
-.tw__card:hover .tw__cover-wrap {
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5), 2px 2px 0 rgba(0,0,0,0.2);
-}
+.tw__card:hover .tw__cover-wrap { box-shadow: 0 14px 34px rgba(0,0,0,0.55), 3px 3px 0 rgba(0,0,0,0.25); }
 
 /* ── Rank badge ── */
 .tw__rank {
   position: absolute;
-  top: 5px;
-  left: 7px;
-  font-size: 0.72rem;
+  top: 6px; left: 8px;
+  font-size: 0.82rem;
   font-weight: 900;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  text-shadow: 0 2px 6px rgba(0,0,0,0.9);
   font-family: 'Playfair Display', serif;
   letter-spacing: -0.5px;
 }
-
 .tw__rating {
   position: absolute;
-  bottom: 5px;
-  right: 5px;
-  background: rgba(0,0,0,0.75);
+  bottom: 6px; right: 6px;
+  background: rgba(0,0,0,0.8);
   color: #f1c40f;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   backdrop-filter: blur(4px);
 }
 
 /* ── Book info ── */
-.tw__info { display: flex; flex-direction: column; gap: 2px; }
-
+.tw__info { display: flex; flex-direction: column; gap: 3px; }
 .tw__book-title {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--text);
   line-height: 1.3;
@@ -118,51 +97,26 @@
   -webkit-box-orient: vertical;
   transition: color 0.2s;
 }
-
-.tw__genre {
-  margin: 0;
-  font-size: 0.65rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-}
-
-.tw__reviews {
-  margin: 0;
-  font-size: 0.62rem;
-  color: var(--muted);
-}
-
-.tw__price {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--gold);
-}
+.tw__genre { margin: 0; font-size: 0.66rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.tw__reviews { margin: 0; font-size: 0.63rem; color: var(--muted); }
+.tw__price { margin: 0; font-size: 0.76rem; font-weight: 700; color: var(--gold); }
 
 /* ── Skeleton ── */
 .tw__card--skeleton { pointer-events: none; }
-
 .tw__skeleton-cover {
-  width: 90px;
-  height: 126px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+  width: 96px; height: 138px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 100%);
   background-size: 200% 100%;
   animation: tw-pulse 1.5s infinite;
 }
-
 .tw__skeleton-line {
-  height: 10px;
-  border-radius: 4px;
-  width: 90px;
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+  height: 10px; border-radius: 4px; width: 96px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 100%);
   background-size: 200% 100%;
   animation: tw-pulse 1.5s infinite 0.2s;
 }
-.tw__skeleton-line--short { width: 60px; animation-delay: 0.4s; }
-
+.tw__skeleton-line--short { width: 65px; animation-delay: 0.4s; }
 @keyframes tw-pulse {
   0%, 100% { background-position: 200% 0; }
   50% { background-position: -200% 0; }
@@ -172,7 +126,7 @@
 @media (max-width: 768px) {
   .tw__title { font-size: 1.05rem; }
   .tw__strip { gap: 10px; }
-  .tw__card { width: 95px; }
-  .tw__cover-wrap { width: 80px; height: 112px; }
-  .tw__skeleton-cover { width: 80px; height: 112px; }
+  .tw__card { width: 100px; }
+  .tw__cover-wrap { width: 84px; height: 120px; }
+  .tw__skeleton-cover { width: 84px; height: 120px; }
 }
