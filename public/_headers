@@ -1,31 +1,43 @@
+# ── Security + Cache headers for Cloudflare Pages ───────────────────────────
+# IMPORTANT: Only ONE block per path pattern. Later blocks override earlier ones.
+# The /* block below covers all HTML pages.
+
+# HTML pages — MUST revalidate on every request so browsers never serve stale
+# index.html with wrong JS chunk filenames (causes black screen MIME errors)
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SEO FIX: Allow search engines to cache and index pages
-# Changed from: no-store, no-cache (which blocked Google from indexing)
-# Changed to: public, max-age=3600, must-revalidate
-# This allows Google bot and CDN to cache pages while ensuring fresh content
-# ─────────────────────────────────────────────────────────────────────────────
+# Hashed JS/CSS bundles — safe to cache forever (Vite content-hashes filenames)
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
 
-# HTML pages — CACHEABLE for search engines (1 hour cache)
-/*
-  Cache-Control: public, max-age=3600, must-revalidate
-  Pragma: public
-
-# SW — never cache
+# Service Worker — never cache
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
   Pragma: no-cache
 
-# Hashed JS/CSS bundles — safe to cache forever (content-hashed filenames)
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
+# PWA manifest — short cache
+/manifest.json
+  Cache-Control: public, max-age=3600, must-revalidate
+  Content-Type: application/json
 
-# Images — cache 1 day
+# Sitemap — 1 day cache (SEO: Google caches this anyway)
+/sitemap.xml
+  Cache-Control: public, max-age=86400, must-revalidate
+  Content-Type: application/xml
+
+# Robots
+/robots.txt
+  Cache-Control: public, max-age=86400, must-revalidate
+  Content-Type: text/plain
+
+# Images
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate
 
@@ -35,29 +47,15 @@
 /*.jpeg
   Cache-Control: public, max-age=86400, must-revalidate
 
-/*.svg
-  Cache-Control: public, max-age=86400, must-revalidate
-
 /*.webp
   Cache-Control: public, max-age=86400, must-revalidate
 
+/*.svg
+  Cache-Control: public, max-age=86400, must-revalidate
+
+# Fonts
 /*.woff2
   Cache-Control: public, max-age=31536000, immutable
 
 /*.woff
   Cache-Control: public, max-age=31536000, immutable
-
-# XML sitemap — cache 1 day
-/sitemap.xml
-  Cache-Control: public, max-age=86400, must-revalidate
-  Content-Type: application/xml
-
-# Robots.txt — cache 1 day  
-/robots.txt
-  Cache-Control: public, max-age=86400, must-revalidate
-  Content-Type: text/plain
-
-# JSON metadata — cache 1 hour
-/manifest.json
-  Cache-Control: public, max-age=3600, must-revalidate
-  Content-Type: application/json
