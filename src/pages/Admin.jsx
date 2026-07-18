@@ -513,10 +513,38 @@ function CoversTab({books,saveBook,showToast}) {
   const [preview,setPreview]       = useState(null);
   const [delOne,setDelOne]         = useState(null);
   const [bulkDel,setBulkDel]       = useState(false);
+  const [autoSuggestions,setAutoSuggestions] = useState({});
+  const [autoAssigning,setAutoAssigning]     = useState(false);
   const {fileRef,uploading,progress,uploadErr,setUploadErr,upload} = usePhotoUpload('novel_covers');
 
   const FSKEY = 'novel_covers';
   const sorted = list => [...list].sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+  
+  // Auto-detect cover files from public folder
+  const detectCoversForBooks = async () => {
+    const suggestions = {};
+    const COVER_PATTERNS = [
+      'cover-marriage-is-a-scam.png', 'cover-pain.png', 'cover-echoes-savanna.svg',
+      'cover-seven-sunsets.svg', 'cover-midnight-mombasa.svg', 'cover-acacia-road.svg',
+      'cover-children-thunder.svg', 'cover-nairobi-nights.svg', 'cover-chasing-her-ghosts.png',
+      'cover-19-days.png', 'cover-the-last-chapter.png', 'cover-letters-from-lamu.png',
+    ];
+    
+    books.forEach(book => {
+      // Try book-specific patterns
+      const patterns = [
+        `/cover-${book.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`,
+        `/cover-${book.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.svg`,
+        `/cover-${book.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.webp`,
+      ];
+      suggestions[book.id] = patterns;
+    });
+    setAutoSuggestions(suggestions);
+  };
+
+  useEffect(() => {
+    detectCoversForBooks();
+  }, [books]);
 
   useEffect(()=>{
     setLoading(true);
@@ -538,14 +566,43 @@ function CoversTab({books,saveBook,showToast}) {
   const removeOne = async p=>{ const next=photos.filter(x=>x.path!==p.path); try{await persist(next);}catch{setPhotos(next);} setSelected(s=>s.filter(x=>x!==p.path)); showToast('Cover removed'); setDelOne(null); };
   const removeBulk= async ()=>{ const next=photos.filter(p=>!selected.includes(p.path)); try{await persist(next);}catch{setPhotos(next);} showToast(selected.length+' deleted'); setSelected([]); setBulkDel(false); };
   const assign    = async b=>{ try { await saveBook({...b,cover:assignTo.url,coverType:'photo'}); showToast('Cover set for "'+b.title+'"'); } catch { showToast('❌ Save failed'); } setAssignTo(null); };
+  const autoAssign = async (book, coverUrl) => {
+    try {
+      setAutoAssigning(true);
+      await saveBook({...book, cover: coverUrl, coverType: 'photo'});
+      showToast(`✓ Cover auto-assigned to "${book.title}"`);
+    } catch (err) {
+      showToast('❌ Auto-assign failed: ' + err.message);
+    } finally {
+      setAutoAssigning(false);
+    }
+  };
   const toggle    = p=>setSelected(s=>s.includes(p)?s.filter(x=>x!==p):[...s,p]);
   const onSaved   = list=>setPhotos(sorted(list));
 
   const grid = list => list.map(photo=>{
-    const used=books.filter(b=>b.coverType==='photo'&&b.cover===photo.url).length;
+    const used=books.filter(b=>b.cover===photo.url).length;
+    const matchingBooks = books.filter(b => {
+      const bookSlug = b.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const photoName = photo.path.replace(/^\/cover-/, '').replace(/\.(png|svg|webp|jpg)$/i, '');
+      return photoName.includes(bookSlug) || bookSlug.includes(photoName);
+    });
+    
     return <PhotoThumb key={photo.path} photo={photo} selected={selected.includes(photo.path)}
       onToggle={()=>toggle(photo.path)} usedBy={used} onPreview={()=>setPreview(photo)}
-      actions={<><button className="adm-act-btn adm-act-edit" onClick={()=>setAssignTo(photo)}>Set as Cover</button><button className="adm-act-btn adm-act-del" onClick={()=>setDelOne(photo)}>Remove</button></>}/>;
+      actions={
+        <div style={{display:'flex',gap:6,flexDirection:'column'}}>
+          <button className="adm-act-btn adm-act-edit" onClick={()=>setAssignTo(photo)}>Assign to Book</button>
+          {matchingBooks.length > 0 && (
+            <button className="adm-act-btn" style={{background:'rgba(46,204,113,0.12)',color:'var(--ok)',border:'1px solid rgba(46,204,113,0.35)',fontSize:'0.7rem'}}
+              disabled={autoAssigning}
+              onClick={() => autoAssign(matchingBooks[0], photo.url)}>
+              🔗 Auto-Assign to {matchingBooks[0].title.split(' ')[0]}
+            </button>
+          )}
+          <button className="adm-act-btn adm-act-del" onClick={()=>setDelOne(photo)}>Remove</button>
+        </div>
+      }/>;
   });
 
   return (
@@ -594,6 +651,47 @@ function CoversTab({books,saveBook,showToast}) {
       {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading…</div>
         :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>🎨</div><p>No covers yet. Upload above.</p></div>
         :<>
+          {/* Books needing covers section */}
+          {books.some(b=>!b.cover) && (
+            <div style={{marginBottom:32,padding:20,background:'rgba(46,204,113,0.06)',border:'1px solid rgba(46,204,113,0.2)',borderRadius:'var(--r)',}}>
+              <h3 style={{fontSize:'0.95rem',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:'1.2rem'}}>📚</span> Books Needing Covers
+              </h3>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
+                {books.filter(b=>!b.cover).map(book => {
+                  const autoSuggest = photos.find(p => {
+                    const bookSlug = book.title.toLowerCase().replace(/[^a-z0-9]/g, '-');
+                    const photoName = p.path.replace(/^\/cover-/, '').replace(/\.(png|svg|webp|jpg)$/i, '');
+                    return photoName.includes(bookSlug) || bookSlug.includes(photoName);
+                  });
+                  
+                  return (
+                    <div key={book.id} style={{padding:12,background:'var(--card)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',}}>
+                      <div style={{display:'flex',gap:10,marginBottom:10}}>
+                        <div style={{width:40,height:56,background: book.coverColor||'#1a1a3a',borderRadius:4,flexShrink:0}}/>
+                        <div style={{minWidth:0,flex:1}}>
+                          <p style={{margin:0,fontSize:'0.85rem',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{book.title}</p>
+                          <p style={{margin:'2px 0 0',fontSize:'0.75rem',color:'var(--muted)'}}>{book.genre}</p>
+                        </div>
+                      </div>
+                      {autoSuggest ? (
+                        <button className="btn btn-sm" style={{width:'100%',background:'rgba(46,204,113,0.12)',color:'var(--ok)',border:'1px solid rgba(46,204,113,0.35)',fontSize:'0.78rem'}}
+                          disabled={autoAssigning}
+                          onClick={() => autoAssign(book, autoSuggest.url)}>
+                          ✓ Auto-Assign Cover
+                        </button>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" style={{width:'100%',fontSize:'0.78rem'}} onClick={()=>setAssignTo(null)}>
+                          Pick Cover…
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
           {photos.some(p=>!p.isPublic)&&<><p style={{fontSize:'0.72rem',color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Uploaded Covers</p><div className="adm-photo-grid" style={{marginBottom:28}}>{grid(photos.filter(p=>!p.isPublic))}</div></>}
           {photos.some(p=>p.isPublic)&&<><p style={{fontSize:'0.72rem',color:'var(--muted)',fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>Built-in Covers</p><div className="adm-photo-grid">{grid(photos.filter(p=>p.isPublic))}</div></>}
         </>}
