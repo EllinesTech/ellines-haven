@@ -126,10 +126,17 @@
   position: sticky;
   top: 86px;
   z-index: 20;
+  /* allow horizontal scroll on mobile so all tabs are reachable */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* hide scrollbar but keep scroll ability */
 }
+.mylib-tabbar::-webkit-scrollbar { display: none; }
 .mylib-tabs {
   display: flex;
   gap: 0;
+  /* prevent tabs from wrapping — let the bar scroll instead */
+  min-width: max-content;
 }
 .mylib-tab {
   position: relative;
@@ -583,10 +590,10 @@
   }
 
   .mylib-orders-summary { grid-template-columns: 1fr 1fr; }
-  .mylib-tab           { padding: 12px 12px; font-size: 0.8rem; }
+  .mylib-tab           { padding: 12px 14px; font-size: 0.82rem; }
   .mylib-settings      { padding: 8px 0 60px; }
   .mylib-hero          { padding-top: 82px; }
-  .mylib-tabbar        { top: 72px; }
+  .mylib-tabbar        { top: 60px; }
   .mylib-offline-row   { flex-wrap: wrap; }
 }
 @media (max-width: 420px) {
@@ -597,8 +604,9 @@
     min-width: 88px;
     min-height: 140px;
   }
-  /* Tab labels: icon only on very small screens */
-  .mylib-tab { padding: 11px 10px; font-size: 0.75rem; }
+  /* Tighter tabs on very small screens — they scroll so just keep them compact */
+  .mylib-tab { padding: 11px 12px; font-size: 0.75rem; }
+  .mylib-hero { padding-top: 72px; }
 }
 
 /* ─────────────────────────────────────────────

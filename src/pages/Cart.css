@@ -102,8 +102,6 @@
     gap: 8px;
   }
   .cart-cancelled-notice span { width: 100%; }
-  /* Summary sticky top accounts for navbar */
-  .cart-sum { top: 100px; }
 }
 
 @media (max-width: 480px) {

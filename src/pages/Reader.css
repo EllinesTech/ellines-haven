@@ -934,8 +934,8 @@
   }
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { height: calc(100vh - 100px); }
-  /* On tablet keep row wrappers hidden but show the right-side controls row */
-  .reader__nav-row1, .reader__nav-row2 { display: none; }
+  /* On tablet keep both rows visible — just tighten the spacing */
+  .reader__nav-row1, .reader__nav-row2 { display: flex; }
   .reader__nav-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 }
 

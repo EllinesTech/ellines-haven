@@ -34,22 +34,34 @@
   .bd-title { font-size: clamp(1.5rem, 5vw, 2.2rem); }
 }
 @media (max-width:480px) {
-  .bd-wrap { padding: 88px 0 32px; }
+  .bd-wrap { padding: 78px 0 32px; }
   .bd-back { font-size: 0.82rem; margin-bottom: 24px; }
   .bd-left { max-width: 220px; }
   .bd-amt { font-size: 1.6rem; }
+  /* Stats row: scroll horizontally so all 5 stats are reachable */
   .bd-meta { 
-    padding: 14px 14px; 
-    gap: 12px;
-    flex-direction: column;
+    padding: 12px 14px;
+    gap: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .bd-meta::-webkit-scrollbar { display: none; }
   .bd-meta div {
-    min-width: 0;
-    flex: none;
+    min-width: 72px;
+    flex: 0 0 auto;
+    padding: 0 10px;
+    border-right: 1px solid var(--dim);
+    gap: 3px;
   }
+  .bd-meta div:first-child { padding-left: 0; }
+  .bd-meta div:last-child  { border-right: none; }
   .bd-meta small {
-    white-space: normal;
+    white-space: nowrap;
+    font-size: 0.65rem;
   }
+  .bd-meta strong { font-size: 0.88rem; white-space: nowrap; }
   .bd-actions { 
     flex-direction: column;
     width: 100%;
@@ -71,14 +83,14 @@
 }
 
 @media (max-width: 380px) {
-  .bd-wrap { padding: 82px 0 28px; }
+  .bd-wrap { padding: 74px 0 28px; }
   .bd-left { max-width: 190px; }
   .bd-title { font-size: clamp(1.4rem, 4vw, 1.8rem); }
   .bd-amt { font-size: 1.4rem; }
   .bd-back { font-size: 0.78rem; margin-bottom: 18px; }
   .bd-meta { 
-    padding: 12px 12px; 
-    gap: 10px;
+    padding: 10px 10px; 
+    gap: 0;
   }
   .bd-actions .btn {
     font-size: 0.82rem;
