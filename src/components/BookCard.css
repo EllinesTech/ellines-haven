@@ -115,6 +115,13 @@
     align-items: flex-end;
     padding-bottom: 14px;
   }
+  /* Make the View Book button visible and tappable on touch */
+  .bcard__overlay .btn {
+    min-height: 44px;
+    font-size: 0.78rem;
+    padding: 10px 18px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+  }
 }
 
 /* ── Badges ── */

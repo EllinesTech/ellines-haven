@@ -271,6 +271,27 @@
     min-width: 200px;
     max-width: calc(100vw - 16px);
   }
+
+  /* Mobile drawer — ensure full-width, scrollable, no overflow */
+  .nav__mobile {
+    max-height: calc(100dvh - 60px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure touch targets are large enough on mobile */
+  .nav__mobile a,
+  .nav__mobile button {
+    min-height: 48px;
+  }
+
+  /* Burger — larger touch target */
+  .nav__burger {
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 /* ── Tablets (769px – 1024px) ── */
@@ -290,6 +311,23 @@
   .nav__cart { padding: 5px; }
   /* Hide PWA install pill on very tight screens — too cramped */
   .nav__install-btn { display: none; }
+}
+
+/* ── Ensure nav never causes horizontal scroll ── */
+.nav__inner,
+.nav__mobile {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+/* ── Active NavLink highlight ── */
+.nav__links a.active {
+  color: var(--gold);
+  font-weight: 600;
+}
+.nav__mobile a.active {
+  color: var(--gold);
+  background: rgba(201,168,76,0.07);
 }
 
 /* ════════════════════════════════════════

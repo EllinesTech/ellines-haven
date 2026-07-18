@@ -239,6 +239,12 @@ export default function Cart() {
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
 
+  // ── Promo code — declared BEFORE the referral useEffect that reads it ───
+  const [promoInput,     setPromoInput]     = useState('');
+  const [promoApplied,   setPromoApplied]   = useState(null); // { code, type, discountValue }
+  const [promoError,     setPromoError]     = useState('');
+  const [promoChecking,  setPromoChecking]  = useState(false);
+
   // ── Auto-apply referral code from URL param ──────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -265,12 +271,6 @@ export default function Cart() {
       })();
     }
   }, [user]); // eslint-disable-line
-
-  // ── Promo code ────────────────────────────────────────────────────────────
-  const [promoInput,     setPromoInput]     = useState('');
-  const [promoApplied,   setPromoApplied]   = useState(null); // { code, type, discountValue }
-  const [promoError,     setPromoError]     = useState('');
-  const [promoChecking,  setPromoChecking]  = useState(false);
 
   const applyPromo = async () => {
     const code = promoInput.trim().toUpperCase();

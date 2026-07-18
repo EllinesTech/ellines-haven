@@ -86,7 +86,7 @@ export default function Navbar() {
   /* ── Scroll listener ── */
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 60);
-    window.addEventListener('scroll', fn);
+    window.addEventListener('scroll', fn, { passive: true });
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
@@ -125,10 +125,14 @@ export default function Navbar() {
 
         {/* ── Brand ── */}
         <Link to="/" className="nav__brand" onClick={closeAll}>
-          <picture>
-            <source srcSet={navLogo.replace(/\.png$/i, '.webp')} type="image/webp" />
-            <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" width="72" height="72" />
-          </picture>
+          {navLogo && navLogo.startsWith('/') ? (
+            <picture>
+              <source srcSet={navLogo.replace(/\.png$/i, '.webp')} type="image/webp" />
+              <img src={navLogo} alt="Ellines Haven" className="nav__logo-img" width="72" height="72" />
+            </picture>
+          ) : (
+            <img src={navLogo || '/logo-nobg3.png'} alt="Ellines Haven" className="nav__logo-img" width="72" height="72" />
+          )}
           <div className="nav__brand-text">
             <span className="nav__brand-name">Ellines Haven</span>
             <span className="nav__brand-tagline">Home For The Story Soul</span>

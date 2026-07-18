@@ -6,7 +6,7 @@
 /* ── Hero Header ── */
 .lib-hero {
   position: relative;
-  padding: 120px 0 56px;
+  padding: 40px 0 56px;
   background: linear-gradient(160deg, #060612 0%, #0d0d1f 55%, #06101c 100%);
   overflow: hidden;
 }
@@ -98,7 +98,7 @@
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
-  top: 90px; /* desktop navbar height */
+  top: var(--navbar-h, 90px); /* tracks navbar height token */
   z-index: 50;
   /* scrollable on mobile */
   overflow-x: auto;
@@ -254,8 +254,8 @@
   border-radius: var(--r);
   padding: 20px;
   position: sticky;
-  top: 150px; /* navbar (90px) + type-bar (58px) + 2px gap */
-  height: calc(100vh - 168px);
+  top: calc(var(--navbar-h, 90px) + 60px); /* navbar + type-bar */
+  height: calc(100vh - var(--navbar-h, 90px) - 68px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--dim) transparent;
@@ -431,11 +431,11 @@
   }
 
   /* Mobile nav is ~60px */
-  .lib-type-bar { top: 60px; }
+  .lib-type-bar { top: var(--navbar-h-mobile, 60px); }
 }
 
 @media (max-width: 640px) {
-  .lib-hero { padding: 90px 0 44px; }
+  .lib-hero { padding: 24px 0 44px; }
   .lib-hero__copy h1 { font-size: 2rem; }
   .lib-type-bar { overflow-x: auto; }
   .lib-type-bar__inner { height: auto; padding: 10px 0; flex-wrap: wrap; min-width: 0; gap: 8px; }

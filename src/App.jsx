@@ -28,7 +28,7 @@
  */
 
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, useState, lazy, Suspense, Component } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense, Component } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { EditModeProvider, useEditMode } from './context/EditModeContext';
@@ -43,6 +43,24 @@ import { initializeActivityLogger } from './utils/reliableActivityLogger';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import './App.css';
+
+/* ── Reliable reload helper — clears all SW caches then hard-reloads ─────────
+   Works on iOS Safari, Android Chrome, and all desktop browsers.
+   The setTimeout(0) ensures reload fires even if caches.keys() is slow.
+────────────────────────────────────────────────────────────────────────── */
+function hardReload() {
+  localStorage.removeItem('eh_chunk_reload');
+  if ('caches' in window) {
+    // Start cache clearing but don't wait — reload regardless after 600ms
+    const clearTimer = setTimeout(() => window.location.reload(), 600);
+    caches.keys()
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => { clearTimeout(clearTimer); window.location.reload(); })
+      .catch(() => { clearTimeout(clearTimer); window.location.reload(); });
+  } else {
+    window.location.reload();
+  }
+}
 
 /* ── Chunk error boundary — auto-reloads on stale deploy cache ──────────────
    Only triggers full-page fallback for true chunk/module-load errors.
@@ -67,13 +85,8 @@ class ChunkErrorBoundary extends Component {
       const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
       if (!isReading && Date.now() - last > 60_000) {
         localStorage.setItem(reloadKey, String(Date.now()));
-        if ('caches' in window) {
-          caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-            .then(() => window.location.reload())
-            .catch(() => window.location.reload());
-        } else {
-          window.location.reload();
-        }
+        // Use setTimeout so the state update finishes before reload fires
+        setTimeout(() => hardReload(), 0);
         return { hasError: false, isChunkError: false };
       }
       return { hasError: true, isChunkError: true };
@@ -108,17 +121,9 @@ class ChunkErrorBoundary extends Component {
                 padding: '7px 16px', background: '#c9a84c', color: '#000',
                 border: 'none', borderRadius: 6, cursor: 'pointer',
                 fontWeight: 700, fontSize: '0.82rem', flexShrink: 0,
+                minHeight: 44, minWidth: 80, // accessible touch target
               }}
-              onClick={() => {
-                localStorage.removeItem('eh_chunk_reload');
-                if ('caches' in window) {
-                  caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-                    .then(() => window.location.reload())
-                    .catch(() => window.location.reload());
-                } else {
-                  window.location.reload();
-                }
-              }}
+              onClick={hardReload}
             >
               Refresh
             </button>
@@ -143,18 +148,9 @@ class ChunkErrorBoundary extends Component {
             style={{
               marginTop: 8, padding: '9px 24px', background: '#c9a84c',
               color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer',
-              fontWeight: 700, fontSize: '0.87rem',
+              fontWeight: 700, fontSize: '0.87rem', minHeight: 44,
             }}
-            onClick={() => {
-              localStorage.removeItem('eh_chunk_reload');
-              if ('caches' in window) {
-                caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-                  .then(() => window.location.reload())
-                  .catch(() => window.location.reload());
-              } else {
-                window.location.reload();
-              }
-            }}
+            onClick={hardReload}
           >
             Refresh Page
           </button>
@@ -580,7 +576,7 @@ function Layout({ children }) {
   return (
     <>
       <Navbar />
-      <div style={{ paddingTop: 0 }}>{children}</div>
+      <div style={{ paddingTop: 'var(--navbar-h, 90px)' }}>{children}</div>
       <Footer />
     </>
   );

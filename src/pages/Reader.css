@@ -970,18 +970,24 @@
 /* ── Landscape phone ── */
 @media (max-width: 900px) and (orientation: landscape) {
   .reader { 
-    --reader-nav-h: 48px; 
+    --reader-nav-h: 52px; 
     --reader-wm-h: 22px;
   }
   
   .reader__nav {
     flex-wrap: nowrap;
-    height: 48px;
+    height: 52px;
     padding: 0 12px;
     align-items: center;
   }
   
-  .reader__nav-row1, 
+  /* In landscape, collapse to single row — row2 hides inside row1 area */
+  .reader__nav-row1 { 
+    display: flex;
+    width: auto;
+    flex: 1;
+    min-height: unset;
+  }
   .reader__nav-row2 { 
     display: none;
   }
@@ -1020,7 +1026,7 @@
 
   .reader__pdf-frame,
   .reader__pdf-zoom-wrap iframe { 
-    height: calc(100vh - 70px);
+    height: calc(100vh - 74px);
   }
 
   /* Audio player in landscape — compact */
@@ -1470,7 +1476,161 @@
   border-color: rgba(66,133,244,0.3);
 }
 
-/* ── Tablet / Mobile responsive ── */
+/* ── Desktop audio player (default, no media query needed) ── */
+/* The base styles above handle desktop layout correctly: */
+/* - Header (left section) with icon + title/subtitle */
+/* - Centre section (flex: 1) with controls and progress */
+/* - Right section with speed pills */
+/* This is the intended desktop layout, already defined in base styles */
+
+/* ── Tablet (769–1024px) audio player ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .audio-player {
+    padding: 16px 18px;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .audio-player__header {
+    width: 100%;
+    order: 0;
+  }
+
+  .audio-player__centre {
+    flex: 1;
+    order: 1;
+    min-width: 280px;
+  }
+
+  .audio-player__right {
+    order: 2;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .audio-speed-pills {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .audio-speed-pill {
+    padding: 5px 10px;
+    font-size: 0.7rem;
+    min-height: 36px;
+  }
+
+  /* Settings panel stays full width when open */
+  .audio-settings {
+    width: 100%;
+    order: 3;
+    margin-top: 8px;
+    padding-top: 12px;
+  }
+
+  .audio-settings__row {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .audio-settings__row label {
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+
+  /* Voice dropdown on tablet */
+  .audio-custom-dd {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+    z-index: 1000;
+    overflow: visible;
+  }
+
+  .audio-custom-dd__list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 10001;
+    transform: none;
+  }
+}
+
+/* ── Desktop (≥1025px) audio player ── */
+@media (min-width: 1025px) {
+  .audio-player {
+    max-width: 100%;
+    gap: 16px;
+  }
+
+  .audio-player__centre {
+    flex: 0 1 400px;
+    min-width: auto;
+  }
+
+  .audio-player__right {
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .audio-speed-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .audio-speed-pill {
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    min-height: 36px;
+    flex: 0 0 auto;
+  }
+
+  /* Settings panel full width when shown */
+  .audio-settings {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .audio-settings__row {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .audio-settings__row label {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Voice dropdown on desktop */
+  .audio-custom-dd {
+    flex: 1;
+    min-width: 250px;
+  }
+
+  .audio-custom-dd__list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    max-height: 300px;
+    z-index: 10001;
+  }
+}
+
+/* ── Mobile & Tablet responsive ── */
 @media (max-width: 768px) {
   /* Full-width card, stack everything vertically */
   .audio-player {
@@ -1677,7 +1837,7 @@
     bottom: auto;
     top: 50%;
     transform: translateY(-50%);
-    z-index: 10001;
+    z-index: 99999;
     background: #1a1428;
     border: 1.5px solid rgba(74,158,255,0.45);
     border-radius: 12px;
