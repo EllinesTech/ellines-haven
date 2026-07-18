@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { getSocialLink } from '../utils/socialLinks';
 import './Contact.css';
 
 const WA_NUMBER = '254748255466';
@@ -37,13 +38,24 @@ export default function Contact() {
   const [form, setForm] = useState({ name:'', email:'', subject:'', message:'' });
   const [sent, setSent] = useState(false);
   const [c, setC] = useState(CONTACT_DEFAULTS);
+  const [socialHandles, setSocialHandles] = useState({});
   const editCtx = useEditMode();
+
+  const SOCIAL_ICONS = {
+    facebook: '📘', instagram: '📸', twitter: '𝕏', tiktok: '🎵', youtube: '📺',
+    linkedin: '💼', telegram: '✈️', discord: '💬', snapchat: '👻', pinterest: '📌',
+    reddit: '🔴', whatsapp: '💬',
+  };
 
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'contact_content')).then(snap => {
       const fsData = snap.exists() ? snap.data() : {};
       const merged = { ...CONTACT_DEFAULTS, ...fsData };
       setC(merged);
+    }).catch(() => {});
+    
+    getDoc(doc(db, 'site_data', 'site_controls')).then(snap => {
+      if (snap.exists() && snap.data().socialHandles) setSocialHandles(snap.data().socialHandles);
     }).catch(() => {});
   }, []);
 
@@ -225,6 +237,57 @@ export default function Contact() {
           </div>
         </div>
       </section>
+
+      {/* Social Media Section */}
+      {Object.keys(socialHandles).length > 0 && (
+        <section className="section" style={{ background: 'var(--surface)', paddingTop: 56 }}>
+          <div className="container" style={{ textAlign: 'center' }}>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', marginBottom: 8 }}>Follow Us</h2>
+            <p style={{ color: 'var(--muted)', marginBottom: 32, fontSize: '0.95rem' }}>
+              Stay connected with Ellines Haven on social media for updates, behind-the-scenes content, and community stories.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+              {Object.entries(socialHandles).map(([platform, handle]) => {
+                if (!handle || !handle.trim()) return null;
+                return (
+                  <a
+                    key={platform}
+                    href={getSocialLink(platform, handle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Follow us on ${platform.charAt(0).toUpperCase() + platform.slice(1)}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '12px 20px',
+                      background: 'rgba(201,168,76,0.08)',
+                      border: '1px solid rgba(201,168,76,0.25)',
+                      borderRadius: 'var(--r)',
+                      color: 'var(--gold)',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(201,168,76,0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(201,168,76,0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>{SOCIAL_ICONS[platform] || '🌐'}</span>
+                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

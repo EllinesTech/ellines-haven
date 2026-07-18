@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { getSocialLink } from '../utils/socialLinks';
 import './Founder.css';
 
 /* ── Firestore key ── */
@@ -130,6 +131,7 @@ export default function Founder() {
   const [saving,  setSaving]  = useState(false);
   const [toast,   setToast]   = useState('');
   const [activePhoto, setActivePhoto] = useState(0);
+  const [socialHandles, setSocialHandles] = useState({});
 
   usePageMeta({
     title: 'Meet the Founder — Elijah Mwangi M',
@@ -154,6 +156,10 @@ export default function Founder() {
   useEffect(() => {
     getDoc(FOUNDER_DOC()).then(snap => {
       if (snap.exists()) setContent(prev => ({ ...prev, ...snap.data() }));
+    }).catch(() => {});
+
+    getDoc(doc(db, 'site_data', 'site_controls')).then(snap => {
+      if (snap.exists() && snap.data().socialHandles) setSocialHandles(snap.data().socialHandles);
     }).catch(() => {});
   }, []);
 
@@ -180,6 +186,12 @@ export default function Founder() {
     <EditableText value={content[key]} onSave={v => patch(key, v)}
       tag={tag} className={cls} style={sty} multiline={multi} />
   );
+
+  const SOCIAL_ICONS = {
+    facebook: '📘', instagram: '📸', twitter: '𝕏', tiktok: '🎵', youtube: '📺',
+    linkedin: '💼', telegram: '✈️', discord: '💬', snapchat: '👻', pinterest: '📌',
+    reddit: '🔴', whatsapp: '💬',
+  };
 
   return (
     <main>
@@ -460,6 +472,59 @@ export default function Founder() {
           </div>
         </div>
       </section>
+
+      {/* Social Media Section */}
+      {Object.keys(socialHandles).length > 0 && (
+        <section className="section" style={{ background: 'var(--surface)', paddingTop: 56 }}>
+          <div className="founder-inner" style={{ textAlign: 'center' }}>
+            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', marginBottom: 8 }}>
+              Connect with <span className="gold-text">Elijah</span>
+            </h2>
+            <p style={{ color: 'var(--muted)', marginBottom: 32, fontSize: '0.95rem' }}>
+              Follow Elijah Mwangi on social media for insights on technology, literature, and building in Africa.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+              {Object.entries(socialHandles).map(([platform, handle]) => {
+                if (!handle || !handle.trim()) return null;
+                return (
+                  <a
+                    key={platform}
+                    href={getSocialLink(platform, handle)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Follow on ${platform.charAt(0).toUpperCase() + platform.slice(1)}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '12px 20px',
+                      background: 'rgba(201,168,76,0.08)',
+                      border: '1px solid rgba(201,168,76,0.25)',
+                      borderRadius: 'var(--r)',
+                      color: 'var(--gold)',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(201,168,76,0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(201,168,76,0.5)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)';
+                    }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>{SOCIAL_ICONS[platform] || '🌐'}</span>
+                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
