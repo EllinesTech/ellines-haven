@@ -237,8 +237,10 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
   // -- Chrome keep-alive -----------------------------------------------------
   // Chromium-based browsers silently cancel speech after ~15 s.
   // Pause+resume every 10 s while speaking prevents the cutoff.
+  // NOTE: Skip this on iOS/Safari — pause+resume breaks speech there.
+  const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/i.test(navigator.userAgent);
   useEffect(() => {
-    if (playing) {
+    if (playing && !isIOS) {
       keepAliveRef.current = setInterval(() => {
         if (synth.speaking && !synth.paused) {
           synth.pause();
@@ -359,6 +361,8 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
 
 
+    // onboundary fires word-position events — not supported on iOS Safari.
+    // On iOS progress bar stays at 0 but audio still plays (graceful degradation).
     utt.onboundary = e => {
 
       if (e.name === 'word') {
@@ -397,7 +401,12 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
 
 
-    utt.onerror = () => { clearInterval(timerRef.current); setPlaying(false); };
+    utt.onerror = (e) => {
+      // 'interrupted' errors are normal when synth.cancel() is called — ignore them
+      if (e.error === 'interrupted' || e.error === 'canceled') return;
+      clearInterval(timerRef.current);
+      setPlaying(false);
+    };
 
 
 
@@ -424,6 +433,21 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
 
   const handlePlay = () => {
+
+    // On mobile, voices may not have loaded yet. Try to load them now from
+    // within this user-gesture handler — this is the only reliable way on
+    // iOS/Android to both load voices AND start speech in one tap.
+    if (!voicesReady) {
+      const v = synth.getVoices();
+      if (v.length) {
+        setVoices(v);
+        setVoicesReady(true);
+        const best = pickBestIdx(v);
+        setVoiceIdx(best);
+        selectedNameRef.current = v[best]?.name || '';
+      }
+      // Proceed even if still no named voices — browser will use system default
+    }
 
     if (playing) {
 
@@ -567,7 +591,7 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
         </div>
 
-        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title={voicesReady ? `Voice settings (${voices.length} voices)` : "Voice settings (loading\u2026)" }><IcoGear /></button>
+        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title={`Voice settings${voices.length ? ` (${voices.length} voices)` : ''}`}><IcoGear /></button>
 
       </div>
 
@@ -579,17 +603,17 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
         <div className="audio-player__controls">
 
-          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind} disabled={!voicesReady}><IcoRewind /></button>
+          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}><IcoRewind /></button>
 
-          <button className="audio-btn audio-btn--play" title={!voicesReady ? 'Loading voices\u2026' : playing ? 'Pause' : 'Play'} onClick={handlePlay} disabled={!voicesReady}>
+          <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay}>
 
             {playing ? <IcoPause /> : <IcoPlay />}
 
           </button>
 
-          <button className="audio-btn" title="Stop" onClick={handleStop} disabled={!voicesReady}><IcoStop /></button>
+          <button className="audio-btn" title="Stop" onClick={handleStop}><IcoStop /></button>
 
-          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={!voicesReady || currentChapter >= chapters.length - 1}><IcoSkip /></button>
+          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}><IcoSkip /></button>
 
         </div>
 
@@ -679,6 +703,18 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
       </div>
 
+      {/* Mobile voice loading hint */}
+
+      {!voicesReady && voices.length === 0 && (
+
+        <div style={{ fontSize: '0.7rem', color: 'rgba(232,224,240,0.5)', padding: '0 8px', textAlign: 'center', marginTop: '2px' }}>
+
+          Loading voices… Tap play to start listening.
+
+        </div>
+
+      )}
+
 
 
       {/* Settings panel */}
@@ -745,23 +781,29 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
               >
 
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
 
-                  {dispVoices[safeIdx]?.name || 'Select voice'}
+                  <span style={{ flex: 1 }}>
 
-                  {dispVoices[safeIdx] && isGoogleNeural(dispVoices[safeIdx]) && (
+                    {dispVoices[safeIdx]?.name || 'Select voice'}
 
-                    <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
+                    {dispVoices[safeIdx] && isGoogleNeural(dispVoices[safeIdx]) && (
 
-                  )}
+                      <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
 
-                  {dispVoices[safeIdx] && !isGoogleNeural(dispVoices[safeIdx]) && isNeuralVoice(dispVoices[safeIdx]) && (
+                    )}
 
-                    <span className="audio-neural-badge">✨ Neural</span>
+                    {dispVoices[safeIdx] && !isGoogleNeural(dispVoices[safeIdx]) && isNeuralVoice(dispVoices[safeIdx]) && (
 
-                  )}
+                      <span className="audio-neural-badge">✨ Neural</span>
 
-                  {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
+                    )}
+
+                    {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
+
+                  </span>
+
+                  <span style={{ fontSize: '0.85rem', color: 'rgba(74,158,255,0.6)', flexShrink: 0, fontWeight: 700 }}>✓ Active</span>
 
                 </span>
 
