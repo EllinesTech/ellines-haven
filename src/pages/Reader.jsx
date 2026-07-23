@@ -351,13 +351,28 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
     const utt = new SpeechSynthesisUtterance(text);
 
-    utt.voice  = getSelectedVoice();
+    const selectedVoice = getSelectedVoice();
+    // CRITICAL: If voice is null, force reload voices and try again
+    if (!selectedVoice && voices.length === 0) {
+      const reloadedVoices = synth.getVoices();
+      if (reloadedVoices.length > 0) {
+        setVoices(reloadedVoices);
+        setVoicesReady(true);
+        const best = pickBestIdx(reloadedVoices);
+        setVoiceIdx(best);
+        selectedNameRef.current = reloadedVoices[best]?.name || '';
+        utt.voice = reloadedVoices[best] || null;
+      }
+    } else {
+      utt.voice = selectedVoice;
+    }
 
     utt.rate   = rate;
 
     utt.pitch  = pitch;
 
     utt.lang   = utt.voice?.lang || 'en-US';
+    utt.volume = 1.0;  // Ensure volume is maximum
 
 
 
@@ -472,6 +487,17 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         setPlaying(true);
 
       } else {
+        // Ensure voices are loaded before speaking
+        if (voices.length === 0) {
+          const v = synth.getVoices();
+          if (v.length) {
+            setVoices(v);
+            setVoicesReady(true);
+            const best = pickBestIdx(v);
+            setVoiceIdx(best);
+            selectedNameRef.current = v[best]?.name || '';
+          }
+        }
 
         speak(charRef.current);
 
