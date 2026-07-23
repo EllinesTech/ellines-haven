@@ -42,7 +42,15 @@ function setCanonical(href) {
   el.setAttribute('href', href);
 }
 
-export function usePageMeta({ title, description, image, url, type = 'website' } = {}) {
+export function usePageMeta({ 
+  title, 
+  description, 
+  image, 
+  url, 
+  type = 'website',
+  // Book-specific schema fields
+  bookData = null,
+} = {}) {
   useEffect(() => {
     const fullTitle = title ? `${title} — ${SITE}` : SITE;
     const desc      = description || DEFAULT_DESC;
@@ -72,10 +80,73 @@ export function usePageMeta({ title, description, image, url, type = 'website' }
     setMetaName('twitter:description', desc.slice(0, 200));
     setMetaName('twitter:image',       img);
 
+    // Add Book schema markup if bookData provided
+    if (bookData) {
+      const bookSchema = {
+        '@context': 'https://schema.org',
+        '@type': 'Book',
+        '@id': canonical,
+        'name': bookData.title,
+        'description': bookData.description || desc,
+        'author': {
+          '@type': 'Person',
+          'name': 'Elijah Mwangi M',
+          'url': `${ORIGIN}/founder`,
+        },
+        'publisher': {
+          '@type': 'Organization',
+          'name': 'Ellines Haven',
+          'url': ORIGIN,
+        },
+        'image': img,
+        'isbn': bookData.isbn || undefined,
+        'url': canonical,
+        'bookEdition': bookData.edition || 'Digital Edition',
+        'genre': bookData.genre || 'Fiction',
+        'inLanguage': 'en',
+        'datePublished': bookData.datePublished || '2024-01-01',
+        'offers': {
+          '@type': 'Offer',
+          'availability': bookData.status === 'coming-soon' ? 'PreOrder' : 'InStock',
+          'price': String(bookData.price || 0),
+          'priceCurrency': 'KES',
+          'url': canonical,
+        },
+      };
+
+      // Add rating if available
+      if (bookData.rating && bookData.reviews) {
+        bookSchema.aggregateRating = {
+          '@type': 'AggregateRating',
+          'ratingValue': String(bookData.rating),
+          'bestRating': '5',
+          'worstRating': '1',
+          'ratingCount': String(bookData.reviews),
+        };
+      }
+
+      // Remove undefined fields
+      Object.keys(bookSchema).forEach(key => 
+        bookSchema[key] === undefined && delete bookSchema[key]
+      );
+
+      let scriptEl = document.querySelector('script[data-book-schema="true"]');
+      if (!scriptEl) {
+        scriptEl = document.createElement('script');
+        scriptEl.setAttribute('type', 'application/ld+json');
+        scriptEl.setAttribute('data-book-schema', 'true');
+        document.head.appendChild(scriptEl);
+      }
+      scriptEl.textContent = JSON.stringify(bookSchema);
+    }
+
     return () => {
       document.title = SITE;
       // Reset canonical to homepage on unmount
       setCanonical(ORIGIN + '/');
+      // Remove book schema on unmount
+      const bookScript = document.querySelector('script[data-book-schema="true"]');
+      if (bookScript) bookScript.remove();
     };
-  }, [title, description, image, url, type]); // eslint-disable-line
+  }, [title, description, image, url, type, bookData]); // eslint-disable-line
 }

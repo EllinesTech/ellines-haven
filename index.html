@@ -115,11 +115,11 @@
       }
     }
     </script>
-    <!-- Structured Data — Organization / BookStore -->
+    <!-- Structured Data — Organization / BookStore (IMPROVED) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": ["Organization", "BookStore"],
+      "@type": ["Organization", "BookStore", "LocalBusiness"],
       "name": "Ellines Haven",
       "url": "https://haven.ellines.co.ke",
       "logo": {
@@ -128,8 +128,14 @@
         "width": 512,
         "height": 512
       },
-      "image": "https://haven.ellines.co.ke/og-image.png",
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://haven.ellines.co.ke/og-image.png",
+        "width": 1200,
+        "height": 630
+      },
       "description": "Kenya's premier digital bookstore. Original novels and short stories by Elijah Mwangi M — all inspired by true East African stories. Buy once, read forever.",
+      "disambiguatingDescription": "An online bookstore featuring original African literature and books from emerging East African authors",
       "telephone": "+254748255466",
       "email": "ellines.haven@gmail.com",
       "address": {
@@ -138,14 +144,26 @@
         "addressLocality": "Nairobi",
         "addressCountry": "KE"
       },
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "telephone": "+254748255466",
-        "contactType": "customer support",
-        "availableLanguage": "English",
-        "areaServed": "KE"
+      "contactPoint": [
+        {
+          "@type": "ContactPoint",
+          "telephone": "+254748255466",
+          "contactType": "customer support",
+          "availableLanguage": "English",
+          "areaServed": "KE"
+        },
+        {
+          "@type": "ContactPoint",
+          "contactType": "sales",
+          "email": "ellines.haven@gmail.com"
+        }
+      ],
+      "areaServed": {
+        "@type": "Country",
+        "name": "Kenya"
       },
-      "paymentAccepted": "M-Pesa, Airtel Money, Paystack, PayPal, Visa, Mastercard",
+      "paymentAccepted": ["M-Pesa", "Airtel Money", "Paystack", "PayPal", "Visa", "Mastercard"],
+      "priceRange": "KES 120 - 500",
       "currenciesAccepted": "KES, USD",
       "openingHoursSpecification": {
         "@type": "OpeningHoursSpecification",
@@ -163,6 +181,12 @@
         "@type": "Person",
         "name": "Elijah Mwangi M",
         "url": "https://haven.ellines.co.ke/founder"
+      },
+      "numberOfEmployees": 1,
+      "knowsAbout": ["African Literature", "East African Culture", "Digital Publishing"],
+      "mainEntity": {
+        "@type": "CreativeWork",
+        "name": "Ellines Haven Literary Platform"
       }
     }
     </script>

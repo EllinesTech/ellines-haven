@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
@@ -170,6 +170,38 @@ export default function FAQ() {
     title: 'FAQ — Frequently Asked Questions',
     description: 'Answers to common questions about payments, reading, downloads, account access, and more on Ellines Haven.',
   });
+
+  // Generate FAQPage schema for Google rich snippets
+  useEffect(() => {
+    const faqSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      'mainEntity': FAQS.flatMap(cat => 
+        cat.items.map(item => ({
+          '@type': 'Question',
+          'name': item.q,
+          'acceptedAnswer': {
+            '@type': 'Answer',
+            'text': item.a,
+          },
+        }))
+      ),
+    };
+
+    let schemaScript = document.querySelector('script[data-faq-schema="true"]');
+    if (!schemaScript) {
+      schemaScript = document.createElement('script');
+      schemaScript.setAttribute('type', 'application/ld+json');
+      schemaScript.setAttribute('data-faq-schema', 'true');
+      document.head.appendChild(schemaScript);
+    }
+    schemaScript.textContent = JSON.stringify(faqSchema);
+
+    return () => {
+      if (schemaScript) schemaScript.remove();
+    };
+  }, []);
+
   const [activeCategory, setActiveCategory] = useState('');
   const [search, setSearch] = useState('');
 

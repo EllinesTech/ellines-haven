@@ -861,7 +861,7 @@ export default function BookDetail() {
     ? calculateReadingTime(resolvedWordCount)
     : (book?.readTime || '—');
 
-  // ── Dynamic page title & OG meta for sharing ──────────────────────────────
+  // ── Dynamic page title & OG meta for sharing + Book schema ──────────────────────────────
   useEffect(() => {
     if (!book) return;
     // Page title
@@ -898,6 +898,89 @@ export default function BookDetail() {
     let canon = document.querySelector('link[rel="canonical"]');
     if (!canon) { canon = document.createElement('link'); canon.rel = 'canonical'; document.head.appendChild(canon); }
     canon.href = bookUrl;
+
+    // ── BOOK SCHEMA MARKUP (JSON-LD) ──
+    // This enables rich snippets in Google Search results
+    const bookSchema = {
+      '@context': 'https://schema.org',
+      '@type': 'Book',
+      '@id': bookUrl,
+      'name': book.title,
+      'description': bookDesc,
+      'author': {
+        '@type': 'Person',
+        'name': book.author || 'Elijah Mwangi M',
+        'url': 'https://haven.ellines.co.ke/founder',
+      },
+      'publisher': {
+        '@type': 'Organization',
+        'name': 'Ellines Haven',
+        'url': 'https://haven.ellines.co.ke',
+        'logo': {
+          '@type': 'ImageObject',
+          'url': 'https://haven.ellines.co.ke/pwa-icon-512.png',
+        },
+      },
+      'image': bookImg,
+      'url': bookUrl,
+      'genre': book.genre || 'Fiction',
+      'inLanguage': 'en',
+      'bookFormat': 'EBook',
+      'datePublished': book.date || '2024-01-01',
+      'offers': {
+        '@type': 'Offer',
+        'availability': book.status === 'coming-soon' ? 'PreOrder' : (book.status === 'complete' || book.status === 'ongoing' || book.status === 'premium' ? 'InStock' : 'OutOfStock'),
+        'price': String(book.price || 0),
+        'priceCurrency': 'KES',
+        'url': bookUrl,
+        'seller': {
+          '@type': 'Organization',
+          'name': 'Ellines Haven',
+        },
+      },
+    };
+
+    // Add rating if available (4+ star minimum to show)
+    if (book.rating && book.rating >= 4 && book.reviews && book.reviews > 0) {
+      bookSchema.aggregateRating = {
+        '@type': 'AggregateRating',
+        'ratingValue': String(Math.min(5, book.rating)).slice(0, 3),
+        'bestRating': '5',
+        'worstRating': '1',
+        'ratingCount': String(book.reviews),
+      };
+    }
+
+    // Add word count if available
+    if (resolvedWordCount && resolvedWordCount > 0) {
+      bookSchema.numberOfPages = String(Math.ceil(resolvedWordCount / 250));
+      bookSchema.wordCount = String(resolvedWordCount);
+    }
+
+    // Add themes/keywords
+    if (book.themes && book.themes.length > 0) {
+      bookSchema.keywords = book.themes.join(', ');
+    }
+
+    // Add content rating
+    if (book.audienceRating) {
+      bookSchema.contentRating = book.audienceRating;
+    }
+
+    // Inject or update Book schema script tag
+    let schemaScript = document.querySelector('script[data-book-schema="true"]');
+    if (!schemaScript) {
+      schemaScript = document.createElement('script');
+      schemaScript.setAttribute('type', 'application/ld+json');
+      schemaScript.setAttribute('data-book-schema', 'true');
+      document.head.appendChild(schemaScript);
+    }
+    schemaScript.textContent = JSON.stringify(bookSchema);
+
+    return () => {
+      // Cleanup on unmount
+      if (schemaScript) schemaScript.remove();
+    };
     setMetaName('twitter:title',       `${book.title} by ${book.author}`);
     setMetaName('twitter:description', bookDesc);
     setMetaName('twitter:image',       bookImg);
