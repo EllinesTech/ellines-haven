@@ -351,21 +351,23 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
     const utt = new SpeechSynthesisUtterance(text);
 
-    const selectedVoice = getSelectedVoice();
-    // CRITICAL: If voice is null, force reload voices and try again
-    if (!selectedVoice && voices.length === 0) {
-      const reloadedVoices = synth.getVoices();
-      if (reloadedVoices.length > 0) {
-        setVoices(reloadedVoices);
-        setVoicesReady(true);
-        const best = pickBestIdx(reloadedVoices);
-        setVoiceIdx(best);
-        selectedNameRef.current = reloadedVoices[best]?.name || '';
-        utt.voice = reloadedVoices[best] || null;
-      }
+    // CRITICAL FIX: Always get fresh voices from browser, don't rely on stale state
+    let selectedVoice = null;
+    const currentVoices = synth.getVoices();
+    
+    if (currentVoices.length > 0) {
+      // Voices available - use the best one
+      selectedVoice = currentVoices[voiceIdx] || currentVoices[0];
     } else {
-      utt.voice = selectedVoice;
+      // No voices yet - this is unusual but keep trying
+      const retryVoices = synth.getVoices();
+      if (retryVoices.length > 0) {
+        selectedVoice = retryVoices[0];
+      }
     }
+    
+    // Set voice - if null, browser will use default system voice
+    utt.voice = selectedVoice;
 
     utt.rate   = rate;
 
@@ -449,19 +451,14 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
 
   const handlePlay = () => {
 
-    // On mobile, voices may not have loaded yet. Try to load them now from
-    // within this user-gesture handler — this is the only reliable way on
-    // iOS/Android to both load voices AND start speech in one tap.
-    if (!voicesReady) {
-      const v = synth.getVoices();
-      if (v.length) {
-        setVoices(v);
-        setVoicesReady(true);
-        const best = pickBestIdx(v);
-        setVoiceIdx(best);
-        selectedNameRef.current = v[best]?.name || '';
-      }
-      // Proceed even if still no named voices — browser will use system default
+    // Load voices on user gesture (required on mobile)
+    const currentVoices = synth.getVoices();
+    if (currentVoices.length > 0 && !voicesReady) {
+      setVoices(currentVoices);
+      setVoicesReady(true);
+      const best = pickBestIdx(currentVoices);
+      setVoiceIdx(best);
+      selectedNameRef.current = currentVoices[best]?.name || '';
     }
 
     if (playing) {
@@ -487,17 +484,6 @@ function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
         setPlaying(true);
 
       } else {
-        // Ensure voices are loaded before speaking
-        if (voices.length === 0) {
-          const v = synth.getVoices();
-          if (v.length) {
-            setVoices(v);
-            setVoicesReady(true);
-            const best = pickBestIdx(v);
-            setVoiceIdx(best);
-            selectedNameRef.current = v[best]?.name || '';
-          }
-        }
 
         speak(charRef.current);
 
