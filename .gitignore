@@ -20,6 +20,7 @@ package-lock.json
 functions/.env
 .dev.vars
 .wrangler/
+.cf-deploy/
 
 # Editor directories and files
 .vscode/*

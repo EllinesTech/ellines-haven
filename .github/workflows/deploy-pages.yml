@@ -51,9 +51,19 @@ jobs:
           VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
           VITE_ENV_MODE: production
 
+      # ./functions is Firebase Cloud Functions. Wrangler treats ./functions as
+      # Pages Functions and fails — stage a clean dist-only tree first.
+      - name: Stage clean dist for Pages
+        run: |
+          rm -rf .cf-deploy
+          mkdir -p .cf-deploy
+          cp -R dist .cf-deploy/dist
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=ellines-haven --commit-dirty=true
+          # Run from .cf-deploy so Wrangler does not scan repo ./functions
+          workingDirectory: .cf-deploy
+          command: pages deploy dist --project-name=ellines-haven --commit-dirty=true --branch=main
