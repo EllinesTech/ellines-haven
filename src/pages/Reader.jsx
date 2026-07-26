@@ -1,4 +1,4 @@
-﻿﻿import { useParams, Link, useLocation } from 'react-router-dom';
+﻿import { useParams, Link, useLocation } from 'react-router-dom';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 
@@ -1015,7 +1015,7 @@ export default function Reader() {
 
   const location = useLocation();
 
-  const { books, user, isOwned, library, myPerms, libLoaded, siteControls } = useApp();
+  const { books, user, isOwned, isChapterOwned, library, myPerms, libLoaded, siteControls } = useApp();
 
   const book = findBookBySlugOrId(books, id);
 
@@ -1275,6 +1275,9 @@ export default function Reader() {
 
     if (checkOwned()) return true; // owns the full book
 
+    // Chapter purchases are 1-based in the library
+    if (book?.id && isChapterOwned?.(book.id, chapterNum + 1)) return true;
+
     // Chapter 0 is always free for free-preview books (no login needed)
 
     if (book?.status === 'free-preview' && chapterNum === 0) return true;
@@ -1285,7 +1288,7 @@ export default function Reader() {
 
     return false;
 
-  }, [book?.status, book?.freeFirstChapter, checkOwned]);
+  }, [book?.status, book?.freeFirstChapter, book?.id, checkOwned, isChapterOwned]);
 
 
 
@@ -1447,7 +1450,7 @@ export default function Reader() {
 
 
 
-  if (!checkOwned() && !isFreePreviewCh0) {
+  if (!checkOwned() && !isFreePreviewCh0 && !canAccessChapter(chapter)) {
 
     // Still waiting for Firestore library snapshot
 

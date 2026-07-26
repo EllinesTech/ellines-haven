@@ -969,13 +969,14 @@ export default function MyLibrary() {
 
   const enrichedLibrary = library.map(lb => {
     // For individual chapter purchases (id like "9_ch_1"), resolve the parent book
-    const chapterMatch = !lb.isChapter && typeof lb.id === 'string' ? null : (
-      lb.isChapter && lb.bookId
-        ? { bookId: lb.bookId, chapterNum: lb.chapterNum }
-        : (typeof lb.id === 'string' && /^(.+)_ch_(\d+)$/.test(lb.id))
-          ? { bookId: lb.id.replace(/_ch_\d+$/, ''), chapterNum: parseInt(lb.id.match(/_ch_(\d+)$/)[1]) }
-          : null
-    );
+    const chapterMatch = (typeof lb.id === 'string' && /_ch_\d+$/.test(lb.id))
+      ? {
+          bookId: lb.bookId || lb.id.replace(/_ch_\d+$/, ''),
+          chapterNum: lb.chapterNum || parseInt(lb.id.match(/_ch_(\d+)$/)[1], 10),
+        }
+      : (lb.isChapter && lb.bookId
+          ? { bookId: lb.bookId, chapterNum: lb.chapterNum }
+          : null);
     const cat = chapterMatch
       ? catalog.find(b => b.id === chapterMatch.bookId)
       : catalog.find(b => b.id === lb.id);

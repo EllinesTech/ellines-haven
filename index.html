@@ -30,12 +30,9 @@
     <link rel="apple-touch-icon" sizes="512x512" href="/pwa-icon-512.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/pwa-icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- ALLOW GOOGLE INDEXING ON PRODUCTION -->
+    <!-- ALLOW GOOGLE INDEXING ON PRODUCTION (do not add no-store meta — blocks indexing) -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <!-- Force browser to never cache this HTML document -->
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
+    <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <title>Ellines Haven | Home For The Story Soul</title>
     <meta name="description" content="Discover original novels and short stories by Elijah Mwangi M — all inspired by true stories from East Africa. Buy once, read forever. Kenya's premier literary platform." />
     <meta name="keywords" content="Ellines Haven, Elijah Mwangi, Kenyan novels, African literature, East Africa books, online bookstore Kenya" />
@@ -55,8 +52,8 @@
     <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
     <link rel="dns-prefetch" href="https://firebase.googleapis.com" />
 
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://haven.ellines.co.ke" />
+    <!-- Canonical URL — single tag only (duplicate canonicals confuse Google) -->
+    <link rel="canonical" href="https://haven.ellines.co.ke/" />
     <!-- Open Graph -->
     <meta property="og:title" content="Ellines Haven | Home For The Story Soul" />
     <meta property="og:description" content="Original novels and short stories from East Africa. Buy once, read forever." />
@@ -82,8 +79,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ellines Haven" />
     <link rel="manifest" href="/manifest.json" />
-    <!-- Canonical URL — homepage default (React will override per-page) -->
-    <link rel="canonical" href="https://haven.ellines.co.ke/" />
     <!-- Sitemap reference -->
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     <!-- Preload only immediately critical resources that are used on every page -->
@@ -303,8 +298,6 @@
         document.head.appendChild(m);
       }
     </script>
-    <!-- EXPLICIT ALLOW FOR PRODUCTION -->
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <!-- CRITICAL: Stale deploy guard — MUST be in <head> BEFORE module scripts.
          Vite moves <script type="module"> into <head> during build, so this guard
          must also be in <head> to run first and redirect stale browsers. -->

@@ -341,9 +341,9 @@ function patchHtml(template, route) {
     `$1${safeDesc}$2`
   );
 
-  // 3. Canonical
+  // 3. Canonical — replace ALL tags (duplicate leftovers confuse Google)
   html = html.replace(
-    /(<link\s+rel="canonical"\s+href=")[^"]*(")/,
+    /(<link\s+rel="canonical"\s+href=")[^"]*(")/g,
     `$1${safeUrl}$2`
   );
 

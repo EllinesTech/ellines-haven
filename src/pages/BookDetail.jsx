@@ -894,10 +894,17 @@ export default function BookDetail() {
     setMetaName('description',         bookDesc);
     setMetaName('twitter:card',        'summary_large_image');
 
-    // Canonical URL — critical for Google indexing
-    let canon = document.querySelector('link[rel="canonical"]');
-    if (!canon) { canon = document.createElement('link'); canon.rel = 'canonical'; document.head.appendChild(canon); }
-    canon.href = bookUrl;
+    // Canonical URL — critical for Google indexing (single tag only)
+    document.querySelectorAll('link[rel="canonical"]').forEach((el, i) => {
+      if (i === 0) el.href = bookUrl;
+      else el.remove();
+    });
+    if (!document.querySelector('link[rel="canonical"]')) {
+      const canon = document.createElement('link');
+      canon.rel = 'canonical';
+      canon.href = bookUrl;
+      document.head.appendChild(canon);
+    }
 
     // ── BOOK SCHEMA MARKUP (JSON-LD) ──
     // This enables rich snippets in Google Search results

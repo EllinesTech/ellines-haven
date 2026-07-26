@@ -33,13 +33,19 @@ function setMetaName(name, content) {
 }
 
 function setCanonical(href) {
-  let el = document.querySelector('link[rel="canonical"]');
-  if (!el) {
-    el = document.createElement('link');
+  const existing = document.querySelectorAll('link[rel="canonical"]');
+  if (existing.length === 0) {
+    const el = document.createElement('link');
     el.setAttribute('rel', 'canonical');
+    el.setAttribute('href', href);
     document.head.appendChild(el);
+    return;
   }
-  el.setAttribute('href', href);
+  // Keep one canonical; update first and remove extras
+  existing.forEach((el, i) => {
+    if (i === 0) el.setAttribute('href', href);
+    else el.remove();
+  });
 }
 
 export function usePageMeta({ 

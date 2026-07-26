@@ -219,7 +219,7 @@ function VerifyingScreen({ orderId, onDone }) {
 
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
-  const { cart, removeFromCart, clearCart, user, placeOrder, confirmOrder, settings, myPerms, siteControls, applyReferralDiscount } = useApp();
+  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount } = useApp();
   
   usePageMeta({
     title: 'Cart',
@@ -441,12 +441,18 @@ export default function Cart() {
       }
 
       await new Promise((resolve) => {
+        let paymentSucceeded = false;
+        const paystackChannels =
+          paystackChannel === 'mpesa' ? ['mobile_money'] :
+          ['card'];
+
         const handler = window.PaystackPop.setup({
           key:      PAYSTACK_PUBLIC_KEY,
           email:    user.email,
           amount:   paystackAmountCents,
           currency: 'KES',
           ref:      paystackRef,
+          channels: paystackChannels,
           metadata: {
             orderId:          order.id,
             userEmail:        user.email,
@@ -460,6 +466,7 @@ export default function Cart() {
           },
           callback: (response) => {
             // Payment successful — verify + unlock
+            paymentSucceeded = true;
             setStep('verifying');
 
             const doVerify = async () => {
@@ -483,6 +490,11 @@ export default function Cart() {
                     downloadUnlocked: true,
                     unlockedAt:       new Date().toISOString(),
                     unlockedBy:       'paystack_frontend',
+                    ...(item.isChapter ? {
+                      isChapter:  true,
+                      bookId:     item.bookId || null,
+                      chapterNum: item.chapterNum || null,
+                    } : {}),
                   });
                 });
                 await fsSet(libRef, { email: userEmailLow, books: Array.from(map.values()) }, { merge: true });
@@ -508,6 +520,7 @@ export default function Cart() {
 
               // ── Step 2: try verify function (confirms with Paystack API) ───
               let verifyConfirmed = false;
+              let verifyErrMsg = '';
               try {
                 await callVerifyPaystack({
                   reference: response.reference,
@@ -516,16 +529,23 @@ export default function Cart() {
                 });
                 verifyConfirmed = true;
               } catch (verifyErr) {
-                console.warn('[Cart] verify threw:', verifyErr.message);
-                // For M-Pesa, the callback fires before Safaricom confirms,
-                // so "pending" is expected. We treat the callback itself as
-                // proof of user intent and do the unlock anyway below.
+                verifyErrMsg = String(verifyErr?.message || verifyErr?.details || '');
+                console.warn('[Cart] verify threw:', verifyErrMsg);
               }
 
-              // ── Step 3: always unlock from frontend ────────────────────────
-              // Whether verify succeeded or timed out on pending M-Pesa,
-              // the Paystack callback only fires when the user completed the
-              // payment flow. Do the unlock directly — it's idempotent.
+              // Unlock when verify succeeded, or when Paystack is still pending
+              // (common for M-Pesa). Do NOT unlock on definitive failures.
+              const pendingRace = /pending|timeout|network|unavailable|deadline/i.test(verifyErrMsg);
+              const hardFail = /failed|abandoned|reversed|declined|invalid/i.test(verifyErrMsg);
+              if (!verifyConfirmed && hardFail && !pendingRace) {
+                setStkError(
+                  'Payment was not confirmed. If money was deducted, go to My Library → Orders and tap Retry Activation. Ref: ' +
+                  response.reference
+                );
+                setStep('pay');
+                return;
+              }
+
               try {
                 await doFrontendUnlock(order.id, user.email.toLowerCase(), order.items || []);
                 // Notify user in their own feed
@@ -563,14 +583,26 @@ export default function Cart() {
             doVerify().finally(resolve);
           },
           onClose: () => {
-            // User closed/cancelled the payment popup — return to cart, preserve items
+            // Paystack also fires onClose after a successful payment — never
+            // cancel an order that already completed or whose success callback ran.
+            if (paymentSucceeded) {
+              resolve();
+              return;
+            }
             if (order?.id) {
-              updateDoc(doc(db, 'orders', order.id), {
-                status: 'Cancelled',
-                cancelledAt: serverTimestamp(),
-                updatedAt: serverTimestamp(),
-              }).catch(() => {});
-              notifyAdminPaymentIssue(order, 'Customer cancelled payment', null);
+              (async () => {
+                try {
+                  const { getDoc: fsGet, doc: fsDoc } = await import('firebase/firestore');
+                  const snap = await fsGet(fsDoc(db, 'orders', order.id));
+                  if (snap.exists() && snap.data().status === 'Completed') return;
+                  await updateDoc(doc(db, 'orders', order.id), {
+                    status: 'Cancelled',
+                    cancelledAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                  });
+                  notifyAdminPaymentIssue(order, 'Customer cancelled payment', null);
+                } catch { /* ignore */ }
+              })();
             }
             setCancelledNotice('Payment was cancelled. Your cart is unchanged — add, remove, or proceed when ready.');
             setStep('cart');
@@ -587,25 +619,16 @@ export default function Cart() {
     }
   };
 
-  // ── Manual reference flow (Airtel / fallback) — auto-confirms immediately ──
+  // ── Manual reference flow (Airtel / fallback) — awaits admin confirmation ──
   const submitManual = async e => {
     e.preventDefault();
     setBusy(true);
     try {
       const order = await placeOrder([...cart], method, ref, phone, promoApplied);
       setPlacedOrder(order);
-
-      // Auto-confirm: unlock books immediately — no manual admin step needed
-      await confirmOrder(order.id);
-
-      // Notify user in their own feed
-      try {
-        const { notifyBooksUnlocked } = await import('../utils/userNotifier');
-        await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
-      } catch {}
-
+      // Do NOT auto-unlock — Airtel refs need admin verification to prevent free unlocks
       clearCart();
-      setStep('done');
+      setStep('pending');
     } catch (err) {
       setStkError('Something went wrong. Please try again or contact support.');
     } finally {

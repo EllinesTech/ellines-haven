@@ -758,7 +758,17 @@ export function AppProvider({ children }) {
     const order = {
       id: 'ORD-' + Date.now(), userId: user?.id || null, userName: user?.name || 'Guest',
       userEmail: user?.email?.toLowerCase() || null,
-      items: items.map(b => ({ id:b.id, title:b.title, price:b.price })),
+      items: items.map(b => ({
+        id: b.id,
+        title: b.title,
+        price: b.price,
+        ...(b.isChapter ? {
+          isChapter: true,
+          bookId: b.bookId || null,
+          chapterNum: b.chapterNum || null,
+          chapterId: b.chapterId || b.id,
+        } : {}),
+      })),
       total: effectiveTotal,
       originalTotal: baseTotal,
       discountAmount: discountAmount || 0,

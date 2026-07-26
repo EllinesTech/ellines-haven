@@ -1,4 +1,23 @@
+# Ellines Haven — https://haven.ellines.co.ke
 User-agent: *
 Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Private / app surfaces (no SEO value)
+Disallow: /admin
+Disallow: /my-library
+Disallow: /cart
+Disallow: /wishlist
+Disallow: /reader-profile
+Disallow: /admin-profile
+Disallow: /change-password
 
 Sitemap: https://haven.ellines.co.ke/sitemap.xml
