@@ -827,7 +827,7 @@ export default function Cart() {
               ))}
               {placedOrder.promoCode && (
                 <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.05)', color:'#2ecc71' }}>
-                  <span>🎟 {placedOrder.promoCode}</span>
+                  <span>{placedOrder.promoCode}</span>
                   <span>−KSh {(placedOrder.discountAmount||0).toLocaleString()}</span>
                 </div>
               )}

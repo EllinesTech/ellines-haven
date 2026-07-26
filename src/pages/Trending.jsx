@@ -57,26 +57,24 @@ export default function Trending() {
   };
 
   return (
-    <main>
-      {/* Page header */}
-      <section className="page-header trending-header">
-        <div className="container">
-          <div className="trending-hero">
-            <span className="badge badge-gold">🔥 What's Hot Right Now</span>
-            <h1>
-              <span className="gold-text">Trending</span> on Ellines Haven
-            </h1>
-            <p>Discover the books everyone is reading — real stories that resonate with thousands of readers across Kenya and beyond.</p>
-          </div>
+    <main className="trending-page">
+      <header className="trending-hero-wrap">
+        <div className="trending-hero-wrap__glow" aria-hidden="true" />
+        <div className="trending-hero-wrap__orb trending-hero-wrap__orb--1" aria-hidden="true" />
+        <div className="trending-hero-wrap__orb trending-hero-wrap__orb--2" aria-hidden="true" />
+        <div className="container trending-hero-wrap__inner">
+          <p className="trending-hero-wrap__brand">Ellines Haven</p>
+          <h1>
+            <span className="gold-text">Trending</span> Now
+          </h1>
+          <p>Discover the books everyone is reading — real stories that resonate across Kenya and beyond.</p>
         </div>
-      </section>
+      </header>
 
-      {/* Filters section */}
       <section className="trending-filters-section">
         <div className="container">
-          {/* Genre filter */}
           <div className="filter-group">
-            <label className="filter-label">📚 Genre</label>
+            <label className="filter-label">Genre</label>
             <div className="genre-pills">
               <button
                 className={`pill ${selectedGenre === 'All' ? 'active' : ''}`}
@@ -96,9 +94,8 @@ export default function Trending() {
             </div>
           </div>
 
-          {/* Sort filter */}
           <div className="filter-group">
-            <label className="filter-label">📊 Sort By</label>
+            <label className="filter-label">Sort By</label>
             <div className="sort-options">
               <button
                 className={`sort-btn ${sortBy === 'trending' ? 'active' : ''}`}
@@ -110,26 +107,25 @@ export default function Trending() {
                 className={`sort-btn ${sortBy === 'rating' ? 'active' : ''}`}
                 onClick={() => handleSortChange('rating')}
               >
-                ⭐ Top Rated
+                Top Rated
               </button>
               <button
                 className={`sort-btn ${sortBy === 'reviews' ? 'active' : ''}`}
                 onClick={() => handleSortChange('reviews')}
               >
-                💬 Most Reviewed
+                Most Reviewed
               </button>
               <button
                 className={`sort-btn ${sortBy === 'newest' ? 'active' : ''}`}
                 onClick={() => handleSortChange('newest')}
               >
-                📅 Newest
+                Newest
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Books grid */}
       <section className="section trending-results-section">
         <div className="container">
           {loading ? (
@@ -139,10 +135,9 @@ export default function Trending() {
             </div>
           ) : trending.length === 0 ? (
             <div className="empty-state">
-              <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>📭</div>
               <h3>No books found</h3>
               <p>Try a different genre or sort option.</p>
-              <Link to="/library" className="btn btn-outline btn-sm" style={{ marginTop: 16 }}>
+              <Link to="/library" className="btn btn-outline btn-sm">
                 Browse All Books →
               </Link>
             </div>
@@ -165,8 +160,7 @@ export default function Trending() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="section trending-cta">
+      <section className="trending-cta">
         <div className="container">
           <div className="cta-card">
             <div className="cta-content">

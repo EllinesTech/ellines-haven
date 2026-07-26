@@ -267,7 +267,7 @@ function ShareBookButton({ book }) {
       style={{ gap: 7 }}
     >
       {copied ? (
-        <>✅ <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Copied!</span></>
+        <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>Copied!</span>
       ) : (
         <>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
