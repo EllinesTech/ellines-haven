@@ -616,7 +616,7 @@ export default function Reader() {
         <h2>Book not found</h2>
         <p style={{ color:'var(--muted)', maxWidth:360, textAlign:'center' }}>
           {isOffline
-            ? 'This title isn’t saved on this device. Reconnect and tap Save offline while reading.'
+            ? 'This title isn’t kept on this device. Reconnect and tap Keep forever while reading.'
             : 'We couldn’t find this book. It may have been removed from the catalogue.'}
         </p>
         <Link to="/my-library" className="btn btn-primary">My Library</Link>
@@ -836,7 +836,7 @@ export default function Reader() {
       setOfflineMsgTone('ok');
 
       setOfflineSaveMsg(
-        `Saved on this device${result.count ? ` · ${result.count} chapters` : ''}${
+        `Owned forever on this device${result.count ? ` · ${result.count} chapters` : ''}${
           result.approxBytes ? ` · ${formatOfflineSize(result.approxBytes)}` : ''
         }`
       );
@@ -847,8 +847,8 @@ export default function Reader() {
 
       setOfflineSaveMsg(
         result?.reason === 'quota'
-          ? 'Storage full — remove an offline book in My Library, then try again'
-          : 'Could not save offline. Please try again.'
+          ? 'Storage full — remove a kept book in My Library, then try again'
+          : 'Could not keep this book. Please try again.'
       );
 
     }
@@ -1264,12 +1264,12 @@ export default function Reader() {
                     className="reader__offline-btn reader__offline-btn--saved"
 
                     title={offlineMeta?.savedAt
-                      ? `Saved on this device · ${new Date(offlineMeta.savedAt).toLocaleDateString('en-KE')}`
-                      : 'Saved on this device — tap to remove'}
+                      ? `Owned forever on this device · ${new Date(offlineMeta.savedAt).toLocaleDateString('en-KE')} — tap to remove`
+                      : 'Owned forever on this device — tap to remove'}
 
                     onClick={handleRemoveOffline}
 
-                  >Saved · Remove</button>
+                  >Owned forever</button>
 
                 ) : (
 
@@ -1277,7 +1277,7 @@ export default function Reader() {
 
                     className="reader__offline-btn"
 
-                    title="Save chapters on this device so you can keep reading after refresh or without internet"
+                    title="Keep chapters on this device so you can keep reading after refresh or without internet"
 
                     onClick={handleSaveOffline}
 
@@ -1285,7 +1285,7 @@ export default function Reader() {
 
                     aria-busy={offlineSaving}
 
-                  >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
+                  >{offlineSaving ? 'Keeping…' : 'Keep forever'}</button>
 
                 )}
                 </>
@@ -1382,12 +1382,12 @@ export default function Reader() {
                     className="reader__offline-btn reader__offline-btn--saved"
 
                     title={offlineMeta?.savedAt
-                      ? `Saved on this device · ${new Date(offlineMeta.savedAt).toLocaleDateString('en-KE')} — tap to remove`
-                      : 'Saved on this device — tap to remove'}
+                      ? `Owned forever on this device · ${new Date(offlineMeta.savedAt).toLocaleDateString('en-KE')} — tap to remove`
+                      : 'Owned forever on this device — tap to remove'}
 
                     onClick={handleRemoveOffline}
 
-                  >Saved · Remove</button>
+                  >Owned forever</button>
 
                 ) : (
 
@@ -1395,7 +1395,7 @@ export default function Reader() {
 
                     className="reader__offline-btn"
 
-                    title="Save chapters on this device so you can keep reading after refresh or without internet"
+                    title="Keep chapters on this device so you can keep reading after refresh or without internet"
 
                     onClick={handleSaveOffline}
 
@@ -1403,7 +1403,7 @@ export default function Reader() {
 
                     aria-busy={offlineSaving}
 
-                  >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
+                  >{offlineSaving ? 'Keeping…' : 'Keep forever'}</button>
 
                 )}
                 </>
@@ -1487,7 +1487,7 @@ export default function Reader() {
 
           <span>
             You’re offline and this book isn’t saved on this device.
-            Reconnect, open the book, then tap <strong>Save offline</strong>.
+            Reconnect, open the book, then tap <strong>Keep forever</strong>.
           </span>
 
         </div>

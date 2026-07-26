@@ -593,7 +593,7 @@ function OfflineBooks({ user, catalog, onCountChange }) {
       <h3>Couldn’t read offline storage</h3>
       <p>
         Your browser blocked offline storage. Try another browser, or turn off private browsing,
-        then open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> again.
+        then open a book and tap <strong style={{ color:'var(--gold)' }}>Keep forever</strong> again.
       </p>
       <button type="button" className="btn btn-primary" onClick={() => setReloadTick((t) => t + 1)}>
         Retry
@@ -606,7 +606,7 @@ function OfflineBooks({ user, catalog, onCountChange }) {
       <div className="mylib-empty-icon">📥</div>
       <h3>No books on this device yet</h3>
       <p>
-        Open a book you own and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong>.
+        Open a book you own and tap <strong style={{ color:'var(--gold)' }}>Keep forever</strong>.
         It stays on this device after refresh — even without internet.
       </p>
       <Link to="/library" className="btn btn-primary">Browse Books</Link>
@@ -619,13 +619,13 @@ function OfflineBooks({ user, catalog, onCountChange }) {
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
         <div>
           <h2 style={{ fontSize:'1.1rem', margin:0 }}>
-            On this device
+            Owned forever
             <span style={{ marginLeft:10, background:'rgba(201,168,76,0.15)', color:'var(--gold)', padding:'2px 10px', borderRadius:20, fontSize:'0.78rem', fontWeight:700 }}>
               {offlineBooks.length}
             </span>
           </h2>
           <p style={{ fontSize:'0.8rem', color:'var(--muted)', margin:'4px 0 0' }}>
-            Saved in this browser — available after refresh. Remove a title anytime to free space.
+            Kept in this browser — available after refresh. Remove a title anytime to free space.
           </p>
         </div>
       </div>
@@ -1278,11 +1278,11 @@ export default function MyLibrary() {
                           <div className="mylib-offline-row">
                             {offlineState[b.id] === 'saved' ? (
                               <>
-                                <span className="mylib-offline-badge">✓ On this device</span>
+                                <span className="mylib-offline-badge">✓ Owned forever</span>
                                 <button
                                   className="btn btn-ghost btn-sm"
                                   style={{ fontSize:'0.72rem', padding:'2px 8px' }}
-                                  title="Remove offline copy from this device"
+                                  title="Remove kept copy from this device"
                                   onClick={async () => {
                                     await removeOfflineBook(user.email, b.id);
                                     setOfflineState(s => ({ ...s, [b.id]: false }));
@@ -1296,7 +1296,7 @@ export default function MyLibrary() {
                                 <button
                                   className={`mylib-offline-btn${offlineState[b.id] === 'error' ? ' mylib-offline-btn--err' : ''}`}
                                   disabled={offlineState[b.id] === 'saving'}
-                                  title="Save this book's chapters on this device for offline reading"
+                                  title="Keep this book's chapters on this device for offline reading"
                                   onClick={async () => {
                                     setOfflineState(s => ({ ...s, [b.id]: 'saving' }));
                                     try {
@@ -1323,16 +1323,16 @@ export default function MyLibrary() {
                                   }}
                                 >
                                   {offlineState[b.id] === 'saving'
-                                    ? 'Saving…'
+                                    ? 'Keeping…'
                                     : offlineState[b.id] === 'error'
-                                      ? 'Retry save'
-                                      : 'Save offline'}
+                                      ? 'Retry'
+                                      : 'Keep forever'}
                                 </button>
                                 {offlineState[b.id] !== 'saving' && (
                                   <p className="mylib-offline-hint">
                                     {offlineState[b.id] === 'error'
-                                      ? 'Couldn’t save — storage may be full. Remove another book and retry.'
-                                      : 'Save chapters here so you can read after refresh offline.'}
+                                      ? 'Couldn’t keep — storage may be full. Remove another book and retry.'
+                                      : 'Keep chapters here so you can read after refresh offline.'}
                                   </p>
                                 )}
                               </>

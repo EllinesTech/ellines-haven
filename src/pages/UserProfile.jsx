@@ -634,7 +634,7 @@ export default function UserProfile() {
                 <div className="up-empty">
                   <div className="up-empty__icon">📱</div>
                   <h3>No books on this device yet</h3>
-                  <p>While reading, tap <strong>Save offline</strong> to keep chapters on this device.</p>
+                  <p>While reading, tap <strong>Keep forever</strong> to own chapters on this device.</p>
                   <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>
                     Saves stay after refresh in this browser. Clearing site data removes them.
                   </p>
