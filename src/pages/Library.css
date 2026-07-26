@@ -432,7 +432,8 @@
 /* ── Books grid ── */
 .lib-books-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 260px));
+  justify-content: start;
   gap: 26px;
 }
 .lib-books-grid > * {
@@ -523,7 +524,7 @@
    RESPONSIVE
 ════════════════════════════════════════ */
 @media (max-width: 1100px) {
-  .lib-books-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+  .lib-books-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 240px)); justify-content: start; }
 }
 
 @media (max-width: 900px) {

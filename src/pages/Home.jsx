@@ -17,10 +17,10 @@ import './Home.css';
 
 /* ── Firestore-backed site content (editable via Page Editor) ── */
 const HOME_DEFAULTS = {
-  eyebrow:             "Kenya's Premier Literary Platform",
-  hero_sub:            'Original novels and short stories by Elijah Mwangi M — drawn from real lives, real heartbreaks, and the soul of East Africa. Buy once. Read forever.',
-  hero_btn_primary:    'Browse Books →',
-  hero_btn_secondary:  'Our Story',
+  eyebrow:             "Kenya's Home for Original Stories",
+  hero_sub:            'Novels drawn from real Kenyan lives — love, betrayal, ambition, and the quiet courage it takes to keep going. Open a chapter. Stay for the story.',
+  hero_btn_primary:    'Start Reading →',
+  hero_btn_secondary:  'Meet the Author',
   hero_poster:         '/poster4.png',
   author_bg_image:     '/cover-the-last-chapter.png',
   stat_books:          '50+',
@@ -30,8 +30,8 @@ const HOME_DEFAULTS = {
   coming_soon_sub:     'Upcoming novels & stories — get notified on launch day',
   new_releases_heading:'New Releases',
   new_releases_sub:    'The latest from Elijah Mwangi M',
-  featured_heading:    'Featured Novels & Books',
-  featured_sub:        'Original works inspired by true stories',
+  featured_heading:    'Stories Worth Opening',
+  featured_sub:        'Start with any title — many include a free first chapter',
   author_badge:        'Author Spotlight',
   author_name:         'Elijah Mwangi M',
   author_bio:          'From the golden savannahs of the Maasai Mara to the misty highlands of Mount Kenya — his stories are drawn from the full breath of this country. Every novel is a window into lives lived and dreams chased across East Africa.',
@@ -39,13 +39,13 @@ const HOME_DEFAULTS = {
   genres_heading:      'Browse by Genre',
   genres_sub:          'Find the story that speaks to you',
   why_heading:         'Why Ellines Haven?',
-  why_sub:             'More than a bookstore — a literary experience',
+  why_sub:             'Built for readers who want stories that feel like home',
   testimonials_heading:'What Readers Say',
-  testimonials_sub:    'Voices from our community',
-  cta_heading:         'Ready to Start Reading?',
-  cta_sub:             "Join thousands of readers discovering Kenya's finest stories.",
+  testimonials_sub:    'Readers across Kenya — and beyond — who opened one page and kept going',
+  cta_heading:         'Your next chapter starts here',
+  cta_sub:             'Create a free account, pick a book, and read on any phone — no app required.',
   cta_btn_primary:     'Create Free Account',
-  cta_btn_secondary:   'Browse First',
+  cta_btn_secondary:   'Browse the Library',
 };
 
 function useHomeContent() {
@@ -125,12 +125,12 @@ function NotifyBtn({ book, e }) {
   );
 }
 
-/* ─── Rotating hero sub-phrases ─── */
+/* ─── Rotating hero headlines — written to stop the scroll ─── */
 const TAGLINES = [
-  'Where Stories Find Their Home',
-  'From the Heart of Kenya',
-  'Real Lives. Real Drama. Real Stories.',
-  'Original Fiction by Elijah Mwangi M',
+  'Open one page. Stay for the story.',
+  'Kenyan stories that feel like home.',
+  'Real lives. Real heartbreak. Real hope.',
+  'Buy once. Read forever.',
 ];
 
 /* ─── Animated book covers carousel (right side of author banner) ─── */
@@ -168,11 +168,10 @@ function BookStack({ books }) {
   );
 }
 
-/* ── Personalised section — shown only to logged-in users with books ─────── */
+/* ── Personalised section — logged-in readers ─────────────────────────────── */
 function PersonalisedSection({ user, library, books }) {
   const stats = getAllReadingStats(user.email);
 
-  // Find in-progress books (chapter > 0)
   const inProgress = library
     .map(lb => {
       const cat      = books.find(b => b.id === lb.id);
@@ -181,128 +180,137 @@ function PersonalisedSection({ user, library, books }) {
     })
     .filter(b => b && b.progress && b.progress.chapter > 0)
     .sort((a, b) => (b.progress.lastRead || 0) - (a.progress.lastRead || 0))
-    .slice(0, 3);
+    .slice(0, 4);
 
-  // Books in library not yet started
   const notStarted = library
     .filter(lb => !stats[lb.id])
     .map(lb => books.find(b => b.id === lb.id))
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 4);
 
-  // Books user doesn't own yet — recommended by genre of owned books
-  const ownedIds    = new Set(library.map(b => b.id));
+  const ownedIds = new Set(library.map(b => b.id));
   const ownedGenres = [...new Set(
     library.map(lb => books.find(b => b.id === lb.id)?.genre).filter(Boolean)
   )];
-  const recommended = books
-    .filter(b => !ownedIds.has(b.id) && ownedGenres.includes(b.genre) && b.active !== false && b.status !== 'coming-soon')
-    .slice(0, 4);
+
+  let recommended = books
+    .filter(b => !ownedIds.has(b.id) && ownedGenres.includes(b.genre) && b.active !== false && b.status !== 'coming-soon' && b.status !== 'draft')
+    .slice(0, 6);
+
+  // Fallback so the strip never looks empty/sparse with 0–1 genre matches
+  if (recommended.length < 3) {
+    const extras = books
+      .filter(b => !ownedIds.has(b.id) && b.active !== false && b.status !== 'coming-soon' && b.status !== 'draft' && !recommended.some(r => r.id === b.id))
+      .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || (b.rating || 0) - (a.rating || 0))
+      .slice(0, 6 - recommended.length);
+    recommended = [...recommended, ...extras];
+  }
 
   const firstName = user.name?.split(' ')[0] || 'Reader';
+  const resumeBook = inProgress[0];
 
   return (
-    <section className="section" style={{ paddingTop:32, paddingBottom:0 }}>
+    <section className="home-personal">
       <div className="container">
-        {/* Welcome banner */}
-        <div style={{
-          display:'flex', alignItems:'center', justifyContent:'space-between',
-          flexWrap:'wrap', gap:12, marginBottom:24,
-          padding:'18px 24px',
-          background:'linear-gradient(135deg,rgba(201,168,76,0.1),rgba(201,168,76,0.04))',
-          border:'1px solid rgba(201,168,76,0.2)', borderRadius:'var(--r)',
-        }}>
-          <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-            <div style={{
-              width:44, height:44, borderRadius:'50%', flexShrink:0,
-              background:'rgba(201,168,76,0.18)', border:'2px solid rgba(201,168,76,0.4)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:'1.1rem', fontWeight:700, color:'var(--gold)',
-            }}>
+        <div className="home-personal__welcome">
+          <div className="home-personal__welcome-left">
+            <div className="home-personal__avatar" aria-hidden="true">
               {firstName.charAt(0).toUpperCase()}
             </div>
             <div>
-              <p style={{ margin:0, fontSize:'0.78rem', color:'var(--muted)', letterSpacing:0.5 }}>WELCOME BACK</p>
-              <h3 style={{ margin:0, fontSize:'1.05rem', color:'var(--text)' }}>
-                {firstName} · <span style={{ color:'var(--gold)' }}>{library.length} book{library.length !== 1 ? 's' : ''}</span> in your library
+              <p className="home-personal__eyebrow">Welcome back</p>
+              <h3 className="home-personal__hello">
+                {firstName}
+                <span className="home-personal__count">
+                  {' '}· {library.length} book{library.length !== 1 ? 's' : ''} in your library
+                </span>
               </h3>
             </div>
           </div>
           <Link to="/my-library" className="btn btn-outline btn-sm">My Library →</Link>
         </div>
 
-        {/* Continue reading */}
-        {inProgress.length > 0 && (
-          <div style={{ marginBottom:28 }}>
-            <h3 style={{ fontSize:'0.92rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.2, marginBottom:14 }}>
-              📖 Continue Reading
-            </h3>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:12 }}>
-              {inProgress.map(b => (
-                <Link key={b.id} to={readPath(b)} style={{
-                  display:'flex', alignItems:'center', gap:14, flex:'1 1 260px', maxWidth:400,
-                  padding:'12px 16px', borderRadius:'var(--r-sm)',
-                  background:'rgba(255,255,255,0.03)', border:'1px solid rgba(201,168,76,0.2)',
-                  textDecoration:'none', transition:'border-color 0.15s, background 0.15s',
-                }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.5)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.2)'}
-                >
-                  {/* Cover */}
-                  {b.cover
-                    ? <img src={b.cover} alt={b.title} style={{ width:44, height:60, objectFit:'cover', borderRadius:4, flexShrink:0 }} />
-                    : <div style={{ width:44, height:60, borderRadius:4, flexShrink:0, background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.3rem' }}>📖</div>
-                  }
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ margin:'0 0 4px', fontWeight:700, fontSize:'0.85rem', color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</p>
-                    <p style={{ margin:'0 0 6px', fontSize:'0.75rem', color:'var(--muted)' }}>{b.genre}</p>
-                    {/* Progress bar */}
-                    {b.chapters && b.chapters.length > 1 && (
-                      <div style={{ height:3, background:'rgba(255,255,255,0.1)', borderRadius:2 }}>
-                        <div style={{
-                          height:'100%', borderRadius:2, background:'var(--gold)',
-                          width:`${Math.min(100, Math.round(((b.progress.chapter + 1) / b.chapters.length) * 100))}%`,
-                        }} />
+        {resumeBook && (
+          <div className="home-personal__block">
+            <div className="home-personal__head">
+              <h3>Continue Reading</h3>
+              {inProgress.length > 1 && (
+                <span className="home-personal__meta">{inProgress.length} in progress</span>
+              )}
+            </div>
+            <Link to={readPath(resumeBook)} className="home-resume">
+              <div className="home-resume__cover">
+                {resumeBook.cover
+                  ? <img src={resumeBook.cover} alt="" />
+                  : <div className="home-resume__cover-fallback" style={{ background: resumeBook.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }} />
+                }
+              </div>
+              <div className="home-resume__body">
+                <p className="home-resume__kicker">Pick up where you left off</p>
+                <h4 className="home-resume__title">{resumeBook.title}</h4>
+                <p className="home-resume__genre">{resumeBook.genre}</p>
+                {(() => {
+                  const total = resumeBook.chapters?.length
+                    || resumeBook.chapterCount
+                    || resumeBook.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(t)).length
+                    || 0;
+                  const ch = (resumeBook.progress?.chapter || 0) + 1;
+                  const pct = total > 1 ? Math.min(100, Math.round((ch / total) * 100)) : 0;
+                  return (
+                    <>
+                      {total > 1 && (
+                        <div className="home-resume__bar" aria-hidden="true">
+                          <span style={{ width: `${pct}%` }} />
+                        </div>
+                      )}
+                      <p className="home-resume__progress">
+                        {total > 1 ? `Chapter ${ch} of ${total}` : 'In progress'}
+                        <span>Resume →</span>
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+            </Link>
+
+            {inProgress.length > 1 && (
+              <div className="home-personal__rail">
+                {inProgress.slice(1).map(b => {
+                  const total = b.chapters?.length || b.chapterCount || 0;
+                  const ch = (b.progress?.chapter || 0) + 1;
+                  return (
+                    <Link key={b.id} to={readPath(b)} className="home-mini-card">
+                      {b.cover
+                        ? <img src={b.cover} alt="" className="home-mini-card__img" />
+                        : <div className="home-mini-card__img home-mini-card__img--fallback" style={{ background: b.coverColor || '#1a1a3a' }} />
+                      }
+                      <div className="home-mini-card__body">
+                        <strong>{b.title}</strong>
+                        <span>{total > 1 ? `Ch ${ch}/${total}` : 'Resume'} →</span>
                       </div>
-                    )}
-                    <p style={{ margin:'4px 0 0', fontSize:'0.7rem', color:'var(--gold)', fontWeight:600 }}>
-                      {b.chapters && b.chapters.length > 1
-                        ? `Ch ${b.progress.chapter + 1} / ${b.chapters.length}`
-                        : '📖 In progress'
-                      } · Resume →
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Unread owned books */}
         {notStarted.length > 0 && (
-          <div style={{ marginBottom:28 }}>
-            <h3 style={{ fontSize:'0.92rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.2, marginBottom:14 }}>
-              📚 Ready to Read
-            </h3>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:10 }}>
+          <div className="home-personal__block">
+            <div className="home-personal__head">
+              <h3>Ready to Read</h3>
+            </div>
+            <div className="home-personal__rail">
               {notStarted.map(b => (
-                <Link key={b.id} to={readPath(b)} style={{
-                  display:'flex', alignItems:'center', gap:12,
-                  padding:'10px 14px', borderRadius:'var(--r-sm)',
-                  background:'rgba(255,255,255,0.02)', border:'1px solid var(--dim)',
-                  textDecoration:'none', flex:'1 1 220px', maxWidth:340,
-                  transition:'border-color 0.15s',
-                }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(201,168,76,0.35)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dim)'}
-                >
+                <Link key={b.id} to={readPath(b)} className="home-mini-card">
                   {b.cover
-                    ? <img src={b.cover} alt={b.title} style={{ width:36, height:50, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
-                    : <div style={{ width:36, height:50, borderRadius:3, flexShrink:0, background: b.coverColor || '#1a1a3a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem' }}>📖</div>
+                    ? <img src={b.cover} alt="" className="home-mini-card__img" />
+                    : <div className="home-mini-card__img home-mini-card__img--fallback" style={{ background: b.coverColor || '#1a1a3a' }} />
                   }
-                  <div style={{ minWidth:0 }}>
-                    <p style={{ margin:0, fontWeight:600, fontSize:'0.83rem', color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</p>
-                    <p style={{ margin:'2px 0 0', fontSize:'0.72rem', color:'var(--gold)' }}>Start Reading →</p>
+                  <div className="home-mini-card__body">
+                    <strong>{b.title}</strong>
+                    <span>Start Reading →</span>
                   </div>
                 </Link>
               ))}
@@ -310,20 +318,72 @@ function PersonalisedSection({ user, library, books }) {
           </div>
         )}
 
-        {/* Recommended based on genres */}
         {recommended.length > 0 && (
-          <div style={{ marginBottom:8 }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-              <h3 style={{ fontSize:'0.92rem', fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:1.2, margin:0 }}>
-                ✨ Recommended For You
-              </h3>
-              <Link to="/library" style={{ fontSize:'0.78rem', color:'var(--gold)', textDecoration:'none' }}>See all →</Link>
+          <div className="home-personal__block">
+            <div className="home-personal__head">
+              <h3>Recommended For You</h3>
+              <Link to="/library" className="home-personal__link">See all →</Link>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:12 }}>
+            <div className="home-personal__books">
               {recommended.map(b => <BookCard key={b.id} book={b} />)}
             </div>
           </div>
         )}
+      </div>
+    </section>
+  );
+}
+
+/* ── Featured story hook — first thing after hero to pull readers in ── */
+function StoryHook({ book }) {
+  if (!book) return null;
+  const lines = (book.excerpt || '').split('\n').filter(Boolean).slice(0, 4);
+  const canSample = book.freeFirstChapter || book.status === 'free-preview';
+
+  return (
+    <section className="story-hook">
+      <div className="story-hook__glow" aria-hidden="true" />
+      <div className="container story-hook__grid">
+        <Link to={bookPath(book)} className="story-hook__cover-link">
+          {book.cover ? (
+            <img src={book.cover} alt={book.title} className="story-hook__cover" />
+          ) : (
+            <div
+              className="story-hook__cover story-hook__cover--fallback"
+              style={{ background: book.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}
+            >
+              <span>{book.title}</span>
+            </div>
+          )}
+        </Link>
+
+        <div className="story-hook__copy">
+          <p className="story-hook__kicker">Start here — free sample</p>
+          <h2 className="story-hook__title">{book.title}</h2>
+          {book.genre && <span className="story-hook__genre">{book.genre}</span>}
+          <div className="story-hook__excerpt">
+            {lines.map((line, i) => (
+              <p key={i}>{line}</p>
+            ))}
+          </div>
+          {book.inspiredNote && (
+            <p className="story-hook__inspired">✦ {book.inspiredNote}</p>
+          )}
+          <div className="story-hook__actions">
+            {canSample ? (
+              <Link to={readPath(book)} className="btn btn-primary">
+                Read Free Chapter →
+              </Link>
+            ) : (
+              <Link to={bookPath(book)} className="btn btn-primary">
+                Open This Story →
+              </Link>
+            )}
+            <Link to={bookPath(book)} className="btn btn-outline">
+              Full Details
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -400,8 +460,8 @@ function TestimonialsCarousel({ sub }) {
 export default function Home() {
   const { books, user, library } = useApp();
   usePageMeta({
-    title: "Kenya's Premier Literary Platform",
-    description: 'Original novels and short stories by Elijah Mwangi M — drawn from real lives, real heartbreaks, and the soul of East Africa. Buy once. Read forever.',
+    title: "Kenya's Home for Original Stories",
+    description: 'Novels drawn from real Kenyan lives — love, betrayal, ambition, and hope. Open a free chapter. Buy once. Read forever.',
   });
   const editCtx = useEditMode();
   const c = useHomeContent();
@@ -437,17 +497,25 @@ export default function Home() {
   }, []);
 
   const taglines = [
-    c.hero_tagline_1 || 'Where Stories Find Their Home',
-    c.hero_tagline_2 || 'From the Heart of Kenya',
-    c.hero_tagline_3 || 'Real Lives. Real Drama. Real Stories.',
-    c.hero_tagline_4 || 'Original Fiction by Elijah Mwangi M',
+    c.hero_tagline_1 || TAGLINES[0],
+    c.hero_tagline_2 || TAGLINES[1],
+    c.hero_tagline_3 || TAGLINES[2],
+    c.hero_tagline_4 || TAGLINES[3],
   ];
 
+  const hookBook =
+    featured.find(b => b.freeFirstChapter || b.status === 'free-preview') ||
+    featured[0] ||
+    activeBooks.find(b => b.freeFirstChapter || b.status === 'free-preview') ||
+    activeBooks.find(b => b.status !== 'coming-soon' && b.status !== 'draft');
+
+  const sampleBook = activeBooks.find(b => b.freeFirstChapter || b.status === 'free-preview');
+
   return (
-    <main>
+    <main className="home-page">
 
       {/* ══════════════════════════════════════
-          HERO
+          HERO — brand first, one job: start reading
       ══════════════════════════════════════ */}
       <section className="hero">
         <div className="hero__glow hero__glow--a" aria-hidden="true" />
@@ -456,7 +524,6 @@ export default function Home() {
         <div className="hero__grain" aria-hidden="true" />
 
         <div className="container hero__inner">
-          {/* LEFT — copy */}
           <div className="hero__copy">
             <p className="hero__brand">Ellines Haven</p>
             <p className="hero__eyebrow">
@@ -474,16 +541,27 @@ export default function Home() {
             </p>
 
             <div className="hero__btns">
-              <Link to="/library" className="btn btn-primary">
+              <Link to="/library" className="btn btn-primary hero__cta-primary">
                 <EditableField field="hero_btn_primary">{c.hero_btn_primary}</EditableField>
               </Link>
-              <Link to="/about" className="btn btn-outline">
-                <EditableField field="hero_btn_secondary">{c.hero_btn_secondary}</EditableField>
-              </Link>
+              {sampleBook ? (
+                <Link to={readPath(sampleBook)} className="btn btn-outline">
+                  Free Chapter
+                </Link>
+              ) : (
+                <Link to="/founder" className="btn btn-outline">
+                  <EditableField field="hero_btn_secondary">{c.hero_btn_secondary}</EditableField>
+                </Link>
+              )}
             </div>
+
+            <ul className="hero__promises">
+              <li>Buy once · own forever</li>
+              <li>M-Pesa ready</li>
+              <li>Read on any phone</li>
+            </ul>
           </div>
 
-          {/* RIGHT — atmospheric poster */}
           <div className="hero__visual">
             <div className="hero__visual-glow" aria-hidden="true" />
             <div className="hero__poster-frame">
@@ -500,14 +578,19 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="hero__scroll-cue">
-          <span>Scroll to explore</span>
+        <button
+          type="button"
+          className="hero__scroll-cue"
+          onClick={() => document.getElementById('home-hook')?.scrollIntoView({ behavior: 'smooth' })}
+          aria-label="Scroll to featured story"
+        >
+          <span>Keep reading</span>
           <div className="hero__scroll-arrow" />
-        </div>
+        </button>
       </section>
 
       {/* ══════════════════════════════════════
-          STATS (below fold — keeps hero uncluttered)
+          STATS
       ══════════════════════════════════════ */}
       <div className="home-stats">
         <div className="container home-stats__inner">
@@ -529,19 +612,29 @@ export default function Home() {
       </div>
 
       {/* ══════════════════════════════════════
-          TRUST BAR
+          STORY HOOK — get them into a chapter
+      ══════════════════════════════════════ */}
+      <div id="home-hook">
+        <StoryHook book={hookBook} />
+      </div>
+
+      {/* ══════════════════════════════════════
+          QUIET TRUST STRIP
       ══════════════════════════════════════ */}
       <div className="trust-bar">
         <div className="container trust-bar__inner">
           {[
-            { icon:'📱', title:'M-Pesa, Airtel & PayPal', desc:'Instant secure payments'    },
-            { icon:'⬇️', title:'Download Forever',        desc:'Buy once, keep forever'     },
-            { icon:'📖', title:'Read Online',              desc:'Beautiful built-in reader'  },
-            { icon:'🔒', title:'Secure & Safe',            desc:'Protected transactions'     },
+            { title: 'M-Pesa & Cards', desc: 'Pay in seconds' },
+            { title: 'Own Forever', desc: 'No subscription' },
+            { title: 'Built-in Reader', desc: 'Phone-ready' },
+            { title: 'Kenya-based', desc: 'Real support' },
           ].map(f => (
             <div key={f.title} className="trust-bar__item">
-              <span className="trust-bar__icon">{f.icon}</span>
-              <div><strong>{f.title}</strong><span>{f.desc}</span></div>
+              <span className="trust-bar__mark" aria-hidden="true" />
+              <div>
+                <strong>{f.title}</strong>
+                <span>{f.desc}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -555,59 +648,22 @@ export default function Home() {
       )}
 
       {/* ══════════════════════════════════════
-          COMING SOON & IN PROGRESS
+          FEATURED BOOKS — available stories first
       ══════════════════════════════════════ */}
-      {comingSoon.length > 0 && (
-        <section className="section coming-soon-sec">
-          <div className="container">
-            <div className="sec-head">
-              <div>
-                <h2>Coming <span className="gold-text">Soon</span></h2>
-                <p>{c.coming_soon_sub}</p>
-              </div>
-              <Link to="/library?status=coming-soon" className="btn btn-outline btn-sm">See All →</Link>
+      <section className="section home-featured-sec">
+        <div className="container">
+          <div className="sec-head">
+            <div>
+              <h2><EditableField field="featured_heading">{c.featured_heading}</EditableField></h2>
+              <p><EditableField field="featured_sub">{c.featured_sub}</EditableField></p>
             </div>
-            <div className="cs-grid">
-              {comingSoon.map((b, i) => (
-                <Link key={b.id} to={bookPath(b)} className={`cs-card${i === 0 ? ' cs-card--hero' : ''}`}>
-                  {/* cover / art */}
-                  <div className="cs-card__art">
-                    {b.cover
-                      ? <img src={b.cover} alt={b.title} className="cs-card__cover-img" />
-                      : <div className="cs-card__cover-styled" style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
-                          <div className="cs-card__cover-deco" style={{ borderColor: b.coverAccent || '#c9a84c' }} />
-                          <img src="/logo-icon.png" alt="" className="cs-card__cover-logo" />
-                          <span className="cs-card__cover-title-art" style={{ color: b.coverAccent || '#c9a84c' }}>{b.title}</span>
-                        </div>
-                    }
-                    <div className="cs-card__art-overlay" />
-                    {/* countdown / status badge */}
-                    <div className="cs-card__top-row">
-                      <BookStatusBadge status={b.status} />
-                      {b.expectedDate && (
-                        <span className="cs-card__eta">📅 {b.expectedDate}</span>
-                      )}
-                    </div>
-                  </div>
-                  {/* info */}
-                  <div className="cs-card__body">
-                    <span className="cs-card__genre">{b.genre}</span>
-                    <h3 className="cs-card__title">{b.title}</h3>
-                    <p className="cs-card__excerpt">{b.excerpt}</p>
-                    {b.inspired && b.inspiredNote && (
-                      <p className="cs-card__inspired">✦ {b.inspiredNote}</p>
-                    )}
-                    <div className="cs-card__footer">
-                      <NotifyBtn book={b} />
-                      <span className="cs-card__arrow">→</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <Link to="/library" className="btn btn-outline btn-sm">View All →</Link>
           </div>
-        </section>
-      )}
+          <div className="books-grid">
+            {featured.map(b => <BookCard key={b.id} book={b} />)}
+          </div>
+        </div>
+      </section>
 
       {/* ══════════════════════════════════════
           NEW RELEASES SPOTLIGHT
@@ -641,7 +697,7 @@ export default function Home() {
                     <p>{b.excerpt}</p>
                     <div className="new-release-card__footer">
                       <span className="new-release-card__price">KSh {b.price}</span>
-                      <span className="new-release-card__cta">View →</span>
+                      <span className="new-release-card__cta">Open →</span>
                     </div>
                   </div>
                 </Link>
@@ -650,24 +706,6 @@ export default function Home() {
           </div>
         </section>
       )}
-
-      {/* ══════════════════════════════════════
-          FEATURED BOOKS
-      ══════════════════════════════════════ */}
-      <section className="section">
-        <div className="container">
-          <div className="sec-head">
-            <div>
-              <h2><EditableField field="featured_heading">{c.featured_heading}</EditableField></h2>
-              <p><EditableField field="featured_sub">{c.featured_sub}</EditableField></p>
-            </div>
-            <Link to="/library" className="btn btn-outline btn-sm">View All →</Link>
-          </div>
-          <div className="books-grid">
-            {featured.map(b => <BookCard key={b.id} book={b} />)}
-          </div>
-        </div>
-      </section>
 
       {/* ══════════════════════════════════════
           AUTHOR SPOTLIGHT BANNER
@@ -701,54 +739,23 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════
-          GENRES
-      ══════════════════════════════════════ */}
-      <section className="section genres-sec">
-        <div className="container">
-          <h2 className="text-c">Browse by <span className="gold-text">Genre</span></h2>
-          <p className="text-c muted" style={{ marginBottom:'40px' }}>{c.genres_sub}</p>
-          <div className="genres-row">
-            {[
-              { label:'Romance',          icon:'💕' },
-              { label:'Drama',            icon:'🎭' },
-              { label:'Mystery',          icon:'🔍' },
-              { label:'Fantasy',          icon:'✨' },
-              { label:'Historical',       icon:'📜' },
-              { label:'Short Stories',    icon:'📖' },
-              { label:'Thriller',         icon:'⚡' },
-              { label:'African Fiction',  icon:'🌍' },
-              { label:'Sci-Fi',           icon:'🚀' },
-              { label:'Adventure',        icon:'🗺️' },
-              { label:'Family Saga',      icon:'👨‍👩‍👧' },
-              { label:'Urban Fiction',    icon:'🏙️' },
-            ].map(g => (
-              <Link key={g.label} to={`/library?genre=${g.label}`} className="genre-pill">
-                <span className="genre-pill__icon">{g.icon}</span>
-                {g.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════
           WHY ELLINES HAVEN
       ══════════════════════════════════════ */}
       <section className="section why-sec">
         <div className="container">
           <h2 className="text-c">Why <span className="gold-text">Ellines Haven</span>?</h2>
-          <p className="text-c muted" style={{ marginBottom:'48px' }}>{c.why_sub}</p>
+          <p className="text-c muted why-sec__sub">{c.why_sub}</p>
           <div className="why-grid">
             {[
-              { icon:'✍️', title:'Authentic Stories',  desc:'Every book draws from real events, real people, and the streets of Kenya.'        },
-              { icon:'💰', title:'Affordable Prices',  desc:'Quality literature for everyone — starting from KSh 120.'                        },
-              { icon:'📲', title:'Read Anywhere',      desc:'Works on any device — phone, tablet, or desktop. No app needed.'                 },
-              { icon:'♾️', title:'Own It Forever',     desc:'Purchase once and keep your copy forever — no subscriptions, no expiry.'         },
-              { icon:'🤝', title:'Support Local Art',  desc:'Every purchase directly supports an independent Kenyan author.'                  },
-              { icon:'⭐', title:'Curated Quality',    desc:'Every title is carefully crafted and reviewed before it reaches your hands.'     },
+              { n: '01', title: 'Authentic Stories',  desc: 'Every book draws from real events, real people, and the streets of Kenya.' },
+              { n: '02', title: 'Affordable Prices',  desc: 'Quality literature for everyone — starting from KSh 120.' },
+              { n: '03', title: 'Read Anywhere',      desc: 'Works on any device — phone, tablet, or desktop. No app needed.' },
+              { n: '04', title: 'Own It Forever',     desc: 'Purchase once and keep your copy forever — no subscriptions, no expiry.' },
+              { n: '05', title: 'Support Local Art',  desc: 'Every purchase directly supports an independent Kenyan author.' },
+              { n: '06', title: 'Curated Quality',    desc: 'Every title is carefully crafted before it reaches your hands.' },
             ].map(w => (
               <div key={w.title} className="why-card">
-                <div className="why-card__icon">{w.icon}</div>
+                <span className="why-card__n">{w.n}</span>
                 <h3>{w.title}</h3>
                 <p>{w.desc}</p>
               </div>
@@ -758,12 +765,85 @@ export default function Home() {
       </section>
 
       {/* ══════════════════════════════════════
-          TESTIMONIALS — auto-carousel
+          TESTIMONIALS
       ══════════════════════════════════════ */}
       <TestimonialsCarousel sub={c.testimonials_sub} />
 
       {/* ══════════════════════════════════════
-          RECOMMENDATIONS & TRENDING — two-column
+          GENRES
+      ══════════════════════════════════════ */}
+      <section className="section genres-sec">
+        <div className="container">
+          <h2 className="text-c">Browse by <span className="gold-text">Genre</span></h2>
+          <p className="text-c muted genres-sec__sub">{c.genres_sub}</p>
+          <div className="genres-row">
+            {[
+              'Romance', 'Drama', 'Mystery', 'Fantasy', 'Historical',
+              'Short Stories', 'Thriller', 'African Fiction', 'Sci-Fi',
+              'Adventure', 'Family Saga', 'Urban Fiction',
+            ].map(label => (
+              <Link key={label} to={`/library?genre=${label}`} className="genre-pill">
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════
+          COMING SOON — after available books
+      ══════════════════════════════════════ */}
+      {comingSoon.length > 0 && (
+        <section className="section coming-soon-sec">
+          <div className="container">
+            <div className="sec-head">
+              <div>
+                <h2>Coming <span className="gold-text">Soon</span></h2>
+                <p>{c.coming_soon_sub}</p>
+              </div>
+              <Link to="/library?status=coming-soon" className="btn btn-outline btn-sm">See All →</Link>
+            </div>
+            <div className="cs-grid">
+              {comingSoon.map((b, i) => (
+                <Link key={b.id} to={bookPath(b)} className={`cs-card${i === 0 ? ' cs-card--hero' : ''}`}>
+                  <div className="cs-card__art">
+                    {b.cover
+                      ? <img src={b.cover} alt={b.title} className="cs-card__cover-img" />
+                      : <div className="cs-card__cover-styled" style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
+                          <div className="cs-card__cover-deco" style={{ borderColor: b.coverAccent || '#c9a84c' }} />
+                          <img src="/logo-icon.png" alt="" className="cs-card__cover-logo" />
+                          <span className="cs-card__cover-title-art" style={{ color: b.coverAccent || '#c9a84c' }}>{b.title}</span>
+                        </div>
+                    }
+                    <div className="cs-card__art-overlay" />
+                    <div className="cs-card__top-row">
+                      <BookStatusBadge status={b.status} />
+                      {b.expectedDate && (
+                        <span className="cs-card__eta">{b.expectedDate}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="cs-card__body">
+                    <span className="cs-card__genre">{b.genre}</span>
+                    <h3 className="cs-card__title">{b.title}</h3>
+                    <p className="cs-card__excerpt">{b.excerpt}</p>
+                    {b.inspired && b.inspiredNote && (
+                      <p className="cs-card__inspired">✦ {b.inspiredNote}</p>
+                    )}
+                    <div className="cs-card__footer">
+                      <NotifyBtn book={b} />
+                      <span className="cs-card__arrow">→</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════
+          RECOMMENDATIONS & TRENDING
       ══════════════════════════════════════ */}
       <section className="section rec-trending-sec">
         <div className="container">
@@ -786,11 +866,11 @@ export default function Home() {
       {/* ══════════════════════════════════════
           CTA
       ══════════════════════════════════════ */}
-      <section className="section">
+      <section className="section home-cta-sec">
         <div className="container">
           <div className="cta-box">
             <div className="cta-box__glow" />
-            <img src="/logo-icon.png" alt="" className="cta-box__logo" />
+            <p className="cta-box__brand">Ellines Haven</p>
             <h2><EditableField field="cta_heading">{c.cta_heading}</EditableField></h2>
             <p><EditableField field="cta_sub" multiline>{c.cta_sub}</EditableField></p>
             <div className="cta-box__btns">

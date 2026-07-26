@@ -126,6 +126,15 @@
 
 /* ── Badges ── */
 .bcard__new { position: absolute; top: 10px; left: 10px; z-index: 5; }
+.bcard__badges {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  max-width: calc(100% - 20px);
+  pointer-events: none;
+}
 .bcard__inspired-badge {
   position: absolute;
   bottom: 10px;

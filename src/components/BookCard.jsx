@@ -75,19 +75,34 @@ function buildCustomBadgeMap(book) {
 }
 
 // Render all badges for a book (status + extra badges array)
-export function BookBadges({ book, style = {}, cardMode = false }) {
+// cardMode: keep covers clean — max 2 pills, no status-key duplicates, skip true-story if inspired
+export function BookBadges({ book, style = {}, cardMode = false, maxExtras = cardMode ? 1 : 99 }) {
   if (!book) return null;
-  // On cards we hide 'complete' to keep things clean — on detail pages we show everything
-  const showStatus = !cardMode || book.status !== 'complete';
-  const extraBadges = Array.isArray(book.badges) ? book.badges : [];
-  const customMap = buildCustomBadgeMap(book);
 
-  if (!showStatus && extraBadges.length === 0) return null;
+  const STATUS_KEYS = new Set(Object.keys(STATUS_META).filter(k =>
+    ['complete','ongoing','premium','free-preview','coming-soon','limited','draft'].includes(k)
+  ));
+
+  const showStatus = book.status && (!cardMode || book.status !== 'complete');
+  const customMap = buildCustomBadgeMap(book);
+  let extras = Array.isArray(book.badges) ? book.badges.filter(Boolean) : [];
+
+  // Never re-render primary status keys as extras; skip true-story when inspired badge shows
+  extras = extras.filter(b => {
+    if (STATUS_KEYS.has(b)) return false;
+    if (b === book.status) return false;
+    if (cardMode && book.inspired && (b === 'true-story' || b === 'inspired')) return false;
+    return true;
+  });
+
+  if (cardMode) extras = extras.slice(0, maxExtras);
+
+  if (!showStatus && extras.length === 0) return null;
 
   return (
-    <span style={{ display:'inline-flex', flexWrap:'wrap', gap:4, alignItems:'center', ...style }}>
+    <span className={cardMode ? 'bcard__badges' : undefined} style={{ display:'inline-flex', flexWrap:'wrap', gap:4, alignItems:'center', ...style }}>
       {showStatus && book.status && <BookStatusBadge status={book.status} />}
-      {extraBadges.map(b => (
+      {extras.map(b => (
         <BookStatusBadge key={b} status={b} customMeta={customMap[b] || undefined} />
       ))}
     </span>
@@ -442,9 +457,22 @@ export default function BookCard({ book }) {
         )}
         {book.isNew && <span className="badge badge-gold bcard__new">New</span>}
         {book.inspired && <span className="bcard__inspired-badge">✦ True Story</span>}
-        {/* Status + extra badges on cover (skip complete + coming-soon/draft which have overlays) */}
+        {/* One status (+ at most one extra) — never a vertical badge pile */}
         {book.status && book.status !== 'complete' && !NO_PURCHASE_STATUSES.has(book.status) && (
-          <BookBadges book={book} cardMode={true} style={{ position:'absolute', bottom: book.inspired ? 36 : 10, left:10, zIndex:5, flexDirection:'column', alignItems:'flex-start', gap:3 }} />
+          <BookBadges
+            book={book}
+            cardMode
+            style={{ position:'absolute', bottom: book.inspired ? 36 : 10, left:10, right:10, zIndex:5 }}
+          />
+        )}
+        {/* Complete books can still show a single highlight extra (not a stack) */}
+        {book.status === 'complete' && Array.isArray(book.badges) && book.badges.length > 0 && !book.inspired && (
+          <BookBadges
+            book={{ ...book, status: null }}
+            cardMode
+            maxExtras={1}
+            style={{ position:'absolute', bottom:10, left:10, right:10, zIndex:5 }}
+          />
         )}
       </div>
       <div className="bcard__body">

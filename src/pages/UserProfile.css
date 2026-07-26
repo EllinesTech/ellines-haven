@@ -240,7 +240,9 @@
 
 /* ── My Books grid ── */
 .up-books-grid {
-  display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(120px, 140px));
+  justify-content:start;
   gap:12px; padding:20px 24px;
 }
 .up-book-card {
@@ -366,5 +368,5 @@
   .up-avatar-wrap { width:88px; height:88px; }
   .up-stats { grid-template-columns:repeat(2,1fr); }
   .up-stat-num { font-size:1.2rem; }
-  .up-books-grid { grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); }
+  .up-books-grid { grid-template-columns:repeat(auto-fill,minmax(100px,120px)); justify-content:start; }
 }

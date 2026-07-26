@@ -244,7 +244,8 @@
 .mylib-grid {
   display: grid;
   /* 2 columns on wide, 1 on narrow — each card at least 280px */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 300px));
+  justify-content: start;
   gap: 14px;
   margin-bottom: 28px;
 }
@@ -678,7 +679,8 @@
 
 .mylib-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 180px));
+  justify-content: start;
   gap: 16px;
   margin-bottom: 24px;
 }
