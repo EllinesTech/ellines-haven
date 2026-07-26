@@ -153,10 +153,71 @@ function pickBestVoice(voiceList) {
   return sortVoicesNeuralFirst(pool)[0] || pool[0];
 }
 
+const FEMALE_PRIORITY = [
+  'Microsoft Jenny', 'Microsoft Aria', 'Microsoft Emma', 'Microsoft Sonia',
+  'Microsoft Libby', 'Microsoft Mia', 'Microsoft Ana', 'Microsoft Neerja',
+  'Google UK English Female', 'Google US English',
+  'Ava', 'Allison', 'Samantha', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Victoria',
+  'Samsung English Female',
+];
+const MALE_PRIORITY = [
+  'Microsoft Guy', 'Microsoft Davis', 'Microsoft Brian', 'Microsoft Andrew',
+  'Microsoft Ryan',
+  'Google UK English Male',
+  'Daniel', 'Alex', 'Fred', 'James', 'Oliver', 'Arthur',
+  'Samsung English Male',
+];
+
+function englishPool(voiceList) {
+  const english = voiceList.filter(isEnglishVoice);
+  return english.length ? english : voiceList;
+}
+
+function pickBestVoiceByGender(voiceList, gender) {
+  if (!voiceList.length) return null;
+  const pool = englishPool(voiceList);
+  const match = gender === 'male' ? isMaleVoice : isFemaleVoice;
+  const gendered = pool.filter(match);
+  const priority = gender === 'male' ? MALE_PRIORITY : FEMALE_PRIORITY;
+
+  const tryPick = (list) => {
+    if (!list.length) return null;
+    for (const name of priority) {
+      const v = list.find(x => x.name.startsWith(name));
+      if (v) return v;
+    }
+    const neural = list.filter(v => isNeuralVoice(v) && !isRoboticDesktop(v));
+    if (neural.length) return sortVoicesNeuralFirst(neural)[0];
+    const natural = list.filter(v => !isRoboticDesktop(v));
+    if (natural.length) return sortVoicesNeuralFirst(natural)[0];
+    return sortVoicesNeuralFirst(list)[0];
+  };
+
+  return tryPick(gendered) || pickBestVoice(pool);
+}
+
+function pickBestNeuralVoice(voiceList) {
+  if (!voiceList.length) return null;
+  const pool = englishPool(voiceList);
+  const neural = pool.filter(v => isNeuralVoice(v) && !isRoboticDesktop(v));
+  if (neural.length) {
+    // Prefer a known high-quality name, else best-scored neural
+    return pickBestVoice(neural) || sortVoicesNeuralFirst(neural)[0];
+  }
+  return pickBestVoice(pool);
+}
+
+function detectVoiceGender(v) {
+  if (!v) return null;
+  if (isFemaleVoice(v)) return 'female';
+  if (isMaleVoice(v)) return 'male';
+  return null;
+}
+
 function defaultDockPos(size = 'normal') {
   if (typeof window === 'undefined') return { x: 24, y: 24 };
   const w = size === 'min' ? 300 : size === 'max' ? Math.min(440, window.innerWidth - 24) : 360;
-  const h = size === 'min' ? 64 : size === 'max' ? 420 : 200;
+  const h = size === 'min' ? 72 : size === 'max' ? 420 : 280;
   return {
     x: Math.max(12, window.innerWidth - w - 20),
     y: Math.max(12, window.innerHeight - h - 96),
@@ -166,7 +227,7 @@ function defaultDockPos(size = 'normal') {
 function clampPos(pos, size = 'normal') {
   if (typeof window === 'undefined' || !pos) return pos;
   const w = size === 'min' ? 300 : size === 'max' ? Math.min(440, window.innerWidth - 24) : 360;
-  const h = size === 'min' ? 64 : size === 'max' ? Math.min(520, window.innerHeight - 24) : 220;
+  const h = size === 'min' ? 72 : size === 'max' ? Math.min(520, window.innerHeight - 24) : 300;
   return {
     x: Math.min(Math.max(8, pos.x), Math.max(8, window.innerWidth - w - 8)),
     y: Math.min(Math.max(8, pos.y), Math.max(8, window.innerHeight - Math.min(h, 120) - 8)),
@@ -688,11 +749,28 @@ export default function AudioPlayer({
   };
 
   const selectVoice = (v) => {
+    if (!v) return;
     selectedNameRef.current = v.name || '';
     setSelectedName(v.name || '');
     persistVoiceSettings({ voiceName: v.name || '' });
+    const g = detectVoiceGender(v);
+    if (g) setFilter(g);
     setVoiceDdOpen(false);
     if (playing) speak(charRef.current);
+  };
+
+  const selectGender = (gender) => {
+    setFilter(gender);
+    setLangScope('en');
+    const best = pickBestVoiceByGender(voices, gender);
+    if (best) selectVoice(best);
+  };
+
+  const selectBestNeural = () => {
+    setFilter('neural');
+    setLangScope('en');
+    const best = pickBestNeuralVoice(voices);
+    if (best) selectVoice(best);
   };
 
   const UtteranceCtor = typeof window !== 'undefined'
@@ -701,9 +779,106 @@ export default function AudioPlayer({
   const available = !!(typeof window !== 'undefined' && window.speechSynthesis && UtteranceCtor);
   const dispVoices = filteredVoices();
   const activeVoice = getSelectedVoice();
+  const activeGender = detectVoiceGender(activeVoice);
   const englishCount = voices.filter(isEnglishVoice).length;
   const showSettings = panelSize === 'max';
   const dockPos = pos || defaultDockPos(panelSize);
+
+  const shortVoiceName = (name) => {
+    if (!name) return 'Select voice';
+    return name
+      .replace(/^Microsoft\s+/i, '')
+      .replace(/\s*\(Natural\)|\s*Online\s*\(Natural\)|\s*-\s*English\s*\(.*\)$/i, '')
+      .trim() || name;
+  };
+
+  const voiceQuickPicker = (
+    <div className="audio-float__voice-row">
+      <div className="audio-float__gender" role="group" aria-label="Voice gender">
+        <button
+          type="button"
+          className={'audio-gender-pill' + (activeGender === 'female' ? ' on' : '')}
+          onClick={() => selectGender('female')}
+          title="Best English female neural voice"
+          aria-pressed={activeGender === 'female'}
+        >
+          Female
+        </button>
+        <button
+          type="button"
+          className={'audio-gender-pill' + (activeGender === 'male' ? ' on' : '')}
+          onClick={() => selectGender('male')}
+          title="Best English male neural voice"
+          aria-pressed={activeGender === 'male'}
+        >
+          Male
+        </button>
+        <button
+          type="button"
+          className="audio-gender-pill audio-gender-pill--best"
+          onClick={selectBestNeural}
+          title="Pick the best English neural voice available"
+        >
+          Best neural
+        </button>
+      </div>
+      <div className="audio-custom-dd audio-float__voice-dd" ref={ddWrapRef}>
+        <button
+          className="audio-custom-dd__trigger audio-float__voice-trigger"
+          type="button"
+          aria-expanded={voiceDdOpen}
+          aria-label={`Select voice — ${activeVoice?.name || selectedName || 'none'}`}
+          onClick={() => {
+            setLangScope('en');
+            if (filter === 'all') setFilter('neural');
+            setVoiceDdOpen(o => !o);
+          }}
+        >
+          <span className="audio-custom-dd__trigger-text">
+            {shortVoiceName(activeVoice?.name || selectedName)}
+            {activeVoice && isNeuralVoice(activeVoice) && (
+              <span className={'audio-neural-badge' + (isGoogleNeural(activeVoice) ? ' audio-neural-badge--google' : '')}>
+                {' '}Neural
+              </span>
+            )}
+          </span>
+          <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
+        </button>
+        {voiceDdOpen && (
+          <div className="audio-custom-dd__list" role="listbox">
+            {dispVoices.length === 0 && (
+              <div className="audio-custom-dd__empty">
+                No voices for this filter. Try Best neural or open settings (gear).
+              </div>
+            )}
+            {dispVoices.map((v) => (
+              <button
+                key={v.voiceURI || v.name}
+                type="button"
+                role="option"
+                aria-selected={selectedNameRef.current === v.name}
+                className={'audio-custom-dd__item' + (selectedNameRef.current === v.name ? ' on' : '')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  selectVoice(v);
+                }}
+              >
+                <span className="audio-custom-dd__name">
+                  {v.name}
+                  {isNeuralVoice(v) && (
+                    <span className={'audio-neural-badge' + (isGoogleNeural(v) ? ' audio-neural-badge--google' : '')}>
+                      {' '}Neural
+                    </span>
+                  )}
+                </span>
+                <span className="audio-custom-dd__lang">{v.lang}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const progressBlock = (
     <div className="audio-player__progress-row">
@@ -831,6 +1006,26 @@ export default function AudioPlayer({
               {fmtTime(elapsed)} / {fmtTime(total)} · {rate}×
             </span>
             {progressBlock}
+            <div className="audio-float__gender audio-float__gender--mini" role="group" aria-label="Voice gender">
+              <button
+                type="button"
+                className={'audio-gender-pill' + (activeGender === 'female' ? ' on' : '')}
+                onClick={() => selectGender('female')}
+                title="Female voice"
+                aria-pressed={activeGender === 'female'}
+              >
+                F
+              </button>
+              <button
+                type="button"
+                className={'audio-gender-pill' + (activeGender === 'male' ? ' on' : '')}
+                onClick={() => selectGender('male')}
+                title="Male voice"
+                aria-pressed={activeGender === 'male'}
+              >
+                M
+              </button>
+            </div>
           </div>
           <button
             type="button"
@@ -869,6 +1064,7 @@ export default function AudioPlayer({
               </button>
             </div>
             {progressBlock}
+            {voiceQuickPicker}
             <div className="audio-float__speed-row">
               {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
                 <button
@@ -910,7 +1106,7 @@ export default function AudioPlayer({
               </div>
 
               <div className="audio-settings__row">
-                <label>Filter</label>
+                <label>List filter</label>
                 <div className="audio-filter-group">
                   {[
                     { id: 'all', label: 'All' },
@@ -931,63 +1127,12 @@ export default function AudioPlayer({
               </div>
 
               <div className="audio-settings__row">
-                <label>Voice ({dispVoices.length})</label>
-                <div className="audio-custom-dd" ref={ddWrapRef}>
-                  <button
-                    className="audio-custom-dd__trigger"
-                    type="button"
-                    aria-expanded={voiceDdOpen}
-                    aria-label={`Select voice — ${dispVoices.length} available`}
-                    onClick={() => setVoiceDdOpen(o => !o)}
-                  >
-                    <span className="audio-custom-dd__trigger-text">
-                      {activeVoice?.name || selectedName || 'Select voice'}
-                      {activeVoice && isNeuralVoice(activeVoice) && (
-                        <span className={'audio-neural-badge' + (isGoogleNeural(activeVoice) ? ' audio-neural-badge--google' : '')}>
-                          {' '}Neural
-                        </span>
-                      )}
-                      <small>{activeVoice?.lang}</small>
-                    </span>
-                    <span className="audio-active-tag">Active</span>
-                    <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
-                  </button>
-
-                  {voiceDdOpen && (
-                    <div className="audio-custom-dd__list" role="listbox">
-                      {dispVoices.length === 0 && (
-                        <div className="audio-custom-dd__empty">
-                          {langScope === 'en'
-                            ? 'No English voices for this filter. Try All languages.'
-                            : 'No voices found for this filter'}
-                        </div>
-                      )}
-                      {dispVoices.map((v) => (
-                        <button
-                          key={v.voiceURI || v.name}
-                          type="button"
-                          role="option"
-                          aria-selected={selectedNameRef.current === v.name}
-                          className={'audio-custom-dd__item' + (selectedNameRef.current === v.name ? ' on' : '')}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            selectVoice(v);
-                          }}
-                        >
-                          <span className="audio-custom-dd__name">
-                            {v.name}
-                            {isNeuralVoice(v) && (
-                              <span className={'audio-neural-badge' + (isGoogleNeural(v) ? ' audio-neural-badge--google' : '')}>
-                                {' '}Neural
-                              </span>
-                            )}
-                          </span>
-                          <span className="audio-custom-dd__lang">{v.lang}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <label>Active voice</label>
+                <p className="audio-settings__active-voice">
+                  {activeVoice?.name || selectedName || 'None selected'}
+                  {activeVoice?.lang ? ` · ${activeVoice.lang}` : ''}
+                  {activeVoice && isNeuralVoice(activeVoice) ? ' · Neural' : ''}
+                </p>
               </div>
 
               <div className="audio-settings__row">

@@ -1232,7 +1232,77 @@
   flex-wrap: wrap;
   gap: 5px;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 6px;
+}
+.audio-float__voice-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+}
+.audio-float__gender {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  align-items: center;
+}
+.audio-float__gender--mini {
+  justify-content: flex-start;
+  margin-top: 2px;
+  gap: 4px;
+}
+.audio-gender-pill {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(232, 224, 240, 0.78);
+  border-radius: 8px;
+  padding: 5px 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  line-height: 1.2;
+}
+.audio-gender-pill:hover {
+  background: rgba(201, 168, 76, 0.14);
+  border-color: rgba(201, 168, 76, 0.35);
+  color: #f0e6c8;
+}
+.audio-gender-pill.on {
+  background: rgba(74, 158, 255, 0.22);
+  border-color: rgba(74, 158, 255, 0.55);
+  color: #d6ebff;
+}
+.audio-gender-pill--best {
+  border-color: rgba(201, 168, 76, 0.4);
+  color: #e8d5a3;
+}
+.audio-gender-pill--best:hover {
+  background: rgba(201, 168, 76, 0.2);
+}
+.audio-float__gender--mini .audio-gender-pill {
+  min-width: 28px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+.audio-float__voice-dd {
+  width: 100%;
+}
+.audio-float__voice-trigger {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+.audio-settings__active-voice {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(232, 224, 240, 0.72);
+  line-height: 1.4;
+  word-break: break-word;
 }
 .audio-float__unsupported-msg {
   margin: 0;
