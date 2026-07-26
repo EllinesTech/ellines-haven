@@ -492,7 +492,7 @@ export default function About() {
             <h4 className="about-offer-aside__title">Get in Touch</h4>
             <div className="about-contact-row">
               <span className="about-contact-icon"><IconMail /></span>
-              <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>
+              <a href="mailto:haven@ellines.co.ke">haven@ellines.co.ke</a>
             </div>
             <div className="about-contact-row">
               <span className="about-contact-icon"><IconPhone /></span>

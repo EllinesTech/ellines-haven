@@ -42,7 +42,7 @@ Thank you for being part of the Ellines Haven community.
 Warm regards,
 Elijah Mwangi M
 Ellines Haven
-📞 0748 255 466 · ellines.haven@gmail.com
+📞 0748 255 466 · haven@ellines.co.ke · support@ellines.co.ke
 https://ellinesgroup.web.app`,
   },
   {
@@ -140,7 +140,7 @@ function ComposeTab({ subs, showToast }) {
     const emails = active.map(s => s.email).filter(Boolean).join(',');
     const encodedSubject = encodeURIComponent(subject);
     const encodedBody    = encodeURIComponent(body);
-    return `mailto:ellines.haven@gmail.com?bcc=${encodeURIComponent(emails)}&subject=${encodedSubject}&body=${encodedBody}`;
+    return `mailto:haven@ellines.co.ke?bcc=${encodeURIComponent(emails)}&subject=${encodedSubject}&body=${encodedBody}`;
   };
 
   const handleSend = async () => {
@@ -282,7 +282,7 @@ function ComposeTab({ subs, showToast }) {
             }}>
               <div style={{ borderBottom: '2px solid #c9a84c', paddingBottom: 12, marginBottom: 16 }}>
                 <strong style={{ fontSize: '1rem' }}>{subject || '(no subject)'}</strong><br />
-                <small style={{ color: '#666' }}>From: ellines.haven@gmail.com · To: {active.length} subscribers</small>
+                <small style={{ color: '#666' }}>From: haven@ellines.co.ke · To: {active.length} subscribers</small>
               </div>
               {body}
             </div>

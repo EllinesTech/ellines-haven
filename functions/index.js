@@ -1514,7 +1514,7 @@ async function deliverOtpMessage({ email, phone, name, otpCode, purpose }) {
           </p>
         </td></tr>
         <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
-          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · ellines.haven@gmail.com</p>
+          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · haven@ellines.co.ke</p>
         </td></tr>
       </table>
     </td></tr>
@@ -1623,7 +1623,7 @@ async function deliverOtpMessage({ email, phone, name, otpCode, purpose }) {
     console.error(`[sendOtp] All delivery channels failed for ${email}. SMTP error: ${smtpError || "none"}. Resend key set: ${!!resendApiKey}`);
     throw new HttpsError(
       "unavailable",
-      "Could not deliver the verification code. Please check your email address or contact support at ellines.haven@gmail.com."
+      "Could not deliver the verification code. Please check your email address or contact support at support@ellines.co.ke."
     );
   }
 
@@ -2101,11 +2101,11 @@ exports.sendAdminPasswordResetNotification = onCall(
             When you sign in, you will be asked to set a new password of your choice.
           </p>
           <p style="margin:16px 0 0;color:rgba(240,236,226,0.5);font-size:0.82rem;line-height:1.6;">
-            If you did not expect this change, contact us immediately at <a href="mailto:ellines.haven@gmail.com" style="color:#c9a84c;">ellines.haven@gmail.com</a> or WhatsApp: 0748 255 466.
+            If you did not expect this change, contact us immediately at <a href="mailto:support@ellines.co.ke" style="color:#c9a84c;">support@ellines.co.ke</a> or WhatsApp: 0748 255 466.
           </p>
         </td></tr>
         <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
-          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · ellines.haven@gmail.com</p>
+          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · haven@ellines.co.ke</p>
         </td></tr>
       </table>
     </td></tr>
@@ -2113,7 +2113,7 @@ exports.sendAdminPasswordResetNotification = onCall(
 </body>
 </html>`.trim();
 
-    const textBody = `Hi ${userName},\n\nAn administrator has reset your Ellines Haven password.\n\nYour temporary password is: ${tempPassword}\n\nYou will be required to set a new password when you next sign in.\n\nIf you did not expect this, contact us at ellines.haven@gmail.com.\n\n— Ellines Haven`;
+    const textBody = `Hi ${userName},\n\nAn administrator has reset your Ellines Haven password.\n\nYour temporary password is: ${tempPassword}\n\nYou will be required to set a new password when you next sign in.\n\nIf you did not expect this, contact us at support@ellines.co.ke.\n\n— Ellines Haven`;
 
     let emailSent = false;
 
@@ -2488,6 +2488,7 @@ console.log("[CloudFunctions] ✅ Reading Challenges system initialized - Phase 
 // Ciphertext can be downloaded, but the AES key never lives in the file.
 // Only the licensed owner (who still owns the book) can fetch the unlock key.
 // ─────────────────────────────────────────────────────────────────────────────
+/** Internal super-admin identity — not a public contact address */
 const SUPER_ADMIN_EMAIL = "ellines.haven@gmail.com";
 
 async function userOwnsBookForEhbook(email, bookId) {

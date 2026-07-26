@@ -164,7 +164,7 @@ export default function AdminOrdersPanel({ showToast, isSuper }) {
       <p>Method: ${o.method || '—'}${o.ref ? ` | Ref: ${o.ref}` : ''}${o.paystackRef ? ` | Paystack: ${o.paystackRef}` : ''}</p>
       ${o.adminNote ? `<p><em>Admin note: ${o.adminNote}</em></p>` : ''}
       <p>Status: ${o.status}</p>
-      <hr/><p style="color:#888;font-size:0.8rem">haven.ellines.co.ke · ellines.haven@gmail.com · +254 748 255 466</p>
+      <hr/><p style="color:#888;font-size:0.8rem">haven.ellines.co.ke · orders@ellines.co.ke · haven@ellines.co.ke · +254 748 255 466</p>
       </body></html>`);
     w.document.close(); w.print();
   };

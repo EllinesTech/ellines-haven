@@ -66,7 +66,7 @@ Completed: ${formatDate(order.completedAt || order.createdAt)}
 Thank you for your purchase!
 Visit us at: https://haven.ellines.co.ke
 Support: +254 748 255 466
-Email: ellines.haven@gmail.com
+Orders: orders@ellines.co.ke · Haven: haven@ellines.co.ke
 `;
 
     const blob = new Blob([receiptText], { type: 'text/plain' });
@@ -215,7 +215,9 @@ Email: ellines.haven@gmail.com
                 {' · '}
                 <a href="tel:+254748255466">+254 748 255 466</a>
                 {' · '}
-                <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>
+                <a href="mailto:orders@ellines.co.ke">orders@ellines.co.ke</a>
+                {' · '}
+                <a href="mailto:haven@ellines.co.ke">haven@ellines.co.ke</a>
               </p>
               <p className="receipt-footer-note">
                 Digital books purchased are non-refundable. For support, contact us via WhatsApp or email.

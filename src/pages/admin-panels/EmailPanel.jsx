@@ -15,7 +15,7 @@ const DEFAULT = {
   provider: 'smtp',
   fromName: 'Ellines Haven',
   fromEmail: 'noreply@haven.ellines.co.ke',
-  replyTo: 'ellines.haven@gmail.com',
+  replyTo: 'haven@ellines.co.ke',
   // SMTP
   smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpTls: true,
   // SendGrid
@@ -36,7 +36,7 @@ const DEFAULT = {
   welcomeEnabled: true,
   welcomeSubject: 'Welcome to Ellines Haven!',
   newOrderAdminEnabled: true,
-  newOrderAdminEmail: 'ellines.haven@gmail.com',
+  newOrderAdminEmail: 'orders@ellines.co.ke',
 };
 
 function Field({ label, value, onChange, type='text', placeholder='', mono=false, hint='' }) {
@@ -162,7 +162,7 @@ export default function EmailPanel({ showToast, isSuper }) {
               <Field label="From Name" value={cfg.fromName} onChange={v=>set('fromName',v)} placeholder="Ellines Haven" />
               <Field label="From Email" value={cfg.fromEmail} onChange={v=>set('fromEmail',v)} placeholder="noreply@haven.ellines.co.ke"
                 hint="Use your custom domain email for best deliverability" />
-              <Field label="Reply-To Email" value={cfg.replyTo} onChange={v=>set('replyTo',v)} placeholder="ellines.haven@gmail.com" />
+              <Field label="Reply-To Email" value={cfg.replyTo} onChange={v=>set('replyTo',v)} placeholder="haven@ellines.co.ke" />
             </div>
           </div>
 
@@ -208,7 +208,7 @@ export default function EmailPanel({ showToast, isSuper }) {
             </>}
 
             {cfg.provider === 'gmail' && <>
-              <Field label="Gmail Address" value={cfg.gmailUser} onChange={v=>set('gmailUser',v)} placeholder="ellines.haven@gmail.com" />
+              <Field label="Gmail Address (SMTP only)" value={cfg.gmailUser} onChange={v=>set('gmailUser',v)} placeholder="your-smtp@gmail.com" hint="Private send account — not shown to customers" />
               <Field label="App Password" value={cfg.gmailPass} onChange={v=>set('gmailPass',v)} type="password" placeholder="xxxx xxxx xxxx xxxx" mono
                 hint="Generate at myaccount.google.com → Security → 2-Step → App Passwords. NOT your Gmail password." />
               <div className="adm-info-note">Gmail: smtp.gmail.com, Port: 587. Requires 2FA enabled on Google account.</div>

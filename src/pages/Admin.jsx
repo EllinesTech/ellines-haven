@@ -2011,7 +2011,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
             lastSender: 'admin',
             userRead:   false,
             fromAdmin:  true,
-            adminEmail: 'ellines.haven@gmail.com',
+            adminEmail: 'orders@ellines.co.ke',
             adminName:  'Ellines Haven',
             bookId:     bookId,
             bookTitle:  group.title,
@@ -2021,7 +2021,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
               text:        `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '…\n\n' : ''}Head over to your library or click the link below:\n${bookUrl}\n\nHappy reading! 📚\n— Ellines Haven Team`,
               sender:      'admin',
               senderName:  'Ellines Haven',
-              senderEmail: 'ellines.haven@gmail.com',
+              senderEmail: 'haven@ellines.co.ke',
               createdAt:   serverTimestamp(),
             })
           ),
@@ -4837,7 +4837,7 @@ export default function Admin() {
               {/* Admin Security  SuperAdmin only */}
               <div className="card adm-settings-card">
                 <h3>Admin and Security {isSuper && <span style={{ fontSize:'0.68rem', background:'linear-gradient(135deg,#c9a84c,#e8c96d)', color:'#000', padding:'2px 8px', borderRadius:10, marginLeft:8, fontWeight:700, letterSpacing:1 }}>SUPER ADMIN</span>}</h3>
-                <div className="adm-field-group"><label>Admin Email</label><input className="field" defaultValue="ellines.haven@gmail.com" /></div>
+                <div className="adm-field-group"><label>Admin Email</label><input className="field" defaultValue="orders@ellines.co.ke" /></div>
                 <div className="adm-field-group"><label>New Password</label><input className="field" type="password" placeholder="Leave blank to keep current" /></div>
                 <div className="adm-field-group"><label>Confirm Password</label><input className="field" type="password" placeholder="Repeat new password" /></div>
                 {isSuper && (

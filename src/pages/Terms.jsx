@@ -48,7 +48,7 @@ export default function Terms() {
             <EditableField field="terms_intro">Welcome to <strong>Ellines Haven</strong>. By accessing or using our platform — including browsing, creating an account, or purchasing any content — you agree to be bound by these Terms of Service. Please read them carefully.</EditableField>
           </p>
           <p>
-            If you have questions, contact us at <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a> or on WhatsApp at <a href="https://wa.me/254748255466">0748 255 466</a>.
+            If you have questions, contact us at <a href="mailto:support@ellines.co.ke">support@ellines.co.ke</a> or on WhatsApp at <a href="https://wa.me/254748255466">0748 255 466</a>.
           </p>
         </div>
 
@@ -195,7 +195,7 @@ export default function Terms() {
             <h2>Contact</h2>
             <p>For questions about these Terms, reach us at:</p>
             <ul>
-              <li>Email: <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a></li>
+              <li>Email: <a href="mailto:support@ellines.co.ke">support@ellines.co.ke</a></li>
               <li>WhatsApp: <a href="https://wa.me/254748255466">0748 255 466</a></li>
               <li>Location: Nairobi, Kenya</li>
             </ul>

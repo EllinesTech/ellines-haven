@@ -342,7 +342,7 @@ export default function Founder() {
             </div>
             <div className="founder-contact-strip">
               <a href="tel:+254748255466" className="founder-contact-item"><IconPhone /> 0748 255 466</a>
-              <a href="mailto:ellines.haven@gmail.com" className="founder-contact-item"><IconMail /> ellines.haven@gmail.com</a>
+              <a href="mailto:haven@ellines.co.ke" className="founder-contact-item"><IconMail /> haven@ellines.co.ke</a>
               <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-contact-item"><IconGlobe /> ellinestech.co.ke</a>
             </div>
           </div>
@@ -598,7 +598,7 @@ export default function Founder() {
           {EA('ctaSub', 'p', undefined, undefined, true)}
           <div className="founder-cta-contact">
             <a href="tel:+254748255466" className="founder-cta-chip"><IconPhone /> 0748 255 466</a>
-            <a href="mailto:ellines.haven@gmail.com" className="founder-cta-chip"><IconMail /> ellines.haven@gmail.com</a>
+            <a href="mailto:haven@ellines.co.ke" className="founder-cta-chip"><IconMail /> haven@ellines.co.ke</a>
             <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-cta-chip"><IconGlobe /> ellinestech.co.ke</a>
           </div>
           <div className="founder-cta-buttons">

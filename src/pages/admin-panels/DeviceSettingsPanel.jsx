@@ -41,7 +41,7 @@ const DEFAULTS = {
   secondaryPhone: '0728807213',
   whatsappNumber: '254748255466',
   whatsappDefaultMsg: 'Hello Ellines Haven, I would like to inquire about',
-  supportEmail: 'ellines.haven@gmail.com',
+  supportEmail: 'support@ellines.co.ke',
   showWhatsappFloat: true,
   showCallFloat: false,
 
@@ -457,7 +457,7 @@ export default function DeviceSettingsPanel({ showToast, isSuper }) {
               className="field"
               value={settings.supportEmail}
               onChange={e => set('supportEmail', e.target.value)}
-              placeholder="ellines.haven@gmail.com"
+              placeholder="support@ellines.co.ke"
               type="email"
             />
           </div>

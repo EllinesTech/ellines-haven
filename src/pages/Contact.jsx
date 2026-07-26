@@ -6,10 +6,23 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { getSocialLink } from '../utils/socialLinks';
+import {
+  PRIMARY_CONTACT_EMAIL,
+  SUPPORT_EMAIL,
+  ORDERS_EMAIL,
+  INFO_EMAIL,
+} from '../utils/ellinesEmails';
 import './Contact.css';
 
 const WA_NUMBER = '254748255466';
 const WA_LINK   = `https://wa.me/${WA_NUMBER}`;
+
+const EMAIL_DIRECTORY = [
+  { email: PRIMARY_CONTACT_EMAIL, label: 'Haven', desc: 'Ellines Haven — books, reading, product questions' },
+  { email: SUPPORT_EMAIL, label: 'Support', desc: 'Account help, login, access & technical issues' },
+  { email: ORDERS_EMAIL, label: 'Orders', desc: 'Payments, missing books, receipts, unlocks' },
+  { email: INFO_EMAIL, label: 'Info', desc: 'Ellines group inquiries, partnerships & general business' },
+];
 
 const CONTACT_DEFAULTS = {
   page_title:      'Get in Touch',
@@ -19,7 +32,7 @@ const CONTACT_DEFAULTS = {
   wa_label:        'Chat on WhatsApp',
   wa_sub:          '0748 255 466 — We reply fast',
   phone:           '0748 255 466',
-  email:           'ellines.haven@gmail.com',
+  email:           PRIMARY_CONTACT_EMAIL,
   location:        'Nairobi, Kenya',
   response_wa:     'Usually within 1 hour',
   response_email:  'Within 24 hours',
@@ -211,19 +224,32 @@ export default function Contact() {
                   <span style={{ color: '#25D366' }}>{cv.wa_label}</span>
                 </div>
               </a>
-              <a href={`mailto:${cv.email}`} className="contact-channel">
-                <span className="contact-channel__icon"><IconMail /></span>
-                <div>
-                  <strong>Email</strong>
-                  <span>{cv.email}</span>
-                </div>
-              </a>
               <div className="contact-channel contact-channel--static">
                 <span className="contact-channel__icon"><IconMap /></span>
                 <div>
                   <strong>Location</strong>
                   <span>{cv.location}</span>
                 </div>
+              </div>
+            </div>
+
+            <div className="contact-email-dir" style={{ marginTop: 18 }}>
+              <span className="contact-times__label">Email directory</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                {EMAIL_DIRECTORY.map(({ email, label, desc }) => (
+                  <a
+                    key={email}
+                    href={`mailto:${email}`}
+                    className="contact-channel"
+                    style={{ padding: '10px 12px' }}
+                  >
+                    <span className="contact-channel__icon"><IconMail /></span>
+                    <div>
+                      <strong>{label} · {email}</strong>
+                      <span>{desc}</span>
+                    </div>
+                  </a>
+                ))}
               </div>
             </div>
 

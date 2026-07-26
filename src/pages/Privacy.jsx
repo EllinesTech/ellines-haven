@@ -47,7 +47,7 @@ export default function Privacy() {
             <EditableField field="privacy_intro">At <strong>Ellines Haven</strong>, we take your privacy seriously. This Privacy Policy explains what information we collect, how we use it, and your rights regarding your personal data.</EditableField>
           </p>
           <p>
-            Questions? Contact us at <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a> or WhatsApp <a href="https://wa.me/254748255466">0748 255 466</a>.
+            Questions? Contact us at <a href="mailto:support@ellines.co.ke">support@ellines.co.ke</a> or WhatsApp <a href="https://wa.me/254748255466">0748 255 466</a>.
           </p>
         </div>
 
@@ -155,7 +155,7 @@ export default function Privacy() {
               <li><strong>Deletion</strong> — request deletion of your account and associated data. Note that completed order records may be retained for financial record-keeping purposes.</li>
               <li><strong>Withdraw consent</strong> — opt out of notification emails at any time by contacting us.</li>
             </ul>
-            <p>To exercise any of these rights, contact us at <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>.</p>
+            <p>To exercise any of these rights, contact us at <a href="mailto:support@ellines.co.ke">support@ellines.co.ke</a>.</p>
           </section>
 
           <section className="legal-section" id="children">
@@ -181,7 +181,7 @@ export default function Privacy() {
             <h2>Contact</h2>
             <p>For any privacy-related questions or requests:</p>
             <ul>
-              <li>Email: <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a></li>
+              <li>Email: <a href="mailto:support@ellines.co.ke">support@ellines.co.ke</a></li>
               <li>WhatsApp: <a href="https://wa.me/254748255466">0748 255 466</a></li>
               <li>Location: Nairobi, Kenya</li>
             </ul>

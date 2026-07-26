@@ -24,6 +24,7 @@ import './Auth.css';
    All other users are in Firestore `users` collection.
    localStorage is used ONLY for the active session token (eh_user) and cart.
 ── */
+/** Internal login only — never show on the public website */
 export const SUPER_ADMIN_EMAIL = 'ellines.haven@gmail.com';
 
 /* ── Load user from Firestore `users` collection ── */
@@ -240,7 +241,7 @@ function ForgotPasswordModal({ onClose }) {
       setSending(false);
       setStep('sent');
     } catch (fnErr) {
-      setErr('We could not send the reset code. Please check your email address or contact support at ellines.haven@gmail.com.');
+      setErr('We could not send the reset code. Please check your email address or contact support at support@ellines.co.ke.');
       setSending(false);
     }
   };
@@ -634,7 +635,7 @@ export default function Login() {
           return { success: false, error: 'No account found with that email address. Please check your email or create an account.' };
         }
         if (fsUser.suspended) {
-          return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
+          return { success: false, error: 'Your account has been suspended. Please contact support at support@ellines.co.ke.' };
         }
         const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
         const localOverride = pwOverrides[emailKey];
@@ -700,7 +701,7 @@ export default function Login() {
             const suspLeg = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
             const allSusp = [...new Set([...suspFs, ...suspLeg])];
             if (allSusp.includes(emailKey) || regUser.suspended) {
-              return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
+              return { success: false, error: 'Your account has been suspended. Please contact support at support@ellines.co.ke.' };
             }
             if (!fsPw) return { success: false, error: 'This account has no password set. Please contact support.' };
             const check = await verifyPassword(values.password, fsPw);
@@ -746,7 +747,7 @@ export default function Login() {
       const legacyAccount = legacy.find(a => a.email?.toLowerCase() === emailKey);
       if (legacyAccount) {
         if (legacyAccount.suspended) {
-          return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
+          return { success: false, error: 'Your account has been suspended. Please contact support at support@ellines.co.ke.' };
         }
         const check = await verifyPassword(values.password, legacyAccount.password);
         if (!check.ok) return failPw(emailKey);

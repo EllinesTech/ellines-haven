@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import NewsletterSignup from './NewsletterSignup';
 import { getSocialLink } from '../utils/socialLinks';
+import { PRIMARY_CONTACT_EMAIL, SUPPORT_EMAIL } from '../utils/ellinesEmails';
 import './Footer.css';
 
 const GENRES = ['Romance', 'Mystery', 'Drama', 'Historical', 'Short Stories', 'Fantasy'];
@@ -71,7 +72,7 @@ export default function Footer() {
               </a>
               <a href="tel:+254748255466" className="footer__contact-chip">📞 0748 255 466</a>
               <a href="tel:+254728807213" className="footer__contact-chip">📞 0728 807 213</a>
-              <a href="mailto:ellines.haven@gmail.com" className="footer__contact-chip">📧 ellines.haven@gmail.com</a>
+              <a href={`mailto:${PRIMARY_CONTACT_EMAIL}`} className="footer__contact-chip">📧 {PRIMARY_CONTACT_EMAIL}</a>
               <span className="footer__contact-chip footer__contact-chip--loc">📍Kenya</span>
             </div>
             {/* Payment badges */}
@@ -134,7 +135,7 @@ export default function Footer() {
             <Link to="/founder" className="footer__link">The Founder</Link>
             <Link to="/contact" className="footer__link">Contact Us</Link>
             <Link to="/faq" className="footer__link">FAQ / Help</Link>
-            <a href="mailto:ellines.haven@gmail.com" className="footer__link">Support</a>
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="footer__link">Support</a>
             <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
               Ellines Tech ↗
             </a>

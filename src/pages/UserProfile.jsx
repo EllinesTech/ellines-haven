@@ -882,9 +882,9 @@ export default function UserProfile() {
                   <div><strong>WhatsApp</strong><span>0748 255 466 — Fast replies</span></div>
                   <span className="up-contact-card__arrow">→</span>
                 </a>
-                <a href="mailto:ellines.haven@gmail.com" className="up-contact-card">
+                <a href="mailto:support@ellines.co.ke" className="up-contact-card">
                   <span className="up-contact-card__icon">📧</span>
-                  <div><strong>Email</strong><span>ellines.haven@gmail.com</span></div>
+                  <div><strong>Email</strong><span>support@ellines.co.ke</span></div>
                   <span className="up-contact-card__arrow">→</span>
                 </a>
                 <a href="tel:+254748255466" className="up-contact-card">

@@ -85,7 +85,7 @@ export const DEFAULT_PERMS = {
 
 const DEFAULT_SETTINGS = {
   siteName:'Ellines Haven', tagline:'Home For The Story Soul',
-  email:'ellines.haven@gmail.com', phone:'0748 255 466', location:'Nairobi, Kenya',
+  email:'haven@ellines.co.ke', phone:'0748 255 466', location:'Nairobi, Kenya',
   authorName:'Elijah Mwangi M',
   authorBio:'IT entrepreneur, software engineer, AI developer, and author based in Kenya.',
   authorWeb:'https://ellinestech.co.ke', authorTwitter:'',

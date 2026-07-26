@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
     { num: '254748255466', label: '0748 255 466', role: 'Primary support' },
     { num: '254728807213', label: '0728 807 213', role: 'Alternate' },
   ],
-  waEmail: 'ellines.haven@gmail.com',
+  waEmail: 'support@ellines.co.ke',
   waSupportHours: 'Mon–Sat\n8am–8pm EAT',
   waResponseTime: 'Usually under\n1 hour',
 
@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS = {
   // Contact info (shown in footer / contact page)
   contactPhone1: '0748 255 466',
   contactPhone2: '0728 807 213',
-  contactEmail: 'ellines.haven@gmail.com',
+  contactEmail: 'haven@ellines.co.ke',
   contactHours: 'Mon–Sat, 8am–8pm EAT',
   contactLocation: 'Nairobi, Kenya',
 };
@@ -382,7 +382,7 @@ export default function ChatSettingsPanel({ showToast }) {
           <div className="adm-settings-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div className="adm-field-group">
               <label>Support Email</label>
-              <input className="field" value={settings.waEmail || ''} onChange={e => set('waEmail', e.target.value)} placeholder="ellines.haven@gmail.com" />
+              <input className="field" value={settings.waEmail || ''} onChange={e => set('waEmail', e.target.value)} placeholder="support@ellines.co.ke" />
             </div>
             <div className="adm-field-group">
               <label>Response Time (shown in widget)</label>
@@ -420,7 +420,7 @@ export default function ChatSettingsPanel({ showToast }) {
             </div>
             <div className="adm-field-group">
               <label>Support Email</label>
-              <input className="field" value={settings.contactEmail || ''} onChange={e => set('contactEmail', e.target.value)} placeholder="ellines.haven@gmail.com" />
+              <input className="field" value={settings.contactEmail || ''} onChange={e => set('contactEmail', e.target.value)} placeholder="haven@ellines.co.ke" />
             </div>
             <div className="adm-field-group">
               <label>Business Hours</label>
