@@ -167,9 +167,7 @@ export function AppProvider({ children }) {
         localStorage.setItem('eh_chapter_grants', JSON.stringify({}));
       }
     }, () => {
-      // Silently fall back to localStorage on error
-      const cached = JSON.parse(localStorage.getItem('eh_chapter_grants') || '{}');
-      console.log('[Grants] loaded from cache:', Object.keys(cached).length, 'books');
+      // Permission/network error — keep any existing localStorage cache silently
     });
 
     return () => unsubGrants();
@@ -314,15 +312,12 @@ export function AppProvider({ children }) {
 
       const { stripped, coversMap, chaptersMap } = stripLargeFields(v);
       setDoc(BOOKS_DOC(), { books: stripped, updatedAt: serverTimestamp() })
-        .then(() => console.log('[Books] catalogue saved to Firestore ✓'))
         .catch(e => console.warn('[Books] catalogue write failed:', e.message));
       if (Object.keys(coversMap).length > 0)
         setDoc(COVERS_DOC(), { covers: coversMap, updatedAt: serverTimestamp() })
-          .then(() => console.log('[Books] covers saved to Firestore ✓'))
           .catch(e => console.warn('[Books] covers write failed:', e.message));
       Object.entries(chaptersMap).forEach(([bookId, chapters]) =>
         setDoc(CHAPTER_DOC(bookId), { bookId, chapters, updatedAt: serverTimestamp() })
-          .then(() => console.log(`[Books] chapters saved for book ${bookId} ✓`))
           .catch(e => console.warn(`[Books] chapters write failed for ${bookId}:`, e.message))
       );
 

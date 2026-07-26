@@ -376,8 +376,8 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
         const chapters = book.freeFirstChapter ? [0] : [];
         setGrantedChapters(chapters);
         // TODO: Could query user_chapter_grants collection here if needed
-      } catch (e) {
-        console.log('Could not load grants:', e);
+      } catch {
+        /* grants are optional — ignore load failures */
       }
     };
     loadGrants();
