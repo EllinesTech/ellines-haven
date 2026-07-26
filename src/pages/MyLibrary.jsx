@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, getDocFromCache, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
 import {
-  isBookSavedOffline,
   saveBookOffline,
   removeOfflineBook,
   listOfflineBooks,
@@ -532,30 +531,43 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
 }
 
 // -- Offline Books Panel -----------------------------------------------
-function OfflineBooks({ user, catalog }) {
+function OfflineBooks({ user, catalog, onCountChange }) {
   const [offlineBooks, setOfflineBooks] = useState([]);
   const [loadingOffline, setLoadingOffline] = useState(true);
   const [removingBook, setRemovingBook] = useState(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadingOffline(true);
+      setLoadError(false);
       try {
         const list = await listOfflineBooks(user.email);
-        if (!cancelled) setOfflineBooks(list);
+        if (!cancelled) {
+          setOfflineBooks(list);
+          onCountChange?.(list.length);
+        }
       } catch {
-        if (!cancelled) setOfflineBooks([]);
+        if (!cancelled) {
+          setOfflineBooks([]);
+          setLoadError(true);
+          onCountChange?.(0);
+        }
       } finally {
         if (!cancelled) setLoadingOffline(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [user.email]);
+  }, [user.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRemove = async (bookId) => {
     await removeOfflineBook(user.email, bookId);
-    setOfflineBooks(list => list.filter(b => b.bookId !== bookId));
+    setOfflineBooks(list => {
+      const next = list.filter(b => b.bookId !== bookId);
+      onCountChange?.(next.length);
+      return next;
+    });
     setRemovingBook(null);
   };
 
@@ -573,13 +585,27 @@ function OfflineBooks({ user, catalog }) {
     </div>
   );
 
+  if (loadError) return (
+    <div className="mylib-empty">
+      <div className="mylib-empty-icon">⚠️</div>
+      <h3>Couldn’t read offline storage</h3>
+      <p>
+        Your browser blocked access to saved books. Try another browser, or turn off private browsing,
+        then open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> again.
+      </p>
+      <Link to="/my-library" className="btn btn-primary" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>
+        Retry
+      </Link>
+    </div>
+  );
+
   if (offlineBooks.length === 0) return (
     <div className="mylib-empty">
       <div className="mylib-empty-icon">📥</div>
       <h3>No books on this device yet</h3>
       <p>
         Open a book you own and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong>.
-        It stays here after refresh — and you can keep reading without internet on this device.
+        Saves stay on this device after refresh — even without internet.
       </p>
       <Link to="/library" className="btn btn-primary">Browse Books</Link>
     </div>
@@ -674,7 +700,9 @@ function OfflineBooks({ user, catalog }) {
               {/* Action buttons */}
               <div style={{ padding:'8px 14px 14px', display:'flex', gap:8, marginTop:'auto' }}>
                 <Link
-                  to={catalogBook ? readPath(catalogBook) : `/read/${book.bookId}`}
+                  to={catalogBook
+                    ? readPath(catalogBook)
+                    : (book.slug ? `/read/${book.slug}` : `/read/${book.bookId}`)}
                   className="btn btn-primary btn-sm"
                   style={{ flex:1, textAlign:'center', fontWeight:700 }}
                 >
@@ -897,6 +925,7 @@ export default function MyLibrary() {
   const [removingBook, setRemovingBook] = useState(null); // bookId being confirmed for removal
   // Track offline save state per-book: { [bookId]: 'saved' | 'saving' | false }
   const [offlineState, setOfflineState] = useState({});
+  const [offlineCount, setOfflineCount] = useState(0);
   // For receipt modal
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -922,14 +951,22 @@ export default function MyLibrary() {
 
   // Check which books are already saved offline (IndexedDB — survives refresh)
   useEffect(() => {
-    if (!user?.email || !library?.length) return;
+    if (!user?.email) return;
     let cancelled = false;
     (async () => {
-      const map = {};
-      await Promise.all(library.map(async (b) => {
-        map[b.id] = (await isBookSavedOffline(user.email, b.id)) ? 'saved' : false;
-      }));
-      if (!cancelled) setOfflineState(map);
+      try {
+        const list = await listOfflineBooks(user.email);
+        if (cancelled) return;
+        setOfflineCount(list.length);
+        if (library?.length) {
+          const savedIds = new Set(list.map((b) => String(b.bookId)));
+          const map = {};
+          library.forEach((b) => { map[b.id] = savedIds.has(String(b.id)) ? 'saved' : false; });
+          setOfflineState(map);
+        }
+      } catch {
+        if (!cancelled) setOfflineCount(0);
+      }
     })();
     return () => { cancelled = true; };
   }, [user?.email, library?.length]); // eslint-disable-line
@@ -1012,7 +1049,7 @@ export default function MyLibrary() {
   const TABS = [
     { k:'library',     label:'My Books',    badge: library.length   || null  },
     { k:'wishlist',    label:'Wishlist',    badge: wishlist.length  || null  },
-    { k:'offline',     label:'Downloaded',  badge: null                       },
+    { k:'offline',     label:'Downloaded',  badge: offlineCount || null       },
     { k:'referral',    label:'Referrals',   badge: null                       },
     { k:'orders',      label:'Orders',      badge: myPending.length || null  },
     { k:'stats',       label:'Stats',       badge: null                       },
@@ -1247,6 +1284,7 @@ export default function MyLibrary() {
                                   onClick={async () => {
                                     await removeOfflineBook(user.email, b.id);
                                     setOfflineState(s => ({ ...s, [b.id]: false }));
+                                    setOfflineCount(c => Math.max(0, c - 1));
                                   }}
                                 >Remove</button>
                                 <p className="mylib-offline-hint">Keeps working after refresh — even without internet.</p>
@@ -1261,11 +1299,22 @@ export default function MyLibrary() {
                                     setOfflineState(s => ({ ...s, [b.id]: 'saving' }));
                                     try {
                                       let chapters = [];
-                                      const snap = await getDoc(doc(db, 'book_chapters', String(b.id)));
-                                      if (snap.exists()) chapters = snap.data().chapters || [];
+                                      const ref = doc(db, 'book_chapters', String(b.id));
+                                      try {
+                                        const cached = await getDocFromCache(ref);
+                                        if (cached.exists()) chapters = cached.data().chapters || [];
+                                      } catch { /* cache miss */ }
+                                      if (!chapters.length) {
+                                        const snap = await getDoc(ref);
+                                        if (snap.exists()) chapters = snap.data().chapters || [];
+                                      }
                                       if (!chapters.length) chapters = getFallbackChapters(b);
-                                      const result = await saveBookOffline(user.email, b.id, b, chapters);
+                                      const result = await saveBookOffline(user.email, b.id, {
+                                        ...b,
+                                        slug: b.slug || undefined,
+                                      }, chapters);
                                       setOfflineState(s => ({ ...s, [b.id]: result?.ok ? 'saved' : 'error' }));
+                                      if (result?.ok) setOfflineCount(c => c + (offlineState[b.id] === 'saved' ? 0 : 1));
                                     } catch {
                                       setOfflineState(s => ({ ...s, [b.id]: 'error' }));
                                     }
@@ -1397,7 +1446,7 @@ export default function MyLibrary() {
 
         {/* -- OFFLINE BOOKS TAB -- */}
         {activeTab === 'offline' && (
-          <OfflineBooks user={user} catalog={catalog} />
+          <OfflineBooks user={user} catalog={catalog} onCountChange={setOfflineCount} />
         )}
 
         {/* -- REFERRAL TAB -- */}

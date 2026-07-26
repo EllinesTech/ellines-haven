@@ -2997,6 +2997,9 @@
   border-color: rgba(231, 76, 60, 0.35);
   color: #e74c3c;
 }
+.reader__offline-btn[aria-busy="true"] {
+  min-width: 7.5rem;
+}
 .reader__offline-toast {
   font-size: 0.75rem;
   color: #2ecc71;

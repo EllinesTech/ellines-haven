@@ -5,6 +5,7 @@
 export {
   saveBookOffline,
   getOfflineBook,
+  findOfflineBook,
   listOfflineBooks as getOfflineBooks,
   isBookSavedOffline,
   removeOfflineBook as deleteOfflineBook,

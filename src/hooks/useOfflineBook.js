@@ -8,6 +8,8 @@
  * { bookId, title, author, cover, slug, savedAt, chapters[], chapterCount, approxBytes }
  */
 
+import { titleToSlug } from '../utils/slugify';
+
 const DB_NAME = 'EllinesHaven_Offline';
 const DB_VERSION = 2;
 const STORE = 'books';
@@ -19,6 +21,21 @@ export const offlineKey = (email, bookId) =>
   email && bookId ? `eh_offline_book_${userDocId(email)}_${bookId}` : null;
 
 const entryId = (email, bookId) => `${userDocId(email)}__${String(bookId)}`;
+
+function toPublicBook(row) {
+  if (!row?.chapters?.length) return null;
+  return {
+    bookId: String(row.bookId),
+    title: row.title || '',
+    author: row.author || '',
+    cover: row.cover || '',
+    slug: row.slug || titleToSlug(row.title || '') || '',
+    savedAt: row.savedAt || 0,
+    chapters: row.chapters,
+    chapterCount: row.chapterCount || row.chapters.length,
+    approxBytes: row.approxBytes || 0,
+  };
+}
 
 let dbPromise = null;
 
@@ -67,6 +84,7 @@ function buildPayload(email, bookId, bookMeta = {}, chapters = []) {
   const approxBytes = typeof Blob !== 'undefined'
     ? new Blob([json]).size
     : json.length * 2;
+  const slug = bookMeta.slug || titleToSlug(bookMeta.title || '') || '';
   return {
     id: entryId(email, bookId),
     userKey: userDocId(email),
@@ -74,7 +92,7 @@ function buildPayload(email, bookId, bookMeta = {}, chapters = []) {
     title: bookMeta.title || '',
     author: bookMeta.author || '',
     cover: bookMeta.cover || '',
-    slug: bookMeta.slug || '',
+    slug,
     savedAt: Date.now(),
     chapters: normalized,
     chapterCount: normalized.length,
@@ -192,7 +210,7 @@ async function listIdb(email) {
       title: r.title || '',
       author: r.author || '',
       cover: r.cover || '',
-      slug: r.slug || '',
+      slug: r.slug || titleToSlug(r.title || '') || '',
       savedAt: r.savedAt || 0,
       chapters: r.chapterCount || r.chapters.length,
       chapterCount: r.chapterCount || r.chapters.length,
@@ -221,19 +239,8 @@ export async function getOfflineBook(email, bookId) {
   if (!email || !bookId) return null;
   try {
     const row = await getIdb(email, bookId);
-    if (row?.chapters?.length) {
-      return {
-        bookId: String(row.bookId),
-        title: row.title || '',
-        author: row.author || '',
-        cover: row.cover || '',
-        slug: row.slug || '',
-        savedAt: row.savedAt || 0,
-        chapters: row.chapters,
-        chapterCount: row.chapterCount || row.chapters.length,
-        approxBytes: row.approxBytes || 0,
-      };
-    }
+    const pub = toPublicBook(row);
+    if (pub) return pub;
   } catch { /* fall through */ }
 
   const legacy = readLegacyLocal(email, bookId);
@@ -245,7 +252,43 @@ export async function getOfflineBook(email, bookId) {
     payload.savedAt = legacy.savedAt || payload.savedAt;
     await putIdb(payload);
   } catch { /* keep legacy */ }
-  return legacy;
+  return toPublicBook(legacy) || legacy;
+}
+
+/**
+ * Resolve a saved offline book from a reader URL param (book id OR slug).
+ * Critical for refresh/offline: catalog may be empty while IndexedDB still has chapters.
+ */
+export async function findOfflineBook(email, slugOrId) {
+  if (!email || !slugOrId) return null;
+
+  const direct = await getOfflineBook(email, slugOrId);
+  if (direct) return direct;
+
+  const needle = String(slugOrId).toLowerCase();
+
+  try {
+    const db = await openDb();
+    const tx = db.transaction(STORE, 'readonly');
+    const rows = await idbRequest(tx.objectStore(STORE).index('userKey').getAll(userDocId(email)));
+    const match = (rows || []).find((r) => {
+      if (!Array.isArray(r.chapters) || !r.chapters.length) return false;
+      const slug = (r.slug || titleToSlug(r.title || '')).toLowerCase();
+      return String(r.bookId) === String(slugOrId) || slug === needle;
+    });
+    const pub = toPublicBook(match);
+    if (pub) return pub;
+  } catch { /* fall through */ }
+
+  // Legacy localStorage scan by slug
+  const legacyList = listLegacyLocal(email);
+  for (const meta of legacyList) {
+    const slug = (meta.slug || titleToSlug(meta.title || '')).toLowerCase();
+    if (String(meta.bookId) === String(slugOrId) || slug === needle) {
+      return getOfflineBook(email, meta.bookId);
+    }
+  }
+  return null;
 }
 
 /**

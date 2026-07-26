@@ -55,12 +55,14 @@ export function readPath(book) {
  */
 export function findBookBySlugOrId(books, slugOrId) {
   if (!slugOrId || !books) return null;
-  
-  // Try numeric ID first (fast exact match)
-  let book = books.find(b => b.id === slugOrId);
+
+  const needle = String(slugOrId);
+
+  // Try ID first (coerce so number/string ids both match)
+  let book = books.find(b => String(b.id) === needle);
   if (book) return book;
-  
+
   // Try slug match
-  book = books.find(b => getBookSlug(b) === slugOrId);
+  book = books.find(b => getBookSlug(b) === needle);
   return book || null;
 }

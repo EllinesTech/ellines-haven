@@ -16,7 +16,7 @@ import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
 
 import {
 
-  getOfflineBook,
+  findOfflineBook,
 
   saveBookOffline,
 
@@ -116,7 +116,7 @@ export default function Reader() {
 
   const { books, user, isOwned, isChapterOwned, library, myPerms, libLoaded, siteControls } = useApp();
 
-  const book = findBookBySlugOrId(books, id);
+  const catalogBook = findBookBySlugOrId(books, id);
 
   const readerRef = useRef(null);
 
@@ -245,17 +245,23 @@ export default function Reader() {
     if (user?.email) updateUserReadingPreference(user.email, 'fontFamily', id);
   };
 
-  // On mount, load offline copy (IndexedDB) so refresh / offline still works
+  // Load offline copy by URL id/slug — works even when catalog hasn't loaded yet
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!user?.email || !book?.id) {
+      if (!user?.email || !id) {
         setOfflineReady(true);
+        setOfflineSaved(false);
+        setOfflineChapters(null);
+        setOfflineMeta(null);
         return;
       }
       setOfflineReady(false);
       try {
-        const cached = await getOfflineBook(user.email, book.id);
+        // Prefer catalog id when available; also resolve by slug from IndexedDB
+        const cached =
+          (catalogBook?.id ? await findOfflineBook(user.email, catalogBook.id) : null) ||
+          (await findOfflineBook(user.email, id));
         if (cancelled) return;
         const ok = Array.isArray(cached?.chapters) && cached.chapters.length > 0;
         setOfflineSaved(ok);
@@ -272,7 +278,25 @@ export default function Reader() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.email, book?.id]);
+  }, [user?.email, id, catalogBook?.id]);
+
+  // Synthesize a minimal book from offline meta when the catalogue isn't available
+  // (hard refresh / reopen while offline). Prefer live catalogue when present.
+  const book = catalogBook || (offlineMeta?.bookId ? {
+    id: offlineMeta.bookId,
+    title: offlineMeta.title || 'Saved book',
+    author: offlineMeta.author || '',
+    cover: offlineMeta.cover || '',
+    slug: offlineMeta.slug || '',
+    _fromOfflineCache: true,
+  } : null);
+
+  // PDF / Drive won't load offline — keep readers in text (or listen) from cache
+  useEffect(() => {
+    if (isOffline && offlineSaved) {
+      setMode((m) => (m === 'listen' ? 'listen' : 'text'));
+    }
+  }, [isOffline, offlineSaved]);
 
 
 
@@ -286,7 +310,7 @@ export default function Reader() {
 
   useEffect(() => {
 
-    if (!book?.id) return;
+    if (!book?.id || book?._fromOfflineCache) return;
 
     const ref = doc(db, 'book_chapters', String(book.id));
 
@@ -326,7 +350,7 @@ export default function Reader() {
 
     return () => unsub();
 
-  }, [book?.id]); // eslint-disable-line
+  }, [book?.id, book?._fromOfflineCache]); // eslint-disable-line
 
 
 
@@ -545,9 +569,25 @@ export default function Reader() {
 
 
 
+  // resize listener — must stay above early returns (Rules of Hooks)
+  useEffect(() => {
+    const fn = () => setIsMobileNav(window.innerWidth < 769);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+
   /* -- Gates -- */
 
   if (!book) {
+    // Still resolving offline IndexedDB (refresh / reopen without catalogue)
+    if (user && !offlineReady) {
+      return (
+        <div className="reader-error">
+          <div style={{ fontSize:'2rem', marginBottom:16 }}>⏳</div>
+          <p style={{ color:'var(--muted)' }}>Opening saved book…</p>
+        </div>
+      );
+    }
     // Safety net: if id looks like a chapter ID (e.g. "9_ch_1"), redirect to the parent book
     const chapterIdMatch = id && typeof id === 'string' ? id.match(/^(.+)_ch_(\d+)$/) : null;
     if (chapterIdMatch) {
@@ -574,7 +614,12 @@ export default function Reader() {
       <div className="reader-error">
         <div className="reader-error__icon">📚</div>
         <h2>Book not found</h2>
-        <Link to="/library" className="btn btn-primary">Back to Library</Link>
+        <p style={{ color:'var(--muted)', maxWidth:360, textAlign:'center' }}>
+          {isOffline
+            ? 'This title isn’t saved on this device. Reconnect and tap Save offline while reading.'
+            : 'We couldn’t find this book. It may have been removed from the catalogue.'}
+        </p>
+        <Link to="/my-library" className="btn btn-primary">My Library</Link>
       </div>
     );
   }
@@ -646,8 +691,9 @@ export default function Reader() {
 
 
 
-  // Free sample chapters stay readable even if online reading is restricted
-  if (user && myPerms && myPerms.canReadOnline === false && !isFreePreviewCh0) return (
+  // Free sample chapters stay readable even if online reading is restricted.
+  // A copy already saved on this device remains readable (device-local cache).
+  if (user && myPerms && myPerms.canReadOnline === false && !isFreePreviewCh0 && !hasOfflineAccess) return (
 
     <div className="reader-error">
 
@@ -745,8 +791,8 @@ export default function Reader() {
 
   const hasPdf     = !!embedUrl;
 
-  // Chapters: when offline prefer cache; otherwise live Firestore → cache → fallback
-  const chapters = isOffline
+  // Chapters: prefer device cache when offline or when live hasn't arrived yet after refresh
+  const chapters = (isOffline || book?._fromOfflineCache)
     ? (offlineChapters || liveChapters || getFallbackChapters(book))
     : (liveChapters || offlineChapters || getFallbackChapters(book));
 
@@ -857,21 +903,10 @@ export default function Reader() {
 
 
 
-  const viewMode   = hasPdf ? mode : (mode === 'listen' ? 'listen' : 'text');
-
-
-
-  // resize listener for mobile nav detection (declared above with state)
-
-  useEffect(() => {
-
-    const fn = () => setIsMobileNav(window.innerWidth < 769);
-
-    window.addEventListener('resize', fn);
-
-    return () => window.removeEventListener('resize', fn);
-
-  }, []);
+  // Offline + saved: never force PDF/Drive (network). Listen still allowed.
+  const viewMode = (isOffline && offlineSaved)
+    ? (mode === 'listen' ? 'listen' : 'text')
+    : (hasPdf ? mode : (mode === 'listen' ? 'listen' : 'text'));
 
 
 
@@ -1235,7 +1270,7 @@ export default function Reader() {
 
                     onClick={handleRemoveOffline}
 
-                  >✓ On device</button>
+                  >Saved · Remove</button>
 
                 ) : (
 
@@ -1248,6 +1283,8 @@ export default function Reader() {
                     onClick={handleSaveOffline}
 
                     disabled={offlineSaving}
+
+                    aria-busy={offlineSaving}
 
                   >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
@@ -1349,7 +1386,7 @@ export default function Reader() {
 
                     onClick={handleRemoveOffline}
 
-                  >✓ On this device</button>
+                  >Saved · Remove</button>
 
                 ) : (
 
@@ -1362,6 +1399,8 @@ export default function Reader() {
                     onClick={handleSaveOffline}
 
                     disabled={offlineSaving}
+
+                    aria-busy={offlineSaving}
 
                   >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
