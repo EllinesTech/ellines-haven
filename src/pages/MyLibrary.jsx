@@ -10,6 +10,7 @@ import { getFallbackChapters } from '../data/bookChapters';
 import { usePageMeta } from '../hooks/usePageMeta';
 import ReferralDashboard from '../components/ReferralDashboard';
 import OrderReceiptModal from '../components/OrderReceiptModal';
+import ReadingPreferencesPanel from '../components/ReadingPreferencesPanel';
 import './MyLibrary.css';
 
 // Helper: get a map of bookId -> progress for current user
@@ -239,6 +240,7 @@ function AccountSettings({ user, myPerms }) {
   const [pwForm, setPwForm] = useState({ current:'', newPw:'', confirm:'' });
   const [pwMsg,  setPwMsg]  = useState('');
   const [saved,  setSaved]  = useState('');
+  const [showReadingPrefs, setShowReadingPrefs] = useState(false);
 
   const savePrefs = (next) => {
     setPrefs(next);
@@ -344,6 +346,32 @@ function AccountSettings({ user, myPerms }) {
             </span>
           ))}
         </div>
+      </div>
+
+      {/* Reading preferences (font, WPM, audio defaults) */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <button
+          type="button"
+          onClick={() => setShowReadingPrefs(v => !v)}
+          style={{
+            width: '100%', textAlign: 'left', padding: '14px 18px',
+            background: 'transparent', border: 'none', color: 'var(--text)',
+            cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            fontFamily: 'inherit', fontSize: '0.95rem', fontWeight: 600,
+          }}
+        >
+          <span>Reading Preferences</span>
+          <span style={{ color: 'var(--gold)' }}>{showReadingPrefs ? '▾' : '▸'}</span>
+        </button>
+        {showReadingPrefs && (
+          <div style={{ padding: '0 12px 16px' }}>
+            <ReadingPreferencesPanel
+              user={user}
+              onClose={() => setShowReadingPrefs(false)}
+              showToast={(msg) => { setSaved(String(msg).replace(/^[^a-zA-Z0-9]+/, '')); setTimeout(() => setSaved(''), 2500); }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Preference groups */}

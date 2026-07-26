@@ -658,8 +658,8 @@
 /* Body text — premium novel typography */
 .reader__text {
   color: #2c2218;
-  line-height: 1.92;
-  font-family: Georgia, 'Times New Roman', serif;
+  line-height: var(--reader-line-height, 1.92);
+  font-family: var(--reader-font, Georgia, 'Times New Roman', serif);
   font-size: 1rem;        /* base; overridden by inline style from font-size control */
   word-spacing: 0.02em;
 }
@@ -1273,6 +1273,51 @@
   color: #e8e0f0;
 }
 .audio-select--wide { max-width: 100%; width: 100%; }
+
+.audio-player__hint {
+  font-size: 0.7rem;
+  color: rgba(232,224,240,0.5);
+  padding: 0 8px;
+  text-align: center;
+  margin-top: 2px;
+}
+
+.audio-active-tag {
+  font-size: 0.75rem;
+  color: rgba(74,158,255,0.75);
+  flex-shrink: 0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.reader__font-select {
+  appearance: none;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: var(--text, #f0ece2);
+  border-radius: 8px;
+  padding: 4px 28px 4px 10px;
+  font-size: 0.72rem;
+  min-height: 32px;
+  max-width: 140px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, rgba(201,168,76,0.8) 50%),
+    linear-gradient(135deg, rgba(201,168,76,0.8) 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% - 2px), calc(100% - 9px) calc(50% - 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.reader__font-select:focus {
+  outline: none;
+  border-color: rgba(201,168,76,0.55);
+}
+
+.reader__font-select option {
+  background: #16122a;
+  color: #f0ece2;
+}
 
 /* Settings panel */
 .audio-settings {

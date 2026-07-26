@@ -13,6 +13,8 @@ import {
   saveUserReadingPreferences,
   calibrateUserWPM,
   recordReadingCalibration,
+  READING_FONTS,
+  getReadingFontStack,
 } from '../utils/readingTime';
 import './ReadingPreferencesPanel.css';
 
@@ -271,6 +273,29 @@ export default function ReadingPreferencesPanel({ user, onClose, showToast }) {
       {/* ── DISPLAY SETTINGS ── */}
       <div className="rpp-section">
         <h3>👁️ Display</h3>
+
+        <div className="rpp-field">
+          <label>Reading Font</label>
+          <div className="rpp-font-grid">
+            {READING_FONTS.map(font => (
+              <button
+                key={font.id}
+                type="button"
+                className={'rpp-font-btn' + ((prefs.fontFamily || 'georgia') === font.id ? ' on' : '')}
+                style={{ fontFamily: font.stack }}
+                onClick={() => updatePref('fontFamily', font.id)}
+              >
+                {font.label}
+              </button>
+            ))}
+          </div>
+          <p
+            className="rpp-font-preview"
+            style={{ fontFamily: getReadingFontStack(prefs.fontFamily || 'georgia') }}
+          >
+            The quick brown fox jumps over the lazy dog — Aa Bb Cc 123
+          </p>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div className="rpp-field">

@@ -43,25 +43,19 @@ export function getNormalizedAudioSettings() {
   const isMobile = isiOS || isAndroid || /Mobile/.test(ua);
 
   return {
-    // Speech synthesis parameters
-    pitch: 1.0,        // Range: 0.5–2.0 (same across all devices)
-    rate: 1.0,         // Range: 0.1–10.0 (but limited to 0.5–2.0 for UX)
-    volume: 1.0,       // Range: 0–1.0
-    
-    // Device-specific tuning
-    keepAliveInterval: isiOS ? 8000 : 10000,  // iOS needs more frequent pause/resume
-    utteranceTimeout: 30000,                   // 30s max per utterance
-    voiceLoadTimeout: isiOS ? 3000 : 1000,    // iOS voice loading is slower
-    
-    // Performance tweaks
-    batchSize: isMobile ? 300 : 500,           // Characters per utterance batch
-    preloadNextChapter: !isMobile,             // Desktop only: preload next chapter
-    cacheAudioContext: isMobile,               // Mobile: cache audio context
-    
-    // Compatibility flags
-    useFallbackPause: isiOS,                   // iOS: fallback method for pause
-    requiresManualResume: isAndroid,           // Android: sometimes needs manual resume
-    supportsOnEnded: !isiOS,                   // iOS: onended event unreliable
+    pitch: 1.0,
+    rate: 1.0,
+    volume: 1.0,
+    // Chrome keep-alive only — never use pause/resume keep-alive on iOS
+    keepAliveInterval: isiOS ? null : 10000,
+    utteranceTimeout: 30000,
+    voiceLoadTimeout: isiOS ? 3000 : 1000,
+    batchSize: isMobile ? 300 : 500,
+    preloadNextChapter: !isMobile,
+    cacheAudioContext: isMobile,
+    useFallbackPause: isiOS, // iOS: cancel + resume from char
+    requiresManualResume: isAndroid,
+    supportsOnEnded: !isiOS,
   };
 }
 
@@ -112,21 +106,10 @@ export function applyDeviceSpecificFixes(audioContext) {
  * @returns {Array} Filtered voices optimized for device
  */
 export function getDeviceOptimizedVoices(allVoices) {
-  const ua = navigator.userAgent;
-  const isiOS = /iPad|iPhone|iPod/.test(ua);
-  const isAndroid = /Android/.test(ua);
-  
   if (!allVoices || allVoices.length === 0) return [];
-  
-  // Filter: prefer local/installed voices on mobile, remote on desktop
-  return allVoices.filter(voice => {
-    if (isiOS || isAndroid) {
-      // Mobile: prefer local voices (faster, no network)
-      return !voice.name.includes('Google') && !voice.name.includes('AWS');
-    }
-    // Desktop: all voices OK
-    return true;
-  });
+  // Keep ALL voices available — do not exclude Google/cloud voices.
+  // Sorting / preference belongs in the player UI (neural-first), not filtering.
+  return [...allVoices];
 }
 
 /**

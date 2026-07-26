@@ -98,6 +98,40 @@
   accent-color: var(--gold);
 }
 
+.rpp-font-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.rpp-font-btn {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rpp-font-btn.on {
+  border-color: var(--gold);
+  background: rgba(201, 168, 76, 0.12);
+  color: var(--gold);
+}
+
+.rpp-font-preview {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+
 /* Calibration form */
 .rpp-calibration-form {
   background: rgba(201, 168, 76, 0.05);

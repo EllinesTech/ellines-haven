@@ -211,6 +211,45 @@ export function getUserReadingPreferences(userEmail) {
  *
  * @returns {Object} Default preferences
  */
+/** Reading font options — stacks work across desktop & mobile */
+export const READING_FONTS = [
+  { id: 'georgia', label: 'Georgia', stack: "Georgia, 'Times New Roman', serif" },
+  { id: 'playfair', label: 'Playfair Display', stack: "'Playfair Display', Georgia, serif" },
+  { id: 'literata', label: 'Literata', stack: "'Literata', Georgia, serif" },
+  { id: 'source-serif', label: 'Source Serif', stack: "'Source Serif 4', Georgia, serif" },
+  { id: 'lora', label: 'Lora', stack: "'Lora', Georgia, serif" },
+  { id: 'inter', label: 'Inter', stack: "'Inter', system-ui, sans-serif" },
+  { id: 'system', label: 'System UI', stack: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+];
+
+export const READER_DISPLAY_KEY = 'eh_reader_display';
+
+export function getReadingFontStack(fontFamilyId) {
+  const found = READING_FONTS.find(f => f.id === fontFamilyId);
+  return found?.stack || READING_FONTS[0].stack;
+}
+
+/** Device-level reader display prefs (works without login) */
+export function getReaderDisplayPreferences() {
+  try {
+    const stored = localStorage.getItem(READER_DISPLAY_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveReaderDisplayPreferences(partial) {
+  try {
+    const next = { ...getReaderDisplayPreferences(), ...partial };
+    localStorage.setItem(READER_DISPLAY_KEY, JSON.stringify(next));
+    return next;
+  } catch (e) {
+    console.warn('[Reader Display] Save failed:', e);
+    return null;
+  }
+}
+
 export function getDefaultReadingPreferences() {
   return {
     wpm: 250,                    // Words per minute (baseline)
@@ -218,6 +257,7 @@ export function getDefaultReadingPreferences() {
     audioPitch: 1.0,             // Voice pitch
     selectedVoice: '',           // Preferred voice
     audioSpeedPreset: 'normal',  // 'slow' (0.75x), 'normal' (1.0x), 'fast' (1.25x), 'faster' (1.5x)
+    fontFamily: 'georgia',       // Reading font family id (see READING_FONTS)
     fontSize: '1rem',            // Reading font size
     lineHeight: 1.6,             // Line height for readability
     theme: 'auto',               // 'light', 'dark', 'auto'
@@ -240,6 +280,12 @@ export function saveUserReadingPreferences(userEmail, prefs) {
     const defaults = getDefaultReadingPreferences();
     const merged = { ...defaults, ...prefs };
     localStorage.setItem(key, JSON.stringify(merged));
+    // Mirror display fields so Reader applies them on any device session
+    saveReaderDisplayPreferences({
+      fontFamily: merged.fontFamily,
+      fontSize: merged.fontSize,
+      lineHeight: merged.lineHeight,
+    });
     return merged;
   } catch (e) {
     console.warn('[Reading Prefs] Save failed:', e);

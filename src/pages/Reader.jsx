@@ -28,920 +28,18 @@ import {
 
 import { getFallbackChapters } from '../data/bookChapters';
 
+import AudioPlayer from '../components/AudioPlayer';
+
+import {
+  READING_FONTS,
+  getReadingFontStack,
+  getReaderDisplayPreferences,
+  saveReaderDisplayPreferences,
+  getUserReadingPreferences,
+  updateUserReadingPreference,
+} from '../utils/readingTime';
+
 import './Reader.css';
-
-
-
-/* ---------------------------------------------
-
-   Audio Book Player — Web Speech API
-
-   Reads chapter text aloud with voice settings
-
---------------------------------------------- */
-
-
-
-// SVG icons — render correctly on every device/browser (no emoji font needed)
-
-const IcoHeadphones = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M12 3C7.03 3 3 7.03 3 12v4a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H5.07A7 7 0 0 1 12 5a7 7 0 0 1 6.93 6H18a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-4c0-4.97-4.03-9-9-9z"/>
-
-  </svg>
-
-);
-
-const IcoRewind = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
-
-  </svg>
-
-);
-
-const IcoPlay = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M8 5v14l11-7z"/>
-
-  </svg>
-
-);
-
-const IcoPause = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-
-  </svg>
-
-);
-
-const IcoStop = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M6 6h12v12H6z"/>
-
-  </svg>
-
-);
-
-const IcoSkip = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M6 18l8.5-6L6 6v12zm2-8.14 5.08 2.14L8 14.14V9.86zM16 6h2v12h-2z"/>
-
-  </svg>
-
-);
-
-const IcoGear = () => (
-
-  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
-
-    <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.02 7.02 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.47.47 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-
-  </svg>
-
-);
-
-
-
-function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
-  const synth = window.speechSynthesis;
-
-  const [playing,     setPlaying]     = useState(false);
-  const [voices,      setVoices]      = useState([]);
-  const [voicesReady, setVoicesReady] = useState(false);
-  const [voiceIdx,    setVoiceIdx]    = useState(0);
-  const [rate,        setRate]        = useState(1.0);
-  const [pitch,       setPitch]       = useState(1.0);
-  const [showCfg,     setShowCfg]     = useState(false);
-  const [progress,    setProgress]    = useState(0);
-  const [elapsed,     setElapsed]     = useState(0);
-  const [total,       setTotal]       = useState(0);
-  const [filter,      setFilter]      = useState('all');
-  const [voiceDdOpen, setVoiceDdOpen] = useState(false);
-
-  const uttRef          = useRef(null);
-  const charRef         = useRef(0);    // char offset into full text
-  const timerRef        = useRef(null);
-  const keepAliveRef    = useRef(null); // Chrome keep-alive interval
-  const startedAt       = useRef(0);
-  const pausedAt        = useRef(0);
-  const selectedNameRef = useRef('');   // persist chosen voice name across filter changes
-
-  const chapterText = chapters[currentChapter]?.text || '';
-
-  // -- Neural / quality badge helpers ----------------------------------------
-  function isNeuralVoice(v) {
-    // Microsoft neural (Windows / Edge / Chrome on desktop + Android WebView)
-    if (/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi|clara|liam|natasha|olivia|james|luna)/i.test(v.name)) return true;
-    // Google voices (Android Chrome / Chrome OS) are high-quality neural
-    if (/^google /i.test(v.name)) return true;
-    // iOS / macOS Siri-quality enhanced voices
-    if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|frederica|joana|mariana|luciana|isabel|paola|soledad|monica|jorge|juan|pablo|diego|enrique|carlos|ximena|angelica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
-    // Samsung built-in neural
-    if (/samsung/i.test(v.name) && /female|male|neural|enhanced/i.test(v.name)) return true;
-    // Android voiceURI hints
-    if (v.voiceURI && /x-nob|x-sfg|x-iob|x-tpf|x-iom/i.test(v.voiceURI)) return true;
-    return false;
-  }
-
-  function isGoogleNeural(v) {
-    return /^google /i.test(v.name);
-  }
-
-  // -- Best-voice auto-selector ----------------------------------------------
-  function pickBestIdx(voiceList) {
-    // Priority: Microsoft Neural > Google > iOS enhanced > local en-US > en-GB > any English > first
-    const PRIORITY = [
-      'Microsoft Jenny', 'Microsoft Aria',  'Microsoft Emma',   'Microsoft Sonia',
-      'Microsoft Libby', 'Microsoft Mia',   'Microsoft Ana',    'Microsoft Neerja',
-      'Microsoft Guy',   'Microsoft Davis', 'Microsoft Brian',  'Microsoft Andrew',
-      'Microsoft Ryan',
-      'Google UK English Female', 'Google US English', 'Google UK English Male',
-      'Ava', 'Allison', 'Samantha', 'Karen', 'Moira', 'Tessa', 'Fiona', 'Victoria',
-      'Samsung English Female', 'Samsung English Male',
-    ];
-    for (const name of PRIORITY) {
-      const idx = voiceList.findIndex(x => x.name.startsWith(name));
-      if (idx >= 0) return idx;
-    }
-    let idx = voiceList.findIndex(x => x.lang === 'en-US' && x.localService);
-    if (idx >= 0) return idx;
-    idx = voiceList.findIndex(x => x.lang === 'en-GB');
-    if (idx >= 0) return idx;
-    idx = voiceList.findIndex(x => x.lang?.startsWith('en'));
-    if (idx >= 0) return idx;
-    return 0;
-  }
-
-  // -- Voice loading ---------------------------------------------------------
-  // Chrome returns empty array on first call; onvoiceschanged fires once then stops.
-  // We poll with exponential back-off (50ms → 1s) for up to ~8 attempts to
-  // guarantee voices are available across Chrome, Firefox, Safari, Edge, and Android.
-  useEffect(() => {
-    let cancelled = false;
-    let pollHandle = null;
-    let attempt = 0;
-
-    const applyVoices = (v) => {
-      if (cancelled || !v.length) return;
-      setVoices(v);
-      setVoicesReady(true);
-      // Try to keep the previously chosen voice by name when voices reload
-      if (selectedNameRef.current) {
-        const idx = v.findIndex(x => x.name === selectedNameRef.current);
-        if (idx >= 0) { setVoiceIdx(idx); return; }
-      }
-      const best = pickBestIdx(v);
-      setVoiceIdx(best);
-      selectedNameRef.current = v[best]?.name || '';
-    };
-
-    const tryLoad = () => {
-      const v = synth.getVoices();
-      if (v.length) { applyVoices(v); return; }
-      attempt++;
-      if (attempt <= 8) {
-        // 50 → 100 → 200 → 400 → 800 → 1000 → 1000 → 1000 ms
-        pollHandle = setTimeout(tryLoad, Math.min(50 * Math.pow(2, attempt - 1), 1000));
-      }
-    };
-
-    // onvoiceschanged is the canonical signal — polling is a safety net
-    synth.onvoiceschanged = () => {
-      const v = synth.getVoices();
-      if (v.length) { clearTimeout(pollHandle); applyVoices(v); }
-    };
-
-    tryLoad();
-
-    return () => {
-      cancelled = true;
-      clearTimeout(pollHandle);
-      synth.onvoiceschanged = null;
-    };
-  }, []); // eslint-disable-line
-
-  // -- Chrome keep-alive -----------------------------------------------------
-  // Chromium-based browsers silently cancel speech after ~15 s.
-  // Pause+resume every 10 s while speaking prevents the cutoff.
-  // NOTE: Skip this on iOS/Safari — pause+resume breaks speech there.
-  const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/i.test(navigator.userAgent);
-  useEffect(() => {
-    if (playing && !isIOS) {
-      keepAliveRef.current = setInterval(() => {
-        if (synth.speaking && !synth.paused) {
-          synth.pause();
-          synth.resume();
-        }
-      }, 10000);
-    } else {
-      clearInterval(keepAliveRef.current);
-    }
-    return () => clearInterval(keepAliveRef.current);
-  }, [playing]); // eslint-disable-line
-
-  // -- Close voice dropdown on outside click ---------------------------------
-  useEffect(() => {
-    if (!voiceDdOpen) return;
-    
-    const handleClickOutside = (e) => {
-      // Close dropdown if click is outside of it
-      const ddElement = document.querySelector('.audio-custom-dd');
-      if (ddElement && !ddElement.contains(e.target)) {
-        setVoiceDdOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [voiceDdOpen]); // eslint-disable-line
-
-  // -- Reset on chapter change -----------------------------------------------
-  useEffect(() => {
-    stopSpeech();
-    charRef.current = 0;
-    setProgress(0);
-    setElapsed(0);
-    // Count exact words in the chapter (title + subtitle + body)
-    const ch = chapters[currentChapter] || {};
-    const fullText = [(ch.title || ''), (ch.subtitle || ''), (chapterText || '')].join(' ');
-    const words = fullText.split(/\s+/).filter(Boolean).length;
-    // Use the current playback rate for the estimate
-    const wpm = Math.round(180 * (rate || 1.0));
-    setTotal(Math.round((words / wpm) * 60));
-  }, [currentChapter, chapterText]); // eslint-disable-line
-
-  // Cleanup on unmount
-  useEffect(() => () => { stopSpeech(); clearInterval(keepAliveRef.current); }, []); // eslint-disable-line
-
-  function stopSpeech() {
-    synth.cancel();
-    clearInterval(timerRef.current);
-    clearInterval(keepAliveRef.current);
-    setPlaying(false);
-    pausedAt.current = 0;
-  }
-
-  function getSelectedVoice() {
-    const filtered = filteredVoices();
-    // Prefer the previously selected voice by name (survives filter changes)
-    if (selectedNameRef.current) {
-      const byName = filtered.find(v => v.name === selectedNameRef.current);
-      if (byName) return byName;
-    }
-    return filtered[voiceIdx] || voices[0] || null;
-  }
-
-  function filteredVoices() {
-    if (!voices.length) return [];
-    if (filter === 'all') return voices;
-    return voices.filter(v => {
-      const n   = v.name.toLowerCase();
-      const uri = (v.voiceURI || '').toLowerCase();
-
-      if (filter === 'female') {
-        if (n.includes('female') || n.includes('woman') || n.includes('femme')) return true;
-        if (/\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia|almudena|marta|zosia|ewa|ioana|laila|fatima|tamar|leila|hessa|linh|naayf|yan|meijia|tingting|sinji|milena|yelena|irina|katya|anna|vicki|alice|amelie|julie|aurelie|petra|katrin|hanna|lotte|claire|ellen|nora|carmit|sara|yuna|kyoko|otoya)\b/.test(n)) return true;
-        if (/^(ava|allison|victoria|fiona|karen|moira|tessa|samantha|nicky|frederica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
-        if (/google uk english female/i.test(v.name)) return true;
-        if (/samsung.*female/i.test(v.name)) return true;
-        if (/female/i.test(uri)) return true;
-        return false;
-      }
-
-      if (filter === 'male') {
-        if ((n.includes('male') && !n.includes('female')) || n.includes('man') || n.includes('homme')) return true;
-        if (/\b(guy|davis|brian|andrew|ryan|mark|david|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|enrique|carlos|juan|william|liam|thomas|oliver|harry|arthur)\b/.test(n)) return true;
-        if (/^(daniel|oliver|arthur|thomas|fred|junior|alex)/i.test(v.name) && v.lang?.startsWith('en')) return true;
-        if (/google uk english male/i.test(v.name)) return true;
-        if (/samsung.*male/i.test(v.name)) return true;
-        if (/male/i.test(uri) && !/female/i.test(uri)) return true;
-        return false;
-      }
-
-      return true;
-    });
-  }
-  function speak(fromChar = 0) {
-
-    synth.cancel();
-
-    clearInterval(timerRef.current);
-
-
-
-    const text = chapterText.slice(fromChar);
-
-    if (!text.trim()) return;
-
-
-
-    const utt = new SpeechSynthesisUtterance(text);
-
-    // CRITICAL FIX: Always get fresh voices from browser, don't rely on stale state
-    let selectedVoice = null;
-    const currentVoices = synth.getVoices();
-    
-    if (currentVoices.length > 0) {
-      // Voices available - use the best one
-      selectedVoice = currentVoices[voiceIdx] || currentVoices[0];
-    } else {
-      // No voices yet - this is unusual but keep trying
-      const retryVoices = synth.getVoices();
-      if (retryVoices.length > 0) {
-        selectedVoice = retryVoices[0];
-      }
-    }
-    
-    // Set voice - if null, browser will use default system voice
-    utt.voice = selectedVoice;
-
-    utt.rate   = rate;
-
-    utt.pitch  = pitch;
-
-    utt.lang   = utt.voice?.lang || 'en-US';
-    utt.volume = 1.0;  // Ensure volume is maximum
-
-
-
-    // onboundary fires word-position events — not supported on iOS Safari.
-    // On iOS progress bar stays at 0 but audio still plays (graceful degradation).
-    utt.onboundary = e => {
-
-      if (e.name === 'word') {
-
-        charRef.current = fromChar + e.charIndex;
-
-        const pct = Math.min(100, Math.round(((fromChar + e.charIndex) / chapterText.length) * 100));
-
-        setProgress(pct);
-
-      }
-
-    };
-
-
-
-    utt.onend = () => {
-
-      clearInterval(timerRef.current);
-
-      setPlaying(false);
-
-      setProgress(100);
-
-      charRef.current = 0;
-
-      // Auto-advance to next chapter
-
-      if (currentChapter < chapters.length - 1) {
-
-        onChapterChange(currentChapter + 1);
-
-      }
-
-    };
-
-
-
-    utt.onerror = (e) => {
-      // 'interrupted' errors are normal when synth.cancel() is called — ignore them
-      if (e.error === 'interrupted' || e.error === 'canceled') return;
-      clearInterval(timerRef.current);
-      setPlaying(false);
-    };
-
-
-
-    uttRef.current = utt;
-
-    synth.speak(utt);
-
-    setPlaying(true);
-
-    startedAt.current = Date.now() - pausedAt.current * 1000;
-
-
-
-    // Update elapsed timer
-
-    timerRef.current = setInterval(() => {
-
-      setElapsed(Math.round((Date.now() - startedAt.current) / 1000));
-
-    }, 1000);
-
-  }
-
-
-
-  const handlePlay = () => {
-
-    // Load voices on user gesture (required on mobile)
-    const currentVoices = synth.getVoices();
-    if (currentVoices.length > 0 && !voicesReady) {
-      setVoices(currentVoices);
-      setVoicesReady(true);
-      const best = pickBestIdx(currentVoices);
-      setVoiceIdx(best);
-      selectedNameRef.current = currentVoices[best]?.name || '';
-    }
-
-    if (playing) {
-
-      synth.pause();
-
-      clearInterval(timerRef.current);
-
-      pausedAt.current = elapsed;
-
-      setPlaying(false);
-
-    } else {
-
-      if (synth.paused) {
-
-        synth.resume();
-
-        startedAt.current = Date.now() - pausedAt.current * 1000;
-
-        timerRef.current = setInterval(() => setElapsed(Math.round((Date.now() - startedAt.current) / 1000)), 1000);
-
-        setPlaying(true);
-
-      } else {
-
-        speak(charRef.current);
-
-      }
-
-    }
-
-  };
-
-
-
-  const handleStop = () => {
-
-    stopSpeech();
-
-    charRef.current = 0;
-
-    setProgress(0);
-
-    setElapsed(0);
-
-    pausedAt.current = 0;
-
-  };
-
-
-
-  const handleRewind = () => {
-
-    // Rewind ~15 seconds worth of text (approx 45 words at rate 1.0)
-
-    const words = Math.round(15 * (180 * rate) / 60);
-
-    const textBefore = chapterText.slice(0, charRef.current);
-
-    const wordArr = textBefore.split(/\s+/);
-
-    const newWords = wordArr.slice(0, Math.max(0, wordArr.length - words));
-
-    const newChar = newWords.join(' ').length;
-
-    charRef.current = newChar;
-
-    pausedAt.current = 0;
-
-    if (playing) speak(newChar);
-
-    else setProgress(Math.round((newChar / chapterText.length) * 100));
-
-  };
-
-
-
-  const handleSkip = () => {
-
-    if (currentChapter < chapters.length - 1) {
-
-      onChapterChange(currentChapter + 1);
-
-    }
-
-  };
-
-
-
-  const fmtTime = s => {
-
-    if (!s || isNaN(s)) return '0:00';
-
-    const m = Math.floor(s / 60), sec = s % 60;
-
-    return `${m}:${sec.toString().padStart(2,'0')}`;
-
-  };
-
-
-
-  const available = typeof window !== 'undefined' && 'speechSynthesis' in window;
-
-  if (!available) return (
-
-    <div className="audio-player audio-player--unsupported">
-
-      🔇 Text-to-speech is not supported in this browser. Try Chrome or Edge.
-
-    </div>
-
-  );
-
-
-
-  const dispVoices = filteredVoices();
-
-  const safeIdx    = Math.min(voiceIdx, Math.max(0, dispVoices.length - 1));
-
-
-
-  return (
-
-    <div className="audio-player">
-
-      {/* Top row: chapter info (left) + gear button (right) */}
-
-      <div className="audio-player__header">
-
-        <div className="audio-player__info">
-
-          <span className="audio-player__icon"><IcoHeadphones /></span>
-
-          <div>
-
-            <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
-
-            <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
-
-          </div>
-
-        </div>
-
-        <button className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')} onClick={() => setShowCfg(s => !s)} title={`Voice settings${voices.length ? ` (${voices.length} voices)` : ''}`}><IcoGear /></button>
-
-      </div>
-
-
-
-      {/* Centre: controls + progress */}
-
-      <div className="audio-player__centre">
-
-        <div className="audio-player__controls">
-
-          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind}><IcoRewind /></button>
-
-          <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay}>
-
-            {playing ? <IcoPause /> : <IcoPlay />}
-
-          </button>
-
-          <button className="audio-btn" title="Stop" onClick={handleStop}><IcoStop /></button>
-
-          <button className="audio-btn" title="Next chapter" onClick={handleSkip} disabled={currentChapter >= chapters.length - 1}><IcoSkip /></button>
-
-        </div>
-
-        <div className="audio-player__progress-row">
-
-          <span className="audio-player__time">{fmtTime(elapsed)}</span>
-
-          <div className="audio-player__track" onClick={e => {
-
-            const rect = e.currentTarget.getBoundingClientRect();
-
-            const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-
-            const newChar = Math.round(pct * chapterText.length);
-
-            charRef.current = newChar;
-
-            setProgress(Math.round(pct * 100));
-
-            pausedAt.current = 0;
-
-            if (playing) speak(newChar);
-
-          }} onTouchEnd={e => {
-
-            e.preventDefault();
-
-            const rect = e.currentTarget.getBoundingClientRect();
-
-            const touch = e.changedTouches[0];
-
-            const pct = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-
-            const newChar = Math.round(pct * chapterText.length);
-
-            charRef.current = newChar;
-
-            setProgress(Math.round(pct * 100));
-
-            pausedAt.current = 0;
-
-            if (playing) speak(newChar);
-
-          }}>
-
-            <div className="audio-player__fill" style={{ width: `${progress}%` }} />
-
-            <div className="audio-player__thumb" style={{ left: `${progress}%` }} />
-
-          </div>
-
-          <span className="audio-player__time">{fmtTime(total)}</span>
-
-        </div>
-
-      </div>
-
-
-
-      {/* Speed pills row — always visible */}
-
-      <div className="audio-player__right">
-
-        <div className="audio-speed-pills">
-
-          {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
-
-            <button
-
-              key={r}
-
-              className={'audio-speed-pill' + (rate === r ? ' on' : '')}
-
-              onClick={() => { setRate(r); if (playing) { speak(charRef.current); } }}
-
-              title={`${r}× speed`}
-
-            >
-
-              {r === 1.0 ? '1×' : `${r}×`}
-
-            </button>
-
-          ))}
-
-        </div>
-
-      </div>
-
-      {/* Mobile voice loading hint */}
-
-      {!voicesReady && voices.length === 0 && (
-
-        <div style={{ fontSize: '0.7rem', color: 'rgba(232,224,240,0.5)', padding: '0 8px', textAlign: 'center', marginTop: '2px' }}>
-
-          Loading voices… Tap play to start listening.
-
-        </div>
-
-      )}
-
-
-
-      {/* Settings panel */}
-
-      {showCfg && (
-
-        <div className="audio-settings">
-
-          <div className="audio-settings__row">
-
-            <label>Voice filter</label>
-
-            <div className="audio-filter-group">
-
-              {['all','female','male'].map(f => (
-
-                <button key={f} className={'audio-filter-btn' + (filter === f ? ' on' : '')}
-
-                  onClick={() => {
-                    setFilter(f);
-                    // Try to keep the previously selected voice if available in new filter
-                    if (!selectedNameRef.current) setVoiceIdx(0);
-                  }}>
-
-                  {f === 'female' ? '♀ Female' : f === 'male' ? '♂ Male' : '👥 All'}
-
-                </button>
-
-              ))}
-
-            </div>
-
-          </div>
-
-          <div className="audio-settings__row">
-
-            <label>Voice</label>
-
-            <div className="audio-custom-dd" style={{ flex: 1 }}>
-
-              <button
-
-                className="audio-custom-dd__trigger"
-
-                onClick={() => setVoiceDdOpen(o => !o)}
-
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setVoiceDdOpen(o => !o);
-                  } else if (e.key === 'Escape') {
-                    setVoiceDdOpen(false);
-                  } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !voiceDdOpen) {
-                    e.preventDefault();
-                    setVoiceDdOpen(true);
-                  }
-                }}
-
-                type="button"
-
-                aria-expanded={voiceDdOpen}
-
-                aria-label="Select voice"
-
-              >
-
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-
-                  <span style={{ flex: 1 }}>
-
-                    {dispVoices[safeIdx]?.name || 'Select voice'}
-
-                    {dispVoices[safeIdx] && isGoogleNeural(dispVoices[safeIdx]) && (
-
-                      <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
-
-                    )}
-
-                    {dispVoices[safeIdx] && !isGoogleNeural(dispVoices[safeIdx]) && isNeuralVoice(dispVoices[safeIdx]) && (
-
-                      <span className="audio-neural-badge">✨ Neural</span>
-
-                    )}
-
-                    {' '}<small style={{ opacity: 0.5, fontSize:'0.65rem' }}>{dispVoices[safeIdx]?.lang}</small>
-
-                  </span>
-
-                  <span style={{ fontSize: '0.85rem', color: 'rgba(74,158,255,0.6)', flexShrink: 0, fontWeight: 700 }}>✓ Active</span>
-
-                </span>
-
-                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
-
-              </button>
-
-              {voiceDdOpen && (
-
-                <div className="audio-custom-dd__list">
-
-                  {dispVoices.length === 0 && (
-
-                    <div className="audio-custom-dd__empty">No voices found for this filter</div>
-
-                  )}
-
-                  {dispVoices.map((v, i) => (
-
-                    <button
-
-                      key={i}
-
-                      type="button"
-
-                      className={'audio-custom-dd__item' + (selectedNameRef.current === v.name ? ' on' : '')}
-
-                      onClick={(e) => {
-                        e.preventDefault();
-                        selectedNameRef.current = v.name || '';
-                        // Find the voice in the full voices array to set correct voiceIdx
-                        const fullIdx = voices.findIndex(voice => voice.name === v.name);
-                        if (fullIdx >= 0) setVoiceIdx(fullIdx);
-                        setVoiceDdOpen(false);
-                        if (playing) speak(charRef.current);
-                      }}
-
-                    >
-
-                      <span className="audio-custom-dd__name">
-
-                        {v.name}
-
-                        {isGoogleNeural(v) && (
-
-                          <span className="audio-neural-badge audio-neural-badge--google">🔵 Neural</span>
-
-                        )}
-
-                        {!isGoogleNeural(v) && isNeuralVoice(v) && (
-
-                          <span className="audio-neural-badge">✨ Neural</span>
-
-                        )}
-
-                      </span>
-
-                      <span className="audio-custom-dd__lang">{v.lang}</span>
-
-                    </button>
-
-                  ))}
-
-                </div>
-
-              )}
-
-            </div>
-
-          </div>
-
-          <div className="audio-settings__row">
-
-            <label>Speed × {rate}×</label>
-
-            <div className="audio-speed-pills">
-
-              {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
-
-                <button
-
-                  key={r}
-
-                  className={'audio-speed-pill' + (rate === r ? ' on' : '')}
-
-                  onClick={() => { setRate(r); if (playing) speak(charRef.current); }}
-
-                >
-
-                  {r}×
-
-                </button>
-
-              ))}
-
-            </div>
-
-          </div>
-
-          <div className="audio-settings__row">
-
-            <label>Pitch × {pitch.toFixed(1)}</label>
-
-            <input type="range" min="0.5" max="2" step="0.1" value={pitch}
-
-              className="audio-slider"
-
-              onChange={e => { setPitch(parseFloat(e.target.value)); if (playing) speak(charRef.current); }} />
-
-          </div>
-
-          <p className="audio-settings__note">
-
-            Available voices depend on your device and browser. Chrome / Edge on Windows or Android give the most choices. On iPhone/iPad use Safari for the best iOS voices. Voices marked ✨ or 🔵 are high-quality neural voices.
-
-          </p>
-
-        </div>
-
-      )}
-
-    </div>
-
-  );
-
-}
 
 
 
@@ -1031,7 +129,21 @@ export default function Reader() {
 
   const [chapter,   setChapter]   = useState(initialChapter);
 
-  const [fontSize,  setFontSize]  = useState(17);
+  const [fontSize,  setFontSize]  = useState(() => {
+    const d = getReaderDisplayPreferences();
+    if (typeof d.fontSizePx === 'number') return d.fontSizePx;
+    return 17;
+  });
+
+  const [fontFamilyId, setFontFamilyId] = useState(() => {
+    const d = getReaderDisplayPreferences();
+    return d.fontFamily || 'georgia';
+  });
+
+  const [lineHeightPref, setLineHeightPref] = useState(() => {
+    const d = getReaderDisplayPreferences();
+    return typeof d.lineHeight === 'number' ? d.lineHeight : 1.92;
+  });
 
   const [zoom,      setZoom]      = useState(100);
 
@@ -1093,7 +205,40 @@ export default function Reader() {
 
 
 
-  // On mount, check if this book is already saved offline and load cached chapters
+  
+  // Load reading display preferences (device + logged-in user)
+  useEffect(() => {
+    const device = getReaderDisplayPreferences();
+    const userPrefs = user?.email ? getUserReadingPreferences(user.email) : null;
+    const fontFamily = userPrefs?.fontFamily || device.fontFamily || 'georgia';
+    const lineHeight = userPrefs?.lineHeight || device.lineHeight || 1.92;
+    setFontFamilyId(fontFamily);
+    setLineHeightPref(typeof lineHeight === 'number' ? lineHeight : 1.92);
+    if (typeof device.fontSizePx === 'number') setFontSize(device.fontSizePx);
+    else if (userPrefs?.fontSize) {
+      const n = parseFloat(userPrefs.fontSize);
+      if (!isNaN(n) && String(userPrefs.fontSize).includes('rem')) {
+        setFontSize(Math.round(n * 17));
+      }
+    }
+  }, [user?.email]);
+
+  const persistDisplay = (partial) => {
+    saveReaderDisplayPreferences(partial);
+  };
+
+  const changeFontSize = (next) => {
+    setFontSize(next);
+    persistDisplay({ fontSizePx: next });
+  };
+
+  const changeFontFamily = (id) => {
+    setFontFamilyId(id);
+    persistDisplay({ fontFamily: id });
+    if (user?.email) updateUserReadingPreference(user.email, 'fontFamily', id);
+  };
+
+// On mount, check if this book is already saved offline and load cached chapters
 
   useEffect(() => {
 
@@ -2080,11 +1225,23 @@ export default function Reader() {
 
                 <div className="reader__zoom-group">
 
-                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))}>A-</button>
+                  <button className="reader__font-btn" onClick={() => changeFontSize(Math.max(13, fontSize - 1))}>A-</button>
 
                   <span className="reader__zoom-label">{fontSize}px</span>
 
-                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))}>A+</button>
+                  <button className="reader__font-btn" onClick={() => changeFontSize(Math.min(26, fontSize + 1))}>A+</button>
+                  <select
+                    className="reader__font-select"
+                    value={fontFamilyId}
+                    onChange={(e) => changeFontFamily(e.target.value)}
+                    title="Reading font"
+                    aria-label="Reading font"
+                  >
+                    {READING_FONTS.map(f => (
+                      <option key={f.id} value={f.id}>{f.label}</option>
+                    ))}
+                  </select>
+
 
                 </div>
 
@@ -2184,11 +1341,23 @@ export default function Reader() {
 
                 <div className="reader__zoom-group">
 
-                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.max(13, s - 1))} title="Smaller text">A-</button>
+                  <button className="reader__font-btn" onClick={() => changeFontSize(Math.max(13, fontSize - 1))} title="Smaller text">A-</button>
 
                   <span className="reader__zoom-label">{fontSize}px</span>
 
-                  <button className="reader__font-btn" onClick={() => setFontSize(s => Math.min(26, s + 1))} title="Larger text">A+</button>
+                  <button className="reader__font-btn" onClick={() => changeFontSize(Math.min(26, fontSize + 1))} title="Larger text">A+</button>
+                  <select
+                    className="reader__font-select"
+                    value={fontFamilyId}
+                    onChange={(e) => changeFontFamily(e.target.value)}
+                    title="Reading font"
+                    aria-label="Reading font"
+                  >
+                    {READING_FONTS.map(f => (
+                      <option key={f.id} value={f.id}>{f.label}</option>
+                    ))}
+                  </select>
+
 
                 </div>
 
@@ -2384,7 +1553,7 @@ export default function Reader() {
 
 
 
-            <div className="reader__text" style={{ fontSize: fontSize + 'px' }}>
+            <div className="reader__text" style={{ fontSize: fontSize + 'px', fontFamily: getReadingFontStack(fontFamilyId), lineHeight: lineHeightPref }}>
 
               {(() => {
 
@@ -2604,7 +1773,7 @@ export default function Reader() {
 
             {/* Follow-along text */}
 
-            <div className="reader__text reader__text--listen" style={{ fontSize: fontSize + 'px' }}>
+            <div className="reader__text reader__text--listen" style={{ fontSize: fontSize + 'px', fontFamily: getReadingFontStack(fontFamilyId), lineHeight: lineHeightPref }}>
 
               {(() => {
 
