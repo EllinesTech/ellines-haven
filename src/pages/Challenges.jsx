@@ -134,45 +134,53 @@ export default function Challenges() {
   if (!user) {
     return (
       <div className="challenges-page challenges-page--not-auth">
-        <div className="challenges-hero">
-          <h1>Reading Challenges</h1>
-          <p>Sign in to start reading challenges and earn rewards</p>
-          <a href="/login" className="btn btn-primary">Sign In</a>
-        </div>
+        <header className="challenges-hero">
+          <div className="challenges-hero__glow" aria-hidden="true" />
+          <div className="challenges-hero__orb challenges-hero__orb--1" aria-hidden="true" />
+          <div className="challenges-hero__orb challenges-hero__orb--2" aria-hidden="true" />
+          <div className="challenges-hero__content">
+            <p className="challenges-hero__brand">Ellines Haven</p>
+            <h1 className="challenges-hero__title">Reading <span className="gold-text">Challenges</span></h1>
+            <p className="challenges-hero__subtitle">Sign in to start reading challenges and earn rewards</p>
+            <a href="/login" className="btn btn-primary">Sign In</a>
+          </div>
+        </header>
       </div>
     );
   }
 
   return (
     <div className="challenges-page">
-      {/* Header */}
-      <div className="challenges-hero">
+      <header className="challenges-hero">
+        <div className="challenges-hero__glow" aria-hidden="true" />
+        <div className="challenges-hero__orb challenges-hero__orb--1" aria-hidden="true" />
+        <div className="challenges-hero__orb challenges-hero__orb--2" aria-hidden="true" />
         <div className="challenges-hero__content">
-          <h1 className="challenges-hero__title">📖 Reading Challenges</h1>
+          <p className="challenges-hero__brand">Ellines Haven</p>
+          <h1 className="challenges-hero__title">Reading <span className="gold-text">Challenges</span></h1>
           <p className="challenges-hero__subtitle">
             Complete reading challenges, earn rewards, and join the leaderboards
           </p>
         </div>
-      </div>
+      </header>
 
-      {/* Stats */}
       <section className="challenges-stats">
         <div className="stat-card">
-          <span className="stat-icon">🎯</span>
+          <span className="stat-icon" aria-hidden="true">🎯</span>
           <div className="stat-info">
             <span className="stat-label">Active Challenges</span>
             <span className="stat-value">{activeChallenges.length}</span>
           </div>
         </div>
         <div className="stat-card">
-          <span className="stat-icon">🏆</span>
+          <span className="stat-icon" aria-hidden="true">🏆</span>
           <div className="stat-info">
             <span className="stat-label">Completed</span>
             <span className="stat-value">{completedChallenges.length}</span>
           </div>
         </div>
         <div className="stat-card">
-          <span className="stat-icon">💰</span>
+          <span className="stat-icon" aria-hidden="true">✦</span>
           <div className="stat-info">
             <span className="stat-label">Total Rewards</span>
             <span className="stat-value">{stats.totalRewardPoints} pts</span>
@@ -180,7 +188,6 @@ export default function Challenges() {
         </div>
       </section>
 
-      {/* Error message */}
       {error && (
         <div className="error-message">
           <span>{error}</span>
@@ -188,7 +195,6 @@ export default function Challenges() {
         </div>
       )}
 
-      {/* My Challenges */}
       <section className="challenges-section">
         <div className="section-header">
           <h2>My Challenges</h2>
@@ -200,10 +206,9 @@ export default function Challenges() {
           </button>
         </div>
 
-        {/* Filters and sort */}
         <div className="challenges-controls">
           <div className="filter-group">
-            <label>Status:</label>
+            <label>Status</label>
             <div className="filter-buttons">
               {['active', 'completed', 'all'].map(opt => (
                 <button
@@ -218,7 +223,7 @@ export default function Challenges() {
           </div>
 
           <div className="filter-group">
-            <label>Type:</label>
+            <label>Type</label>
             <select
               className="filter-select"
               value={filter}
@@ -233,7 +238,6 @@ export default function Challenges() {
           </div>
         </div>
 
-        {/* Challenges grid */}
         {loading ? (
           <div className="challenges-loading">
             <div className="skeleton-card" />
@@ -253,7 +257,6 @@ export default function Challenges() {
           </div>
         ) : (
           <div className="challenges-empty">
-            <span className="empty-icon">📭</span>
             <p>No challenges yet. Start your first reading challenge!</p>
             <button
               className="btn btn-primary"
@@ -265,7 +268,6 @@ export default function Challenges() {
         )}
       </section>
 
-      {/* Leaderboards */}
       <section className="challenges-section leaderboards-section">
         <h2>Leaderboards</h2>
         <div className="leaderboards-grid">
@@ -273,7 +275,7 @@ export default function Challenges() {
             const lb = leaderboards[typeData.id] || [];
             return (
               <div key={key} className="leaderboard-card">
-                <h3>{typeData.name} 🏅</h3>
+                <h3>{typeData.name}</h3>
                 {lb.length > 0 ? (
                   <div className="leaderboard-list">
                     {lb.slice(0, 5).map((entry, idx) => (
@@ -293,7 +295,6 @@ export default function Challenges() {
         </div>
       </section>
 
-      {/* Start Challenge Modal */}
       {showStartModal && (
         <ChallengeStartModal
           types={CHALLENGE_TYPES}
@@ -305,7 +306,6 @@ export default function Challenges() {
         />
       )}
 
-      {/* Challenge Details Modal */}
       {selectedChallenge && (
         <ChallengeDetailsModal
           challenge={selectedChallenge}
@@ -339,7 +339,7 @@ function ChallengeStartModal({ types, onSelect, onClose }) {
               <h3>{type.name}</h3>
               <p>Goal: {type.goal} book{type.goal !== 1 ? 's' : ''}</p>
               <p className="duration">{type.duration} days</p>
-              <p className="reward">💰 {type.reward} points</p>
+              <p className="reward">{type.reward} points</p>
             </div>
           ))}
         </div>
@@ -381,7 +381,7 @@ function ChallengeDetailsModal({ challenge, onClose }) {
           )}
           <div className="detail-item">
             <span className="label">Reward Points</span>
-            <span className="value">💰 {challenge.reward_points}</span>
+            <span className="value">{challenge.reward_points}</span>
           </div>
           <div className="detail-item">
             <span className="label">Time Remaining</span>

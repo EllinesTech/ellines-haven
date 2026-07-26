@@ -2,59 +2,105 @@
    MyLibrary — full user dashboard
    ───────────────────────────────────────────── */
 
-.mylib-page { min-height: 100vh; background: var(--bg); }
+.mylib-page { min-height: 100vh; background: var(--bg); overflow: hidden; }
 
 /* ── Gate (logged-out / restricted) ── */
 .mylib-gate {
+  position: relative;
+  z-index: 1;
   text-align: center;
-  padding: 100px 20px 120px;
+  padding: 48px 20px 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
   max-width: 460px;
   margin: 0 auto;
+  animation: mylib-rise .7s ease-out both;
 }
 .mylib-gate-logo {
   height: 90px;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
   filter: drop-shadow(0 2px 16px rgba(201,168,76,0.45));
 }
 .mylib-gate-icon { font-size: 3.5rem; margin-bottom: 4px; }
-.mylib-gate h2   { font-size: 1.7rem; color: var(--text); }
-.mylib-gate p    { color: var(--muted); max-width: 360px; line-height: 1.6; }
+.mylib-gate h2 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  color: var(--text);
+  margin: 0;
+  line-height: 1.15;
+}
+.mylib-gate > p {
+  color: rgba(200,196,215,.72);
+  max-width: 360px;
+  line-height: 1.7;
+  margin: 0;
+}
 
 /* ── Hero header ── */
 .mylib-hero {
   position: relative;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 20px 0 20px;
+  background: linear-gradient(160deg, #060612 0%, #0d0d1f 55%, #0a1628 100%);
+  border-bottom: 1px solid rgba(201,168,76,.12);
+  padding: 48px 0 36px;
   overflow: hidden;
 }
-.mylib-hero-glow {
+.mylib-hero--gate { padding: 88px 0 56px; }
+.mylib-hero__glow {
+  position: absolute;
+  width: 720px; height: 420px;
+  top: -40px; left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(201,168,76,.12) 0%, transparent 70%);
+  pointer-events: none;
+  animation: mylib-glow-pulse 6s ease-in-out infinite;
+}
+.mylib-hero__orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
   pointer-events: none;
-  opacity: 0.12;
+  filter: blur(40px);
 }
-.mylib-hero-glow--a {
-  width: 400px; height: 400px;
-  background: var(--gold);
-  top: -100px; left: -80px;
+.mylib-hero__orb--1 {
+  width: 280px; height: 280px;
+  top: 5%; right: -60px;
+  background: rgba(201,168,76,.08);
+  animation: mylib-float 9s ease-in-out infinite;
 }
-.mylib-hero-glow--b {
-  width: 300px; height: 300px;
-  background: #4a9eff;
-  bottom: -60px; right: -40px;
+.mylib-hero__orb--2 {
+  width: 220px; height: 220px;
+  bottom: -40px; left: -40px;
+  background: rgba(201,168,76,.05);
+  animation: mylib-float 11s ease-in-out infinite reverse;
+}
+@keyframes mylib-glow-pulse {
+  0%, 100% { opacity: .7; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+}
+@keyframes mylib-float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(18px, -14px); }
+}
+@keyframes mylib-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.mylib-hero__brand {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(.95rem, 2vw, 1.1rem);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin: 0 0 8px;
 }
 .mylib-hero-inner {
   position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 20px;
   flex-wrap: wrap;
+  animation: mylib-rise .7s ease-out both;
 }
 .mylib-hero-avatar {
   width: 64px; height: 64px;
@@ -69,47 +115,54 @@
 }
 .mylib-hero-text { flex: 1; min-width: 200px; }
 .mylib-hero-text h1 {
-  font-size: 1.35rem;
-  margin: 0 0 5px;
+  font-size: clamp(1.45rem, 3vw, 1.85rem);
+  margin: 0 0 6px;
   line-height: 1.2;
 }
-.mylib-hero-text p {
-  color: var(--muted);
-  font-size: 0.88rem;
+.mylib-hero-text > p {
+  color: rgba(200,196,215,.72);
+  font-size: 0.92rem;
   margin: 0;
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  line-height: 1.55;
 }
 .mylib-pending-badge {
   background: rgba(232,131,42,0.15);
   color: #e8832a;
   border: 1px solid rgba(232,131,42,0.35);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 2px 8px;
   font-size: 0.78rem;
   font-weight: 600;
 }
 .mylib-hero-stats {
   display: flex;
-  gap: 20px;
+  gap: 12px;
   flex-shrink: 0;
 }
 .mylib-hero-stat {
   text-align: center;
-  padding: 10px 18px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  padding: 12px 18px;
+  background: rgba(201,168,76,.06);
+  border: 1px solid rgba(201,168,76,.2);
+  border-radius: var(--r);
+  min-width: 72px;
+  transition: border-color .2s, transform .2s;
+}
+.mylib-hero-stat:hover {
+  border-color: rgba(201,168,76,.4);
+  transform: translateY(-1px);
 }
 .mylib-hero-stat strong {
   display: block;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--gold);
   line-height: 1;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 .mylib-hero-stat span {
   font-size: 0.65rem;
@@ -121,15 +174,14 @@
 
 /* ── Tab bar ── */
 .mylib-tabbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--dim);
+  background: linear-gradient(180deg, rgba(13,13,31,.98), rgba(10,10,22,.98));
+  border-bottom: 1px solid rgba(201,168,76,.12);
   position: sticky;
-  top: var(--navbar-h, 90px); /* tracks the CSS variable — updates on mobile */
+  top: var(--navbar-h, 90px);
   z-index: 20;
-  /* allow horizontal scroll on mobile so all tabs are reachable */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; /* hide scrollbar but keep scroll ability */
+  scrollbar-width: none;
 }
 .mylib-tabbar::-webkit-scrollbar { display: none; }
 .mylib-tabs {
@@ -361,10 +413,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 22px;
-  background: rgba(201,168,76,0.05);
-  border: 1px solid rgba(201,168,76,0.2);
-  border-radius: var(--r-sm);
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgba(201,168,76,.06), rgba(201,168,76,.02));
+  border: 1px solid rgba(201,168,76,.22);
+  border-radius: var(--r);
   flex-wrap: wrap;
 }
 .mylib-discover strong { display: block; font-size: 0.9rem; margin-bottom: 2px; }
@@ -562,10 +614,12 @@
   /* Grid stays auto-fill — single column happens naturally below 640px */
 }
 @media (max-width: 640px) {
+  .mylib-hero          { padding: 36px 0 28px; }
+  .mylib-hero--gate    { padding: 72px 0 48px; }
   .mylib-hero-inner    { gap: 14px; }
-  .mylib-hero-stats    { gap: 10px; }
+  .mylib-hero-stats    { gap: 8px; }
   .mylib-hero-stat     { padding: 8px 12px; }
-  .mylib-hero-text h1  { font-size: 1.3rem; }
+  .mylib-hero-text h1  { font-size: 1.35rem; }
   /* On mobile: single column, card is full width */
   .mylib-grid          { grid-template-columns: 1fr; gap: 12px; }
 
@@ -592,7 +646,6 @@
   .mylib-orders-summary { grid-template-columns: 1fr 1fr; }
   .mylib-tab           { padding: 12px 14px; font-size: 0.82rem; }
   .mylib-settings      { padding: 8px 0 60px; }
-  .mylib-hero          { padding-top: 12px; }
   .mylib-tabbar        { top: var(--navbar-h-mobile, 60px); }
   .mylib-offline-row   { flex-wrap: wrap; }
 }
@@ -604,9 +657,9 @@
     min-width: 88px;
     min-height: 140px;
   }
-  /* Tighter tabs on very small screens — they scroll so just keep them compact */
   .mylib-tab { padding: 11px 12px; font-size: 0.75rem; }
-  .mylib-hero { padding-top: 8px; }
+  .mylib-hero { padding: 28px 0 24px; }
+  .mylib-hero--gate { padding: 64px 0 40px; }
 }
 
 /* ─────────────────────────────────────────────

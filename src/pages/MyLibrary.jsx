@@ -886,17 +886,23 @@ export default function MyLibrary() {
 
   if (!user) return (
     <main className="mylib-page">
-      <div className="container">
-        <div className="mylib-gate">
-          <img src="/logo-nobg3.png" alt="Ellines Haven" className="mylib-gate-logo" />
-          <h2>Your Library Awaits</h2>
-          <p>Sign in to access your books, track orders, and manage your reading journey.</p>
-          <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
-            <Link to="/login"    className="btn btn-primary">Sign In</Link>
-            <Link to="/register" className="btn btn-outline">Create Account</Link>
+      <header className="mylib-hero mylib-hero--gate">
+        <div className="mylib-hero__glow" aria-hidden="true" />
+        <div className="mylib-hero__orb mylib-hero__orb--1" aria-hidden="true" />
+        <div className="mylib-hero__orb mylib-hero__orb--2" aria-hidden="true" />
+        <div className="container">
+          <div className="mylib-gate">
+            <p className="mylib-hero__brand">Ellines Haven</p>
+            <img src="/logo-nobg3.png" alt="Ellines Haven" className="mylib-gate-logo" />
+            <h2>Your <span className="gold-text">Library</span> Awaits</h2>
+            <p>Sign in to access your books, track orders, and manage your reading journey.</p>
+            <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+              <Link to="/login"    className="btn btn-primary">Sign In</Link>
+              <Link to="/register" className="btn btn-outline">Create Account</Link>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
     </main>
   );
 
@@ -968,14 +974,16 @@ export default function MyLibrary() {
     <main className="mylib-page">
 
       {/* -- Hero header -- */}
-      <div className="mylib-hero">
-        <div className="mylib-hero-glow mylib-hero-glow--a" />
-        <div className="mylib-hero-glow mylib-hero-glow--b" />
+      <header className="mylib-hero">
+        <div className="mylib-hero__glow" aria-hidden="true" />
+        <div className="mylib-hero__orb mylib-hero__orb--1" aria-hidden="true" />
+        <div className="mylib-hero__orb mylib-hero__orb--2" aria-hidden="true" />
         <div className="container mylib-hero-inner">
           <div className="mylib-hero-avatar">
             {user.name.charAt(0).toUpperCase()}
           </div>
           <div className="mylib-hero-text">
+            <p className="mylib-hero__brand">Ellines Haven</p>
             <h1>Welcome back, <span className="gold-text">{user.name.split(' ')[0]}</span></h1>
             <p>
               {library.length > 0
@@ -999,7 +1007,7 @@ export default function MyLibrary() {
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* -- Tab bar -- */}
       <div className="mylib-tabbar">

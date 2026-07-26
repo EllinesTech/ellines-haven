@@ -81,9 +81,18 @@ export default function Recommendations() {
   if (loading) {
     return (
       <main className="recommendations-page">
-        <section className="section">
+        <header className="rec-hero">
+          <div className="rec-hero__glow" aria-hidden="true" />
+          <div className="rec-hero__orb rec-hero__orb--1" aria-hidden="true" />
+          <div className="rec-hero__orb rec-hero__orb--2" aria-hidden="true" />
+          <div className="container rec-hero__content">
+            <p className="rec-hero__brand">Ellines Haven</p>
+            <h1>For <span className="gold-text">You</span></h1>
+            <p className="rec-hero__subtitle">Loading your recommendations…</p>
+          </div>
+        </header>
+        <section className="rec-results-section">
           <div className="container">
-            <h1>Loading recommendations...</h1>
             <div className="books-grid">
               {Array.from({ length: 12 }).map((_, i) => (
                 <div key={i} className="book-card-loading">
@@ -100,34 +109,36 @@ export default function Recommendations() {
 
   return (
     <main className="recommendations-page">
-      {/* Hero */}
-      <section className="rec-hero">
-        <div className="container">
-          <div className="rec-hero__content">
-            <h1>📚 Personalized Recommendations</h1>
-            <p className="rec-hero__subtitle">
-              {user
-                ? `Discover books tailored to your reading style and preferences`
-                : `Popular and trending books handpicked for you`}
+      <header className="rec-hero">
+        <div className="rec-hero__glow" aria-hidden="true" />
+        <div className="rec-hero__orb rec-hero__orb--1" aria-hidden="true" />
+        <div className="rec-hero__orb rec-hero__orb--2" aria-hidden="true" />
+        <div className="container rec-hero__content">
+          <p className="rec-hero__brand">Ellines Haven</p>
+          <h1>
+            {user ? <>For <span className="gold-text">You</span></> : <>Worth <span className="gold-text">Reading</span></>}
+          </h1>
+          <p className="rec-hero__subtitle">
+            {user
+              ? 'Discover books tailored to your reading style and preferences'
+              : 'Popular and trending books handpicked for you'}
+          </p>
+          {!user && (
+            <p className="rec-hero__note">
+              <Link to="/login">Sign in</Link> to get personalized recommendations based on your reading history.
             </p>
-            {!user && (
-              <p className="rec-hero__note">
-                📝 <Link to="/login">Sign in</Link> to get personalized recommendations based on your reading history.
-              </p>
-            )}
-          </div>
+          )}
         </div>
-      </section>
+      </header>
 
-      {/* Controls */}
-      <section className="section">
+      <section className="rec-controls-section">
         <div className="container">
           <div className="rec-controls">
             <div className="rec-count">
               Found <strong>{sortedRecommendations.length}</strong> books for you
             </div>
             <div className="rec-sort">
-              <label htmlFor="sort">Sort by:</label>
+              <label htmlFor="sort">Sort by</label>
               <select
                 id="sort"
                 value={sortBy}
@@ -144,20 +155,18 @@ export default function Recommendations() {
         </div>
       </section>
 
-      {/* Error */}
       {error && !loading && (
-        <section className="section">
+        <section className="rec-results-section" style={{ paddingTop: 0 }}>
           <div className="container">
             <div className="rec-error">
-              <p>⚠️ {error}</p>
+              <p>{error}</p>
               <p>Please try again later or <Link to="/library">browse all books</Link>.</p>
             </div>
           </div>
         </section>
       )}
 
-      {/* Results */}
-      <section className="section">
+      <section className="rec-results-section">
         <div className="container">
           {sortedRecommendations.length > 0 ? (
             <div className="books-grid">
@@ -167,7 +176,7 @@ export default function Recommendations() {
             </div>
           ) : (
             <div className="rec-empty">
-              <p>📖 No recommendations found. Check back soon!</p>
+              <p>No recommendations found. Check back soon!</p>
               <Link to="/library" className="btn btn-primary">Browse All Books</Link>
             </div>
           )}
