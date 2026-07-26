@@ -60,11 +60,10 @@ function NotifyMeDetailBtn({ book }) {
   };
 
   if (state === 'done') return (
-    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'14px 18px', background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'var(--r-sm)' }}>
-      <span style={{ fontSize:'1.4rem' }}>🔔</span>
+    <div className="bd-notify bd-notify--done">
       <div>
-        <strong style={{ color:'var(--ok)', display:'block' }}>You're on the list!</strong>
-        <span style={{ fontSize:'0.8rem', color:'var(--muted)' }}>
+        <strong>You're on the list!</strong>
+        <span>
           {book.status === 'ongoing'
             ? `We'll notify you when all chapters of "${book.title}" are complete.`
             : `We'll notify you the moment "${book.title}" is available.`}
@@ -74,15 +73,15 @@ function NotifyMeDetailBtn({ book }) {
   );
 
   const btnLabel = book.status === 'ongoing'
-    ? '🔔 Notify Me When All Chapters Are Ready'
-    : '🔔 Notify Me When Available';
+    ? 'Notify Me When All Chapters Are Ready'
+    : 'Notify Me When Available';
 
   return (
     <div>
-      <button className="btn btn-primary" style={{ width:'100%', marginBottom:10 }} onClick={handle} disabled={state === 'loading'}>
-        {state === 'loading' ? '⏳ Saving…' : btnLabel}
+      <button className="btn btn-primary bd-notify-btn" onClick={handle} disabled={state === 'loading'}>
+        {state === 'loading' ? 'Saving…' : btnLabel}
       </button>
-      <p style={{ fontSize:'0.76rem', color:'var(--muted)', textAlign:'center' }}>
+      <p className="bd-notify-hint">
         {!user ? 'Sign in to get notified' : 'Free — no spam. One email when it launches.'}
       </p>
     </div>
@@ -295,7 +294,7 @@ function FreeSample({ book }) {
     <div className="bd-sample">
       <div className="bd-sample-header">
         <div>
-          <h3>📖 Free Sample</h3>
+          <h3>Free Sample</h3>
           <p>Read the opening passage before you buy.</p>
         </div>
         <button
@@ -721,7 +720,7 @@ function TocSection({ book, owned, libLoaded, user }) {
 
           {!owned && libLoaded && !NO_PURCHASE_STATUSES.has(book.status) && (
             <div className="bd-toc-gate-note">
-              🔒 Purchase this book to unlock all chapters and read online
+              Purchase this book to unlock all chapters and read online
             </div>
           )}
 
@@ -783,7 +782,9 @@ function TocSection({ book, owned, libLoaded, user }) {
                     }}>
                       <span className="bd-toc-num">{numStr}</span>
                       <span className="bd-toc-title">{title}</span>
-                      <span className="bd-toc-lock">🔒</span>
+                      <span className="bd-toc-lock" aria-hidden="true">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      </span>
                     </span>
                   </li>
                 );
@@ -1087,8 +1088,9 @@ export default function BookDetail() {
   })();
 
   return (
-    <main>
+    <main className="bd-page">
       <div className="bd-wrap">
+        <div className="bd-wrap__glow" aria-hidden="true" />
         <div className="container">
           <Link to="/library" className="bd-back">← Back to Library</Link>
           <div className="bd-grid">
@@ -1144,7 +1146,9 @@ export default function BookDetail() {
               {/* ── Setting ── */}
               {book.setting && (
                 <div className="bd-setting">
-                  <span className="bd-setting-icon">📍</span>
+                  <span className="bd-setting-icon" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  </span>
                   <span>{book.setting}</span>
                 </div>
               )}
@@ -1256,11 +1260,11 @@ export default function BookDetail() {
               {/* Coming Soon / Draft — no purchase, just notify */}
               {(book.status === 'coming-soon' || book.status === 'draft') ? (
                 <div style={{ padding:'20px 0' }}>
-                  <div style={{ padding:'16px 20px', background:'rgba(232,131,42,0.08)', border:'1px solid rgba(232,131,42,0.25)', borderRadius:'var(--r-sm)', marginBottom:16 }}>
-                    <strong style={{ color:'#e8832a', display:'block', marginBottom:6 }}>
-                      {book.status === 'coming-soon' ? '🔜 Coming Soon' : '📝 In Development'}
+                <div className="bd-coming-soon">
+                    <strong>
+                      {book.status === 'coming-soon' ? 'Coming Soon' : 'In Development'}
                     </strong>
-                    <p style={{ fontSize:'0.85rem', color:'var(--muted)', margin:0 }}>
+                    <p>
                       {book.status === 'coming-soon'
                         ? 'This title is not yet available for purchase. Get notified the moment it launches.'
                         : 'This book is still being written. Check back soon.'}
@@ -1371,7 +1375,7 @@ export default function BookDetail() {
                 {owned && <span>✓ You own this book — read anytime</span>}
               </div>
               {/* Wishlist button */}
-              <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className="bd-wl-row">
                 <WishlistButton book={book} size="md" showLabel />
                 <ShareBookButton book={book} />
               </div>
@@ -1386,8 +1390,7 @@ export default function BookDetail() {
           <div className="container">
             <div className="bd-authornote">
               <div className="bd-authornote-header">
-                <span className="bd-authornote-icon">✍️</span>
-                <h2>Author's Note</h2>
+                <h2>Author's <span className="gold-text">Note</span></h2>
               </div>
               <div className="bd-authornote-body">
                 {book.authorNote.split('\n\n').map((para, i) => (
@@ -1438,7 +1441,7 @@ export default function BookDetail() {
       <section className="section">
         <div className="container">
           <div style={{ marginBottom: 40 }}>
-            <h2 style={{ margin: '0 0 16px 0', fontSize: '1.3rem', color: 'var(--gold)' }}>📢 Share This Book</h2>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '1.3rem' }}>Share This <span className="gold-text">Book</span></h2>
             <SocialShare
               title="Share on Social Media"
               text={`Check out "${book.title}" on Ellines Haven - a great read!`}

@@ -864,55 +864,50 @@ export default function Cart() {
                     URL.revokeObjectURL(url);
                   }}
                 >
-                  📄 Save Receipt
+                  Save Receipt
                 </button>
               </div>
             </div>
           )}
 
           {/* ── Share your purchase ── */}
-          <div style={{
-            margin: '16px 0 4px',
-            padding: '12px 16px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 'var(--r-sm)',
-          }}>
-            <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, fontWeight:600 }}>📢 Share with friends</p>
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
+          <div className="done-share">
+            <p className="done-share__label">Share with friends</p>
+            <div className="done-share__links">
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(
-                  `📚 Just bought "${(placedOrder?.items||[]).map(i=>i.title).join('" & "')}" on Ellines Haven — amazing East African fiction!\n\nhaven.ellines.co.ke`
+                  `Just bought "${(placedOrder?.items||[]).map(i=>i.title).join('" & "')}" on Ellines Haven — amazing East African fiction!\n\nhaven.ellines.co.ke`
                 )}`}
                 target="_blank" rel="noopener noreferrer"
-                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(37,211,102,0.12)', border:'1px solid rgba(37,211,102,0.3)', color:'#25D366', fontSize:'0.8rem', fontWeight:600, textDecoration:'none' }}
+                className="done-share__btn done-share__btn--wa"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                 WhatsApp
               </a>
               <a
                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                  `Just bought "${(placedOrder?.items||[]).map(i=>i.title).join('" & "')}" — East African fiction at its finest 📚\n\nhaven.ellines.co.ke`
+                  `Just bought "${(placedOrder?.items||[]).map(i=>i.title).join('" & "')}" — East African fiction at its finest\n\nhaven.ellines.co.ke`
                 )}`}
                 target="_blank" rel="noopener noreferrer"
-                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(29,161,242,0.12)', border:'1px solid rgba(29,161,242,0.3)', color:'#1da1f2', fontSize:'0.8rem', fontWeight:600, textDecoration:'none' }}
+                className="done-share__btn done-share__btn--x"
               >
-                𝕏 Tweet
+                Tweet
               </a>
               <button
-                style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.12)', color:'var(--muted)', fontSize:'0.8rem', fontWeight:600, cursor:'pointer' }}
+                type="button"
+                className="done-share__btn"
                 onClick={() => {
                   const url = 'https://haven.ellines.co.ke/library';
                   try { navigator.clipboard.writeText(url); } catch { window.prompt('Copy:', url); }
                 }}
               >
-                🔗 Copy Link
+                Copy Link
               </button>
             </div>
           </div>
 
-          <div style={{ display:'flex', gap:'12px', justifyContent:'center', marginTop:'20px', flexWrap:'wrap' }}>
-            <Link to="/my-library" className="btn btn-primary">📚 Go to My Library</Link>
+          <div className="done-box__actions">
+            <Link to="/my-library" className="btn btn-primary">Go to My Library</Link>
             <Link to="/library" className="btn btn-outline">Browse More</Link>
           </div>
         </div>
@@ -971,7 +966,7 @@ export default function Cart() {
         <div className="cart-hero__orb cart-hero__orb--1" aria-hidden="true" />
         <div className="container cart-hero__inner">
           <p className="cart-hero__brand">Ellines Haven</p>
-          <h1><EditableField field="checkout_heading">Check<span className="gold-text">out</span></EditableField></h1>
+          <h1><EditableField field="checkout_heading">Checkout</EditableField></h1>
           <p>Secure payment · Instant unlock</p>
         </div>
       </header>
@@ -1181,17 +1176,21 @@ export default function Cart() {
   // ── Cart screen ──────────────────────────────────────────────────────────
   return (
     <main className="cart-page">
-      <div className="page-header">
-        <div className="container">
+      <header className="cart-hero">
+        <div className="cart-hero__glow" aria-hidden="true" />
+        <div className="cart-hero__orb cart-hero__orb--1" aria-hidden="true" />
+        <div className="cart-hero__orb cart-hero__orb--2" aria-hidden="true" />
+        <div className="container cart-hero__inner">
+          <p className="cart-hero__brand">Ellines Haven</p>
           <h1><EditableField field="cart_heading">Your Cart</EditableField></h1>
-          <p>{cart.length} item{cart.length !== 1 ? 's' : ''}</p>
+          <p>{cart.length} item{cart.length !== 1 ? 's' : ''} · Ready when you are</p>
         </div>
-      </div>
+      </header>
       <div className="container">
         {/* Payment cancelled notice */}
         {cancelledNotice && (
           <div className="cart-cancelled-notice" role="alert">
-            <span>⚠ {cancelledNotice}</span>
+            <span>{cancelledNotice}</span>
             <button
               className="cart-cancelled-notice__close"
               onClick={() => setCancelledNotice('')}
@@ -1203,7 +1202,7 @@ export default function Cart() {
         {cart.length === 0
           ? (
             <div className="cart-empty">
-              <div className="cart-empty__icon">🛒</div>
+              <div className="cart-empty__icon" aria-hidden="true" />
               <h3><EditableField field="cart_empty_heading">Your cart is empty</EditableField></h3>
               <p><EditableField field="cart_empty_sub">Discover books you'll love and add them here.</EditableField></p>
               <Link to="/library" className="btn btn-primary"><EditableField field="cart_browse_btn">Browse Books</EditableField></Link>
@@ -1224,10 +1223,10 @@ export default function Cart() {
                   <div key={b.id} className="cart-item card">
                     {b.isChapter ? (
                       /* ── Chapter item ── */
-                      <div className="cart-item__img-wrap" style={{ display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(74,158,255,0.06)', border:'1px solid rgba(74,158,255,0.2)', borderRadius:8, minWidth:70, minHeight:80 }}>
-                        <div style={{ textAlign:'center', padding:'8px 6px' }}>
-                          <div style={{ fontSize:'0.65rem', fontWeight:800, color:'#4a9eff', letterSpacing:0.5, marginBottom:4 }}>CH.</div>
-                          <div style={{ fontSize:'1.5rem', fontWeight:800, color:'#4a9eff', lineHeight:1 }}>{b.chapterNum}</div>
+                      <div className="cart-item__img-wrap cart-item__img-wrap--chapter">
+                        <div className="cart-item__chapter-badge">
+                          <div className="cart-item__chapter-label">CH.</div>
+                          <div className="cart-item__chapter-num">{b.chapterNum}</div>
                         </div>
                       </div>
                     ) : (
@@ -1243,12 +1242,12 @@ export default function Cart() {
                     <div className="cart-item__info">
                       {b.isChapter ? (
                         <>
-                          <span className="cart-item__genre" style={{ color:'#4a9eff' }}>Chapter {b.chapterNum}</span>
+                          <span className="cart-item__genre cart-item__genre--chapter">Chapter {b.chapterNum}</span>
                           <h3 style={{ fontSize:'0.9rem' }}>{b.chapterTitle || b.title}</h3>
                           <p className="cart-item__author" style={{ fontSize:'0.78rem', color:'var(--muted)' }}>
                             from <em>{b.title.replace(/ — Chapter \d+$/, '')}</em>
                           </p>
-                          <p className="cart-item__meta" style={{ color:'#4a9eff', fontSize:'0.72rem' }}>📖 Ongoing Series · Individual Chapter</p>
+                          <p className="cart-item__meta cart-item__meta--chapter">Ongoing Series · Individual Chapter</p>
                         </>
                       ) : (
                         <>
@@ -1291,49 +1290,47 @@ export default function Cart() {
                   <strong>KSh {total.toLocaleString()}</strong>
                 </div>
                 {/* ── Promo code entry ── */}
-                <div style={{ marginTop:10, marginBottom:4 }}>
+                <div className="cart-promo">
                   {!promoApplied ? (
-                    <div style={{ display:'flex', gap:6 }}>
+                    <div className="cart-promo__row">
                       <input
                         className="field"
                         placeholder="Promo code"
                         value={promoInput}
                         onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
                         onKeyDown={e => e.key === 'Enter' && applyPromo()}
-                        style={{ flex:1, fontSize:'0.82rem', padding:'7px 10px', textTransform:'uppercase', letterSpacing:1 }}
                       />
                       <button
                         className="btn btn-outline btn-sm"
                         onClick={applyPromo}
                         disabled={promoChecking || !promoInput.trim()}
-                        style={{ flexShrink:0, fontSize:'0.78rem' }}
                       >
-                        {promoChecking ? '⏳' : 'Apply'}
+                        {promoChecking ? '…' : 'Apply'}
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', background:'rgba(46,204,113,0.1)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'var(--r-sm)' }}>
-                      <span style={{ fontSize:'0.8rem', color:'var(--ok)', fontWeight:600 }}>
-                        🎟 {promoApplied.code} — <span style={{ color:'#2ecc71' }}>−KSh {discountAmount.toLocaleString()}</span>
+                    <div className="cart-promo__applied">
+                      <span>
+                        {promoApplied.code} — <strong>−KSh {discountAmount.toLocaleString()}</strong>
                       </span>
-                      <button onClick={removePromo} style={{ background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.9rem', padding:0 }}>✕</button>
+                      <button onClick={removePromo} type="button" aria-label="Remove promo">✕</button>
                     </div>
                   )}
-                  {promoError && <p style={{ color:'#e74c3c', fontSize:'0.75rem', marginTop:5 }}>{promoError}</p>}
+                  {promoError && <p className="cart-promo__error">{promoError}</p>}
                 </div>
                 {discountAmount > 0 && (
-                  <div className="cart-sum__total" style={{ marginTop:6 }}>
+                  <div className="cart-sum__total cart-sum__total--discount">
                     <span>Discount</span>
-                    <strong style={{ color:'#2ecc71' }}>−KSh {discountAmount.toLocaleString()}</strong>
+                    <strong>−KSh {discountAmount.toLocaleString()}</strong>
                   </div>
                 )}
-                <div className="cart-sum__total" style={{ marginTop: discountAmount > 0 ? 4 : 0 }}>
+                <div className="cart-sum__total cart-sum__total--final">
                   <span>Total</span>
-                  <strong style={{ color:'var(--gold)' }}>KSh {effectiveTotal.toLocaleString()}</strong>
+                  <strong>KSh {effectiveTotal.toLocaleString()}</strong>
                 </div>
-                <p className="cart-sum__unlock-note">⚡ Books unlock instantly after payment</p>
-                <div style={{ padding:'10px 12px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.18)', borderRadius:'var(--r-sm)', fontSize:'0.76rem', color:'var(--muted)', lineHeight:1.6, marginBottom:12 }}>
-                  🚫 <strong style={{ color:'var(--text)' }}>No refunds</strong> — digital books are delivered instantly and cannot be returned once unlocked. <Link to="/terms#refund" style={{ color:'var(--gold)' }}>Policy →</Link>
+                <p className="cart-sum__unlock-note">Books unlock instantly after payment</p>
+                <div className="cart-sum__refund">
+                  <strong>No refunds</strong> — digital books are delivered instantly and cannot be returned once unlocked. <Link to="/terms#refund">Policy →</Link>
                 </div>
                 <button className="btn btn-primary cart-sum__cta" onClick={checkout}>
                   Proceed to Checkout
