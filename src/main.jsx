@@ -54,33 +54,20 @@ if (typeof window !== 'undefined') {
   const forceFreshNavigation = () => {
     if (window.__EH_RELOADING__) return;
     window.__EH_RELOADING__ = true;
-    try { sessionStorage.removeItem('eh_build_v'); } catch { /* ignore */ }
     const bust = () => {
       window.location.replace(window.location.pathname + '?_eh=' + Date.now() + (window.location.hash || ''));
     };
     const cleanup = Promise.all([
       'serviceWorker' in navigator
-        ? navigator.serviceWorker
-            .register('/sw.js', { scope: '/', updateViaCache: 'none' })
-            .then((reg) => reg.update())
-            .catch(() => {})
-            .then(() =>
-              navigator.serviceWorker.getRegistrations().then((regs) =>
-                Promise.all(
-                  regs.map((r) => {
-                    const src =
-                      r.active?.scriptURL || r.waiting?.scriptURL || r.installing?.scriptURL || '';
-                    return src.includes('sw.js?') ? r.unregister() : Promise.resolve();
-                  })
-                )
-              )
-            )
+        ? navigator.serviceWorker.getRegistrations().then((regs) =>
+            Promise.all(regs.map((r) => r.unregister()))
+          )
         : Promise.resolve(),
       'caches' in window
         ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
         : Promise.resolve(),
     ]);
-    const timer = setTimeout(bust, 800);
+    const timer = setTimeout(bust, 600);
     cleanup.then(() => { clearTimeout(timer); bust(); }).catch(() => { clearTimeout(timer); bust(); });
   };
 

@@ -58,40 +58,27 @@ function hardReload() {
   try {
     localStorage.removeItem('eh_chunk_reload');
     localStorage.removeItem('eh_chunk_reload_global');
-    sessionStorage.removeItem('eh_build_v');
+    // Keep eh_build_v — clearing it fought the stamp guard and could loop after deploys
   } catch { /* ignore */ }
 
   const bust = () => {
     window.location.replace(window.location.pathname + '?_eh=' + Date.now() + (window.location.hash || ''));
   };
 
-  // Register kill-switch so it can displace a still-controlling caching SW before
-  // navigation. Plain unregister() does not stop the current controller mid-flight.
+  // Drop any leftover service workers + caches, then navigate once.
+  // Do NOT re-register a kill-switch SW — that triggered claim/reload races.
   const cleanup = Promise.all([
     'serviceWorker' in navigator
-      ? navigator.serviceWorker
-          .register('/sw.js', { scope: '/', updateViaCache: 'none' })
-          .then((reg) => reg.update())
-          .catch(() => {})
-          .then(() =>
-            navigator.serviceWorker.getRegistrations().then((regs) =>
-              Promise.all(
-                regs.map((r) => {
-                  const src =
-                    r.active?.scriptURL || r.waiting?.scriptURL || r.installing?.scriptURL || '';
-                  // Drop legacy ?v= stamped registrations; leave stable /sw.js to activate
-                  return src.includes('sw.js?') ? r.unregister() : Promise.resolve();
-                })
-              )
-            )
-          )
+      ? navigator.serviceWorker.getRegistrations().then((regs) =>
+          Promise.all(regs.map((r) => r.unregister()))
+        )
       : Promise.resolve(),
     'caches' in window
       ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       : Promise.resolve(),
   ]);
 
-  const clearTimer = setTimeout(bust, 800);
+  const clearTimer = setTimeout(bust, 600);
   cleanup.then(() => { clearTimeout(clearTimer); bust(); }).catch(() => { clearTimeout(clearTimer); bust(); });
 }
 
@@ -741,11 +728,9 @@ function CookieConsent() {
 }
 
 
-/* ── Service Worker update poller ───────────────────────────────────────────
-   Polls /version.json every 2 minutes. When a new build is detected it
-   clears all caches and reloads — silently for most pages, skipped on /read/.
-   This guarantees users always get fresh code within 2 minutes of a deploy,
-   even if the SW update flow fails for any reason.
+/* ── Deploy update poller ───────────────────────────────────────────────────
+   Polls /version.json. On a new build, reload once (session-guarded).
+   Never loops; skipped on /read/.
 ────────────────────────────────────────────────────────────────────────── */
 function SWUpdateBanner() {
   useEffect(() => {
@@ -754,6 +739,7 @@ function SWUpdateBanner() {
     if (isLocalhost) return;
 
     let currentVersion = null;
+    const ONCE_KEY = 'eh_version_reload';
 
     const checkVersion = async () => {
       try {
@@ -764,26 +750,25 @@ function SWUpdateBanner() {
         if (!latest) return;
 
         if (!currentVersion) {
-          // First load — remember what version we started on
           currentVersion = latest;
           return;
         }
 
         if (latest !== currentVersion) {
-          // New deploy detected — don't interrupt readers
-          const isReading = location.pathname.startsWith('/read');
-          if (isReading) return;
+          if (location.pathname.startsWith('/read')) return;
+          // One reload per new version in this tab session
+          if (sessionStorage.getItem(ONCE_KEY) === latest) return;
+          sessionStorage.setItem(ONCE_KEY, latest);
+          currentVersion = latest;
           hardReload();
         }
       } catch {
-        // Network error — ignore, will retry next interval
+        // Network error — ignore
       }
     };
 
-    // Check immediately, then every 2 minutes
     checkVersion();
-    const timer = setInterval(checkVersion, 2 * 60 * 1000);
-    // Also check when the tab comes back into focus
+    const timer = setInterval(checkVersion, 5 * 60 * 1000);
     const onVisible = () => { if (document.visibilityState === 'visible') checkVersion(); };
     document.addEventListener('visibilitychange', onVisible);
 

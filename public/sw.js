@@ -1,9 +1,8 @@
 /**
- * ELLINES HAVEN — Service Worker (KILL SWITCH)
+ * ELLINES HAVEN — leftover Service Worker cleanup (optional)
  *
- * Never caches anything (CDN owns /assets/ hashed bundles).
- * Purpose: displace any lingering old caching SW, clear Cache Storage,
- * claim clients, then unregister so refresh always hits the network.
+ * Modern builds no longer register this file. If an old client still has it,
+ * activate once, clear caches, and unregister without messaging reloads.
  */
 
 self.addEventListener('install', (event) => {
@@ -18,27 +17,9 @@ self.addEventListener('activate', (event) => {
     } catch (_) { /* ignore */ }
 
     try {
-      await self.clients.claim();
-    } catch (_) { /* ignore */ }
-
-    try {
-      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of clients) {
-        client.postMessage({ type: 'EH_SW_KILLED' });
-      }
-    } catch (_) { /* ignore */ }
-
-    try {
       await self.registration.unregister();
     } catch (_) { /* ignore */ }
   })());
 });
 
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// Never intercept — do not call event.respondWith(). Browser/CDN handle all fetches.
 self.addEventListener('fetch', () => {});
