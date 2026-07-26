@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findUserInFirestore } from './Login';
+import { storePasswordValue } from '../utils/passwordSecurity';
 import './Auth.css';
 
 function EyeIcon({ open }) {
@@ -60,11 +61,13 @@ export default function ChangePassword() {
     try {
       const emailKey = user.email.toLowerCase();
 
+      const hashed = await storePasswordValue(newPw);
+
       // 1. Update Firestore users collection — clear mustChangePassword flag
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
         await setDoc(doc(db, 'users', fsUser.id), {
-          passwordHash: newPw,
+          passwordHash: hashed,
           mustChangePassword: false,
           passwordResetBy: null,
           updatedAt: serverTimestamp(),
@@ -73,7 +76,7 @@ export default function ChangePassword() {
 
       // 2. Update localStorage pw_overrides for cross-device compat
       const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-      overrides[emailKey] = newPw;
+      overrides[emailKey] = hashed;
       localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
 
       // 3. Also clear flag in registered_users legacy doc if present
@@ -83,7 +86,7 @@ export default function ChangePassword() {
         const regSnap = await getDoc(firestoreDoc(firestoreDb, 'site_data', 'registered_users'));
         if (regSnap.exists()) {
           const pwOv = regSnap.data().pwOverrides || {};
-          pwOv[emailKey] = newPw;
+          pwOv[emailKey] = hashed;
           await firestoreSetDoc(firestoreDoc(firestoreDb, 'site_data', 'registered_users'), {
             pwOverrides: pwOv, updatedAt: sTs(),
           }, { merge: true });

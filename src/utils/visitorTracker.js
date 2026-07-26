@@ -1,82 +1,66 @@
 /**
  * Visitor Tracking Utility
- * Client writes the visit immediately; geo enrichment is server-side only
- * (ip-api.com blocks browser HTTPS → console 403 noise).
+ *
+ * Writes visit docs to Firestore only. Does NOT call trackVisitorHttp /
+ * Cloud Functions from the browser — those 500s always show as red console
+ * errors even when caught, and adblockers/network tools amplify the noise.
+ *
+ * Geo enrichment (if needed) belongs in Admin → Visitors (manual) or a
+ * server-side trigger after functions are healthy.
  */
 
 const VISITOR_QUEUE_KEY = 'eh_visitor_queue';
 const LAST_VISITOR_LOG = 'eh_last_visitor_log';
-const GEO_ENRICH_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitorHttp';
+
+function buildPayload(trackData) {
+  return {
+    page: (trackData.page || '/').slice(0, 200),
+    referrer: (trackData.referrer || 'direct').slice(0, 200),
+    userAgent: (trackData.userAgent || '').slice(0, 300),
+    device: trackData.device || 'Desktop',
+    userEmail: trackData.userEmail || '',
+    userName: trackData.userName || '',
+  };
+}
 
 /**
- * Track a visitor — Firestore write first, then silent server geo enrich.
+ * Track a visitor with zero Cloud Function HTTP from the browser.
  */
 export async function trackVisitorReliable(trackData, options = {}) {
   const { isRetry = false } = options;
+  const payload = buildPayload(trackData);
 
   try {
     const { db } = await import('../firebase');
     const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
 
-    const ua = trackData.userAgent || '';
-
-    const visitData = {
-      ip:          '',
-      rawIp:       '',
-      city:        '',
-      region:      '',
-      country:     '',
+    await addDoc(collection(db, 'site_visitors'), {
+      ip: '',
+      rawIp: '',
+      city: '',
+      region: '',
+      country: '',
       countryCode: '',
-      lat:         null,
-      lon:         null,
-      isp:         '',
-      org:         '',
-      timezone:    Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-      page:        (trackData.page     || '/').slice(0, 200),
-      referrer:    (trackData.referrer || 'direct').slice(0, 200),
-      userAgent:   ua.slice(0, 300),
-      device:      trackData.device || 'Desktop',
-      ...(trackData.userEmail ? { userEmail: trackData.userEmail, userName: trackData.userName || '' } : {}),
-      visitedAt:   serverTimestamp(),
+      lat: null,
+      lon: null,
+      isp: '',
+      org: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+      page: payload.page,
+      referrer: payload.referrer,
+      userAgent: payload.userAgent,
+      device: payload.device,
+      ...(payload.userEmail ? { userEmail: payload.userEmail, userName: payload.userName || '' } : {}),
+      visitedAt: serverTimestamp(),
       visitedAtMs: Date.now(),
-      _needsGeo:   true,
-    };
-
-    const docRef = await addDoc(collection(db, 'site_visitors'), visitData);
-
-    // Server-side geo (ip-api over HTTP from Cloud Function) — never call ip-api from the browser
-    enrichGeoViaCloudFunction(docRef.id, trackData).catch(() => {});
+      _needsGeo: true,
+    });
 
     clearVisitorQueue();
-    return { success: true, data: { ok: true, docId: docRef.id } };
-
+    return { success: true, data: { ok: true } };
   } catch (error) {
     queueForRetry(trackData, isRetry ? 1 : 0);
-    return { success: false, error: error.message };
-  }
-}
-
-/** Fire-and-forget geo enrichment via Cloud Function (no console noise on failure). */
-async function enrichGeoViaCloudFunction(docId, trackData) {
-  try {
-    const res = await fetch(GEO_ENRICH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        _docId: docId,
-        page: trackData.page || '/',
-        referrer: trackData.referrer || 'direct',
-        userAgent: trackData.userAgent || '',
-        device: trackData.device || 'Desktop',
-        userEmail: trackData.userEmail || '',
-        userName: trackData.userName || '',
-      }),
-      signal: AbortSignal.timeout(12000),
-    });
-    // Swallow non-OK — visit is already recorded; geo is best-effort
-    if (!res.ok) await res.text().catch(() => {});
-  } catch {
-    /* silent */
+    return { success: false, error: error?.message || 'track_failed' };
   }
 }
 
@@ -101,9 +85,6 @@ function queueForRetry(trackData, retryCount = 0) {
   } catch { /* ignore */ }
 }
 
-/**
- * Process queued visitor tracking attempts
- */
 export async function processVisitorQueue() {
   try {
     const stored = sessionStorage.getItem(VISITOR_QUEUE_KEY);
@@ -118,7 +99,7 @@ export async function processVisitorQueue() {
 
     for (const item of queue) {
       try {
-        const { queuedAt, retryCount, ...trackData } = item;
+        const { queuedAt, retryCount: _r, ...trackData } = item;
         if (Date.now() - queuedAt > 24 * 60 * 60 * 1000) continue;
         await new Promise((r) => setTimeout(r, 500));
         const result = await trackVisitorReliable(trackData, { isRetry: true });

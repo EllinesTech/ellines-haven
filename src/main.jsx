@@ -3,6 +3,8 @@
 if (typeof window !== 'undefined' && window.__EH_BUILD__ === undefined) {
   window.__EH_BUILD__ = '20260711-T132900-GODMODE';
 }
+// Capture beforeinstallprompt before React mounts (must call prompt() later from UI)
+import './utils/pwaBootstrap.js';
 import { createRoot } from 'react-dom/client';
 import { Component } from 'react';
 import './index.css';

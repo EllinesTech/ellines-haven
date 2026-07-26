@@ -156,12 +156,15 @@ export default function Register() {
 
       const userId = 'u_' + Date.now();
       const joined = new Date().toISOString().slice(0, 10);
+      const { storePasswordValue } = await import('../utils/passwordSecurity');
+      const hashedPassword = await storePasswordValue(form.password);
 
       // 1. Save to Firestore users collection (PRIMARY SOURCE — for login)
       await setDoc(doc(db, 'users', userId), {
         id: userId, name: form.name.trim(), email: emailKey,
         phone: form.phone.trim() || '',
-        passwordHash: form.password, role: 'user',
+        passwordHash: hashedPassword, role: 'user',
+        twoFactorEnabled: false,
         joined, createdAt: serverTimestamp(), status: 'active',
       });
 
@@ -173,7 +176,7 @@ export default function Register() {
       if (!currentList.find(u => u.email?.toLowerCase() === emailKey)) {
         await setDoc(doc(db, 'site_data', 'registered_users'), {
           registered: [...currentList, userEntry],
-          pwOverrides: { ...currentPwOverrides, [emailKey]: form.password },
+          pwOverrides: { ...currentPwOverrides, [emailKey]: hashedPassword },
           updatedAt: serverTimestamp(),
         }, { merge: true });
       }
@@ -182,12 +185,12 @@ export default function Register() {
       const local = JSON.parse(localStorage.getItem('eh_registered_users') || '[]');
       if (!local.find(u => u.email?.toLowerCase() === emailKey)) {
         localStorage.setItem('eh_registered_users', JSON.stringify([
-          ...local, { ...userEntry, password: form.password }
+          ...local, { ...userEntry, password: hashedPassword }
         ]));
       }
       // Also sync password overrides
       const localPwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-      localPwOverrides[emailKey] = form.password;
+      localPwOverrides[emailKey] = hashedPassword;
       localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
 
       setUser({ id: userId, name: form.name.trim(), email: emailKey, role: 'user' });

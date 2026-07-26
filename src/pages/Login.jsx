@@ -8,8 +8,15 @@ import { useAuthFormValidation } from '../hooks/useFormValidation';
 import { handleAuthError, logError } from '../utils/errorHandler';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { verifyPassword, storePasswordValue } from '../utils/passwordSecurity';
+import {
+  getSecuritySettings,
+  shouldRequire2FA,
+  sendLoginOtp,
+  verifyLoginOtp,
+  sendPasswordResetOtpServer,
+} from '../utils/twoFactorAuth';
 import './Auth.css';
 
 /* ── The ONE hardcoded account is the super admin only.
@@ -36,13 +43,26 @@ async function checkAdminCredentials(email, password) {
     if (snap.exists()) {
       const data = snap.data();
       const admins = data.accounts || [];
-      // Check accounts array first
-      const found = admins.find(a => a.email.toLowerCase() === email.toLowerCase() && a.password === password);
-      if (found) return found;
-      // Also check pwOverrides stored in same doc
-      const pwMap = data.pwOverrides || {};
       const byEmail = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
-      if (byEmail && pwMap[email.toLowerCase()] === password) return byEmail;
+      if (byEmail) {
+        const pwMap = data.pwOverrides || {};
+        const stored = pwMap[email.toLowerCase()] || byEmail.password || '';
+        const check = await verifyPassword(password, stored);
+        if (check.ok) {
+          if (check.needsUpgrade) {
+            const hashed = await storePasswordValue(password);
+            const nextAccounts = admins.map(a =>
+              a.email.toLowerCase() === email.toLowerCase() ? { ...a, password: hashed } : a
+            );
+            await setDoc(doc(db, 'site_data', 'admin_credentials'), {
+              accounts: nextAccounts,
+              pwOverrides: { ...pwMap, [email.toLowerCase()]: hashed },
+              updatedAt: serverTimestamp(),
+            }, { merge: true });
+          }
+          return byEmail;
+        }
+      }
     }
     // Bootstrap: seed Firestore with super admin credentials on first run
     if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
@@ -141,7 +161,6 @@ const OTP_VALID_SECS = 15 * 60; // 15 minutes
 function ForgotPasswordModal({ onClose }) {
   const [email,       setEmail]       = useState('');
   const [step,        setStep]        = useState('email');
-  const [code,        setCode]        = useState('');
   const [enteredCode, setEnteredCode] = useState('');
   const [newPw,       setNewPw]       = useState('');
   const [confirmPw,   setConfirmPw]   = useState('');
@@ -180,17 +199,18 @@ function ForgotPasswordModal({ onClose }) {
   };
 
   const doSend = async (targetEmail, targetPhone, targetName) => {
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
-    setCode(otp);
     setCodeExpiry(Date.now() + OTP_VALID_SECS * 1000);
     setCountdown(OTP_VALID_SECS);
 
     const delivered = [];
-    const fn = httpsCallable(getFunctions(), 'sendPasswordResetOtp');
-    const result = await fn({ email: targetEmail, phone: targetPhone, otp, name: targetName });
-    if (result.data?.emailSent) delivered.push('email');
-    if (result.data?.smsSent)  delivered.push('SMS');
-    return { otp, delivered };
+    const result = await sendPasswordResetOtpServer({
+      email: targetEmail,
+      phone: targetPhone,
+      name: targetName,
+    });
+    if (result?.emailSent) delivered.push('email');
+    if (result?.smsSent) delivered.push('SMS');
+    return { delivered };
   };
 
   const handleSendCode = async e => {
@@ -233,26 +253,31 @@ function ForgotPasswordModal({ onClose }) {
     setSending(false);
   };
 
-  const handleVerifyCode = e => {
+  const handleVerifyCode = async e => {
     e.preventDefault(); setErr('');
     if (countdown <= 0) { setErr('This code has expired. Please request a new one.'); return; }
-    if (enteredCode !== code) { setErr('That code is incorrect. Please check and try again.'); return; }
-    setStep('reset');
+    setSending(true);
+    try {
+      await verifyLoginOtp({ email, otp: enteredCode, purpose: 'reset' });
+      setStep('reset');
+    } catch (err) {
+      setErr(err?.message || 'That code is incorrect. Please check and try again.');
+    }
+    setSending(false);
   };
 
   const handleReset = async e => {
     e.preventDefault(); setErr('');
     if (newPw.length < 6) { setErr('Your password must be at least 6 characters.'); return; }
     if (newPw !== confirmPw) { setErr('Passwords do not match. Please re-enter.'); return; }
+    const hashed = await storePasswordValue(newPw);
     const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-    overrides[email.toLowerCase()] = newPw;
+    overrides[email.toLowerCase()] = hashed;
     localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
-    // Also save to Firestore user doc if it exists
     try {
       const fsUser = await findUserInFirestore(email);
-      if (fsUser) await setDoc(doc(db, 'users', fsUser.id), { passwordHash: newPw, updatedAt: serverTimestamp() }, { merge: true });
+      if (fsUser) await setDoc(doc(db, 'users', fsUser.id), { passwordHash: hashed, updatedAt: serverTimestamp() }, { merge: true });
     } catch {}
-    // Clear any lockout for this email
     clearAttempts(email.toLowerCase());
     setSuccess('Your password has been reset successfully. You can now sign in with your new password.');
     setStep('done');
@@ -354,20 +379,32 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const [successMsg,setSuccessMsg]= useState('');
   const [showReset, setShowReset] = useState(false);
+  const [pending2FA, setPending2FA] = useState(null); // { sessionUser, phone, emailKey }
+  const [otpCode, setOtpCode] = useState('');
+  const [otpBusy, setOtpBusy] = useState(false);
+  const [otpErr, setOtpErr] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(0);
   const { showError, showSuccess, ToastComponent } = useToast();
-
-  // ── Block render if already logged in — no flash, instant redirect ─────────
-  if (user) {
-    const raw = loc.state?.from?.pathname;
-    const safe = raw && raw !== '/login' && raw !== '/register' ? raw : '/';
-    window.location.replace(safe);
-    return null; // render nothing while redirecting
-  }
 
   // Remember Me state — only pre-checks if user explicitly saved it before
   const rememberedEmail = localStorage.getItem('eh_remembered_email') || '';
   const [rememberMe, setRememberMe] = useState(!!rememberedEmail);
   const [lc, setLc] = useState({ heading:'Welcome Back', sub:'Sign in to access your library', btn:'Sign In', no_account:'No account?', create_link:'Create one' });
+
+  // ── Block render if already logged in — no flash, instant redirect ─────────
+  // (after hooks so Rules of Hooks stay valid)
+  useEffect(() => {
+    if (!user || pending2FA) return;
+    const raw = loc.state?.from?.pathname;
+    const safe = raw && raw !== '/login' && raw !== '/register' ? raw : '/';
+    window.location.replace(safe);
+  }, [user, pending2FA, loc.state]);
+
+  useEffect(() => {
+    if (otpCountdown <= 0) return;
+    const t = setInterval(() => setOtpCountdown((v) => Math.max(0, v - 1)), 1000);
+    return () => clearInterval(t);
+  }, [otpCountdown]);
 
   // Use our form validation hook — onSubmit is NOT passed here to avoid
   // a stale-closure ReferenceError (handleLoginSubmit is defined below).
@@ -402,46 +439,143 @@ export default function Login() {
   const cv = (editCtx?.editMode && editCtx?.pageKey === 'login_content')
     ? { ...lc, ...editCtx.pageData } : lc;
 
+  const failPw = (emailKey) => {
+    const data = recordFailedAttempt(emailKey);
+    const remaining = MAX_ATTEMPTS - data.count;
+    if (data.lockedUntil) {
+      return { success: false, error: getLockoutMessage(data) || 'Too many failed attempts. Account locked.' };
+    }
+    return {
+      success: false,
+      error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}`,
+    };
+  };
+
+  const upgradeStoredPassword = async (emailKey, userId, plaintext) => {
+    try {
+      const hashed = await storePasswordValue(plaintext);
+      if (userId) {
+        await setDoc(doc(db, 'users', userId), { passwordHash: hashed, updatedAt: serverTimestamp() }, { merge: true });
+      }
+      const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
+      overrides[emailKey] = hashed;
+      localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
+    } catch (e) {
+      console.warn('[Login] Password upgrade skipped:', e.message);
+    }
+  };
+
+  const finishAuthenticatedLogin = async (sessionUser, extras = {}) => {
+    const finalizeSession = (u) => {
+      setUser(u);
+      if (!rememberMe) sessionStorage.setItem('eh_session_only', '1');
+      else sessionStorage.removeItem('eh_session_only');
+    };
+
+    const security = await getSecuritySettings();
+    const accountFor2FA = {
+      ...sessionUser,
+      twoFactorEnabled: extras.twoFactorEnabled === true || sessionUser.twoFactorEnabled === true,
+    };
+
+    if (shouldRequire2FA(accountFor2FA, security)) {
+      try {
+        await sendLoginOtp({
+          email: sessionUser.email,
+          name: sessionUser.name,
+          phone: extras.phone || '',
+        });
+        setPending2FA({
+          sessionUser: { ...sessionUser, twoFactorEnabled: true },
+          emailKey: String(sessionUser.email).toLowerCase(),
+          mustChangePassword: !!extras.mustChangePassword,
+        });
+        setOtpCode('');
+        setOtpErr('');
+        setOtpCountdown(OTP_VALID_SECS);
+        return { success: true, requires2FA: true };
+      } catch (e) {
+        return {
+          success: false,
+          error: e?.message || 'Could not send your 2FA code. Please try again or contact support.',
+        };
+      }
+    }
+
+    finalizeSession(sessionUser);
+    await logLogin(sessionUser.email, sessionUser.name);
+    if (extras.mustChangePassword) {
+      showLoginSuccess(sessionUser.name);
+      setTimeout(() => navigate('/change-password', { replace: true }), 1000);
+      return { success: true };
+    }
+    showLoginSuccess(sessionUser.name);
+    return { success: true };
+  };
+
+  const handleVerifyLoginOtp = async (e) => {
+    e.preventDefault();
+    if (!pending2FA) return;
+    setOtpErr('');
+    if (otpCountdown <= 0) {
+      setOtpErr('This code has expired. Please request a new one.');
+      return;
+    }
+    setOtpBusy(true);
+    try {
+      await verifyLoginOtp({ email: pending2FA.emailKey, otp: otpCode, purpose: 'login' });
+      const sessionUser = pending2FA.sessionUser;
+      setUser(sessionUser);
+      if (!rememberMe) sessionStorage.setItem('eh_session_only', '1');
+      else sessionStorage.removeItem('eh_session_only');
+      await logLogin(sessionUser.email, sessionUser.name);
+      const mustChange = pending2FA.mustChangePassword;
+      setPending2FA(null);
+      if (mustChange) {
+        showLoginSuccess(sessionUser.name);
+        setTimeout(() => navigate('/change-password', { replace: true }), 1000);
+      } else {
+        showLoginSuccess(sessionUser.name);
+      }
+    } catch (err) {
+      const raw = err?.message || 'Incorrect verification code.';
+      setOtpErr(raw.replace(/^Firebase:\s*/i, '').replace(/\s*\([^)]*\)\.?$/, '').trim());
+    }
+    setOtpBusy(false);
+  };
+
+  const handleResendLoginOtp = async () => {
+    if (!pending2FA || otpCountdown > OTP_VALID_SECS - 60) return;
+    setOtpBusy(true);
+    setOtpErr('');
+    try {
+      await sendLoginOtp({
+        email: pending2FA.emailKey,
+        name: pending2FA.sessionUser.name,
+      });
+      setOtpCountdown(OTP_VALID_SECS);
+      setOtpCode('');
+    } catch (err) {
+      setOtpErr(err?.message || 'Could not resend the code.');
+    }
+    setOtpBusy(false);
+  };
+
   const handleLoginSubmit = async (values) => {
     const emailKey = values.email.trim().toLowerCase();
 
     try {
-      // ── Remember Me — save or clear based on current checkbox state ──────────
-      // Always respects the current email the user typed, not any cached email
-      if (rememberMe) {
-        localStorage.setItem('eh_remembered_email', values.email.trim());
-      } else {
-        localStorage.removeItem('eh_remembered_email');
-      }
+      if (rememberMe) localStorage.setItem('eh_remembered_email', values.email.trim());
+      else localStorage.removeItem('eh_remembered_email');
 
-      // ── Helper: set user session; if !rememberMe also write to sessionStorage
-      //    so AppContext localStorage persists only when chosen ─────────────────
-      const finalizeSession = (sessionUser) => {
-        setUser(sessionUser); // AppContext always writes to localStorage
-        if (!rememberMe) {
-          // Mark this session as "session-only" — on next app load AppContext
-          // will check this flag and clear if the sessionStorage token is gone
-          sessionStorage.setItem('eh_session_only', '1');
-        } else {
-          sessionStorage.removeItem('eh_session_only');
-        }
-      };
-
-      // ── Lockout check ───────────────────────────────────────────────────────
       const attemptData = getAttemptData(emailKey);
       if (attemptData.lockedUntil && Date.now() < attemptData.lockedUntil) {
-        const lockoutMsg = getLockoutMessage(attemptData) || 'Account temporarily locked. Please try again later.';
-        return { success: false, error: lockoutMsg };
+        return { success: false, error: getLockoutMessage(attemptData) || 'Account temporarily locked. Please try again later.' };
       }
-      // If lockout has expired, clear it
-      if (attemptData.lockedUntil && Date.now() >= attemptData.lockedUntil) {
-        clearAttempts(emailKey);
-      }
+      if (attemptData.lockedUntil && Date.now() >= attemptData.lockedUntil) clearAttempts(emailKey);
 
-      /* 1. Check Firestore users collection first */
       const fsUser = await findUserInFirestore(emailKey);
       if (fsUser) {
-        // Block deleted users from logging in — check both Firestore status and localStorage blocklist
         const lsDeleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
         if (fsUser.status === 'deleted' || lsDeleted.includes(emailKey)) {
           return { success: false, error: 'No account found with that email address. Please check your email or create an account.' };
@@ -452,58 +586,56 @@ export default function Login() {
         const pwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
         const localOverride = pwOverrides[emailKey];
         const fsHash = fsUser.passwordHash || fsUser.password || '';
-        const passwordOk = (localOverride && localOverride === values.password) || (fsHash && fsHash === values.password);
         if (!fsHash && !localOverride) {
           return { success: false, error: 'This account has no password set. Please contact support.' };
         }
-        if (!passwordOk) {
-          const data = recordFailedAttempt(emailKey);
-          const remaining = MAX_ATTEMPTS - data.count;
-          if (data.lockedUntil) {
-            const lockoutMsg = getLockoutMessage(data) || 'Too many failed attempts. Account locked.';
-            return { success: false, error: lockoutMsg };
-          } else {
-            return { success: false, error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}` };
-          }
-        }
+        const primary = await verifyPassword(values.password, fsHash);
+        const overrideCheck = localOverride
+          ? await verifyPassword(values.password, localOverride)
+          : { ok: false, needsUpgrade: false };
+        if (!primary.ok && !overrideCheck.ok) return failPw(emailKey);
+
         clearAttempts(emailKey);
+        if (primary.needsUpgrade || overrideCheck.needsUpgrade) {
+          await upgradeStoredPassword(emailKey, fsUser.id, values.password);
+        }
         const roleOverrides1 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
         const effectiveRole1 = roleOverrides1[emailKey] || fsUser.role || 'user';
-        const sessionUser = { id: fsUser.id, name: fsUser.name, email: fsUser.email, role: effectiveRole1, mustChangePassword: !!fsUser.mustChangePassword };
-        finalizeSession(sessionUser);
-        await logLogin(fsUser.email, fsUser.name);
-        showLoginSuccess(fsUser.name);
-        
-        if (fsUser.mustChangePassword) {
-          // For password change, navigate immediately without success message delay
-          setTimeout(() => navigate('/change-password', { replace: true }), 1000);
-          return { success: true };
-        }
-        // Navigation handled by showLoginSuccess
-        return { success: true };
+        return finishAuthenticatedLogin(
+          {
+            id: fsUser.id,
+            name: fsUser.name,
+            email: fsUser.email,
+            role: effectiveRole1,
+            mustChangePassword: !!fsUser.mustChangePassword,
+            twoFactorEnabled: !!fsUser.twoFactorEnabled,
+          },
+          { phone: fsUser.phone || '', mustChangePassword: !!fsUser.mustChangePassword, twoFactorEnabled: !!fsUser.twoFactorEnabled }
+        );
       }
 
-      /* 2. Check admin credentials in Firestore */
       const adminAccount = await checkAdminCredentials(emailKey, values.password);
       if (adminAccount) {
         clearAttempts(emailKey);
-        const sessionUser = { id: adminAccount.id || 'admin01', name: adminAccount.name || 'Admin', email: adminAccount.email, role: adminAccount.role };
-        finalizeSession(sessionUser);
-        await logLogin(adminAccount.email, adminAccount.name);
-        showLoginSuccess(adminAccount.name || 'Admin');
-        // Navigation handled by showLoginSuccess
-        return { success: true };
+        return finishAuthenticatedLogin(
+          {
+            id: adminAccount.id || 'admin01',
+            name: adminAccount.name || 'Admin',
+            email: adminAccount.email,
+            role: adminAccount.role,
+            twoFactorEnabled: !!adminAccount.twoFactorEnabled,
+          },
+          { twoFactorEnabled: !!adminAccount.twoFactorEnabled }
+        );
       }
 
-      /* 3. Legacy: check localStorage registered users OR Firestore site_data/registered_users ── */
       try {
         const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
         if (regSnap.exists()) {
           const regData = regSnap.data();
-          // Check both Firestore deletedEmails and localStorage blocklist
           const fsDeletedEmails = new Set((regData.deletedEmails || []).map(e => e.toLowerCase()));
-          const lsDeleted       = new Set(JSON.parse(localStorage.getItem('eh_deleted_users') || '[]').map(e => e.toLowerCase()));
-          const isDeleted       = fsDeletedEmails.has(emailKey) || lsDeleted.has(emailKey);
+          const lsDeleted = new Set(JSON.parse(localStorage.getItem('eh_deleted_users') || '[]').map(e => e.toLowerCase()));
+          const isDeleted = fsDeletedEmails.has(emailKey) || lsDeleted.has(emailKey);
           const regUser = !isDeleted
             ? (regData.registered || []).find(u => u.email?.toLowerCase() === emailKey)
             : null;
@@ -511,42 +643,31 @@ export default function Login() {
             const fsPwOverrides = regData.pwOverrides || {};
             const localOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
             const fsPw = fsPwOverrides[emailKey] || localOverrides[emailKey] || regUser.password || '';
-            
             const suspFs = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
             const suspLeg = JSON.parse(localStorage.getItem('eh_suspended_users') || '[]');
             const allSusp = [...new Set([...suspFs, ...suspLeg])];
             if (allSusp.includes(emailKey) || regUser.suspended) {
               return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
             }
-            
-            if (!fsPw) {
-              return { success: false, error: 'This account has no password set. Please contact support.' };
-            }
-            if (fsPw !== values.password) {
-              const data = recordFailedAttempt(emailKey);
-              const remaining = MAX_ATTEMPTS - data.count;
-              if (data.lockedUntil) {
-                const lockoutMsg = getLockoutMessage(data) || 'Too many failed attempts. Account locked.';
-                return { success: false, error: lockoutMsg };
-              } else {
-                return { success: false, error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}` };
-              }
-            }
+            if (!fsPw) return { success: false, error: 'This account has no password set. Please contact support.' };
+            const check = await verifyPassword(values.password, fsPw);
+            if (!check.ok) return failPw(emailKey);
             clearAttempts(emailKey);
-            
+
             const uid = regUser.id || ('u_' + Date.now());
             const joined = regUser.joined || new Date().toISOString().slice(0, 10);
             const roleOverrides3 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
             const effectiveRole3 = roleOverrides3[emailKey] || regData.roleOverrides?.[emailKey] || regUser.role || 'user';
+            const hashed = check.needsUpgrade ? await storePasswordValue(values.password) : fsPw;
             await setDoc(doc(db, 'users', uid), {
               id: uid, name: regUser.name, email: emailKey,
-              role: effectiveRole3, passwordHash: fsPw,
+              role: effectiveRole3, passwordHash: hashed,
+              twoFactorEnabled: !!regUser.twoFactorEnabled,
               joined, migratedAt: serverTimestamp(), status: 'active',
             }, { merge: true }).catch((e) => {
               console.warn('[Login] Auto-migration to users collection failed:', e.message);
             });
-            
-            // Sync registered list back to localStorage — always filter deleted emails
+
             const loginDeletedSet = new Set([
               ...(regData.deletedEmails || []),
               ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
@@ -555,48 +676,35 @@ export default function Login() {
               (regData.registered || []).filter(r => !loginDeletedSet.has((r.email || '').toLowerCase()))
             ));
             const localPwOverrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-            localPwOverrides[emailKey] = fsPw;
+            localPwOverrides[emailKey] = hashed;
             localStorage.setItem('eh_pw_overrides', JSON.stringify(localPwOverrides));
-            
-            const sessionUser = { id: uid, name: regUser.name, email: emailKey, role: effectiveRole3 };
-            finalizeSession(sessionUser);
-            await logLogin(emailKey, regUser.name);
-            showLoginSuccess(regUser.name);
-            // Navigation handled by showLoginSuccess
-            return { success: true };
+
+            return finishAuthenticatedLogin(
+              { id: uid, name: regUser.name, email: emailKey, role: effectiveRole3, twoFactorEnabled: !!regUser.twoFactorEnabled },
+              { twoFactorEnabled: !!regUser.twoFactorEnabled }
+            );
           }
         }
       } catch (e) {
         logError(e, { operation: 'firestore-registered-users-check' });
       }
 
-      /* 4. Last resort — localStorage registered users */
       const legacy = getAccounts();
       const legacyAccount = legacy.find(a => a.email?.toLowerCase() === emailKey);
       if (legacyAccount) {
         if (legacyAccount.suspended) {
           return { success: false, error: 'Your account has been suspended. Please contact support at ellines.haven@gmail.com.' };
         }
-        const effectivePw = legacyAccount.password;
-        if (effectivePw !== values.password) {
-          const data = recordFailedAttempt(emailKey);
-          const remaining = MAX_ATTEMPTS - data.count;
-          if (data.lockedUntil) {
-            const lockoutMsg = getLockoutMessage(data) || 'Too many failed attempts. Account locked.';
-            return { success: false, error: lockoutMsg };
-          } else {
-            return { success: false, error: `Incorrect password. ${remaining > 0 ? remaining + ' attempt' + (remaining !== 1 ? 's' : '') + ' remaining.' : ''}` };
-          }
-        }
+        const check = await verifyPassword(values.password, legacyAccount.password);
+        if (!check.ok) return failPw(emailKey);
         clearAttempts(emailKey);
+        if (check.needsUpgrade) await upgradeStoredPassword(emailKey, legacyAccount.id, values.password);
         const roleOverrides4 = JSON.parse(localStorage.getItem('eh_role_overrides') || '{}');
         const effectiveRole4 = roleOverrides4[emailKey] || legacyAccount.role || 'user';
-        const sessionUser = { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: effectiveRole4 };
-        finalizeSession(sessionUser);
-        await logLogin(legacyAccount.email, legacyAccount.name);
-        showLoginSuccess(legacyAccount.name);
-        // Navigation handled by showLoginSuccess
-        return { success: true };
+        return finishAuthenticatedLogin(
+          { id: legacyAccount.id, name: legacyAccount.name, email: legacyAccount.email, role: effectiveRole4, twoFactorEnabled: !!legacyAccount.twoFactorEnabled },
+          { twoFactorEnabled: !!legacyAccount.twoFactorEnabled }
+        );
       }
 
       return { success: false, error: 'No account found with that email address. Please check your email or create an account.' };
@@ -605,6 +713,8 @@ export default function Login() {
       return handleAuthError(e, 'login');
     }
   };
+
+  if (user && !pending2FA) return null;
 
   return (
     <main className="auth-page">
@@ -618,10 +728,67 @@ export default function Login() {
             </Link>
             <p className="auth-brand">Ellines Haven</p>
             <hr className="auth-brand-rule" />
-            <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
-            <p><EditableField field="sub">{cv.sub}</EditableField></p>
+            {pending2FA ? (
+              <>
+                <h2>Two-Factor Verification</h2>
+                <p>Enter the 6-digit code we sent to <strong>{pending2FA.emailKey}</strong></p>
+              </>
+            ) : (
+              <>
+                <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
+                <p><EditableField field="sub">{cv.sub}</EditableField></p>
+              </>
+            )}
           </div>
 
+          {pending2FA ? (
+            <form onSubmit={handleVerifyLoginOtp}>
+              {otpErr && <ErrorAlert error={otpErr} className="auth-alert" style={{ marginBottom: '16px' }} />}
+              <div className="form-group">
+                <label>Verification Code</label>
+                <input
+                  className="field auth-otp-input"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  autoFocus
+                  required
+                  autoComplete="one-time-code"
+                />
+                <div className={`auth-otp-timer${otpCountdown <= 60 ? ' is-urgent' : ''}`} style={{ marginTop: 8 }}>
+                  <span className="auth-otp-timer-label">
+                    {otpCountdown > 0
+                      ? `Code expires in ${Math.floor(otpCountdown / 60)}:${String(otpCountdown % 60).padStart(2, '0')}`
+                      : 'Code expired'}
+                  </span>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary auth-submit-btn" disabled={otpBusy || otpCode.length !== 6}>
+                {otpBusy ? <><span className="auth-spinner" />Verifying…</> : 'Verify & Sign In'}
+              </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, gap: 12 }}>
+                <button
+                  type="button"
+                  className="auth-forgot-link"
+                  disabled={otpBusy || otpCountdown > OTP_VALID_SECS - 60}
+                  onClick={handleResendLoginOtp}
+                >
+                  Resend code
+                </button>
+                <button
+                  type="button"
+                  className="auth-forgot-link"
+                  onClick={() => { setPending2FA(null); setOtpCode(''); setOtpErr(''); }}
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            </form>
+          ) : (
           <form onSubmit={async (e) => {
             e.preventDefault();
             setSubmitting(true);
@@ -715,11 +882,14 @@ export default function Login() {
               }
             </button>
           </form>
+          )}
 
+          {!pending2FA && (
           <p className="auth-switch">
             <EditableField field="no_account">{cv.no_account}</EditableField>{' '}
             <Link to="/register"><EditableField field="create_link">{cv.create_link}</EditableField></Link>
           </p>
+          )}
         </div>
       </div>
     </main>

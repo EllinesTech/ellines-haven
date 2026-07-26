@@ -68,24 +68,29 @@ export const callVerifyPaystack   = (data) => httpsCallable(functions, 'verifyPa
 export const callCreatePayPalOrder  = (data) => httpsCallable(functions, 'createPayPalOrder')(data);
 export const callCapturePayPalOrder = (data) => httpsCallable(functions, 'capturePayPalOrder')(data);
 export const callTrackVisitor     = (data) => httpsCallable(functions, 'trackVisitor')(data);
+export const callSendLoginOtp     = (data) => httpsCallable(functions, 'sendLoginOtp')(data);
+export const callVerifyAuthOtp    = (data) => httpsCallable(functions, 'verifyAuthOtp')(data);
 
 // Reading Challenges Cloud Functions (Phase 5-6)
 export const callStartChallenge      = (data) => httpsCallable(functions, 'startChallenge')(data);
 export const callCompleteChallenge   = (data) => httpsCallable(functions, 'completeChallenge')(data);
 export const callUpdateChallengeProgress = (data) => httpsCallable(functions, 'updateChallengeProgress')(data);
 
-// HTTP endpoints (as fallback if callable functions fail)
+/**
+ * Admin-only geo re-enrich. Prefer sendBeacon so failed responses do not
+ * appear as red fetch() console errors. Public pages must never call this.
+ */
 export async function callTrackVisitorHttp(data) {
-  const regionUrl = 'https://us-central1-ellines-haven-web.cloudfunctions.net';
-  const response = await fetch(`${regionUrl}/trackVisitorHttp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-  return { data: await response.json() };
+  const regionUrl = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitorHttp';
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([JSON.stringify(data || {})], { type: 'text/plain;charset=UTF-8' });
+      const ok = navigator.sendBeacon(regionUrl, blob);
+      return { data: { ok, queued: ok } };
+    }
+  } catch { /* fall through */ }
+  // No fetch() fallback — a 500 from fetch always paints the console red.
+  return { data: { ok: false, error: 'enrichment_skipped' } };
 }
 
 export default app;

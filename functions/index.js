@@ -16,6 +16,7 @@
  */
 
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
@@ -23,6 +24,60 @@ const axios = require("axios");
 
 admin.initializeApp();
 const db = admin.firestore();
+
+/** Look up geo for an IP. Never throws — returns {} on failure. */
+async function lookupVisitorGeo(clientIp) {
+  if (!clientIp || clientIp === "unknown" || clientIp.startsWith("127.") || clientIp.startsWith("::1") || clientIp === "0.0.0.0") {
+    return {};
+  }
+  try {
+    const geoRes = await axios.get(
+      `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
+      { timeout: 5000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" } }
+    );
+    if (geoRes.data?.status === "success") return geoRes.data;
+  } catch (_) { /* try fallback */ }
+  try {
+    const fallback = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
+      timeout: 4000,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" },
+    });
+    if (fallback.data && !fallback.data.error) {
+      return {
+        status: "success",
+        country: fallback.data.country_name,
+        countryCode: fallback.data.country_code,
+        region: fallback.data.region_code,
+        regionName: fallback.data.region,
+        city: fallback.data.city,
+        lat: fallback.data.latitude,
+        lon: fallback.data.longitude,
+        isp: fallback.data.org || fallback.data.isp,
+        org: fallback.data.org,
+        timezone: fallback.data.timezone,
+        query: clientIp,
+      };
+    }
+  } catch (_) { /* ignore */ }
+  return {};
+}
+
+function buildVisitorGeoFields(geo, clientIp) {
+  return {
+    ip: geo.query || clientIp || "",
+    city: geo.city || "",
+    region: geo.regionName || geo.region || "",
+    country: geo.country || "",
+    countryCode: geo.countryCode || "",
+    lat: typeof geo.lat === "number" ? geo.lat : null,
+    lon: typeof geo.lon === "number" ? geo.lon : null,
+    isp: geo.isp || geo.org || "",
+    org: geo.org || "",
+    timezone: geo.timezone || "",
+    rawIp: clientIp || "",
+    _needsGeo: false,
+  };
+}
 
 // ── Secrets ──────────────────────────────────────────────────────────────────
 const CONSUMER_KEY    = defineSecret("MPESA_CONSUMER_KEY");
@@ -1247,35 +1302,39 @@ exports.trackVisitor = onCall(
 // ─────────────────────────────────────────────────────────────────────────────
 // ── HTTP endpoint for visitor tracking (alternative to onCall, 100% public) ───
 // ─────────────────────────────────────────────────────────────────────────────
-// This HTTP endpoint bypasses Firebase callable functions entirely.
-// Used as fallback if onCall is blocked by auth/CORS/AppCheck issues.
+// HTTP enrich endpoint (admin re-enrich / legacy). Always returns HTTP 200 so
+// browsers never log a failed network request in the console.
 exports.trackVisitorHttp = onRequest(
   { region: "us-central1", cors: true },
   async (req, res) => {
-    // Accept both POST and OPTIONS (CORS preflight)
+    const ok = (payload) => res.status(200).json(payload);
+
     if (req.method === "OPTIONS") {
       return res.status(204).send("");
     }
     if (req.method !== "POST") {
-      return res.status(405).json({ ok: false, error: "Method not allowed" });
+      return ok({ ok: false, error: "Method not allowed" });
     }
 
     try {
-      console.log("[trackVisitorHttp] 📨 HTTP request received");
+      let body = req.body || {};
+      // sendBeacon often arrives as text/plain string
+      if (typeof body === "string") {
+        try { body = JSON.parse(body); } catch { body = {}; }
+      } else if (Buffer.isBuffer(body)) {
+        try { body = JSON.parse(body.toString("utf8")); } catch { body = {}; }
+      }
+      if (!body || typeof body !== "object") body = {};
 
-      // Extract data from POST body
-      const body = req.body || {};
-      const page      = (body.page      || "/").slice(0, 200);
-      const referrer  = (body.referrer  || "direct").slice(0, 200);
-      const userAgent = (body.userAgent || "").slice(0, 300);
-      const device    = (body.device    || "Desktop").slice(0, 30);
-      const userEmail = (body.userEmail || "").slice(0, 200);
-      const userName  = (body.userName  || "").slice(0, 100);
-      const existingDocId = body._docId || null; // doc already created by client
-      // Optional: admin re-enrich of a stored visitor IP (never trust for auth — geo only)
+      const page      = String(body.page      || "/").slice(0, 200);
+      const referrer  = String(body.referrer  || "direct").slice(0, 200);
+      const userAgent = String(body.userAgent || "").slice(0, 300);
+      const device    = String(body.device    || "Desktop").slice(0, 30);
+      const userEmail = String(body.userEmail || "").slice(0, 200);
+      const userName  = String(body.userName  || "").slice(0, 100);
+      const existingDocId = body._docId ? String(body._docId).slice(0, 128) : null;
       const requestedIp   = typeof body.ip === "string" ? body.ip.trim() : "";
 
-      // Extract real IP from request headers
       const xForwardedFor = req.get("x-forwarded-for") || "";
       const cfConnecting  = req.get("cf-connecting-ip") || "";
       const fastlyClient  = req.get("fastly-client-ip") || "";
@@ -1290,134 +1349,129 @@ exports.trackVisitorHttp = onRequest(
         "";
 
       const headerIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
-      // Prefer explicit IP only when looking up a past visitor; else use the requester's IP
       const clientIp = (/^\d{1,3}(\.\d{1,3}){3}$/.test(requestedIp) || requestedIp.includes(":"))
         ? requestedIp.replace(/^::ffff:/, "")
         : headerIp;
 
-      console.log("[trackVisitorHttp] 🌐 IP:", clientIp, "| headerIp:", headerIp, "| docId:", existingDocId);
+      const geo = await lookupVisitorGeo(clientIp);
+      const geoData = buildVisitorGeoFields(geo, clientIp);
 
-      // Geolocate
-      let geo = {};
-      if (clientIp && clientIp !== "unknown" && !clientIp.startsWith("127.") && !clientIp.startsWith("::1")) {
-        try {
-          const geoRes = await axios.get(
-            `http://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,isp,org,timezone,query`,
-            { timeout: 5000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" } }
-          );
-          if (geoRes.data?.status === "success") {
-            geo = geoRes.data;
-            console.log("[trackVisitorHttp] ✅ Geo:", geo.country, geo.city);
-          }
-        } catch (geoErr) {
-          // Try backup
-          try {
-            const fallback = await axios.get(`https://ipapi.co/${encodeURIComponent(clientIp)}/json/`, {
-              timeout: 4000, headers: { "User-Agent": "Mozilla/5.0 (compatible; Ellines-Haven-Bot/1.0)" }
-            });
-            if (fallback.data && !fallback.data.error) {
-              geo = {
-                status: "success",
-                country: fallback.data.country_name, countryCode: fallback.data.country_code,
-                region: fallback.data.region_code, regionName: fallback.data.region,
-                city: fallback.data.city, lat: fallback.data.latitude, lon: fallback.data.longitude,
-                isp: fallback.data.org || fallback.data.isp, org: fallback.data.org,
-                timezone: fallback.data.timezone, query: clientIp
-              };
-            }
-          } catch (_) { /* ignore */ }
-        }
-      }
-
-      const geoData = {
-        ip:          geo.query       || clientIp,
-        city:        geo.city        || "",
-        region:      geo.regionName  || geo.region || "",
-        country:     geo.country     || "",
-        countryCode: geo.countryCode || "",
-        lat:         geo.lat         || null,
-        lon:         geo.lon         || null,
-        isp:         geo.isp         || geo.org || "",
-        org:         geo.org         || "",
-        timezone:    geo.timezone    || "",
-        rawIp:       clientIp,
-        _needsGeo:   false,  // mark as enriched
-      };
-
+      let docId = existingDocId;
       if (existingDocId) {
-        // Update the doc that was already created by the client
-        await db.collection("site_visitors").doc(existingDocId).update(geoData);
-        console.log("[trackVisitorHttp] ✅ Updated existing doc:", existingDocId, "with geo data");
+        // merge set — never throws NOT_FOUND like update() can
+        await db.collection("site_visitors").doc(existingDocId).set(geoData, { merge: true });
       } else {
-        // Create a new doc if none exists (legacy flow)
-        const visitId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
-        await db.collection("site_visitors").doc(visitId).set({
+        docId = "v_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+        await db.collection("site_visitors").doc(docId).set({
           ...geoData,
           page, referrer, userAgent, device,
           ...(userEmail ? { userEmail, userName } : {}),
           visitedAt:   admin.firestore.FieldValue.serverTimestamp(),
           visitedAtMs: Date.now(),
         });
-        console.log("[trackVisitorHttp] ✅ Created new doc:", visitId);
       }
 
-      res.json({
+      return ok({
         ok: true,
-        ip: geo.query || clientIp,
-        city: geo.city || '',
-        country: geo.country || '',
-        countryCode: geo.countryCode || '',
-        region: geo.regionName || geo.region || '',
-        isp: geo.isp || geo.org || '',
-        lat: geo.lat || null,
-        lon: geo.lon || null,
-        timezone: geo.timezone || '',
-        docId: existingDocId || null
+        ip: geoData.ip,
+        city: geoData.city,
+        country: geoData.country,
+        countryCode: geoData.countryCode,
+        region: geoData.region,
+        isp: geoData.isp,
+        lat: geoData.lat,
+        lon: geoData.lon,
+        timezone: geoData.timezone,
+        docId,
       });
     } catch (err) {
-      console.error("[trackVisitorHttp] ❌ Error:", err.message);
-      res.status(500).json({ ok: false, error: err.message });
+      console.error("[trackVisitorHttp] Error (soft):", err.message);
+      // Soft-fail: 200 so client consoles stay clean
+      return ok({ ok: false, error: "enrichment_skipped" });
+    }
+  }
+);
+
+// Auto-enrich visitor docs written by the client — no browser HTTP call needed.
+exports.enrichVisitorOnCreate = onDocumentCreated(
+  {
+    document: "site_visitors/{docId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    try {
+      const snap = event.data;
+      if (!snap) return;
+      const data = snap.data() || {};
+      if (data._needsGeo === false && data.country) return;
+
+      // Prefer IP already on the doc; otherwise we cannot know the visitor IP
+      // from a Firestore trigger (no request headers). Mark enriched empty.
+      const ip = (data.rawIp || data.ip || "").trim();
+      if (!ip || ip === "unknown") {
+        await snap.ref.set({ _needsGeo: false }, { merge: true });
+        return;
+      }
+
+      const geo = await lookupVisitorGeo(ip);
+      await snap.ref.set(buildVisitorGeoFields(geo, ip), { merge: true });
+    } catch (err) {
+      console.error("[enrichVisitorOnCreate]", err.message);
     }
   }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Send Password Reset OTP — email + SMS via Africa's Talking ───────────────
+// ── Auth OTP helpers (password reset + login 2FA) — server-side codes only ───
 // ─────────────────────────────────────────────────────────────────────────────
-// ── RESEND_API_KEY secret (HTTPS email — works from Cloud Run, no port issues)
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+const OTP_TTL_MS = 15 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
 
-exports.sendPasswordResetOtp = onCall(
-  {
-    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, RESEND_API_KEY],
-    region: "us-central1",
-    allowInvalidAppCheckToken: true,
-    invoker: "public",
-  },
-  async (request) => {
-    const nodemailer = require("nodemailer");
+function authOtpDocId(email, purpose) {
+  return `${libDocId(email)}_${purpose || "login"}`;
+}
 
-    const { email, phone, otp, name } = request.data;
-    if (!email || !otp) throw new HttpsError("invalid-argument", "email and otp are required");
+function hashOtpCode(otp, email, purpose) {
+  return crypto
+    .createHash("sha256")
+    .update(`${String(otp)}:${String(email).toLowerCase()}:${purpose || "login"}`)
+    .digest("hex");
+}
 
-    const userName  = name  || "Valued Reader";
-    const otpCode   = String(otp).slice(0, 6);
-    let   emailSent = false;
-    let   smsSent   = false;
-    let   smtpError = "";
+async function storeAuthOtp(email, purpose, otpCode) {
+  const emailKey = String(email).toLowerCase().trim();
+  const docId = authOtpDocId(emailKey, purpose);
+  await db.collection("auth_otps").doc(docId).set({
+    email: emailKey,
+    purpose,
+    hash: hashOtpCode(otpCode, emailKey, purpose),
+    attempts: 0,
+    expiresAtMs: Date.now() + OTP_TTL_MS,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return docId;
+}
 
-    const atApiKey   = AT_API_KEY.value()   || "";
-    const atUsername = AT_USERNAME.value()  || "";
-    const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
+async function deliverOtpMessage({ email, phone, name, otpCode, purpose }) {
+  const nodemailer = require("nodemailer");
+  const userName = name || "Valued Reader";
+  const isLogin = purpose === "login";
+  const title = isLogin ? "Your sign-in code" : "Your password reset code";
+  const subject = isLogin
+    ? `Your sign-in code: ${otpCode} — Ellines Haven`
+    : `Your reset code: ${otpCode} — Ellines Haven`;
+  const intro = isLogin
+    ? "Use this code to finish signing in to Ellines Haven. It expires in <strong style=\"color:#c9a84c;\">15 minutes</strong>."
+    : "We received a request to reset your Ellines Haven password. Use the code below — it expires in <strong style=\"color:#c9a84c;\">15 minutes</strong>.";
+  const textBody = isLogin
+    ? `Hi ${userName},\n\nYour Ellines Haven sign-in code is: ${otpCode}\n\nThis code expires in 15 minutes. If you didn't try to sign in, ignore this email and change your password.\n\n— Ellines Haven`
+    : `Hi ${userName},\n\nYour Ellines Haven password reset code is: ${otpCode}\n\nThis code expires in 15 minutes. If you didn't request this, ignore this email.\n\n— Ellines Haven`;
+  const smsText = isLogin
+    ? `Ellines Haven sign-in code: ${otpCode}. Valid 15 mins. Do not share.`
+    : `Ellines Haven reset code: ${otpCode}. Valid 15 mins. Do not share.`;
 
-    const smtpHost     = SMTP_HOST.value()     || "";
-    const smtpPort     = parseInt(SMTP_PORT.value() || "587", 10);
-    const smtpUser     = SMTP_USER.value()     || "";
-    const smtpPass     = SMTP_PASS.value()     || "";
-    const resendApiKey = RESEND_API_KEY.value() || "";
-
-    // ── HTML email body ───────────────────────────────────────────────────────
-    const htmlBody = `
+  const htmlBody = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -1430,16 +1484,15 @@ exports.sendPasswordResetOtp = onCall(
         </td></tr>
         <tr><td style="padding:32px 36px;">
           <p style="margin:0 0 8px;color:#f0ece2;font-size:1rem;">Hi <strong>${userName}</strong>,</p>
-          <p style="margin:0 0 24px;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">
-            We received a request to reset your Ellines Haven password. Use the code below — it expires in <strong style="color:#c9a84c;">15 minutes</strong>.
-          </p>
+          <p style="margin:0 0 24px;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">${intro}</p>
           <div style="text-align:center;margin:28px 0;">
             <div style="display:inline-block;background:#0d0d1a;border:2px solid #c9a84c;border-radius:12px;padding:20px 40px;">
+              <div style="color:rgba(201,168,76,0.7);font-size:0.75rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">${title}</div>
               <div style="color:#c9a84c;font-size:2.2rem;font-weight:700;letter-spacing:10px;font-family:monospace;">${otpCode}</div>
             </div>
           </div>
           <p style="margin:24px 0 0;color:rgba(240,236,226,0.5);font-size:0.82rem;line-height:1.6;">
-            If you did not request a password reset, you can safely ignore this email. Your password will not change.
+            If you did not request this, you can safely ignore this email.
           </p>
         </td></tr>
         <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
@@ -1451,109 +1504,210 @@ exports.sendPasswordResetOtp = onCall(
 </body>
 </html>`.trim();
 
-    const textBody = `Hi ${userName},\n\nYour Ellines Haven password reset code is: ${otpCode}\n\nThis code expires in 15 minutes. If you didn't request this, ignore this email.\n\n— Ellines Haven`;
+  let emailSent = false;
+  let smsSent = false;
+  let smtpError = "";
 
-    // ── 1a. Send email via Resend (HTTPS — primary, no port blocking) ─────────
-    if (resendApiKey) {
-      try {
-        const { Resend } = require("resend");
-        const resend = new Resend(resendApiKey);
-        const { error: resendError } = await resend.emails.send({
-          from:    "Ellines Haven <noreply@haven.ellines.co.ke>",
-          to:      [email],
-          subject: `Your reset code: ${otpCode} — Ellines Haven`,
-          text:    textBody,
-          html:    htmlBody,
-        });
-        if (resendError) {
-          // 403 = domain not verified — fall through to SMTP silently
-          console.warn("[sendOtp] Resend error:", resendError.message, "| falling back to SMTP");
-        } else {
-          emailSent = true;
-          console.log("[sendOtp] Email sent via Resend to", email);
-        }
-      } catch (e) {
-        console.warn("[sendOtp] Resend failed:", e.message, "| falling back to SMTP");
-      }
-    }
+  const atApiKey   = AT_API_KEY.value()   || "";
+  const atUsername = AT_USERNAME.value()  || "";
+  const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
+  const smtpHost     = SMTP_HOST.value()     || "";
+  const smtpUser     = SMTP_USER.value()     || "";
+  const smtpPass     = SMTP_PASS.value()     || "";
+  const resendApiKey = RESEND_API_KEY.value() || "";
 
-    // ── 1b. Send email via SMTP port 587 (fallback — works on Cloud Run) ─────
-    if (!emailSent && smtpHost && smtpUser && smtpPass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host:   smtpHost,
-          port:   587,           // always use 587 — 465 is blocked on Cloud Run
-          secure: false,         // STARTTLS on 587
-          auth:   { user: smtpUser, pass: smtpPass },
-          tls:    { rejectUnauthorized: false },
-          connectionTimeout: 15000,
-          greetingTimeout:   15000,
-          socketTimeout:     15000,
-        });
-        await transporter.sendMail({
-          from:    `"Ellines Haven" <${smtpUser}>`,
-          to:      email,
-          subject: `Your reset code: ${otpCode} — Ellines Haven`,
-          text:    textBody,
-          html:    htmlBody,
-        });
+  if (resendApiKey) {
+    try {
+      const { Resend } = require("resend");
+      const resend = new Resend(resendApiKey);
+      const { error: resendError } = await resend.emails.send({
+        from: "Ellines Haven <noreply@haven.ellines.co.ke>",
+        to: [email],
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+      if (resendError) {
+        console.warn("[sendOtp] Resend error:", resendError.message, "| falling back to SMTP");
+      } else {
         emailSent = true;
-        console.log("[sendOtp] Email sent via SMTP/587 to", email);
+        console.log("[sendOtp] Email sent via Resend to", email);
+      }
+    } catch (e) {
+      console.warn("[sendOtp] Resend failed:", e.message, "| falling back to SMTP");
+    }
+  }
+
+  if (!emailSent && smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: 587,
+        secure: false,
+        auth: { user: smtpUser, pass: smtpPass },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000,
+      });
+      await transporter.sendMail({
+        from: `"Ellines Haven" <${smtpUser}>`,
+        to: email,
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+      emailSent = true;
+      console.log("[sendOtp] Email sent via SMTP/587 to", email);
+    } catch (e) {
+      smtpError = e.message;
+      console.warn("[sendOtp] SMTP/587 failed:", e.message, "| code:", e.code);
+    }
+  }
+
+  if (atApiKey && atUsername) {
+    const rawPhone = phone ? String(phone).replace(/\D/g, "") : "";
+    if (rawPhone) {
+      let formattedPhone = rawPhone;
+      if (rawPhone.startsWith("0")) formattedPhone = "+254" + rawPhone.slice(1);
+      else if (rawPhone.startsWith("254")) formattedPhone = "+" + rawPhone;
+      else if (!rawPhone.startsWith("+")) formattedPhone = "+254" + rawPhone;
+
+      try {
+        const isSandbox = atUsername === "sandbox";
+        const params = new URLSearchParams({
+          username: atUsername,
+          to: formattedPhone,
+          message: smsText,
+        });
+        if (!isSandbox && atSenderId) params.append("from", atSenderId);
+
+        const smsRes = await axios.post(
+          "https://api.africastalking.com/version1/messaging",
+          params.toString(),
+          {
+            headers: {
+              apiKey: atApiKey,
+              Accept: "application/json",
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        const recipients = smsRes.data?.SMSMessageData?.Recipients || [];
+        smsSent = recipients.some((r) => r.statusCode === 101 || r.status === "Success");
       } catch (e) {
-        smtpError = e.message;
-        console.warn("[sendOtp] SMTP/587 failed:", e.message, "| code:", e.code);
+        console.warn("[sendOtp] SMS failed:", e.response?.data || e.message);
       }
     }
+  }
 
-    // ── 2. Send SMS via Africa's Talking (if phone provided + AT creds set) ──
-    if (atApiKey && atUsername) {
-      const rawPhone = phone ? String(phone).replace(/\D/g, "") : "";
-      if (rawPhone) {
-        let formattedPhone = rawPhone;
-        if (rawPhone.startsWith("0"))        formattedPhone = "+254" + rawPhone.slice(1);
-        else if (rawPhone.startsWith("254")) formattedPhone = "+"   + rawPhone;
-        else if (!rawPhone.startsWith("+"))  formattedPhone = "+254" + rawPhone;
+  if (!emailSent && !smsSent) {
+    console.error(`[sendOtp] All delivery channels failed for ${email}. SMTP error: ${smtpError || "none"}. Resend key set: ${!!resendApiKey}`);
+    throw new HttpsError(
+      "unavailable",
+      "Could not deliver the verification code. Please check your email address or contact support at ellines.haven@gmail.com."
+    );
+  }
 
-        const smsText = `Ellines Haven reset code: ${otpCode}. Valid 15 mins. Do not share.`;
-        try {
-          const isSandbox = atUsername === "sandbox";
-          const params = new URLSearchParams({
-            username: atUsername,
-            to:       formattedPhone,
-            message:  smsText,
-          });
-          if (!isSandbox && atSenderId) params.append("from", atSenderId);
+  return { emailSent, smsSent };
+}
 
-          const smsRes = await axios.post(
-            "https://api.africastalking.com/version1/messaging",
-            params.toString(),
-            {
-              headers: {
-                apiKey:         atApiKey,
-                Accept:         "application/json",
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-            }
-          );
-          console.log("[sendOtp] SMS response:", JSON.stringify(smsRes.data));
-          const recipients = smsRes.data?.SMSMessageData?.Recipients || [];
-          smsSent = recipients.some(r => r.statusCode === 101 || r.status === "Success");
-        } catch (e) {
-          console.warn("[sendOtp] SMS failed:", e.response?.data || e.message);
-        }
-      }
+async function issueAndDeliverOtp({ email, phone, name, purpose }) {
+  const emailKey = String(email || "").toLowerCase().trim();
+  if (!emailKey) throw new HttpsError("invalid-argument", "email is required");
+
+  const otpCode = String(crypto.randomInt(100000, 1000000));
+  await storeAuthOtp(emailKey, purpose, otpCode);
+  const delivered = await deliverOtpMessage({
+    email: emailKey,
+    phone,
+    name,
+    otpCode,
+    purpose,
+  });
+  return { ...delivered, expiresInSec: Math.floor(OTP_TTL_MS / 1000) };
+}
+
+exports.sendPasswordResetOtp = onCall(
+  {
+    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, RESEND_API_KEY],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { email, phone, name } = request.data || {};
+    // OTP is always generated server-side (client-supplied otp ignored for security)
+    return issueAndDeliverOtp({
+      email,
+      phone,
+      name,
+      purpose: "reset",
+    });
+  }
+);
+
+/** Login 2FA — email/SMS OTP after password succeeds */
+exports.sendLoginOtp = onCall(
+  {
+    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, RESEND_API_KEY],
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const { email, phone, name } = request.data || {};
+    return issueAndDeliverOtp({
+      email,
+      phone,
+      name,
+      purpose: "login",
+    });
+  }
+);
+
+/** Verify a server-issued OTP for login or password reset */
+exports.verifyAuthOtp = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const emailKey = String(request.data?.email || "").toLowerCase().trim();
+    const otp = String(request.data?.otp || "").trim();
+    const purpose = String(request.data?.purpose || "login").trim() || "login";
+
+    if (!emailKey || !/^\d{6}$/.test(otp)) {
+      throw new HttpsError("invalid-argument", "Valid email and 6-digit code are required");
     }
 
-    // ── 3. If neither channel worked, throw so the client knows delivery failed
-    if (!emailSent && !smsSent) {
-      console.error(`[sendOtp] All delivery channels failed for ${email}. SMTP error: ${smtpError || "none"}. Resend key set: ${!!resendApiKey}`);
-      throw new HttpsError(
-        "unavailable",
-        "Could not deliver the reset code. Please check your email address or contact support at ellines.haven@gmail.com."
-      );
+    const ref = db.collection("auth_otps").doc(authOtpDocId(emailKey, purpose));
+    const snap = await ref.get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "No active verification code. Please request a new one.");
     }
 
-    return { emailSent, smsSent };
+    const data = snap.data() || {};
+    if (Date.now() > (data.expiresAtMs || 0)) {
+      await ref.delete().catch(() => {});
+      throw new HttpsError("deadline-exceeded", "This code has expired. Please request a new one.");
+    }
+
+    const attempts = data.attempts || 0;
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      await ref.delete().catch(() => {});
+      throw new HttpsError("resource-exhausted", "Too many incorrect attempts. Please request a new code.");
+    }
+
+    const expected = hashOtpCode(otp, emailKey, purpose);
+    if (expected !== data.hash) {
+      await ref.update({ attempts: attempts + 1 }).catch(() => {});
+      throw new HttpsError("permission-denied", "Incorrect verification code.");
+    }
+
+    await ref.delete().catch(() => {});
+    return { ok: true, purpose };
   }
 );
 
@@ -1870,189 +2024,6 @@ exports.getUserLoginHistory = onCall(
   }
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Password Reset OTP — send reset code via email & SMS ─────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-exports.sendPasswordResetOtp = onCall(
-  {
-    secrets: [AT_API_KEY, AT_USERNAME, AT_SENDER_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS],
-    region: "us-central1",
-    allowInvalidAppCheckToken: true,
-    invoker: "public",
-  },
-  async (request) => {
-    const nodemailer = require("nodemailer");
-    
-    const { email, phone, otp, name } = request.data;
-    if (!email || !otp) {
-      throw new HttpsError("invalid-argument", "email and otp are required");
-    }
-
-    const userName = name || "Valued Reader";
-    const otpCode = String(otp).slice(0, 6); // 6 digits
-
-    const smtpHost     = SMTP_HOST.value()      || "";
-    const smtpPort     = parseInt(SMTP_PORT.value() || "587", 10);
-    const smtpUser     = SMTP_USER.value()      || "";
-    const smtpPass     = SMTP_PASS.value()      || "";
-
-    const atApiKey   = AT_API_KEY.value()   || "";
-    const atUsername = AT_USERNAME.value()  || "";
-    const atSenderId = AT_SENDER_ID.value() || "EllinesHvn";
-
-    // ── Email HTML template ──────────────────────────────────────────────────
-    const htmlBody = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#0d0d1a;font-family:Georgia,serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d1a;padding:40px 0;">
-    <tr><td align="center">
-      <table width="520" cellpadding="0" cellspacing="0" style="background:#13132a;border-radius:12px;border:1px solid rgba(201,168,76,0.3);overflow:hidden;">
-        <tr><td style="background:linear-gradient(135deg,#1a1a0f,#2a2508);padding:28px 36px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2);">
-          <h1 style="margin:0;color:#c9a84c;font-size:1.5rem;letter-spacing:1px;">🔐 Reset Your Password</h1>
-        </td></tr>
-        <tr><td style="padding:32px 36px;">
-          <p style="margin:0 0 8px;color:#f0ece2;font-size:1rem;">Hi <strong>${userName}</strong>,</p>
-          <p style="margin:0 0 24px;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;">
-            You requested a password reset for your Ellines Haven account. Use this code to reset your password. <strong style="color:#c9a84c;">This code expires in 15 minutes.</strong>
-          </p>
-          <div style="text-align:center;margin:28px 0;">
-            <div style="display:inline-block;background:#0d0d1a;border:2px solid #c9a84c;border-radius:12px;padding:20px 40px;">
-              <div style="color:#c9a84c;font-size:2rem;font-weight:700;letter-spacing:6px;font-family:monospace;">${otpCode}</div>
-              <div style="color:rgba(201,168,76,0.6);font-size:0.8rem;margin-top:8px;">6-digit reset code</div>
-            </div>
-          </div>
-          <p style="margin:28px 0 0;color:rgba(240,236,226,0.7);font-size:0.92rem;line-height:1.6;text-align:center;">
-            <strong>Didn't request a reset?</strong> Ignore this email. Your account remains secure.
-          </p>
-          <p style="margin:16px 0 0;color:rgba(240,236,226,0.5);font-size:0.82rem;line-height:1.6;">
-            Questions? Contact us at <a href="mailto:ellines.haven@gmail.com" style="color:#c9a84c;">ellines.haven@gmail.com</a> or WhatsApp: 0748 255 466.
-          </p>
-        </td></tr>
-        <tr><td style="padding:16px 36px 24px;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
-          <p style="margin:0;color:rgba(240,236,226,0.35);font-size:0.78rem;">© Ellines Haven · ellines.haven@gmail.com</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`.trim();
-
-    const textBody = `🔐 Reset Your Password\n\nHi ${userName},\n\nYou requested a password reset. Use this code to reset your password:\n\n${otpCode}\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, ignore this email.\n\n— Ellines Haven Team`;
-
-    const smsBody = `Ellines Haven: Your password reset code is ${otpCode}. Valid for 15 min. Do not share.`;
-
-    let emailSent = false;
-    let smsSent = false;
-
-    // ── Send Email via SMTP ──────────────────────────────────────────────────
-    if (smtpHost && smtpUser && smtpPass) {
-      try {
-        const transporter = nodemailer.createTransport({
-          host:   smtpHost,
-          port:   587,
-          secure: false,
-          auth:   { user: smtpUser, pass: smtpPass },
-          tls:    { rejectUnauthorized: false },
-          connectionTimeout: 10000,
-          greetingTimeout:   10000,
-          socketTimeout:     10000,
-        });
-        await transporter.sendMail({
-          from:    `"Ellines Haven" <${smtpUser}>`,
-          to:      email,
-          subject: "🔐 Password Reset Code — Ellines Haven",
-          text:    textBody,
-          html:    htmlBody,
-        });
-        emailSent = true;
-        console.log("[sendPasswordResetOtp] Email sent to", email);
-      } catch (e) {
-        console.warn("[sendPasswordResetOtp] SMTP email failed:", e.message);
-      }
-    } else {
-      console.warn("[sendPasswordResetOtp] SMTP not configured");
-    }
-
-    // ── Send SMS via Africa's Talking ────────────────────────────────────────
-    if (phone && atApiKey && atUsername) {
-      try {
-        let formattedPhone = String(phone).replace(/\D/g, "");
-        if (formattedPhone.startsWith("0"))   formattedPhone = "+254" + formattedPhone.slice(1);
-        else if (formattedPhone.startsWith("254")) formattedPhone = "+" + formattedPhone;
-        else if (!formattedPhone.startsWith("+"))  formattedPhone = "+254" + formattedPhone;
-
-        const isSandbox = atUsername === "sandbox";
-        const params = new URLSearchParams({
-          username: atUsername,
-          to:       formattedPhone,
-          message:  smsBody,
-        });
-        if (!isSandbox && atSenderId) params.append("from", atSenderId);
-
-        await axios.post(
-          "https://api.africastalking.com/version1/messaging",
-          params.toString(),
-          {
-            headers: {
-              apiKey:         atApiKey,
-              Accept:         "application/json",
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-          }
-        );
-        smsSent = true;
-        console.log("[sendPasswordResetOtp] SMS sent to", formattedPhone);
-      } catch (e) {
-        console.warn("[sendPasswordResetOtp] SMS failed:", e.response?.data || e.message);
-      }
-    }
-
-    // ── Fallback: AT Email (production only) ─────────────────────────────────
-    if (!emailSent && atApiKey && atUsername && atUsername !== "sandbox") {
-      try {
-        const emailParams = new URLSearchParams({
-          username: atUsername,
-          to:       email,
-          from:     smtpUser || "noreply@ellines-haven.web.app",
-          subject:  "🔐 Password Reset Code — Ellines Haven",
-          message:  textBody,
-        });
-        await axios.post(
-          "https://api.africastalking.com/version1/messaging/email",
-          emailParams.toString(),
-          {
-            headers: {
-              apiKey:         atApiKey,
-              Accept:         "application/json",
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-          }
-        );
-        emailSent = true;
-        console.log("[sendPasswordResetOtp] Fallback email sent via AT to", email);
-      } catch (e) {
-        console.warn("[sendPasswordResetOtp] AT email fallback failed:", e.response?.data || e.message);
-      }
-    }
-
-    if (!emailSent && !smsSent) {
-      // Log failure for debugging
-      try {
-        await db.collection("password_reset_failures").add({
-          email,
-          phone,
-          reason: "No email or SMS service configured",
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      } catch {}
-      throw new HttpsError("unavailable", "Could not send reset code. Please try again or contact support@ellines-haven.co.ke");
-    }
-
-    return { emailSent, smsSent };
-  }
-);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Admin Password Reset Notification — email user when admin resets their pw ─

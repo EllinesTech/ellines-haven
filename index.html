@@ -2,6 +2,65 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Strip Cloudflare Web Analytics beacon before it loads.
+         CF injects beacon.min.js at the edge; adblockers then log ERR_BLOCKED_BY_CLIENT.
+         Permanent fix: Cloudflare Dashboard → Web Analytics → disable for this site. -->
+    <script>
+      (function () {
+        try {
+          var BLOCK = /cloudflareinsights\.com|beacon\.min\.js/i;
+          function isBlockedSrc(src) { return !!(src && BLOCK.test(String(src))); }
+          function nuke(node) {
+            if (!node || node.nodeType !== 1) return false;
+            if (node.tagName === 'SCRIPT') {
+              var src = node.src || node.getAttribute('src') || '';
+              if (isBlockedSrc(src) || BLOCK.test(node.textContent || '')) {
+                try { node.type = 'javascript/blocked'; node.removeAttribute('src'); } catch (e) {}
+                try { node.remove(); } catch (e2) {}
+                return true;
+              }
+            }
+            return false;
+          }
+          var obs = new MutationObserver(function (list) {
+            for (var i = 0; i < list.length; i++) {
+              var nodes = list[i].addedNodes;
+              for (var j = 0; j < nodes.length; j++) nuke(nodes[j]);
+            }
+          });
+          obs.observe(document.documentElement, { childList: true, subtree: true });
+          ['appendChild', 'insertBefore', 'replaceChild'].forEach(function (method) {
+            var orig = Element.prototype[method];
+            Element.prototype[method] = function () {
+              var node = method === 'replaceChild' ? arguments[0] : arguments[0];
+              if (nuke(node)) return node;
+              return orig.apply(this, arguments);
+            };
+          });
+          var origSetAttr = Element.prototype.setAttribute;
+          Element.prototype.setAttribute = function (name, value) {
+            if (this.tagName === 'SCRIPT' && String(name).toLowerCase() === 'src' && isBlockedSrc(value)) {
+              return;
+            }
+            return origSetAttr.call(this, name, value);
+          };
+          try {
+            var desc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+            if (desc && desc.set) {
+              Object.defineProperty(HTMLScriptElement.prototype, 'src', {
+                configurable: true,
+                enumerable: true,
+                get: desc.get,
+                set: function (v) {
+                  if (isBlockedSrc(v)) return;
+                  return desc.set.call(this, v);
+                }
+              });
+            }
+          } catch (e3) {}
+        } catch (e) {}
+      })();
+    </script>
     <!-- CRITICAL: Displace stale SWs + clear Cache Storage before modules load.
          Do NOT re-register a kill-switch SW on every visit — that caused claim/reload
          races. Only unregister leftover workers and drop Cache Storage. -->

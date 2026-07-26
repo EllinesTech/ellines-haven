@@ -176,6 +176,12 @@ service cloud.firestore {
       allow write: if true;           // Public (testing)
     }
 
+    // ── Auth OTPs (login 2FA + password reset) — Cloud Functions / Admin SDK only
+    match /auth_otps/{d} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
     // ── Chapter analytics (read tracking per chapter per day) ────────────────
     match /chapter_analytics/{docId} {
       allow read:   if isAdmin();     // Admins view analytics

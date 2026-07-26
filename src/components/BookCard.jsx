@@ -115,7 +115,8 @@ function webpSrc(src) {
   return src.replace(/\.png$/i, '.webp');
 }
 
-function BookCover({ book, priority = false }) {
+/** Shared cover used by BookCard, RecommendationWidget, TrendingWidget, etc. */
+export function BookCover({ book, priority = false }) {
   if (book.coverType === 'photo' && book.cover) {
     return (
       <picture>

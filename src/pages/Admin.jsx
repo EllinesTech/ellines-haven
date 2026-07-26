@@ -4847,7 +4847,9 @@ export default function Admin() {
                 )}
                 <div className="adm-field-group">
                   <label>Two-Factor Authentication</label>
-                  <label className="adm-check"><input type="checkbox" defaultChecked={false} /> Enable 2FA via email OTP</label>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '4px 0 0' }}>
+                    Configure site-wide 2FA in <strong>Security → 2FA</strong>. Admins can also enable personal 2FA from Profile → Security.
+                  </p>
                 </div>
                 <div className="adm-field-group">
                   <label>Session Timeout</label>

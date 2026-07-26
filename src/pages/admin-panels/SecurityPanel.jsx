@@ -18,12 +18,14 @@ function Toggle({label,desc,checked,onChange}) {
   );
 }
 
-function calcScore(c,pw) {
+function calcScore(c,pw,twoFa) {
   let n=0;
-  if(c.forceHttps) n+=12; if(c.disableDevTools) n+=14; if(c.disableCopy) n+=8;
-  if(c.disablePrint) n+=5; if(c.disableRightClick) n+=5; if(c.disableSelect) n+=4;
-  if(c.watermarkAll) n+=8; if(pw.minLength>=8) n+=14; if(pw.requireNumbers) n+=10;
-  if(pw.requireSpecial) n+=12; if(pw.maxAttempts<=5) n+=5; if(pw.brute) n+=8;
+  if(c.forceHttps) n+=10; if(c.disableDevTools) n+=10; if(c.disableCopy) n+=6;
+  if(c.disablePrint) n+=4; if(c.disableRightClick) n+=4; if(c.disableSelect) n+=3;
+  if(c.watermarkAll) n+=6; if(pw.minLength>=8) n+=12; if(pw.requireNumbers) n+=8;
+  if(pw.requireSpecial) n+=10; if(pw.maxAttempts<=5) n+=5; if(pw.brute) n+=6;
+  if(twoFa?.forceAdmin2FA) n+=10;
+  if(twoFa?.require2FAForAll) n+=12;
   return Math.min(100,n);
 }
 
@@ -38,9 +40,10 @@ export default function SecurityPanel({ showToast, siteControls, saveSiteControl
   const [logoutConf,setLogoutConf]= useState(false);
   const [authLogs,  setAuthLogs]  = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
+  const [twoFa, setTwoFa] = useState({ forceAdmin2FA: false, require2FAForAll: false });
   const [tab, setTab] = useState('controls');
 
-  const TABS = [{k:'controls',l:'Controls'},{k:'sessions',l:'Sessions'},{k:'passwords',l:'Passwords'},{k:'logs',l:'Auth Logs'},{k:'admin',l:'Admin Log'}];
+  const TABS = [{k:'controls',l:'Controls'},{k:'sessions',l:'Sessions'},{k:'passwords',l:'Passwords'},{k:'2fa',l:'2FA'},{k:'logs',l:'Auth Logs'},{k:'admin',l:'Admin Log'}];
 
   useEffect(()=>{
     getDoc(doc(db,'site_data','security_settings')).then(snap=>{
@@ -50,6 +53,10 @@ export default function SecurityPanel({ showToast, siteControls, saveSiteControl
         if(d.sessionTimeout!==undefined) setSessionTimeout(d.sessionTimeout);
         if(d.rateLimit!==undefined) setRateLimit(d.rateLimit);
         if(d.pwPolicy) setPw(p=>({...p,...d.pwPolicy}));
+        setTwoFa({
+          forceAdmin2FA: !!d.forceAdmin2FA,
+          require2FAForAll: !!d.require2FAForAll,
+        });
       }
     }).catch(()=>{});
     // Auth logs from system_logs
@@ -74,8 +81,19 @@ export default function SecurityPanel({ showToast, siteControls, saveSiteControl
     const blockedIps = ipList.split('\n').map(l=>l.trim()).filter(Boolean);
     const blockedDomains = emailDoms.split('\n').map(l=>l.trim()).filter(Boolean);
     try {
-      await setDoc(doc(db,'site_data','security_settings'),{blockedIps,blockedDomains,sessionTimeout,rateLimit,pwPolicy:pw,updatedAt:serverTimestamp()},{merge:true});
-      await saveSiteControls?.({...c,sessionTimeout,rateLimit,pwMinLength:pw.minLength,pwNumbers:pw.requireNumbers,pwSpecial:pw.requireSpecial,maxAttempts:pw.maxAttempts,lockoutMins:pw.lockoutMins,brute:pw.brute,autoBan:pw.autoBan});
+      await setDoc(doc(db,'site_data','security_settings'),{
+        blockedIps,blockedDomains,sessionTimeout,rateLimit,pwPolicy:pw,
+        forceAdmin2FA: !!twoFa.forceAdmin2FA,
+        require2FAForAll: !!twoFa.require2FAForAll,
+        updatedAt:serverTimestamp(),
+      },{merge:true});
+      await saveSiteControls?.({
+        ...c,sessionTimeout,rateLimit,pwMinLength:pw.minLength,pwNumbers:pw.requireNumbers,
+        pwSpecial:pw.requireSpecial,maxAttempts:pw.maxAttempts,lockoutMins:pw.lockoutMins,
+        brute:pw.brute,autoBan:pw.autoBan,
+        forceAdmin2FA: !!twoFa.forceAdmin2FA,
+        require2FAForAll: !!twoFa.require2FAForAll,
+      });
       showToast?.('✅ Security settings saved');
     } catch(e){ showToast?.('❌ '+e.message); }
     setSaving(false);
@@ -86,7 +104,7 @@ export default function SecurityPanel({ showToast, siteControls, saveSiteControl
     setLogoutConf(false); showToast?.('✅ All sessions cleared');
   };
 
-  const score = calcScore(c,pw);
+  const score = calcScore(c,pw,twoFa);
   const scoreColor = score>=75?'var(--ok)':score>=45?'#e8832a':'var(--err)';
   const scoreLabel = score>=75?'Strong':score>=45?'Moderate':'Weak';
 
@@ -120,7 +138,7 @@ export default function SecurityPanel({ showToast, siteControls, saveSiteControl
           <div style={{width:score+'%',height:'100%',background:scoreColor,borderRadius:5,transition:'width 0.5s'}}/>
         </div>
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
-          {[['HTTPS',c.forceHttps],['No DevTools',c.disableDevTools],['No Copy',c.disableCopy],['Watermark',c.watermarkAll],['Strong PW',pw.minLength>=8],['Numbers',pw.requireNumbers],['Special',pw.requireSpecial],['Rate Limit',c.rateLimit],['Brute Force',pw.brute]].map(([l,v])=>(
+          {[['HTTPS',c.forceHttps],['No DevTools',c.disableDevTools],['No Copy',c.disableCopy],['Watermark',c.watermarkAll],['Strong PW',pw.minLength>=8],['Numbers',pw.requireNumbers],['Special',pw.requireSpecial],['Admin 2FA',twoFa.forceAdmin2FA],['2FA All',twoFa.require2FAForAll],['Brute Force',pw.brute]].map(([l,v])=>(
             <span key={l} style={{fontSize:'0.68rem',padding:'2px 8px',borderRadius:4,background:v?'rgba(46,204,113,0.1)':'rgba(255,255,255,0.05)',color:v?'var(--ok)':'var(--muted)',border:`1px solid ${v?'rgba(46,204,113,0.3)':'rgba(255,255,255,0.08)'}`}}>{v?'✓':' '} {l}</span>
           ))}
         </div>
@@ -258,10 +276,40 @@ export default function SecurityPanel({ showToast, siteControls, saveSiteControl
         </div>
       )}
 
-      {tab!=='controls'&&tab!=='sessions'&&tab!=='passwords'&&tab!=='logs'&&tab!=='admin' && (
-        <div className="card" style={{padding:20,textAlign:'center'}}>
-          <div style={{fontSize:'2rem',marginBottom:8}}>🔐</div>
-          <p style={{color:'var(--muted)'}}>2FA — Coming in a future update</p>
+      {tab==='2fa' && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          <div className="card" style={{padding:18}}>
+            <h3 style={{fontSize:'0.88rem',marginBottom:6,color:'var(--gold)'}}>🔐 Two-Factor Authentication</h3>
+            <p style={{fontSize:'0.78rem',color:'var(--muted)',marginBottom:12,lineHeight:1.5}}>
+              After a correct password, users must enter a one-time code emailed (and SMS when a phone is on file). Codes are generated and verified server-side.
+            </p>
+            <Toggle
+              label="Require 2FA for admins"
+              desc="Recommended. All admin and superadmin logins need an email OTP."
+              checked={!!twoFa.forceAdmin2FA}
+              onChange={v=>setTwoFa(p=>({...p,forceAdmin2FA:v}))}
+            />
+            <Toggle
+              label="Require 2FA for every user"
+              desc="All accounts must verify a login code after password."
+              checked={!!twoFa.require2FAForAll}
+              onChange={v=>setTwoFa(p=>({...p,require2FAForAll:v}))}
+            />
+            <div style={{marginTop:14,padding:12,background:'rgba(201,168,76,0.06)',borderRadius:'var(--r-sm)',border:'1px solid rgba(201,168,76,0.2)',fontSize:'0.75rem',color:'var(--muted)'}}>
+              Readers can also enable 2FA themselves from Profile → Security. Click Save Settings to apply site-wide rules.
+            </div>
+          </div>
+          <div className="card" style={{padding:18}}>
+            <h3 style={{fontSize:'0.88rem',marginBottom:10,color:'var(--gold)'}}>How it works</h3>
+            {[
+              '1. User enters email + password',
+              '2. Server emails a 6-digit code (15 min)',
+              '3. Code must match before session starts',
+              '4. Max 5 wrong attempts per code',
+            ].map(line=>(
+              <div key={line} style={{padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,0.04)',fontSize:'0.82rem',color:'var(--text)'}}>{line}</div>
+            ))}
+          </div>
         </div>
       )}
     </div>

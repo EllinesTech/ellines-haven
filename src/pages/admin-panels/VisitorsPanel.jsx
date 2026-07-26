@@ -23,7 +23,6 @@ const fmtRelative = ts => {
 };
 
 const FLAG_BASE = 'https://flagcdn.com/16x12/';
-const GEO_ENRICH_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitorHttp';
 
 /**
  * Enrich a visitor doc via Cloud Function (server calls ip-api over HTTP).
@@ -33,16 +32,12 @@ const GEO_ENRICH_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net
 async function enrichVisitorDoc(docId, ip) {
   if (!docId) return false;
   try {
-    const res = await fetch(GEO_ENRICH_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        _docId: docId,
-        ...(ip ? { ip } : {}),
-      }),
-      signal: AbortSignal.timeout(12000),
+    const { callTrackVisitorHttp } = await import('../../firebase');
+    const result = await callTrackVisitorHttp({
+      _docId: docId,
+      ...(ip ? { ip } : {}),
     });
-    return res.ok;
+    return !!result?.data?.ok;
   } catch {
     return false;
   }
@@ -58,7 +53,23 @@ export default function VisitorsPanel({ showToast }) {
   const [exporting, setExporting]   = useState(false);
   const [clearing,  setClearing]    = useState(false);
   const [enriching, setEnriching]   = useState(false);
-  const [geoCache,  setGeoCache]    = useState({});  // ip → geo data cache
+  const [nowMs, setNowMs]           = useState(() => Date.now());
+
+  const setFilterSafe = (next) => {
+    setNowMs(Date.now());
+    setFilter(next);
+  };
+
+  const calcStats = useCallback((data) => {
+    const now   = Date.now();
+    const today = data.filter(v => {
+      const ts = typeof v.visitedAtMs === 'number' ? v.visitedAtMs : v.visitedAt?.toMillis?.() || 0;
+      return now - ts < 86400000;
+    }).length;
+    const unique    = new Set(data.map(v => v.ip || v.rawIp).filter(Boolean)).size;
+    const countries = new Set(data.map(v => v.country).filter(Boolean)).size;
+    setStats({ total: data.length, today, unique, countries });
+  }, []);
 
   // ── Firestore listener ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -74,31 +85,11 @@ export default function VisitorsPanel({ showToast }) {
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [calcStats]);
 
-  // ── Auto-enrich visitors that are missing geo data (server-side only) ────────
-  useEffect(() => {
-    if (loading || visitors.length === 0) return;
-    const needsGeo = visitors.filter(v => v._needsGeo && !geoCache[v.id]);
-    if (needsGeo.length === 0) return;
-
-    const batch = needsGeo.slice(0, 5);
-    batch.forEach(async (v) => {
-      setGeoCache(prev => ({ ...prev, [v.id]: true })); // mark attempted so we don't loop
-      await enrichVisitorDoc(v.id, v.rawIp || v.ip || undefined);
-    });
-  }, [visitors, loading]);
-
-  const calcStats = (data) => {
-    const now   = Date.now();
-    const today = data.filter(v => {
-      const ts = typeof v.visitedAtMs === 'number' ? v.visitedAtMs : v.visitedAt?.toMillis?.() || 0;
-      return now - ts < 86400000;
-    }).length;
-    const unique    = new Set(data.map(v => v.ip || v.rawIp).filter(Boolean)).size;
-    const countries = new Set(data.map(v => v.country).filter(Boolean)).size;
-    setStats({ total: data.length, today, unique, countries });
-  };
+  // Auto-enrich on panel open removed — it fired trackVisitorHttp and flooded
+  // the browser console with 500s when the function was unhealthy. Use the
+  // manual "Enrich IPs" action instead (after functions are deployed).
 
   // ── Delete a single visitor record ───────────────────────────────────────────
   const deleteVisitor = async (id) => {
@@ -178,11 +169,11 @@ export default function VisitorsPanel({ showToast }) {
   const filtered = visitors.filter(v => {
     if (filter === 'today') {
       const ts = typeof v.visitedAtMs === 'number' ? v.visitedAtMs : v.visitedAt?.toMillis?.() || 0;
-      if (Date.now() - ts >= 86400000) return false;
+      if (nowMs - ts >= 86400000) return false;
     }
     if (filter === 'week') {
       const ts = typeof v.visitedAtMs === 'number' ? v.visitedAtMs : v.visitedAt?.toMillis?.() || 0;
-      if (Date.now() - ts >= 7 * 86400000) return false;
+      if (nowMs - ts >= 7 * 86400000) return false;
     }
     if (!search) {
       // SUPER ADMIN GHOST MODE: Filter out super admin's visitor records
@@ -248,7 +239,7 @@ export default function VisitorsPanel({ showToast }) {
         </div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
           {['all','today','week'].map(f => (
-            <button key={f} className={'adm-filter-btn' + (filter===f?' active':'')} onClick={() => { setFilter(f); setSearch(''); }}>
+            <button key={f} className={'adm-filter-btn' + (filter===f?' active':'')} onClick={() => { setFilterSafe(f); setSearch(''); }}>
               {f === 'all' ? 'All Time' : f === 'today' ? 'Today' : 'This Week'}
             </button>
           ))}

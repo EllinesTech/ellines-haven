@@ -8,6 +8,8 @@ import { UserNotificationsPanel } from '../components/UserNotifications';
 import OrderReceiptModal from '../components/OrderReceiptModal';
 import { readPath } from '../utils/slugify';
 import { listOfflineBooks, removeOfflineBook } from '../hooks/useOfflineBook';
+import { verifyPassword, storePasswordValue } from '../utils/passwordSecurity';
+import { findUserInFirestore } from './Login';
 import './UserProfile.css';
 
 const WA = '254748255466';
@@ -134,6 +136,9 @@ export default function UserProfile() {
   const [pw,         setPw]         = useState({ current:'', next:'', confirm:'' });
   const [pwMsg,      setPwMsg]      = useState('');
   const [showPw,     setShowPw]     = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(!!user?.twoFactorEnabled);
+  const [twoFaBusy, setTwoFaBusy] = useState(false);
+  const [userDocId, setUserDocId] = useState(user?.id || null);
   const [prefs,      setPrefs]      = useState(() => { try { return JSON.parse(localStorage.getItem('eh_prefs')||'{}'); } catch { return {}; } });
   const [tab,        setTab]        = useState('account');
   const [toast,      setToast]      = useState('');
@@ -176,6 +181,11 @@ export default function UserProfile() {
         else setPendingDel(null);
       }
     }).catch(()=>{});
+    findUserInFirestore(user.email).then((fsUser) => {
+      if (!fsUser) return;
+      setUserDocId(fsUser.id);
+      setTwoFactorEnabled(!!fsUser.twoFactorEnabled);
+    }).catch(() => {});
   }, [user?.email]);
 
   /* Live unread notification count */
@@ -250,17 +260,49 @@ export default function UserProfile() {
   };
 
   /* ── Change password ── */
-  const changePassword = () => {
+  const changePassword = async () => {
     if (!pw.current||!pw.next||!pw.confirm) { setPwMsg('Fill all fields'); return; }
     if (pw.next !== pw.confirm) { setPwMsg('Passwords do not match'); return; }
-    if (pw.next.length < 4)    { setPwMsg('Minimum 4 characters'); return; }
-    const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides')||'{}');
-    const stored = overrides[user.email.toLowerCase()] || user.password || '';
-    if (pw.current !== stored && pw.current !== user.password) { setPwMsg('Current password is incorrect'); return; }
-    overrides[user.email.toLowerCase()] = pw.next;
-    localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
-    setPw({ current:'', next:'', confirm:'' }); setPwMsg('');
-    showToast('✅ Password updated');
+    if (pw.next.length < 6)    { setPwMsg('Minimum 6 characters'); return; }
+    try {
+      const emailKey = user.email.toLowerCase();
+      const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides')||'{}');
+      const fsUser = await findUserInFirestore(emailKey);
+      const stored = (fsUser?.passwordHash || fsUser?.password || overrides[emailKey] || user.password || '');
+      const check = await verifyPassword(pw.current, stored);
+      if (!check.ok) { setPwMsg('Current password is incorrect'); return; }
+      const hashed = await storePasswordValue(pw.next);
+      overrides[emailKey] = hashed;
+      localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
+      if (fsUser?.id) {
+        await setDoc(doc(db, 'users', fsUser.id), { passwordHash: hashed, updatedAt: serverTimestamp() }, { merge: true });
+      }
+      setPw({ current:'', next:'', confirm:'' }); setPwMsg('');
+      showToast('✅ Password updated');
+    } catch (e) {
+      setPwMsg(e.message || 'Could not update password');
+    }
+  };
+
+  const toggleTwoFactor = async () => {
+    if (!user?.email) return;
+    setTwoFaBusy(true);
+    try {
+      const next = !twoFactorEnabled;
+      const fsUser = await findUserInFirestore(user.email);
+      const id = fsUser?.id || userDocId || user.id;
+      if (!id) throw new Error('Could not find your account record');
+      await setDoc(doc(db, 'users', id), {
+        twoFactorEnabled: next,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      setTwoFactorEnabled(next);
+      setUser({ ...user, twoFactorEnabled: next });
+      showToast(next ? '✅ Two-factor authentication enabled' : 'Two-factor authentication turned off');
+    } catch (e) {
+      showToast('❌ ' + (e.message || 'Could not update 2FA'), 'err');
+    }
+    setTwoFaBusy(false);
   };
 
   /* ── Preferences ── */
@@ -698,11 +740,27 @@ export default function UserProfile() {
                 <button className="btn btn-primary" onClick={changePassword}>🔑 Update Password</button>
               </div>
 
-              {/* Account info security */}
-              <div className="up-security-info">
+              <div className="up-security-info" style={{ marginTop: 18 }}>
+                <div className="up-security-item" style={{ alignItems: 'center' }}>
+                  <span className="up-security-item__icon">🔐</span>
+                  <div style={{ flex: 1 }}>
+                    <strong>Two-Factor Authentication</strong>
+                    <span>Email a one-time code after password on every sign-in</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="up-toggle"
+                    disabled={twoFaBusy}
+                    style={{ background: twoFactorEnabled ? 'var(--gold)' : 'rgba(255,255,255,0.12)' }}
+                    onClick={toggleTwoFactor}
+                    aria-label="Toggle two-factor authentication"
+                  >
+                    <span className="up-toggle-dot" style={{ left: twoFactorEnabled ? 23 : 3 }} />
+                  </button>
+                </div>
                 <div className="up-security-item">
                   <span className="up-security-item__icon">✅</span>
-                  <div><strong>Email Verified</strong><span>{user.email}</span></div>
+                  <div><strong>Email</strong><span>{user.email}</span></div>
                 </div>
                 <div className="up-security-item">
                   <span className="up-security-item__icon">📱</span>
