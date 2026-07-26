@@ -1386,6 +1386,19 @@
   background: linear-gradient(135deg, rgba(201, 168, 76, 0.32), rgba(201, 168, 76, 0.14));
   color: #fff3c9;
 }
+.listen-dock__pill--narrator {
+  border-color: rgba(160, 180, 210, 0.35);
+  color: #c8d4e6;
+}
+.listen-dock__pill--narrator.on {
+  background: linear-gradient(135deg, rgba(140, 165, 200, 0.28), rgba(140, 165, 200, 0.12));
+  border-color: rgba(180, 200, 230, 0.5);
+  color: #e8eef8;
+}
+.listen-dock__pill:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
 .listen-dock__active {
   display: flex;
@@ -1429,6 +1442,95 @@
 .listen-dock__badge--gold {
   background: rgba(201, 168, 76, 0.22);
   color: #f0e6c8;
+}
+
+/* Premium 5♀ + 5♂ neural gallery — in document flow inside the dock */
+.listen-dock__gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.listen-dock__gallery-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.listen-dock__gallery-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ld-dim);
+}
+.listen-dock__gallery-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.listen-dock__gchip {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--ld-surface);
+  color: var(--ld-muted);
+  border-radius: 9px;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.2;
+  min-height: 30px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.listen-dock__gchip:hover:not(:disabled) {
+  border-color: var(--ld-gold-line);
+  color: #f0e6c8;
+  background: var(--ld-gold-soft);
+}
+.listen-dock__gchip.on {
+  background: rgba(201, 168, 76, 0.22);
+  border-color: rgba(201, 168, 76, 0.55);
+  color: #fff3c9;
+}
+.listen-dock__gchip--brand {
+  border-color: rgba(201, 168, 76, 0.4);
+  color: #e8d5a3;
+}
+.listen-dock__gchip--brand.on {
+  background: linear-gradient(135deg, rgba(201, 168, 76, 0.34), rgba(201, 168, 76, 0.14));
+}
+.listen-dock__gchip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.listen-dock__gallery-empty {
+  font-size: 0.68rem;
+  color: var(--ld-dim);
+  padding: 4px 2px;
+}
+.listen-dock__tip {
+  margin: 0;
+  font-size: 0.64rem;
+  line-height: 1.4;
+  color: var(--ld-dim);
+}
+.listen-dock__more-toggle {
+  align-self: flex-start;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: var(--ld-muted);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.listen-dock__more-toggle:hover {
+  border-color: var(--ld-gold-line);
+  color: #e8d5a3;
+}
+.listen-dock__voice-list--more {
+  max-height: min(140px, 22vh);
 }
 
 .listen-dock__speeds {
@@ -2861,4 +2963,71 @@
   -webkit-user-select: text !important;
   -moz-user-select: text !important;
   user-select: text !important;
+}
+
+/* ── Offline save controls ── */
+.reader__offline-btn {
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: rgba(201, 168, 76, 0.12);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: var(--r-sm, 8px);
+  color: var(--gold, #c9a84c);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.reader__offline-btn:hover:not(:disabled) {
+  background: rgba(201, 168, 76, 0.2);
+  border-color: rgba(201, 168, 76, 0.55);
+}
+.reader__offline-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.reader__offline-btn--saved {
+  background: rgba(46, 204, 113, 0.12);
+  border-color: rgba(46, 204, 113, 0.35);
+  color: #2ecc71;
+}
+.reader__offline-btn--saved:hover {
+  background: rgba(231, 76, 60, 0.12);
+  border-color: rgba(231, 76, 60, 0.35);
+  color: #e74c3c;
+}
+.reader__offline-toast {
+  font-size: 0.75rem;
+  color: #2ecc71;
+  flex-shrink: 0;
+  max-width: 240px;
+  line-height: 1.35;
+}
+.reader__offline-toast--err {
+  color: #e8832a;
+}
+.reader__offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 18px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.reader__offline-banner--ok {
+  background: rgba(46, 204, 113, 0.1);
+  border-bottom: 1px solid rgba(46, 204, 113, 0.22);
+  color: #2ecc71;
+}
+.reader__offline-banner--warn {
+  background: rgba(232, 131, 42, 0.1);
+  border-bottom: 1px solid rgba(232, 131, 42, 0.25);
+  color: #e8832a;
+}
+@media (max-width: 768px) {
+  .reader__offline-btn {
+    padding: 3px 9px;
+    font-size: 0.7rem;
+  }
 }

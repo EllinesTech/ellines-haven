@@ -1,17 +1,23 @@
 /**
  * AudioPlayer — floating Listen dock (Web Speech API).
  *
- * "Ellinea Voice" is a display alias for the best Jenny-like English neural
- * system voice available on the device (Microsoft Jenny / Aria / Emma, or
- * Google neural female). Synthesis still uses that installed OS/browser voice;
- * this is not a proprietary offline TTS engine.
+ * Branded aliases map to the best installed neural system voices:
+ * - "Ellinea Voice" → Jenny-like neural female (prefer localService)
+ * - "Ellines Narrator" → Guy/Davis/Brian-like neural male
+ * Synthesis still uses OS/browser speechSynthesis voices — not a custom TTS binary.
  */
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 const AUDIO_PREFS_KEY = 'eh_audio_prefs';
-/** Persisted marker: user wants the branded Ellinea alias (resolved to a real system voice). */
+/** Persisted marker: branded Ellinea alias (resolved to a real system voice). */
 const ELLINEA_PREF = '__ellinea__';
+/** Persisted marker: branded male narrator alias. */
+const NARRATOR_PREF = '__ellines_narrator__';
+/** Slightly slower than 1.0 softens robotic cadence on neural voices. */
+const DEFAULT_RATE = 0.95;
+const DEFAULT_PITCH = 1.0;
+const GALLERY_LIMIT = 5;
 
 function loadAudioPrefs() {
   try {
@@ -73,24 +79,31 @@ function isEnglishVoice(v) {
 
 function isNeuralVoice(v) {
   if (!v) return false;
-  if (/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi|clara|liam|natasha|olivia|james|luna|neural)/i.test(v.name)) return true;
-  if (/^google /i.test(v.name)) return true;
-  if (/\b(neural|natural|enhanced|premium|wavenet|studio)\b/i.test(v.name)) return true;
-  if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|frederica|joana|mariana|luciana|isabel|paola|soledad|monica|jorge|juan|pablo|diego|enrique|carlos|ximena|angelica)/i.test(v.name) && isEnglishVoice(v)) return true;
-  if (/samsung/i.test(v.name) && /female|male|neural|enhanced/i.test(v.name)) return true;
+  const n = v.name || '';
+  if (/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi|clara|liam|natasha|olivia|james|luna|neural)/i.test(n)) return true;
+  if (/microsoft.*(online\s*)?\(?natural\)?/i.test(n)) return true;
+  if (/^google /i.test(n)) return true;
+  if (/\b(neural|natural|enhanced|premium|wavenet|studio)\b/i.test(n)) return true;
+  // Safari / macOS / iOS premium English voices
+  if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|susan|daniel|oliver|alex|fred|tom|reed|aaron|bruce)/i.test(n) && isEnglishVoice(v)) return true;
+  if (/samsung/i.test(n) && /female|male|neural|enhanced/i.test(n)) return true;
   if (v.voiceURI && /x-nob|x-sfg|x-iob|x-tpf|x-iom/i.test(v.voiceURI)) return true;
   return false;
 }
 
+/** Classic Desktop / eSpeak / Mark / Zira — demote aggressively; hide from main picker. */
 function isRoboticDesktop(v) {
   if (!v) return false;
-  if (/microsoft.*(desktop|david|zira|mark|hazel|susan)/i.test(v.name) && !isNeuralVoice(v)) return true;
-  if (/espeak|festival|robot/i.test(v.name)) return true;
+  const n = v.name || '';
+  if (/espeak|festival|\brobot\b|pico\s*tts|\bflite\b/i.test(n)) return true;
+  if (/\bDesktop\b/i.test(n) && /microsoft/i.test(n)) return true;
+  if (/^Microsoft (David|Zira|Mark|Hazel|Susan)\b/i.test(n) && !/\b(natural|neural)\b/i.test(n)) return true;
+  if (/microsoft.*(david|zira|mark|hazel|susan)/i.test(n) && !/\b(natural|neural)\b/i.test(n) && !isNeuralVoice(v)) return true;
   return false;
 }
 
-const FEMALE_NAME_RE = /\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia|almudena|marta|zosia|ewa|ioana|laila|fatima|tamar|leila|hessa|linh|naayf|yan|meijia|tingting|sinji|milena|yelena|irina|katya|anna|vicki|alice|amelie|julie|aurelie|petra|katrin|hanna|lotte|claire|ellen|nora|carmit|sara|yuna|kyoko|caroline|catherine|denise|hortense|elise|marie|linda|heami|nanami|ayumi|haruka|seo-hyeon|sun-hi)\b/i;
-const MALE_NAME_RE = /\b(guy|davis|brian|andrew|ryan|mark|david|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|enrique|carlos|juan|william|liam|thomas|oliver|harry|arthur|richard|christopher|eric|steffan|geraint|gordon|wayne)\b/i;
+const FEMALE_NAME_RE = /\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|nicky|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia)\b/i;
+const MALE_NAME_RE = /\b(guy|davis|brian|andrew|ryan|mark|david|daniel|alex|james|george|reed|fred|tom|aaron|bruce|rishi|luca|diego|jorge|pablo|miguel|ivan|enrique|carlos|juan|william|liam|thomas|oliver|harry|arthur|richard|christopher|eric|steffan|geraint|gordon|wayne)\b/i;
 
 function isFemaleVoice(v) {
   if (!v) return false;
@@ -119,14 +132,26 @@ function englishPool(voiceList) {
   return english.length ? english : voiceList;
 }
 
-/** Prefer local (offline-capable) neural English voices. */
+/**
+ * Quality ranking (lower = better):
+ * neural + localService > neural > English local > other English > reject robotic.
+ */
 function voiceQualityScore(v) {
-  if (!v) return 99;
-  let score = 40;
-  if (isEnglishVoice(v)) score -= 20;
-  if (isNeuralVoice(v)) score -= 15;
-  if (v.localService) score -= 10;
-  if (isRoboticDesktop(v)) score += 25;
+  if (!v) return 999;
+  if (isRoboticDesktop(v)) return 900;
+  let score = 55;
+  if (isEnglishVoice(v)) score -= 18;
+  if (isNeuralVoice(v)) {
+    score -= 22;
+    if (v.localService) score -= 14; // neural + local wins
+  } else if (v.localService) {
+    score -= 6;
+  }
+  // Known premium personas get a small boost
+  if (/microsoft\s+(jenny|aria|emma|guy|davis|brian|andrew|ryan|sonia|libby|mia|ana)\b/i.test(v.name || '')) score -= 6;
+  if (/^google (uk english (female|male)|us english)/i.test(v.name || '')) score -= 4;
+  if (/online\s*\(?natural\)?|\(natural\)/i.test(v.name || '')) score -= 2;
+  if (!isNeuralVoice(v)) score += 18;
   return score;
 }
 
@@ -135,7 +160,6 @@ function sortVoicesNeuralFirst(list) {
     const qa = voiceQualityScore(a);
     const qb = voiceQualityScore(b);
     if (qa !== qb) return qa - qb;
-    // Local neural before online of same quality
     if (!!a.localService !== !!b.localService) return a.localService ? -1 : 1;
     return (a.name || '').localeCompare(b.name || '');
   });
@@ -187,12 +211,101 @@ const MALE_PRIORITY = [
   'Google UK English Male',
   'Daniel',
   'Alex',
+  'Tom',
   'Fred',
-  'James',
+  'Aaron',
   'Oliver',
   'Arthur',
+  'James',
   'Samsung English Male',
 ];
+
+/** Friendly chip labels for the premium gallery (real voice kept under the hood). */
+const FRIENDLY_LABELS = [
+  { re: /\bjenny\b/i, label: 'Jenny Soft' },
+  { re: /\baria\b/i, label: 'Aria Soft' },
+  { re: /\bemma\b/i, label: 'Emma Clear' },
+  { re: /\bsonia\b/i, label: 'Sonia Bright' },
+  { re: /\blibby\b/i, label: 'Libby Calm' },
+  { re: /\bmia\b/i, label: 'Mia Light' },
+  { re: /\bana\b/i, label: 'Ana Warm' },
+  { re: /\bguy\b/i, label: 'Guy Warm' },
+  { re: /\bdavis\b/i, label: 'Davis Deep' },
+  { re: /\bbrian\b/i, label: 'Brian Steady' },
+  { re: /\bandrew\b/i, label: 'Andrew Clear' },
+  { re: /\bryan\b/i, label: 'Ryan Smooth' },
+  { re: /google uk english female/i, label: 'UK Female' },
+  { re: /google uk english male/i, label: 'UK Male' },
+  { re: /google us english/i, label: 'US Neural' },
+  { re: /\bsamantha\b/i, label: 'Samantha' },
+  { re: /\bava\b/i, label: 'Ava Soft' },
+  { re: /\ballison\b/i, label: 'Allison' },
+  { re: /\bkaren\b/i, label: 'Karen' },
+  { re: /\bmoira\b/i, label: 'Moira' },
+  { re: /\btessa\b/i, label: 'Tessa' },
+  { re: /\bfiona\b/i, label: 'Fiona' },
+  { re: /\bvictoria\b/i, label: 'Victoria' },
+  { re: /\bdaniel\b/i, label: 'Daniel' },
+  { re: /\balex\b/i, label: 'Alex' },
+  { re: /\boliver\b/i, label: 'Oliver' },
+  { re: /\bfred\b/i, label: 'Fred' },
+  { re: /\btom\b/i, label: 'Tom' },
+  { re: /samsung.*female/i, label: 'Samsung ♀' },
+  { re: /samsung.*male/i, label: 'Samsung ♂' },
+];
+
+function shortSystemName(name) {
+  if (!name) return '';
+  return name
+    .replace(/^Microsoft\s+/i, '')
+    .replace(/\s*\(Natural\)|\s*Online\s*\(Natural\)|\s*-\s*English\s*\(.*\)$/i, '')
+    .trim() || name;
+}
+
+function friendlyVoiceLabel(v) {
+  if (!v) return '';
+  const name = v.name || '';
+  for (const { re, label } of FRIENDLY_LABELS) {
+    if (re.test(name)) return label;
+  }
+  return shortSystemName(name);
+}
+
+/** Collapse Online/Natural variants of the same persona into one gallery slot. */
+function voicePersonaKey(v) {
+  const n = (v.name || '').toLowerCase();
+  if (/google uk english female/.test(n)) return 'google-uk-f';
+  if (/google uk english male/.test(n)) return 'google-uk-m';
+  if (/google us english/.test(n)) return 'google-us';
+  const ms = n.match(/microsoft\s+([a-z]+)/);
+  if (ms) return `ms-${ms[1]}`;
+  const short = shortSystemName(v.name).toLowerCase().split(/[\s(-]/)[0];
+  return short || n;
+}
+
+function dedupeByPersona(list) {
+  const seen = new Set();
+  const out = [];
+  for (const v of sortVoicesNeuralFirst(list)) {
+    const key = voicePersonaKey(v);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
+}
+
+function premiumNeuralPool(voiceList) {
+  return englishPool(voiceList).filter(v => isNeuralVoice(v) && !isRoboticDesktop(v));
+}
+
+/** Up to 5 female + 5 male high-quality neural English voices for the dock gallery. */
+function curatePremiumGallery(voiceList, limit = GALLERY_LIMIT) {
+  const pool = premiumNeuralPool(voiceList);
+  const females = dedupeByPersona(pool.filter(isFemaleVoice)).slice(0, limit);
+  const males = dedupeByPersona(pool.filter(isMaleVoice)).slice(0, limit);
+  return { females, males };
+}
 
 function pickEllineaVoice(voiceList) {
   if (!voiceList.length) return null;
@@ -200,11 +313,22 @@ function pickEllineaVoice(voiceList) {
   const neuralFemale = pool.filter(v => isNeuralVoice(v) && !isRoboticDesktop(v) && isFemaleVoice(v));
   const neuralAny = pool.filter(v => isNeuralVoice(v) && !isRoboticDesktop(v));
   return (
-    findByPriority(neuralFemale.length ? neuralFemale : pool, ELLINEA_PRIORITY)
-    || findByPriority(neuralAny.length ? neuralAny : pool, ELLINEA_PRIORITY)
+    findByPriority(neuralFemale, ELLINEA_PRIORITY)
+    || findByPriority(neuralAny, ELLINEA_PRIORITY)
     || sortVoicesNeuralFirst(neuralFemale)[0]
     || sortVoicesNeuralFirst(neuralAny)[0]
-    || sortVoicesNeuralFirst(pool)[0]
+    || sortVoicesNeuralFirst(pool.filter(v => !isRoboticDesktop(v)))[0]
+    || null
+  );
+}
+
+function pickNarratorVoice(voiceList) {
+  if (!voiceList.length) return null;
+  const pool = englishPool(voiceList);
+  const neuralMale = pool.filter(v => isNeuralVoice(v) && !isRoboticDesktop(v) && isMaleVoice(v));
+  return (
+    findByPriority(neuralMale, MALE_PRIORITY)
+    || sortVoicesNeuralFirst(neuralMale)[0]
     || null
   );
 }
@@ -217,15 +341,23 @@ function pickBestVoiceByGender(voiceList, gender) {
   const priority = gender === 'male' ? MALE_PRIORITY : FEMALE_PRIORITY;
   const tryPick = (list) => {
     if (!list.length) return null;
-    const hit = findByPriority(list, priority);
-    if (hit) return hit;
     const neural = list.filter(v => isNeuralVoice(v) && !isRoboticDesktop(v));
-    if (neural.length) return sortVoicesNeuralFirst(neural)[0];
+    if (neural.length) {
+      const hit = findByPriority(neural, priority);
+      if (hit) return hit;
+      return sortVoicesNeuralFirst(neural)[0];
+    }
     const natural = list.filter(v => !isRoboticDesktop(v));
-    if (natural.length) return sortVoicesNeuralFirst(natural)[0];
-    return sortVoicesNeuralFirst(list)[0];
+    if (natural.length) {
+      const hit = findByPriority(natural, priority);
+      if (hit) return hit;
+      return sortVoicesNeuralFirst(natural)[0];
+    }
+    return null; // never auto-pick robotic
   };
-  return tryPick(gendered) || pickEllineaVoice(pool);
+  return tryPick(gendered)
+    || (gender === 'male' ? pickNarratorVoice(pool) : pickEllineaVoice(pool))
+    || pickEllineaVoice(pool);
 }
 
 function detectVoiceGender(v) {
@@ -235,10 +367,14 @@ function detectVoiceGender(v) {
   return null;
 }
 
+function isBrandedPref(name) {
+  return name === ELLINEA_PREF || name === NARRATOR_PREF;
+}
+
 function defaultDockPos(size = 'normal') {
   if (typeof window === 'undefined') return { x: 24, y: 24 };
   const w = size === 'min' ? 300 : size === 'max' ? Math.min(400, window.innerWidth - 24) : 340;
-  const h = size === 'min' ? 72 : size === 'max' ? 480 : 300;
+  const h = size === 'min' ? 72 : size === 'max' ? 520 : 360;
   return {
     x: Math.max(12, window.innerWidth - w - 20),
     y: Math.max(12, window.innerHeight - h - 96),
@@ -248,19 +384,11 @@ function defaultDockPos(size = 'normal') {
 function clampPos(pos, size = 'normal') {
   if (typeof window === 'undefined' || !pos) return pos;
   const w = size === 'min' ? 300 : size === 'max' ? Math.min(400, window.innerWidth - 24) : 340;
-  const h = size === 'min' ? 72 : size === 'max' ? Math.min(560, window.innerHeight - 24) : 320;
+  const h = size === 'min' ? 72 : size === 'max' ? Math.min(600, window.innerHeight - 24) : 380;
   return {
     x: Math.min(Math.max(8, pos.x), Math.max(8, window.innerWidth - w - 8)),
     y: Math.min(Math.max(8, pos.y), Math.max(8, window.innerHeight - Math.min(h, 120) - 8)),
   };
-}
-
-function shortSystemName(name) {
-  if (!name) return '';
-  return name
-    .replace(/^Microsoft\s+/i, '')
-    .replace(/\s*\(Natural\)|\s*Online\s*\(Natural\)|\s*-\s*English\s*\(.*\)$/i, '')
-    .trim() || name;
 }
 
 export default function AudioPlayer({
@@ -287,12 +415,13 @@ export default function AudioPlayer({
   const [playing, setPlaying] = useState(false);
   const [voices, setVoices] = useState([]);
   const [voicesReady, setVoicesReady] = useState(false);
-  const [rate, setRate] = useState(() => (typeof saved.rate === 'number' ? saved.rate : 1.0));
-  const [pitch, setPitch] = useState(() => (typeof saved.pitch === 'number' ? saved.pitch : 1.0));
+  const [rate, setRate] = useState(() => (typeof saved.rate === 'number' ? saved.rate : DEFAULT_RATE));
+  const [pitch, setPitch] = useState(() => (typeof saved.pitch === 'number' ? saved.pitch : DEFAULT_PITCH));
   const [panelSize, setPanelSize] = useState(() => (
     ['min', 'normal', 'max'].includes(saved.panelSize) ? saved.panelSize : 'normal'
   ));
   const [showCfg, setShowCfg] = useState(false);
+  const [showMoreVoices, setShowMoreVoices] = useState(false);
   const [pos, setPos] = useState(() => {
     if (saved.panelPos?.x != null && saved.panelPos?.y != null) {
       return clampPos(saved.panelPos, saved.panelSize || 'normal');
@@ -304,12 +433,11 @@ export default function AudioPlayer({
   const [progress, setProgress] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [total, setTotal] = useState(0);
-  const [filter, setFilter] = useState('neural');
-  const [langScope, setLangScope] = useState('en');
-  /** Real system voice name, or ELLINEA_PREF for branded default. */
+  /** Real system voice name, or branded pref markers. */
   const [selectedName, setSelectedName] = useState(() => saved.voiceName || ELLINEA_PREF);
   const [portalReady, setPortalReady] = useState(false);
   const [ellineaMappedName, setEllineaMappedName] = useState('');
+  const [narratorMappedName, setNarratorMappedName] = useState('');
 
   const uttRef = useRef(null);
   const charRef = useRef(0);
@@ -458,6 +586,8 @@ export default function AudioPlayer({
 
     const ellinea = pickEllineaVoice(sorted);
     if (ellinea) setEllineaMappedName(ellinea.name);
+    const narrator = pickNarratorVoice(sorted);
+    if (narrator) setNarratorMappedName(narrator.name);
 
     const pref = selectedNameRef.current;
     if (pref === ELLINEA_PREF || !pref) {
@@ -466,14 +596,20 @@ export default function AudioPlayer({
       persistVoiceSettings({ voiceName: ELLINEA_PREF });
       return;
     }
+    if (pref === NARRATOR_PREF) {
+      selectedNameRef.current = NARRATOR_PREF;
+      setSelectedName(NARRATOR_PREF);
+      persistVoiceSettings({ voiceName: NARRATOR_PREF });
+      return;
+    }
 
     const found = sorted.find(x => x.name === pref);
-    if (found && isEnglishVoice(found)) {
+    if (found && isEnglishVoice(found) && !isRoboticDesktop(found)) {
       setSelectedName(found.name);
       return;
     }
 
-    // Saved voice missing or non-English — fall back to Ellinea
+    // Saved voice missing, robotic, or non-English — fall back to Ellinea
     selectedNameRef.current = ELLINEA_PREF;
     setSelectedName(ELLINEA_PREF);
     persistVoiceSettings({ voiceName: ELLINEA_PREF });
@@ -561,26 +697,19 @@ export default function AudioPlayer({
     boundarySeenRef.current = false;
   }
 
-  function filteredVoices() {
-    if (!voices.length) return [];
-    let list = voices;
-    if (langScope === 'en') list = list.filter(isEnglishVoice);
-    if (filter === 'neural') return list.filter(isNeuralVoice);
-    if (filter === 'female') return list.filter(v => isFemaleVoice(v) && isNeuralVoice(v));
-    if (filter === 'male') return list.filter(v => isMaleVoice(v) && isNeuralVoice(v));
-    return list;
-  }
-
   function resolveSelectedVoice() {
     const live = synth?.getVoices?.() || voices;
     const pool = live.length ? live : voices;
     if (selectedNameRef.current === ELLINEA_PREF) {
-      return pickEllineaVoice(pool) || pool.find(isEnglishVoice) || pool[0] || null;
+      return pickEllineaVoice(pool) || pool.find(v => isEnglishVoice(v) && !isRoboticDesktop(v)) || null;
+    }
+    if (selectedNameRef.current === NARRATOR_PREF) {
+      return pickNarratorVoice(pool) || pickBestVoiceByGender(pool, 'male') || pickEllineaVoice(pool);
     }
     if (selectedNameRef.current) {
       const byName = pool.find(v => v.name === selectedNameRef.current)
         || voices.find(v => v.name === selectedNameRef.current);
-      if (byName) return byName;
+      if (byName && !isRoboticDesktop(byName)) return byName;
     }
     return pickEllineaVoice(pool);
   }
@@ -756,54 +885,92 @@ export default function AudioPlayer({
     if (playing) speak(charRef.current);
   };
 
-  const selectVoice = (v, { asEllinea = false } = {}) => {
-    if (!v && !asEllinea) return;
-    if (asEllinea) {
+  const selectVoice = (v, { branded = null } = {}) => {
+    if (!v && !branded) return;
+    if (branded === ELLINEA_PREF) {
       selectedNameRef.current = ELLINEA_PREF;
       setSelectedName(ELLINEA_PREF);
       persistVoiceSettings({ voiceName: ELLINEA_PREF });
-      setFilter('neural');
+    } else if (branded === NARRATOR_PREF) {
+      selectedNameRef.current = NARRATOR_PREF;
+      setSelectedName(NARRATOR_PREF);
+      persistVoiceSettings({ voiceName: NARRATOR_PREF });
     } else {
       selectedNameRef.current = v.name || '';
       setSelectedName(v.name || '');
       persistVoiceSettings({ voiceName: v.name || '' });
-      const g = detectVoiceGender(v);
-      if (g) setFilter(g);
     }
     if (playing) speak(charRef.current);
   };
 
-  const selectGender = (gender) => {
-    setFilter(gender);
-    setLangScope('en');
-    const best = pickBestVoiceByGender(voices, gender);
-    if (best) selectVoice(best);
-  };
-
   const selectEllinea = () => {
-    setLangScope('en');
-    setFilter('neural');
     const v = pickEllineaVoice(voices);
     if (v) setEllineaMappedName(v.name);
-    selectVoice(v, { asEllinea: true });
+    selectVoice(v, { branded: ELLINEA_PREF });
+  };
+
+  const selectNarrator = () => {
+    const v = pickNarratorVoice(voices);
+    if (v) setNarratorMappedName(v.name);
+    selectVoice(v, { branded: NARRATOR_PREF });
+  };
+
+  const selectGender = (gender) => {
+    const best = pickBestVoiceByGender(voices, gender);
+    if (!best) return;
+    // Prefer branded defaults when they resolve to the same top pick
+    if (gender === 'female') {
+      const ellinea = pickEllineaVoice(voices);
+      if (ellinea && ellinea.name === best.name) {
+        selectEllinea();
+        return;
+      }
+    }
+    if (gender === 'male') {
+      const narrator = pickNarratorVoice(voices);
+      if (narrator && narrator.name === best.name) {
+        selectNarrator();
+        return;
+      }
+    }
+    selectVoice(best);
   };
 
   const UtteranceCtor = typeof window !== 'undefined'
     ? (window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance)
     : null;
   const available = !!(typeof window !== 'undefined' && window.speechSynthesis && UtteranceCtor);
-  const dispVoices = filteredVoices();
+  const gallery = curatePremiumGallery(voices);
+  const premiumNames = new Set([
+    ...gallery.females.map(v => v.name),
+    ...gallery.males.map(v => v.name),
+    ellineaMappedName,
+    narratorMappedName,
+  ].filter(Boolean));
+  const moreVoices = englishPool(voices)
+    .filter(v => !isRoboticDesktop(v) && !premiumNames.has(v.name))
+    .sort((a, b) => voiceQualityScore(a) - voiceQualityScore(b));
   const activeVoice = resolveSelectedVoice();
   const usingEllinea = selectedName === ELLINEA_PREF;
+  const usingNarrator = selectedName === NARRATOR_PREF;
   const activeGender = detectVoiceGender(activeVoice);
-  const englishNeuralFemale = voices.filter(v => isEnglishVoice(v) && isNeuralVoice(v) && isFemaleVoice(v)).length;
-  const englishNeuralMale = voices.filter(v => isEnglishVoice(v) && isNeuralVoice(v) && isMaleVoice(v)).length;
-  const englishCount = voices.filter(isEnglishVoice).length;
+  const englishNeuralFemale = gallery.females.length;
+  const englishNeuralMale = gallery.males.length;
   const dockPos = pos || defaultDockPos(panelSize);
+  const showInstallTip = voicesReady && (englishNeuralFemale < GALLERY_LIMIT || englishNeuralMale < GALLERY_LIMIT);
+
+  const isGalleryVoiceOn = (v) => {
+    if (!v) return false;
+    if (usingEllinea && v.name === ellineaMappedName) return true;
+    if (usingNarrator && v.name === narratorMappedName) return true;
+    return !isBrandedPref(selectedName) && selectedName === v.name;
+  };
 
   const displayVoiceLabel = usingEllinea
     ? 'Ellinea Voice'
-    : shortSystemName(activeVoice?.name || selectedName) || 'Select voice';
+    : usingNarrator
+      ? 'Ellines Narrator'
+      : friendlyVoiceLabel(activeVoice) || shortSystemName(activeVoice?.name || selectedName) || 'Select voice';
 
   const progressBlock = (
     <div className="listen-dock__progress">
@@ -977,19 +1144,19 @@ export default function AudioPlayer({
           <div className="listen-dock__gender" role="group" aria-label="Voice presets">
             <button
               type="button"
-              className={'listen-dock__pill' + (!usingEllinea && activeGender === 'female' ? ' on' : '')}
+              className={'listen-dock__pill' + (!usingEllinea && !usingNarrator && activeGender === 'female' ? ' on' : '')}
               onClick={() => selectGender('female')}
               title="Best English female neural voice"
-              aria-pressed={!usingEllinea && activeGender === 'female'}
+              aria-pressed={!usingEllinea && !usingNarrator && activeGender === 'female'}
             >
               Female
             </button>
             <button
               type="button"
-              className={'listen-dock__pill' + (!usingEllinea && activeGender === 'male' ? ' on' : '')}
+              className={'listen-dock__pill' + (!usingEllinea && !usingNarrator && activeGender === 'male' ? ' on' : '')}
               onClick={() => selectGender('male')}
               title="Best English male neural voice"
-              aria-pressed={!usingEllinea && activeGender === 'male'}
+              aria-pressed={!usingEllinea && !usingNarrator && activeGender === 'male'}
             >
               Male
             </button>
@@ -997,14 +1164,33 @@ export default function AudioPlayer({
               type="button"
               className={'listen-dock__pill listen-dock__pill--ellinea' + (usingEllinea ? ' on' : '')}
               onClick={selectEllinea}
-              title="Ellinea Voice — Jenny-like neural default (device system voice)"
+              title="Ellinea Voice — Jenny-like neural default"
               aria-pressed={usingEllinea}
             >
               Ellinea
             </button>
+            <button
+              type="button"
+              className={'listen-dock__pill listen-dock__pill--narrator' + (usingNarrator ? ' on' : '')}
+              onClick={selectNarrator}
+              title="Ellines Narrator — Guy-like neural male default"
+              aria-pressed={usingNarrator}
+              disabled={!narratorMappedName && !gallery.males.length}
+            >
+              Narrator
+            </button>
           </div>
 
-          <div className="listen-dock__active" title={usingEllinea ? (ellineaMappedName || activeVoice?.name || '') : (activeVoice?.name || '')}>
+          <div
+            className="listen-dock__active"
+            title={
+              usingEllinea
+                ? (ellineaMappedName || activeVoice?.name || '')
+                : usingNarrator
+                  ? (narratorMappedName || activeVoice?.name || '')
+                  : (activeVoice?.name || '')
+            }
+          >
             <span className="listen-dock__active-label">{displayVoiceLabel}</span>
             {activeVoice && isNeuralVoice(activeVoice) && (
               <span className="listen-dock__badge">Neural</span>
@@ -1014,15 +1200,93 @@ export default function AudioPlayer({
             )}
           </div>
 
+          <div className="listen-dock__gallery" aria-label="Premium neural voices">
+            <div className="listen-dock__gallery-block">
+              <span className="listen-dock__gallery-label">Female</span>
+              <div className="listen-dock__gallery-chips" role="listbox" aria-label="Female neural voices">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={usingEllinea}
+                  className={'listen-dock__gchip listen-dock__gchip--brand' + (usingEllinea ? ' on' : '')}
+                  onClick={selectEllinea}
+                  title={ellineaMappedName ? `Uses ${ellineaMappedName}` : 'Jenny-like neural'}
+                >
+                  Ellinea Voice
+                </button>
+                {gallery.females
+                  .filter(v => v.name !== ellineaMappedName)
+                  .map((v) => (
+                    <button
+                      key={v.voiceURI || v.name}
+                      type="button"
+                      role="option"
+                      aria-selected={isGalleryVoiceOn(v)}
+                      className={'listen-dock__gchip' + (isGalleryVoiceOn(v) ? ' on' : '')}
+                      onClick={() => selectVoice(v)}
+                      title={v.name}
+                    >
+                      {friendlyVoiceLabel(v)}
+                    </button>
+                  ))}
+                {voicesReady && gallery.females.length === 0 && (
+                  <span className="listen-dock__gallery-empty">No neural female voices found</span>
+                )}
+              </div>
+            </div>
+
+            <div className="listen-dock__gallery-block">
+              <span className="listen-dock__gallery-label">Male</span>
+              <div className="listen-dock__gallery-chips" role="listbox" aria-label="Male neural voices">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={usingNarrator}
+                  className={'listen-dock__gchip listen-dock__gchip--brand' + (usingNarrator ? ' on' : '')}
+                  onClick={selectNarrator}
+                  title={narratorMappedName ? `Uses ${narratorMappedName}` : 'Guy-like neural'}
+                  disabled={!narratorMappedName && !gallery.males.length}
+                >
+                  Ellines Narrator
+                </button>
+                {gallery.males
+                  .filter(v => v.name !== narratorMappedName)
+                  .map((v) => (
+                    <button
+                      key={v.voiceURI || v.name}
+                      type="button"
+                      role="option"
+                      aria-selected={isGalleryVoiceOn(v)}
+                      className={'listen-dock__gchip' + (isGalleryVoiceOn(v) ? ' on' : '')}
+                      onClick={() => selectVoice(v)}
+                      title={v.name}
+                    >
+                      {friendlyVoiceLabel(v)}
+                    </button>
+                  ))}
+                {voicesReady && gallery.males.length === 0 && (
+                  <span className="listen-dock__gallery-empty">No neural male voices found</span>
+                )}
+              </div>
+            </div>
+
+            {showInstallTip && (
+              <p className="listen-dock__tip">
+                Tip: Install more neural voices in Windows Settings → Time &amp; language → Speech,
+                or use Chrome / Edge / Safari for richer voices.
+              </p>
+            )}
+          </div>
+
           <div className="listen-dock__speeds" role="group" aria-label="Playback speed">
-            {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
+            {[0.75, 0.95, 1.0, 1.25, 1.5].map(r => (
               <button
                 key={r}
                 type="button"
                 className={'listen-dock__speed' + (rate === r ? ' on' : '')}
                 onClick={() => updateRate(r)}
               >
-                {r === 1.0 ? '1×' : `${r}×`}
+                {r === 0.95 ? '0.95×' : r === 1.0 ? '1×' : `${r}×`}
               </button>
             ))}
           </div>
@@ -1036,55 +1300,14 @@ export default function AudioPlayer({
               <div className="listen-dock__panel-head">
                 <span>Voice settings</span>
                 <span className="listen-dock__panel-count">
-                  {englishNeuralFemale}♀ · {englishNeuralMale}♂ neural
+                  {englishNeuralFemale}♀ · {englishNeuralMale}♂ premium
                 </span>
-              </div>
-
-              <div className="listen-dock__row">
-                <span className="listen-dock__row-label">Language</span>
-                <div className="listen-dock__chips">
-                  <button
-                    type="button"
-                    className={'listen-dock__chip' + (langScope === 'en' ? ' on' : '')}
-                    onClick={() => setLangScope('en')}
-                  >
-                    English ({englishCount})
-                  </button>
-                  <button
-                    type="button"
-                    className={'listen-dock__chip' + (langScope === 'all' ? ' on' : '')}
-                    onClick={() => setLangScope('all')}
-                  >
-                    All ({voices.length})
-                  </button>
-                </div>
-              </div>
-
-              <div className="listen-dock__row">
-                <span className="listen-dock__row-label">List</span>
-                <div className="listen-dock__chips">
-                  {[
-                    { id: 'neural', label: 'Neural' },
-                    { id: 'female', label: 'Female' },
-                    { id: 'male', label: 'Male' },
-                    { id: 'all', label: 'All' },
-                  ].map(f => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      className={'listen-dock__chip' + (filter === f.id ? ' on' : '')}
-                      onClick={() => setFilter(f.id)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div className="listen-dock__row">
                 <span className="listen-dock__row-label">Speed {rate}×</span>
                 <div className="listen-dock__chips">
-                  {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
+                  {[0.5, 0.75, 0.95, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
                     <button
                       key={r}
                       type="button"
@@ -1110,7 +1333,7 @@ export default function AudioPlayer({
                 />
               </div>
 
-              <div className="listen-dock__voice-list" role="listbox" aria-label="Available voices">
+              <div className="listen-dock__voice-list" role="listbox" aria-label="Premium neural voices">
                 <button
                   type="button"
                   role="option"
@@ -1126,38 +1349,88 @@ export default function AudioPlayer({
                     {ellineaMappedName ? shortSystemName(ellineaMappedName) : 'Jenny-like neural'}
                   </span>
                 </button>
-                {dispVoices.length === 0 && (
-                  <div className="listen-dock__voice-empty">
-                    No voices for this filter. Try Neural or All.
-                  </div>
-                )}
-                {dispVoices.map((v) => {
-                  const isOn = !usingEllinea && selectedName === v.name;
-                  const isEllineaMap = usingEllinea && v.name === ellineaMappedName;
-                  return (
-                    <button
-                      key={v.voiceURI || v.name}
-                      type="button"
-                      role="option"
-                      aria-selected={isOn}
-                      className={'listen-dock__voice' + (isOn || isEllineaMap ? ' on' : '')}
-                      onClick={() => selectVoice(v)}
-                    >
-                      <span className="listen-dock__voice-name">
-                        {v.name}
-                        {isNeuralVoice(v) && <span className="listen-dock__badge">Neural</span>}
-                        {v.localService && <span className="listen-dock__badge listen-dock__badge--local">Offline</span>}
-                      </span>
-                      <span className="listen-dock__voice-meta">{v.lang}</span>
-                    </button>
-                  );
-                })}
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={usingNarrator}
+                  className={'listen-dock__voice' + (usingNarrator ? ' on' : '')}
+                  onClick={selectNarrator}
+                  disabled={!narratorMappedName && !gallery.males.length}
+                >
+                  <span className="listen-dock__voice-name">
+                    Ellines Narrator
+                    <span className="listen-dock__badge listen-dock__badge--gold">Male</span>
+                  </span>
+                  <span className="listen-dock__voice-meta">
+                    {narratorMappedName ? shortSystemName(narratorMappedName) : 'Guy-like neural'}
+                  </span>
+                </button>
+                {[...gallery.females, ...gallery.males]
+                  .filter(v => v.name !== ellineaMappedName && v.name !== narratorMappedName)
+                  .map((v) => {
+                    const isOn = isGalleryVoiceOn(v);
+                    return (
+                      <button
+                        key={v.voiceURI || v.name}
+                        type="button"
+                        role="option"
+                        aria-selected={isOn}
+                        className={'listen-dock__voice' + (isOn ? ' on' : '')}
+                        onClick={() => selectVoice(v)}
+                      >
+                        <span className="listen-dock__voice-name">
+                          {friendlyVoiceLabel(v)}
+                          <span className="listen-dock__badge">Neural</span>
+                          {v.localService && <span className="listen-dock__badge listen-dock__badge--local">Offline</span>}
+                        </span>
+                        <span className="listen-dock__voice-meta">{shortSystemName(v.name)}</span>
+                      </button>
+                    );
+                  })}
               </div>
 
+              <button
+                type="button"
+                className="listen-dock__more-toggle"
+                onClick={() => setShowMoreVoices((o) => !o)}
+                aria-expanded={showMoreVoices}
+              >
+                {showMoreVoices ? 'Hide more voices' : `More voices${moreVoices.length ? ` (${moreVoices.length})` : ''}`}
+              </button>
+
+              {showMoreVoices && (
+                <div className="listen-dock__voice-list listen-dock__voice-list--more" role="listbox" aria-label="Additional voices">
+                  {moreVoices.length === 0 && (
+                    <div className="listen-dock__voice-empty">
+                      No extra non-robotic English voices on this device.
+                    </div>
+                  )}
+                  {moreVoices.map((v) => {
+                    const isOn = !isBrandedPref(selectedName) && selectedName === v.name;
+                    return (
+                      <button
+                        key={v.voiceURI || v.name}
+                        type="button"
+                        role="option"
+                        aria-selected={isOn}
+                        className={'listen-dock__voice' + (isOn ? ' on' : '')}
+                        onClick={() => selectVoice(v)}
+                      >
+                        <span className="listen-dock__voice-name">
+                          {v.name}
+                          {isNeuralVoice(v) && <span className="listen-dock__badge">Neural</span>}
+                        </span>
+                        <span className="listen-dock__voice-meta">{v.lang}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <p className="listen-dock__note">
-                Ellinea Voice uses your device’s best Jenny-like neural voice
-                {ellineaMappedName ? ` (currently ${ellineaMappedName})` : ''}.
-                Not a proprietary TTS pack — offline when that system voice is installed locally.
+                Ellinea Voice → {ellineaMappedName || 'best Jenny-like neural female'}.
+                {' '}Ellines Narrator → {narratorMappedName || 'best Guy-like neural male'}.
+                Robotic Desktop / eSpeak voices are hidden. Offline when the mapped system voice is local.
               </p>
             </div>
           )}
