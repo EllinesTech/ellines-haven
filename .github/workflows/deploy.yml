@@ -1,13 +1,10 @@
 ##############################################################################
 # ELLINES HAVEN — DEPLOYMENT NOTES
 #
-# HOSTING: Cloudflare Pages handles all web hosting automatically.
-#   - Every push to `main` triggers a Cloudflare Pages build + deploy.
-#   - NO manual deploy needed. Just `git push origin main`.
-#   - Live site: haven.ellines.co.ke
+# HOSTING: Cloudflare Pages (see deploy-pages.yml + wrangler.toml).
+#   - Live site: haven.ellines.co.ke — NOT Vercel, NOT Firebase Hosting.
 #
-# FIREBASE: Used for Firestore database, Auth, Storage, and Cloud Functions.
-#   - Firebase does NOT host the website.
+# FIREBASE: Firestore, Auth, Storage, and Cloud Functions only.
 #   - This workflow deploys ONLY Firestore security rules + Cloud Functions.
 #   - DO NOT add `--only hosting` to firebase deploy here.
 #

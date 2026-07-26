@@ -17,7 +17,7 @@ export default function EmailNotificationPanel({ showToast, users, isSuper }) {
     smtpEnabled: false,
     smtpHost: '',
     smtpPort: 587,
-    smtpFrom: 'noreply@ellines.haven',
+    smtpFrom: 'noreply@haven.ellines.co.ke',
     smtpFromName: 'Ellines Haven',
     notifications: {
       orderConfirmation: true,
@@ -155,7 +155,7 @@ export default function EmailNotificationPanel({ showToast, users, isSuper }) {
               className="field"
               value={config.smtpFrom}
               onChange={(e) => setConfig((c) => ({ ...c, smtpFrom: e.target.value }))}
-              placeholder="noreply@ellines.haven"
+              placeholder="noreply@haven.ellines.co.ke"
               style={{ fontSize: '0.85rem' }}
             />
           </div>

@@ -3,6 +3,8 @@
  * Handles M-Pesa STK Push (Daraja), Paystack webhook, automatic book unlocking,
  * password reset OTP (email + SMS via Africa's Talking), and SMS broadcasts.
  *
+ * Frontend hosting is Cloudflare Pages (not Vercel / not Firebase Hosting).
+ *
  * Secrets:
  *   MPESA_*           — Daraja API credentials
  *   PAYSTACK_SECRET   — Paystack secret key
@@ -13,11 +15,18 @@
  *   SMTP_PORT         — SMTP port (e.g. 465)
  *   SMTP_USER         — SMTP username / from address
  *   SMTP_PASS         — SMTP password / app password
+ *   RESEND_API_KEY    — Resend transactional email
+ *
+ * String params (defaults mirror Ellines Tech Website notify inboxes):
+ *   RESEND_FROM             Ellines Haven <noreply@haven.ellines.co.ke>
+ *   LEADS_NOTIFY_EMAIL      tech@ellines.co.ke
+ *   ORDERS_NOTIFY_EMAIL     tech@ellines.co.ke
+ *   CAREERS_NOTIFY_EMAIL    info@ellines.co.ke
  */
 
 const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { defineSecret } = require("firebase-functions/params");
+const { defineSecret, defineString } = require("firebase-functions/params");
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 const axios = require("axios");
@@ -99,6 +108,43 @@ const SMTP_HOST     = defineSecret("SMTP_HOST");
 const SMTP_PORT     = defineSecret("SMTP_PORT");
 const SMTP_USER     = defineSecret("SMTP_USER");
 const SMTP_PASS     = defineSecret("SMTP_PASS");
+
+// Resend + staff notify (same names as Ellines Tech Cloudflare Pages env)
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+const RESEND_FROM = defineString("RESEND_FROM", {
+  default: "Ellines Haven <noreply@haven.ellines.co.ke>",
+});
+const LEADS_NOTIFY_EMAIL = defineString("LEADS_NOTIFY_EMAIL", {
+  default: "tech@ellines.co.ke",
+});
+const ORDERS_NOTIFY_EMAIL = defineString("ORDERS_NOTIFY_EMAIL", {
+  default: "tech@ellines.co.ke",
+});
+const CAREERS_NOTIFY_EMAIL = defineString("CAREERS_NOTIFY_EMAIL", {
+  default: "info@ellines.co.ke",
+});
+
+function getResendFrom() {
+  return (
+    String(RESEND_FROM.value() || "").trim() ||
+    "Ellines Haven <noreply@haven.ellines.co.ke>"
+  );
+}
+
+/** Staff inbox for internal Resend alerts — mirrors Tech LEADS/ORDERS/CAREERS. */
+function getStaffNotifyEmail(kind) {
+  if (kind === "careers") {
+    return String(CAREERS_NOTIFY_EMAIL.value() || "").trim() || "info@ellines.co.ke";
+  }
+  if (kind === "orders") {
+    return String(ORDERS_NOTIFY_EMAIL.value() || "").trim() || "tech@ellines.co.ke";
+  }
+  return (
+    String(LEADS_NOTIFY_EMAIL.value() || "").trim() ||
+    String(ORDERS_NOTIFY_EMAIL.value() || "").trim() ||
+    "tech@ellines.co.ke"
+  );
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const libDocId = (email) =>
@@ -1424,7 +1470,6 @@ exports.enrichVisitorOnCreate = onDocumentCreated(
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Auth OTP helpers (password reset + login 2FA) — server-side codes only ───
 // ─────────────────────────────────────────────────────────────────────────────
-const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 const OTP_TTL_MS = 15 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -1539,7 +1584,7 @@ async function deliverOtpMessage({ email, phone, name, otpCode, purpose }) {
       const { Resend } = require("resend");
       const resend = new Resend(resendApiKey);
       const { error: resendError } = await resend.emails.send({
-        from: "Ellines Haven <noreply@haven.ellines.co.ke>",
+        from: getResendFrom(),
         to: [email],
         subject,
         text: textBody,
@@ -2123,7 +2168,7 @@ exports.sendAdminPasswordResetNotification = onCall(
         const { Resend } = require("resend");
         const resend = new Resend(resendApiKey);
         const { error: resendError } = await resend.emails.send({
-          from:    "Ellines Haven <onboarding@resend.dev>",
+          from:    getResendFrom(),
           to:      [email],
           subject: "Your Ellines Haven password was reset by an admin",
           text:    textBody,

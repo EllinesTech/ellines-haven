@@ -13,6 +13,14 @@ dist-ssr
 *.local
 package-lock.json
 
+# Env / Cloudflare / Wrangler
+.env
+.env.*
+!.env.example
+functions/.env
+.dev.vars
+.wrangler/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

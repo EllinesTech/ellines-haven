@@ -1,0 +1,19 @@
+# Cloudflare Pages — Ellines Haven
+# https://haven.ellines.co.ke
+name = "ellines-haven"
+compatibility_date = "2026-07-25"
+pages_build_output_dir = "dist"
+
+# Frontend is a static Vite SPA. Auth, Firestore, Storage, and transactional
+# email (Resend / SMTP / Africa's Talking) run on Firebase — not Pages Functions.
+#
+# Cloudflare Pages → Settings → Environment variables (build / runtime):
+#   VITE_PAYSTACK_PUBLIC_KEY   Paystack public key (safe for the browser)
+#   VITE_ENV_MODE              production | development
+#
+# Firebase Functions secrets / params (NOT Pages — set via Firebase CLI):
+#   RESEND_API_KEY             Transactional email
+#   RESEND_FROM                Optional "Name <address>" sender
+#   LEADS_NOTIFY_EMAIL         Internal leads inbox (default tech@ellines.co.ke)
+#   ORDERS_NOTIFY_EMAIL        Internal orders inbox (default tech@ellines.co.ke)
+#   CAREERS_NOTIFY_EMAIL       Careers inbox (default info@ellines.co.ke)

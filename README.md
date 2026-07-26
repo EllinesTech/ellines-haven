@@ -8,11 +8,12 @@ Ellines Haven is a full-stack React web application for discovering, purchasing,
 
 ## Tech Stack
 
-- **Frontend:** React 18 + Vite
+- **Frontend:** React + Vite
 - **Database:** Firebase Firestore (real-time)
-- **Auth:** Custom auth with localStorage + Firestore
-- **Hosting:** Cloudflare Pages (development) — production domain TBD
-- **Payments:** M-Pesa, Airtel Money, Visa/MC
+- **Auth:** Custom auth + Firestore
+- **Hosting:** Cloudflare Pages — [haven.ellines.co.ke](https://haven.ellines.co.ke) (not Vercel)
+- **Functions:** Firebase Cloud Functions (payments, OTP, Resend email)
+- **Payments:** M-Pesa, Paystack, PayPal
 
 ## Features
 
@@ -38,10 +39,21 @@ npm run dev
 npm run build
 ```
 
+## Deploy (Cloudflare Pages)
+
+```bash
+npm run build
+npm run deploy:pages   # requires CLOUDFLARE_API_TOKEN + account login
+```
+
+Or push to `main` — `.github/workflows/deploy-pages.yml` builds and deploys via Wrangler.
+
+Build settings (if using dashboard Git connect): **Build command** `npm run build`, **Output** `dist`.
+
 ## Environment
 
-Firebase config is embedded in `src/firebase.js`. For production, move credentials to environment variables.
+See [`.env.example`](.env.example). Frontend `VITE_*` vars go on Cloudflare Pages; Resend / notify inboxes are Firebase Functions params (same names as Ellines Tech).
 
 ---
 
-© 2025 Ellines Haven · [tech.ellines.co.ke](https://tech.ellines.co.ke/)
+© Ellines Haven · [tech.ellines.co.ke](https://tech.ellines.co.ke/)

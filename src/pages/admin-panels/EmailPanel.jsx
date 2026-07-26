@@ -36,7 +36,8 @@ const DEFAULT = {
   welcomeEnabled: true,
   welcomeSubject: 'Welcome to Ellines Haven!',
   newOrderAdminEnabled: true,
-  newOrderAdminEmail: 'haven@ellines.co.ke',
+  // Internal notify — mirrors Tech ORDERS_NOTIFY_EMAIL (not public haven@ display)
+  newOrderAdminEmail: 'tech@ellines.co.ke',
 };
 
 function Field({ label, value, onChange, type='text', placeholder='', mono=false, hint='' }) {
@@ -283,9 +284,10 @@ export default function EmailPanel({ showToast, isSuper }) {
             <h3 style={{ fontSize:'0.92rem', marginBottom:14, color:'var(--gold)' }}>📧 Recommended Email Addresses</h3>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { addr:'haven@ellines.co.ke', use:'Orders, leads, invoices, project requests' },
-                { addr:'info@ellines.co.ke',  use:'General, group, careers' },
-                { addr:'noreply@haven.ellines.co.ke', use:'System emails (orders, resets) — optional' },
+                { addr:'haven@ellines.co.ke', use:'Public — orders, leads, invoices (customer-facing)' },
+                { addr:'info@ellines.co.ke',  use:'Public — general / careers display' },
+                { addr:'tech@ellines.co.ke',  use:'Internal notify — leads & orders (Resend)' },
+                { addr:'noreply@haven.ellines.co.ke', use:'RESEND_FROM — system mail (OTP, resets)' },
               ].map(e => (
                 <div key={e.addr} style={{ padding:'10px 14px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)' }}>
                   <code style={{ fontSize:'0.82rem', color:'var(--gold)' }}>{e.addr}</code>

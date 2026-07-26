@@ -1,0 +1,59 @@
+# Auto-deploy Ellines Haven frontend to Cloudflare Pages on push to main.
+# Mirrors Ellines Tech Website (deploy-pages.yml). Firebase rules/functions
+# stay in deploy.yml — this workflow only builds + uploads `dist/`.
+#
+# Required GitHub Actions secrets:
+#   CLOUDFLARE_API_TOKEN   Account API token with Pages Edit
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare account id
+#
+# Optional: attach Git in the dashboard instead, then disable this workflow
+# to avoid double deploys.
+#   dash.cloudflare.com → Workers & Pages → ellines-haven → Settings → Builds
+#   → Connect to Git → branch main, build `npm run build`, output `dist`
+
+name: Deploy Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.claude/**'
+      - 'functions/**'
+      - 'firestore.rules'
+  workflow_dispatch:
+
+concurrency:
+  group: pages-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        # package-lock.json is gitignored in this repo — use npm install, not npm ci
+        run: npm install
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
+          VITE_ENV_MODE: production
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=ellines-haven --commit-dirty=true
