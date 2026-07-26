@@ -4,7 +4,7 @@ Kenya's premier digital literary platform — a home for original African litera
 
 ## About
 
-Ellines Haven is a full-stack React web application for discovering, purchasing, and reading original African stories by **Elijah Mwangi M**. Built by [Ellines Tech](https://ellinestech.co.ke).
+Ellines Haven is a full-stack React web application for discovering, purchasing, and reading original African stories by **Elijah Mwangi M**. Built by [Ellines Tech](https://tech.ellines.co.ke/).
 
 ## Tech Stack
 
@@ -44,4 +44,4 @@ Firebase config is embedded in `src/firebase.js`. For production, move credentia
 
 ---
 
-© 2025 Ellines Haven · [ellinestech.co.ke](https://ellinestech.co.ke)
+© 2025 Ellines Haven · [tech.ellines.co.ke](https://tech.ellines.co.ke/)
