@@ -22,7 +22,14 @@
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cache-Control: public, max-age=0, must-revalidate
 
-# Explicit document shell — never long-cached at the edge
+# Document shell — never long-cached at the edge.
+# `/` and `/index.html` both matter: custom-domain requests often hit `/`
+# without matching `/index.html`, and a cached HTML shell points at deleted
+# Vite hashes (vendor-firebase-core-*.js / index-*.js) → console 404s.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+  CDN-Cache-Control: no-cache
+
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
   CDN-Cache-Control: no-cache

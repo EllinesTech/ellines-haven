@@ -384,6 +384,66 @@
         } catch (e) {}
       })();
     </script>
+    <!-- CRITICAL: Recover when entry/vendor modulepreload 404s before React boots.
+         main.jsx never runs if a hashed /assets chunk misses — JS recovery cannot help. -->
+    <script>
+      (function () {
+        var KEY = 'eh_boot_asset_reload';
+        var COOLDOWN_MS = 60000;
+        function isAssetUrl(url) {
+          try {
+            var u = new URL(url, location.origin);
+            return u.origin === location.origin && u.pathname.indexOf('/assets/') === 0;
+          } catch (e) {
+            return typeof url === 'string' && url.indexOf('/assets/') !== -1;
+          }
+        }
+        function recover(reason) {
+          if (window.__EH_RELOADING__) return;
+          if (location.pathname.indexOf('/read') === 0) return;
+          try {
+            var last = parseInt(sessionStorage.getItem(KEY) || '0', 10);
+            if (Date.now() - last < COOLDOWN_MS) return;
+            sessionStorage.setItem(KEY, String(Date.now()));
+          } catch (e) {}
+          window.__EH_RELOADING__ = true;
+          console.warn('[eh-boot] Stale hashed asset — reloading:', reason);
+          var go = function () {
+            location.replace(location.pathname + '?_eh=' + Date.now() + (location.hash || ''));
+          };
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }).then(go).catch(go);
+          } else {
+            go();
+          }
+        }
+        window.addEventListener('error', function (e) {
+          var t = e && e.target;
+          if (!t) return;
+          var tag = (t.tagName || '').toLowerCase();
+          if (tag !== 'script' && tag !== 'link') return;
+          var href = t.src || t.href || '';
+          if (!isAssetUrl(href)) return;
+          recover(href);
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          var msg = String((e && e.reason && e.reason.message) || e.reason || '');
+          if (
+            msg.indexOf('/assets/') !== -1 &&
+            (
+              msg.indexOf('Failed to fetch') !== -1 ||
+              msg.indexOf('Failed to load module') !== -1 ||
+              msg.indexOf('Importing a module script failed') !== -1 ||
+              /MIME type .* text\/html/i.test(msg)
+            )
+          ) {
+            recover(msg);
+          }
+        });
+      })();
+    </script>
     <!-- Keep crawlable SEO text invisible so reload never flashes plain HTML before React mounts -->
     <style id="eh-seo-hide">
       html,body{background:#05050e;color:#f0ece2;margin:0;}

@@ -3,6 +3,10 @@
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
+      {
+        "source": "/assets/**",
+        "destination": "/404.html"
+      },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

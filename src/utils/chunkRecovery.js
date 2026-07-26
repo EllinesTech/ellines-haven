@@ -14,6 +14,7 @@ export function isChunkLoadError(err) {
   return (
     err?.name === 'ChunkLoadError' ||
     msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Failed to load module script') ||
     msg.includes('Importing a module script failed') ||
     msg.includes('error loading dynamically imported module') ||
     msg.includes('Loading chunk') ||

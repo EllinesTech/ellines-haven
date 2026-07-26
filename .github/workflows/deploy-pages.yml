@@ -11,6 +11,14 @@
 #   dash.cloudflare.com → Workers & Pages → ellines-haven → Settings → Builds
 #   → Connect to Git → branch main, build `npm run build`, output `dist`
 #
+# CRITICAL — dual deploy race (root cause of vendor-*.js / index-*.js 404s):
+# Use ONLY this workflow OR Cloudflare Git builds — never both.
+# If dash.cloudflare.com → Workers & Pages → ellines-haven → Settings → Builds
+# shows a connected Git repo, disconnect it (or disable automatic deployments).
+# Two builders of the same push produce different Vite content hashes; the
+# custom domain can serve HTML from build A while origin assets are already
+# build B → ERR_ABORTED 404 on vendor-B63*.js / vendor-firebase-core-*.js.
+#
 # Zone cache tip (custom domain haven.ellines.co.ke):
 #   Caching → Configuration → Browser Cache TTL = "Respect Existing Headers"
 #   Avoid zone Cache Rules that set long TTLs on /* or /assets/* 404s.
@@ -67,11 +75,19 @@ jobs:
           count=$(find dist/assets -type f -name '*.js' | wc -l)
           echo "JS assets in dist/assets: $count"
           test "$count" -ge 10
-          # Entry script referenced by index must exist on disk
-          entry=$(grep -oE '/assets/index-[^"]+\.js' dist/index.html | head -1)
-          test -n "$entry"
-          test -f "dist${entry}"
-          echo "Entry OK: $entry"
+          # Every script/modulepreload/stylesheet in index.html must exist on disk.
+          # Entry-only checks miss missing vendor-*.js / vendor-firebase-core-*.js.
+          mapfile -t refs < <(grep -oE '(src|href)="/assets/[^"]+\.(js|css)"' dist/index.html | grep -oE '/assets/[^"]+\.(js|css)' | sort -u)
+          test "${#refs[@]}" -ge 4
+          for ref in "${refs[@]}"; do
+            test -f "dist${ref}"
+            echo "OK dist${ref}"
+          done
+          html_stamp=$(grep -oE '<!-- build:[0-9]{14} -->' dist/index.html | head -1 | grep -oE '[0-9]{14}')
+          ver_stamp=$(node -p "JSON.parse(require('fs').readFileSync('dist/version.json','utf8')).v")
+          echo "HTML stamp=$html_stamp version.json=$ver_stamp"
+          test -n "$html_stamp"
+          test "$html_stamp" = "$ver_stamp"
 
       # ./functions is Firebase Cloud Functions. Wrangler treats ./functions as
       # Pages Functions and fails — stage a clean dist-only tree first.
@@ -96,10 +112,20 @@ jobs:
         run: |
           set -e
           sleep 8
-          entry=$(grep -oE '/assets/index-[^"]+\.js' dist/index.html | head -1)
-          code=$(curl -sS -o /dev/null -w '%{http_code}' "https://haven.ellines.co.ke${entry}")
-          echo "GET ${entry} → ${code}"
-          test "$code" = "200"
+          mapfile -t refs < <(grep -oE '(src|href)="/assets/[^"]+\.(js|css)"' dist/index.html | grep -oE '/assets/[^"]+\.(js|css)' | sort -u)
+          for ref in "${refs[@]}"; do
+            ok=0
+            for attempt in 1 2 3 4 5; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' "https://haven.ellines.co.ke${ref}" || echo 000)
+              echo "GET ${ref} → ${code} (try ${attempt})"
+              if [ "$code" = "200" ]; then
+                ok=1
+                break
+              fi
+              sleep 4
+            done
+            test "$ok" = "1"
+          done
           html_cc=$(curl -sSI "https://haven.ellines.co.ke/" | tr -d '\r' | grep -i '^cache-control:' | head -1)
           echo "index Cache-Control: $html_cc"
           echo "$html_cc" | grep -qi 'max-age=0\|must-revalidate\|no-cache'
