@@ -91,18 +91,19 @@ export function AppProvider({ children }) {
   const [user,     setUserState]     = useState(() => {
     const u = load('eh_user', null);
     if (u && (u.id === 'u1' || u.id === 'a1')) { localStorage.removeItem('eh_user'); return null; }
-    // If the session was marked as "session-only" and sessionStorage is gone
-    // (new tab opened or browser restarted), treat as logged out
-    const isSessionOnly = sessionStorage.getItem('eh_session_only');
-    const sessionAlive  = sessionStorage.getItem('eh_session_alive');
-    if (u && !isSessionOnly && localStorage.getItem('eh_remembered_email') === null) {
-      // No remembered email and no session-only flag → could be a fresh start after close
-      // Be conservative: keep the user (old behaviour)
-    }
+    // Session-only flag lives in localStorage (survives restart); alive marker is sessionStorage
+    const isSessionOnly = localStorage.getItem('eh_session_only') === '1'
+      || sessionStorage.getItem('eh_session_only') === '1';
+    const sessionAlive  = sessionStorage.getItem('eh_session_alive') === '1';
     if (u && isSessionOnly && !sessionAlive) {
-      // Session-only flag set but no alive marker → session was closed, auto-logout
       localStorage.removeItem('eh_user');
+      localStorage.removeItem('eh_session_only');
+      sessionStorage.removeItem('eh_session_only');
       return null;
+    }
+    if (u && isSessionOnly && sessionAlive) {
+      // Migrate legacy sessionStorage-only flag into localStorage
+      localStorage.setItem('eh_session_only', '1');
     }
     return u;
   });
@@ -329,10 +330,11 @@ export function AppProvider({ children }) {
     setUserState(v);
     if (v) {
       save('eh_user', v);
-      // Mark session as alive in sessionStorage — clears automatically on tab/browser close
+      // Alive marker clears on browser/tab close; pairs with eh_session_only in localStorage
       sessionStorage.setItem('eh_session_alive', '1');
     } else {
       localStorage.removeItem('eh_user');
+      localStorage.removeItem('eh_session_only');
       sessionStorage.removeItem('eh_session_only');
       sessionStorage.removeItem('eh_session_alive');
     }

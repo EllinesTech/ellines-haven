@@ -39,42 +39,48 @@ export async function findUserInFirestore(email) {
 /* ── Check admin credentials from Firestore (not source code) ── */
 async function checkAdminCredentials(email, password) {
   try {
+    const emailKey = email.toLowerCase();
     const snap = await getDoc(doc(db, 'site_data', 'admin_credentials'));
-    if (snap.exists()) {
-      const data = snap.data();
-      const admins = data.accounts || [];
-      const byEmail = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
-      if (byEmail) {
-        const pwMap = data.pwOverrides || {};
-        const stored = pwMap[email.toLowerCase()] || byEmail.password || '';
-        const check = await verifyPassword(password, stored);
-        if (check.ok) {
-          if (check.needsUpgrade) {
-            const hashed = await storePasswordValue(password);
-            const nextAccounts = admins.map(a =>
-              a.email.toLowerCase() === email.toLowerCase() ? { ...a, password: hashed } : a
-            );
-            await setDoc(doc(db, 'site_data', 'admin_credentials'), {
-              accounts: nextAccounts,
-              pwOverrides: { ...pwMap, [email.toLowerCase()]: hashed },
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-          }
-          return byEmail;
-        }
+    const data = snap.exists() ? (snap.data() || {}) : null;
+    const admins = data?.accounts || [];
+
+    // Existing admin account: verify password only — never overwrite on failure
+    const byEmail = admins.find(a => (a.email || '').toLowerCase() === emailKey);
+    if (byEmail) {
+      const pwMap = data.pwOverrides || {};
+      let localOverride = '';
+      try { localOverride = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}')[emailKey] || ''; } catch { /* ignore */ }
+      const stored = pwMap[emailKey] || localOverride || byEmail.password || '';
+      if (!stored) return null;
+      const check = await verifyPassword(password, stored);
+      if (!check.ok) return null;
+      if (check.needsUpgrade) {
+        const hashed = await storePasswordValue(password);
+        const nextAccounts = admins.map(a =>
+          (a.email || '').toLowerCase() === emailKey ? { ...a, password: hashed } : a
+        );
+        await setDoc(doc(db, 'site_data', 'admin_credentials'), {
+          accounts: nextAccounts,
+          pwOverrides: { ...pwMap, [emailKey]: hashed },
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
       }
+      return byEmail;
     }
-    // Bootstrap: seed Firestore with super admin credentials on first run
-    if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+
+    // First-run seed only: no accounts exist yet, and email is the super admin
+    if (admins.length === 0 && emailKey === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      const hashed = await storePasswordValue(password);
       const bootstrapEntry = {
         email: SUPER_ADMIN_EMAIL,
         role: 'superadmin',
         name: 'Admin',
         id: 'admin01',
-        password: password, // store whatever password they successfully use
+        password: hashed,
       };
       await setDoc(doc(db, 'site_data', 'admin_credentials'), {
         accounts: [bootstrapEntry],
+        pwOverrides: { [emailKey]: hashed },
         updatedAt: serverTimestamp(),
       }, { merge: true });
       return bootstrapEntry;
@@ -271,14 +277,40 @@ function ForgotPasswordModal({ onClose }) {
     if (newPw.length < 6) { setErr('Your password must be at least 6 characters.'); return; }
     if (newPw !== confirmPw) { setErr('Passwords do not match. Please re-enter.'); return; }
     const hashed = await storePasswordValue(newPw);
+    const emailKey = email.toLowerCase();
     const overrides = JSON.parse(localStorage.getItem('eh_pw_overrides') || '{}');
-    overrides[email.toLowerCase()] = hashed;
+    overrides[emailKey] = hashed;
     localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
     try {
       const fsUser = await findUserInFirestore(email);
       if (fsUser) await setDoc(doc(db, 'users', fsUser.id), { passwordHash: hashed, updatedAt: serverTimestamp() }, { merge: true });
     } catch {}
-    clearAttempts(email.toLowerCase());
+    // Super-admin / admin_credentials path (login ignores users.passwordHash for this account)
+    try {
+      const snap = await getDoc(doc(db, 'site_data', 'admin_credentials'));
+      if (snap.exists()) {
+        const data = snap.data() || {};
+        const admins = data.accounts || [];
+        const idx = admins.findIndex(a => (a.email || '').toLowerCase() === emailKey);
+        if (idx >= 0 || emailKey === SUPER_ADMIN_EMAIL.toLowerCase()) {
+          const nextAccounts = idx >= 0
+            ? admins.map((a, i) => (i === idx ? { ...a, password: hashed } : a))
+            : [...admins, {
+                email: SUPER_ADMIN_EMAIL,
+                role: 'superadmin',
+                name: 'Admin',
+                id: 'admin01',
+                password: hashed,
+              }];
+          await setDoc(doc(db, 'site_data', 'admin_credentials'), {
+            accounts: nextAccounts,
+            pwOverrides: { ...(data.pwOverrides || {}), [emailKey]: hashed },
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        }
+      }
+    } catch {}
+    clearAttempts(emailKey);
     setSuccess('Your password has been reset successfully. You can now sign in with your new password.');
     setStep('done');
   };
@@ -468,8 +500,14 @@ export default function Login() {
   const finishAuthenticatedLogin = async (sessionUser, extras = {}) => {
     const finalizeSession = (u) => {
       setUser(u);
-      if (!rememberMe) sessionStorage.setItem('eh_session_only', '1');
-      else sessionStorage.removeItem('eh_session_only');
+      // Persist "session-only" in localStorage so browser restart can clear the session
+      if (!rememberMe) {
+        localStorage.setItem('eh_session_only', '1');
+        sessionStorage.setItem('eh_session_alive', '1');
+      } else {
+        localStorage.removeItem('eh_session_only');
+        sessionStorage.removeItem('eh_session_only');
+      }
     };
 
     const security = await getSecuritySettings();
@@ -526,8 +564,13 @@ export default function Login() {
       await verifyLoginOtp({ email: pending2FA.emailKey, otp: otpCode, purpose: 'login' });
       const sessionUser = pending2FA.sessionUser;
       setUser(sessionUser);
-      if (!rememberMe) sessionStorage.setItem('eh_session_only', '1');
-      else sessionStorage.removeItem('eh_session_only');
+      if (!rememberMe) {
+        localStorage.setItem('eh_session_only', '1');
+        sessionStorage.setItem('eh_session_alive', '1');
+      } else {
+        localStorage.removeItem('eh_session_only');
+        sessionStorage.removeItem('eh_session_only');
+      }
       await logLogin(sessionUser.email, sessionUser.name);
       const mustChange = pending2FA.mustChangePassword;
       setPending2FA(null);

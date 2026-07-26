@@ -119,10 +119,25 @@ function pickBestVoice(voiceList) {
   return sortVoicesNeuralFirst(voiceList)[0] || voiceList[0];
 }
 
-export default function AudioPlayer({ chapters, currentChapter, onChapterChange }) {
+export default function AudioPlayer({
+  chapters,
+  currentChapter,
+  onChapterChange,
+  canAccessChapter,
+  onChapterBlocked,
+}) {
   const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const saved = loadAudioPrefs();
   const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/i.test(navigator.userAgent);
+
+  const tryAdvanceChapter = (next) => {
+    if (typeof canAccessChapter === 'function' && !canAccessChapter(next)) {
+      onChapterBlocked?.(next);
+      return false;
+    }
+    onChapterChange(next);
+    return true;
+  };
 
   const [playing, setPlaying] = useState(false);
   const [voices, setVoices] = useState([]);
@@ -394,7 +409,7 @@ export default function AudioPlayer({ chapters, currentChapter, onChapterChange 
       setProgress(100);
       charRef.current = 0;
       if (currentChapter < chapters.length - 1) {
-        onChapterChange(currentChapter + 1);
+        tryAdvanceChapter(currentChapter + 1);
       }
     };
 
@@ -482,7 +497,7 @@ export default function AudioPlayer({ chapters, currentChapter, onChapterChange 
   };
 
   const handleSkip = () => {
-    if (currentChapter < chapters.length - 1) onChapterChange(currentChapter + 1);
+    if (currentChapter < chapters.length - 1) tryAdvanceChapter(currentChapter + 1);
   };
 
   const fmtTime = (s) => {

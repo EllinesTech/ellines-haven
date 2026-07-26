@@ -1745,6 +1745,10 @@ export default function Reader() {
 
               currentChapter={chapter}
 
+              canAccessChapter={canAccessChapter}
+
+              onChapterBlocked={() => setChapterGate(true)}
+
               onChapterChange={ch => { setChapter(ch); window.scrollTo(0, 0); }}
 
             />
@@ -1885,7 +1889,21 @@ export default function Reader() {
 
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}
 
-                  onClick={() => { setChapter(c => c + 1); window.scrollTo(0, 0); }}>
+                  onClick={() => {
+
+                    const nextCh = chapter + 1;
+
+                    if (!canAccessChapter(nextCh)) {
+
+                      setChapterGate(true);
+
+                      return;
+
+                    }
+
+                    setChapter(nextCh); window.scrollTo(0, 0);
+
+                  }}>
 
                   Continue to Chapter {chapter + 2} →
 
