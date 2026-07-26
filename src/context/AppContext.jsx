@@ -635,9 +635,23 @@ export function AppProvider({ children }) {
     })();
   }, []); // eslint-disable-line
 
-  // ── Library from Firestore (real-time) ───────────────────────────────────
+  // ── Library from Firestore (real-time) + local cache for offline/refresh ─
   useEffect(() => {
     if (!user?.email) { setLibState([]); setLibLoaded(false); return; }
+    const cacheKey = `eh_library_${libDocId(user.email)}`;
+    // Hydrate instantly from last known library so refresh / brief offline still works
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+      if (Array.isArray(cached) && cached.length) {
+        setLibState(cached);
+        setLibLoaded(true);
+      } else {
+        setLibLoaded(false);
+      }
+    } catch {
+      setLibLoaded(false);
+    }
+
     const ref = doc(db, 'libraries', libDocId(user.email));
 
     // Timeout fallback: if Firestore snapshot takes > 2 s, mark as loaded anyway
@@ -646,10 +660,12 @@ export function AppProvider({ children }) {
 
     const unsub = onSnapshot(ref, snap => {
       clearTimeout(timeout);
-      setLibState(snap.exists() ? (snap.data().books || []) : []);
+      const books = snap.exists() ? (snap.data().books || []) : [];
+      setLibState(books);
       setLibLoaded(true);
+      try { localStorage.setItem(cacheKey, JSON.stringify(books)); } catch { /* quota */ }
     }, () => {
-      // Firestore error — still mark loaded so UI unblocks
+      // Firestore error — keep cached library if any, still mark loaded so UI unblocks
       clearTimeout(timeout);
       setLibLoaded(true);
     });
@@ -671,6 +687,7 @@ export function AppProvider({ children }) {
     const ref     = doc(db, 'libraries', libDocId(user.email));
     setDoc(ref, { email: user.email.toLowerCase(), books: updated }, { merge: true });
     setLibState(updated);
+    try { localStorage.setItem(`eh_library_${libDocId(user.email)}`, JSON.stringify(updated)); } catch { /* quota */ }
   };
   const isOwned     = id => {
     // Direct ownership (whole book purchased)

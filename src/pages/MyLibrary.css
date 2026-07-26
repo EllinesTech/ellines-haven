@@ -1055,3 +1055,35 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+.mylib-offline-btn {
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  color: var(--muted);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.mylib-offline-btn:hover:not(:disabled) {
+  color: var(--gold);
+  border-color: rgba(201,168,76,0.4);
+  background: rgba(201,168,76,0.08);
+}
+.mylib-offline-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.mylib-offline-btn--err {
+  color: #e8832a;
+  border-color: rgba(232,131,42,0.35);
+}
+.mylib-offline-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.35;
+  margin: 0;
+  flex: 1;
+  min-width: 140px;
+}

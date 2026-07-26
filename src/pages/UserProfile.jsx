@@ -202,11 +202,19 @@ export default function UserProfile() {
     return () => unsub();
   }, [user?.email]);
 
-  /* Load offline books */
+  /* Load offline books (IndexedDB — survives refresh) */
   useEffect(() => {
     if (!user?.email) return;
-    const books = listOfflineBooks(user.email);
-    setOfflineBooks(books);
+    let cancelled = false;
+    (async () => {
+      try {
+        const books = await listOfflineBooks(user.email);
+        if (!cancelled) setOfflineBooks(books);
+      } catch {
+        if (!cancelled) setOfflineBooks([]);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user?.email]);
 
   if (!user) return null;
@@ -343,11 +351,11 @@ export default function UserProfile() {
   };
 
   /* ── Remove offline book ── */
-  const handleRemoveOffline = (bookId) => {
+  const handleRemoveOffline = async (bookId) => {
     setRemovingOffline(bookId);
-    removeOfflineBook(user.email, bookId);
+    await removeOfflineBook(user.email, bookId);
     setOfflineBooks(books => books.filter(b => b.bookId !== bookId));
-    showToast('📥 Book removed from offline library');
+    showToast('Removed from this device');
     setRemovingOffline(null);
   };
 
@@ -625,9 +633,9 @@ export default function UserProfile() {
               {offlineBooks.length === 0 ? (
                 <div className="up-empty">
                   <div className="up-empty__icon">📱</div>
-                  <h3>No offline books yet</h3>
-                  <p>When reading a book, click "Save Offline" to read it without an internet connection.</p>
-                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>Your offline books are stored in your browser and persist even if you reload the page.</p>
+                  <h3>No books on this device yet</h3>
+                  <p>While reading, tap <strong>Save offline</strong> to keep chapters on this device.</p>
+                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>They stay available after refresh — and work without internet on this browser.</p>
                   <Link to="/library" className="btn btn-primary">Browse & Read Books →</Link>
                 </div>
               ) : (
@@ -662,7 +670,7 @@ export default function UserProfile() {
                     ))}
                   </div>
                   <div style={{padding:'14px 16px',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',fontSize:'0.78rem',color:'var(--muted)'}}>
-                    <strong style={{color:'var(--gold)'}}>ℹ️ How it works:</strong> Offline books are stored in your browser's local storage. They persist even if you close the app or reload the page. To free up space, delete books you no longer need.
+                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Chapters are saved in this browser (IndexedDB). They survive refresh and closing the tab. They stay on this device only — clear a title anytime to free space.
                   </div>
                 </div>
               )}

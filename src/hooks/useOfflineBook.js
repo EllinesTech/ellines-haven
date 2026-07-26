@@ -1,118 +1,340 @@
 /**
- * useOfflineBook — saves book chapters to localStorage so the user
- * can read without an internet connection.
+ * Offline books — IndexedDB primary, localStorage migration/fallback.
  *
- * Storage key: eh_offline_book_{userDocId}_{bookId}
- * Stores: { bookId, title, author, cover, savedAt, chapters[] }
+ * Persists across refresh and browser restarts on the same device.
+ * API is async; callers should await.
  *
- * This is NOT a downloadable file. The data lives only in the
- * browser's localStorage — it cannot be shared or transferred.
+ * Entry shape:
+ * { bookId, title, author, cover, slug, savedAt, chapters[], chapterCount, approxBytes }
  */
+
+const DB_NAME = 'EllinesHaven_Offline';
+const DB_VERSION = 2;
+const STORE = 'books';
 
 const userDocId = (email) =>
   (email || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
 
 export const offlineKey = (email, bookId) =>
-  email && bookId
-    ? `eh_offline_book_${userDocId(email)}_${bookId}`
-    : null;
+  email && bookId ? `eh_offline_book_${userDocId(email)}_${bookId}` : null;
 
-/**
- * Check if a book is saved for offline reading.
- */
-export function isBookSavedOffline(email, bookId) {
-  const key = offlineKey(email, bookId);
-  if (!key) return false;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return false;
-    const data = JSON.parse(raw);
-    return Array.isArray(data?.chapters) && data.chapters.length > 0;
-  } catch {
-    return false;
-  }
+const entryId = (email, bookId) => `${userDocId(email)}__${String(bookId)}`;
+
+let dbPromise = null;
+
+function openDb() {
+  if (typeof indexedDB === 'undefined') return Promise.reject(new Error('IndexedDB unavailable'));
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error || new Error('IndexedDB open failed'));
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) {
+        const store = db.createObjectStore(STORE, { keyPath: 'id' });
+        store.createIndex('userKey', 'userKey', { unique: false });
+        store.createIndex('bookId', 'bookId', { unique: false });
+      }
+    };
+  });
+  return dbPromise;
 }
 
-/**
- * Get offline-cached chapters for a book.
- * Returns null if not cached.
- */
-export function getOfflineBook(email, bookId) {
+function idbRequest(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function normalizeChapters(chapters = []) {
+  return (Array.isArray(chapters) ? chapters : []).map((ch) => ({
+    title: ch.title || '',
+    subtitle: ch.subtitle || '',
+    part: ch.part || '',
+    text: ch.text || '',
+    endMessage: ch.endMessage || '',
+  }));
+}
+
+function buildPayload(email, bookId, bookMeta = {}, chapters = []) {
+  const normalized = normalizeChapters(chapters);
+  const json = JSON.stringify(normalized);
+  const approxBytes = typeof Blob !== 'undefined'
+    ? new Blob([json]).size
+    : json.length * 2;
+  return {
+    id: entryId(email, bookId),
+    userKey: userDocId(email),
+    bookId: String(bookId),
+    title: bookMeta.title || '',
+    author: bookMeta.author || '',
+    cover: bookMeta.cover || '',
+    slug: bookMeta.slug || '',
+    savedAt: Date.now(),
+    chapters: normalized,
+    chapterCount: normalized.length,
+    approxBytes,
+  };
+}
+
+function readLegacyLocal(email, bookId) {
   const key = offlineKey(email, bookId);
   if (!key) return null;
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data?.chapters) || !data.chapters.length) return null;
+    return {
+      bookId: String(data.bookId || bookId),
+      title: data.title || '',
+      author: data.author || '',
+      cover: data.cover || '',
+      slug: data.slug || '',
+      savedAt: data.savedAt || Date.now(),
+      chapters: normalizeChapters(data.chapters),
+      chapterCount: data.chapters.length,
+      approxBytes: raw.length,
+    };
   } catch {
     return null;
   }
 }
 
-/**
- * Save chapters for offline reading.
- * Only saves chapter title + text (no PDF — PDFs require Google Drive and cannot be cached).
- */
-export function saveBookOffline(email, bookId, bookMeta, chapters) {
+function writeLegacyLocal(email, bookId, payload) {
   const key = offlineKey(email, bookId);
   if (!key) return false;
   try {
-    const payload = {
-      bookId,
-      title:     bookMeta.title   || '',
-      author:    bookMeta.author  || '',
-      cover:     bookMeta.cover   || '',
-      savedAt:   Date.now(),
-      chapters:  chapters.map(ch => ({
-        title:      ch.title      || '',
-        subtitle:   ch.subtitle   || '',
-        part:       ch.part       || '',
-        text:       ch.text       || '',
-        endMessage: ch.endMessage || '',
-      })),
-    };
-    localStorage.setItem(key, JSON.stringify(payload));
+    localStorage.setItem(key, JSON.stringify({
+      bookId: payload.bookId,
+      title: payload.title,
+      author: payload.author,
+      cover: payload.cover,
+      slug: payload.slug,
+      savedAt: payload.savedAt,
+      chapters: payload.chapters,
+    }));
     return true;
-  } catch (e) {
-    // localStorage may be full
-    console.warn('[OfflineBook] save failed:', e.message);
+  } catch {
     return false;
+  }
+}
+
+function removeLegacyLocal(email, bookId) {
+  const key = offlineKey(email, bookId);
+  if (key) localStorage.removeItem(key);
+}
+
+function listLegacyLocal(email) {
+  const prefix = `eh_offline_book_${userDocId(email)}_`;
+  const result = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith(prefix)) continue;
+      try {
+        const data = JSON.parse(localStorage.getItem(k) || '{}');
+        if (!Array.isArray(data?.chapters) || !data.chapters.length) continue;
+        result.push({
+          bookId: String(data.bookId || ''),
+          title: data.title || '',
+          author: data.author || '',
+          cover: data.cover || '',
+          slug: data.slug || '',
+          savedAt: data.savedAt || 0,
+          chapters: data.chapters.length,
+          chapterCount: data.chapters.length,
+          approxBytes: (localStorage.getItem(k) || '').length,
+        });
+      } catch { /* skip */ }
+    }
+  } catch { /* ignore */ }
+  return result;
+}
+
+async function putIdb(payload) {
+  const db = await openDb();
+  const tx = db.transaction(STORE, 'readwrite');
+  await idbRequest(tx.objectStore(STORE).put(payload));
+  return true;
+}
+
+async function getIdb(email, bookId) {
+  const db = await openDb();
+  const tx = db.transaction(STORE, 'readonly');
+  const row = await idbRequest(tx.objectStore(STORE).get(entryId(email, bookId)));
+  if (!row?.chapters?.length) return null;
+  return row;
+}
+
+async function deleteIdb(email, bookId) {
+  const db = await openDb();
+  const tx = db.transaction(STORE, 'readwrite');
+  await idbRequest(tx.objectStore(STORE).delete(entryId(email, bookId)));
+  return true;
+}
+
+async function listIdb(email) {
+  const db = await openDb();
+  const tx = db.transaction(STORE, 'readonly');
+  const store = tx.objectStore(STORE);
+  const index = store.index('userKey');
+  const rows = await idbRequest(index.getAll(userDocId(email)));
+  return (rows || [])
+    .filter((r) => Array.isArray(r.chapters) && r.chapters.length > 0)
+    .map((r) => ({
+      bookId: String(r.bookId),
+      title: r.title || '',
+      author: r.author || '',
+      cover: r.cover || '',
+      slug: r.slug || '',
+      savedAt: r.savedAt || 0,
+      chapters: r.chapterCount || r.chapters.length,
+      chapterCount: r.chapterCount || r.chapters.length,
+      approxBytes: r.approxBytes || 0,
+    }))
+    .sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+}
+
+/**
+ * Check if a book is saved for offline reading.
+ */
+export async function isBookSavedOffline(email, bookId) {
+  if (!email || !bookId) return false;
+  try {
+    const row = await getIdb(email, bookId);
+    if (row?.chapters?.length) return true;
+  } catch { /* fall through */ }
+  return !!readLegacyLocal(email, bookId);
+}
+
+/**
+ * Get offline-cached book (full chapters).
+ * Migrates legacy localStorage → IndexedDB when found.
+ */
+export async function getOfflineBook(email, bookId) {
+  if (!email || !bookId) return null;
+  try {
+    const row = await getIdb(email, bookId);
+    if (row?.chapters?.length) {
+      return {
+        bookId: String(row.bookId),
+        title: row.title || '',
+        author: row.author || '',
+        cover: row.cover || '',
+        slug: row.slug || '',
+        savedAt: row.savedAt || 0,
+        chapters: row.chapters,
+        chapterCount: row.chapterCount || row.chapters.length,
+        approxBytes: row.approxBytes || 0,
+      };
+    }
+  } catch { /* fall through */ }
+
+  const legacy = readLegacyLocal(email, bookId);
+  if (!legacy) return null;
+
+  // Best-effort migrate so refresh + future reads use IndexedDB
+  try {
+    const payload = buildPayload(email, bookId, legacy, legacy.chapters);
+    payload.savedAt = legacy.savedAt || payload.savedAt;
+    await putIdb(payload);
+  } catch { /* keep legacy */ }
+  return legacy;
+}
+
+/**
+ * Save chapters for offline reading.
+ * Returns { ok, reason?, count?, approxBytes? }
+ */
+export async function saveBookOffline(email, bookId, bookMeta, chapters) {
+  if (!email || !bookId) return { ok: false, reason: 'missing' };
+  const normalized = normalizeChapters(chapters);
+  if (!normalized.length) return { ok: false, reason: 'empty' };
+
+  const payload = buildPayload(email, bookId, bookMeta, normalized);
+
+  try {
+    await putIdb(payload);
+    // Mirror a slim copy in localStorage for older code paths / quick list recovery
+    writeLegacyLocal(email, bookId, payload);
+    return { ok: true, count: payload.chapterCount, approxBytes: payload.approxBytes };
+  } catch (e) {
+    const quota = e?.name === 'QuotaExceededError' || /quota/i.test(e?.message || '');
+    // Fallback to localStorage only
+    const localOk = writeLegacyLocal(email, bookId, payload);
+    if (localOk) {
+      return { ok: true, count: payload.chapterCount, approxBytes: payload.approxBytes, reason: 'local-fallback' };
+    }
+    console.warn('[OfflineBook] save failed:', e?.message || e);
+    return { ok: false, reason: quota ? 'quota' : 'error' };
   }
 }
 
 /**
  * Remove a book's offline cache.
  */
-export function removeOfflineBook(email, bookId) {
-  const key = offlineKey(email, bookId);
-  if (!key) return;
-  localStorage.removeItem(key);
+export async function removeOfflineBook(email, bookId) {
+  if (!email || !bookId) return false;
+  removeLegacyLocal(email, bookId);
+  try {
+    await deleteIdb(email, bookId);
+    return true;
+  } catch (e) {
+    console.warn('[OfflineBook] remove failed:', e?.message || e);
+    return true; // legacy already cleared
+  }
 }
 
 /**
- * List all books the user has saved offline.
- * Returns array of { bookId, title, author, cover, savedAt }
+ * List all books the user has saved offline (metadata only).
  */
-export function listOfflineBooks(email) {
-  const prefix = `eh_offline_book_${userDocId(email)}_`;
-  const result = [];
+export async function listOfflineBooks(email) {
+  if (!email) return [];
+  const byId = new Map();
+
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(prefix)) {
-        try {
-          const data = JSON.parse(localStorage.getItem(k) || '{}');
-          result.push({
-            bookId:   data.bookId,
-            title:    data.title,
-            author:   data.author,
-            cover:    data.cover,
-            savedAt:  data.savedAt,
-            chapters: data.chapters?.length || 0,
-          });
-        } catch { /* skip malformed */ }
-      }
-    }
+    const idbList = await listIdb(email);
+    idbList.forEach((b) => byId.set(String(b.bookId), b));
   } catch { /* ignore */ }
-  return result;
+
+  // Merge legacy localStorage entries (and migrate missing ones)
+  const legacy = listLegacyLocal(email);
+  for (const b of legacy) {
+    if (!byId.has(String(b.bookId))) {
+      byId.set(String(b.bookId), b);
+      try {
+        const full = readLegacyLocal(email, b.bookId);
+        if (full) {
+          const payload = buildPayload(email, b.bookId, full, full.chapters);
+          payload.savedAt = full.savedAt || payload.savedAt;
+          await putIdb(payload);
+        }
+      } catch { /* ignore migrate errors */ }
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+}
+
+/**
+ * Count saved offline books (for badges / max limits).
+ */
+export async function countOfflineBooks(email) {
+  const list = await listOfflineBooks(email);
+  return list.length;
+}
+
+/**
+ * Format bytes for friendly UI copy.
+ */
+export function formatOfflineSize(bytes = 0) {
+  if (!bytes || bytes < 1024) return `${bytes || 0} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

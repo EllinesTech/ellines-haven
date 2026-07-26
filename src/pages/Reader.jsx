@@ -16,13 +16,13 @@ import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
 
 import {
 
-  isBookSavedOffline,
-
   getOfflineBook,
 
   saveBookOffline,
 
   removeOfflineBook,
+
+  formatOfflineSize,
 
 } from '../hooks/useOfflineBook';
 
@@ -178,7 +178,13 @@ export default function Reader() {
 
   const [offlineSaveMsg,  setOfflineSaveMsg]   = useState('');
 
+  const [offlineMsgTone,  setOfflineMsgTone]   = useState('ok'); // ok | err
+
   const [offlineChapters, setOfflineChapters]  = useState(null);
+
+  const [offlineReady,    setOfflineReady]     = useState(false);
+
+  const [offlineMeta,     setOfflineMeta]      = useState(null);
 
 
 
@@ -239,25 +245,34 @@ export default function Reader() {
     if (user?.email) updateUserReadingPreference(user.email, 'fontFamily', id);
   };
 
-// On mount, check if this book is already saved offline and load cached chapters
-
+  // On mount, load offline copy (IndexedDB) so refresh / offline still works
   useEffect(() => {
-
-    if (!user?.email || !book?.id) return;
-
-    const saved = isBookSavedOffline(user.email, book.id);
-
-    setOfflineSaved(saved);
-
-    if (saved) {
-
-      const cached = getOfflineBook(user.email, book.id);
-
-      if (cached?.chapters?.length) setOfflineChapters(cached.chapters);
-
-    }
-
-  }, [user?.email, book?.id]); // eslint-disable-line
+    let cancelled = false;
+    (async () => {
+      if (!user?.email || !book?.id) {
+        setOfflineReady(true);
+        return;
+      }
+      setOfflineReady(false);
+      try {
+        const cached = await getOfflineBook(user.email, book.id);
+        if (cancelled) return;
+        const ok = Array.isArray(cached?.chapters) && cached.chapters.length > 0;
+        setOfflineSaved(ok);
+        setOfflineChapters(ok ? cached.chapters : null);
+        setOfflineMeta(ok ? cached : null);
+      } catch {
+        if (!cancelled) {
+          setOfflineSaved(false);
+          setOfflineChapters(null);
+          setOfflineMeta(null);
+        }
+      } finally {
+        if (!cancelled) setOfflineReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.email, book?.id]);
 
 
 
@@ -593,11 +608,13 @@ export default function Reader() {
 
 
 
-  if (!checkOwned() && !isFreePreviewCh0 && !canAccessChapter(chapter)) {
+  // Offline copy on this device is enough to keep reading after refresh / no network
+  const hasOfflineAccess = offlineSaved && Array.isArray(offlineChapters) && offlineChapters.length > 0;
 
-    // Still waiting for Firestore library snapshot
+  if (!checkOwned() && !isFreePreviewCh0 && !canAccessChapter(chapter) && !hasOfflineAccess) {
 
-    if (user && !libLoaded) return (
+    // Still waiting for library snapshot or offline cache lookup
+    if (user && (!libLoaded || !offlineReady)) return (
 
       <div className="reader-error">
 
@@ -728,9 +745,10 @@ export default function Reader() {
 
   const hasPdf     = !!embedUrl;
 
-  // Chapters: prefer live Firestore ? offline cache ? fallback static content
-
-  const chapters   = liveChapters || offlineChapters || getFallbackChapters(book);
+  // Chapters: when offline prefer cache; otherwise live Firestore → cache → fallback
+  const chapters = isOffline
+    ? (offlineChapters || liveChapters || getFallbackChapters(book))
+    : (liveChapters || offlineChapters || getFallbackChapters(book));
 
 
 
@@ -740,45 +758,76 @@ export default function Reader() {
 
     if (!user?.email || !book?.id) return;
 
+    if (!chapters?.length) {
+      setOfflineMsgTone('err');
+      setOfflineSaveMsg('Nothing to save yet — wait for chapters to load');
+      setTimeout(() => setOfflineSaveMsg(''), 4000);
+      return;
+    }
+
     setOfflineSaving(true);
 
     setOfflineSaveMsg('');
 
-    const ok = saveBookOffline(user.email, book.id, book, chapters);
+    const result = await saveBookOffline(user.email, book.id, book, chapters);
 
     setOfflineSaving(false);
 
-    if (ok) {
+    if (result?.ok) {
 
       setOfflineSaved(true);
 
       setOfflineChapters(chapters);
 
-      setOfflineSaveMsg('✅ Saved for offline reading');
+      setOfflineMeta({
+        bookId: book.id,
+        title: book.title,
+        chapterCount: result.count,
+        approxBytes: result.approxBytes,
+        savedAt: Date.now(),
+      });
+
+      setOfflineMsgTone('ok');
+
+      setOfflineSaveMsg(
+        `Saved on this device${result.count ? ` · ${result.count} chapters` : ''}${
+          result.approxBytes ? ` · ${formatOfflineSize(result.approxBytes)}` : ''
+        }`
+      );
 
     } else {
 
-      setOfflineSaveMsg('❌ Could not save — storage may be full');
+      setOfflineMsgTone('err');
+
+      setOfflineSaveMsg(
+        result?.reason === 'quota'
+          ? 'Storage full — remove an offline book in My Library, then try again'
+          : 'Could not save offline. Please try again.'
+      );
 
     }
 
-    setTimeout(() => setOfflineSaveMsg(''), 3500);
+    setTimeout(() => setOfflineSaveMsg(''), 5000);
 
   };
 
 
 
-  const handleRemoveOffline = () => {
+  const handleRemoveOffline = async () => {
 
     if (!user?.email || !book?.id) return;
 
-    removeOfflineBook(user.email, book.id);
+    await removeOfflineBook(user.email, book.id);
 
     setOfflineSaved(false);
 
     setOfflineChapters(null);
 
-    setOfflineSaveMsg('🗑️ Removed from offline library');
+    setOfflineMeta(null);
+
+    setOfflineMsgTone('ok');
+
+    setOfflineSaveMsg('Removed from this device');
 
     setTimeout(() => setOfflineSaveMsg(''), 3000);
 
@@ -1170,39 +1219,37 @@ export default function Reader() {
 
             <div className="reader__nav-row2">
 
-              {/* Offline save button */}
+              {/* Offline save — keep status visible after refresh; allow remove while offline */}
 
-              {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
+              {(siteControls?.offlineEnabled !== false) && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
 
                 offlineSaved ? (
 
                   <button
 
-                    className="reader__font-btn"
+                    className="reader__offline-btn reader__offline-btn--saved"
 
-                    style={{padding:'3px 9px',fontSize:'0.7rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71',whiteSpace:'nowrap'}}
-
-                    title="Remove from offline library"
+                    title={offlineMeta?.savedAt
+                      ? `Saved on this device · ${new Date(offlineMeta.savedAt).toLocaleDateString('en-KE')}`
+                      : 'Saved on this device — tap to remove'}
 
                     onClick={handleRemoveOffline}
 
-                  >✅ Offline</button>
+                  >✓ On device</button>
 
                 ) : (
 
                   <button
 
-                    className="reader__font-btn"
+                    className="reader__offline-btn"
 
-                    style={{padding:'3px 9px',fontSize:'0.7rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)',whiteSpace:'nowrap'}}
-
-                    title="Save book for offline reading"
+                    title="Save chapters on this device so you can keep reading after refresh or without internet"
 
                     onClick={handleSaveOffline}
 
                     disabled={offlineSaving}
 
-                  >{offlineSaving ? '⏳' : '⬇️ Save'}</button>
+                  >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
                 )
 
@@ -1288,37 +1335,35 @@ export default function Reader() {
 
               )}
 
-              {!isOffline && (siteControls?.offlineEnabled !== false) && chapters?.length > 0 && (
+              {(siteControls?.offlineEnabled !== false) && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
 
                 offlineSaved ? (
 
                   <button
 
-                    className="reader__font-btn"
+                    className="reader__offline-btn reader__offline-btn--saved"
 
-                    style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(46,204,113,0.12)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',color:'#2ecc71'}}
-
-                    title="Remove from offline library"
+                    title={offlineMeta?.savedAt
+                      ? `Saved on this device · ${new Date(offlineMeta.savedAt).toLocaleDateString('en-KE')} — tap to remove`
+                      : 'Saved on this device — tap to remove'}
 
                     onClick={handleRemoveOffline}
 
-                  >✅ Saved Offline</button>
+                  >✓ On this device</button>
 
                 ) : (
 
                   <button
 
-                    className="reader__font-btn"
+                    className="reader__offline-btn"
 
-                    style={{padding:'4px 12px',fontSize:'0.78rem',background:'rgba(201,168,76,0.12)',border:'1px solid rgba(201,168,76,0.3)',borderRadius:'var(--r-sm)',color:'var(--gold)'}}
-
-                    title="Save book for offline reading (stored in your browser)"
+                    title="Save chapters on this device so you can keep reading after refresh or without internet"
 
                     onClick={handleSaveOffline}
 
                     disabled={offlineSaving}
 
-                  >{offlineSaving ? '⏳ Saving…' : '⬇️ Save Offline'}</button>
+                  >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
                 )
 
@@ -1326,7 +1371,10 @@ export default function Reader() {
 
               {offlineSaveMsg && (
 
-                <span style={{fontSize:'0.75rem',color:'var(--muted)',flexShrink:0}}>{offlineSaveMsg}</span>
+                <span
+                  className={`reader__offline-toast${offlineMsgTone === 'err' ? ' reader__offline-toast--err' : ''}`}
+                  role="status"
+                >{offlineSaveMsg}</span>
 
               )}
 
@@ -1380,47 +1428,23 @@ export default function Reader() {
 
       {isOffline && offlineSaved && (
 
-        <div style={{
+        <div className="reader__offline-banner reader__offline-banner--ok" role="status">
 
-          display: 'flex', alignItems: 'center', gap: 10,
+          <span aria-hidden="true">✓</span>
 
-          padding: '8px 18px',
-
-          background: 'rgba(46,204,113,0.10)',
-
-          borderBottom: '1px solid rgba(46,204,113,0.2)',
-
-          fontSize: '0.82rem', color: '#2ecc71',
-
-        }}>
-
-          <span>✅</span>
-
-          <span>Reading from offline cache — no internet required.</span>
+          <span>Reading from this device — no internet needed. Your place is kept after refresh.</span>
 
         </div>
 
       )}
 
-      {isOffline && !offlineSaved && (
+      {isOffline && !offlineSaved && offlineReady && (
 
-        <div style={{
+        <div className="reader__offline-banner reader__offline-banner--warn" role="status">
 
-          display: 'flex', alignItems: 'center', gap: 10,
+          <span aria-hidden="true">!</span>
 
-          padding: '8px 18px',
-
-          background: 'rgba(231,76,60,0.10)',
-
-          borderBottom: '1px solid rgba(231,76,60,0.2)',
-
-          fontSize: '0.82rem', color: '#e74c3c',
-
-        }}>
-
-          <span>⚠️</span>
-
-          <span>You are offline. This book was not saved for offline reading. Connect to the internet to continue.</span>
+          <span>You’re offline and this book isn’t saved on this device. Reconnect, open the book, then tap <strong>Save offline</strong>.</span>
 
         </div>
 
