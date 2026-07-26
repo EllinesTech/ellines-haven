@@ -1,21 +1,60 @@
-.bcard { overflow: hidden; transition: transform .3s, box-shadow .3s; }
-.bcard:hover { transform: translateY(-5px); box-shadow: 0 14px 44px rgba(0,0,0,.55); }
+/* ════════════════════════════════════════
+   BOOK CARD
+════════════════════════════════════════ */
+.bcard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background:
+    linear-gradient(165deg, rgba(22, 22, 42, 0.98), rgba(16, 16, 32, 1));
+  border: 1px solid rgba(201, 168, 76, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+}
+.bcard:hover {
+  transform: translateY(-6px);
+  border-color: rgba(201, 168, 76, 0.38);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(201, 168, 76, 0.12);
+}
 
-/* ── Cover wrapper ── */
-.bcard__img-wrap { position: relative; height: 280px; overflow: hidden; }
+/* ── Cover ── */
+.bcard__img-wrap {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  height: auto;
+  max-height: 340px;
+  overflow: hidden;
+  background: #0a0a16;
+  flex-shrink: 0;
+}
+.bcard__img-wrap::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 42%;
+  background: linear-gradient(to top, rgba(8, 8, 18, 0.55), transparent);
+  pointer-events: none;
+  z-index: 2;
+}
 
-/* ── Photo cover ── */
 .bcard__cover-photo {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center top;
   display: block;
-  transition: transform .4s;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.bcard:hover .bcard__cover-photo { transform: scale(1.05); }
+.bcard:hover .bcard__cover-photo { transform: scale(1.06); }
 
-/* ── Styled CSS cover ── */
 .bcard__cover-styled {
   width: 100%;
   height: 100%;
@@ -26,7 +65,7 @@
   padding: 20px 18px 22px;
   position: relative;
   overflow: hidden;
-  transition: transform .4s;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .bcard:hover .bcard__cover-styled { transform: scale(1.03); }
 
@@ -82,7 +121,7 @@
 .bcard__cover-author {
   font-size: 0.65rem;
   letter-spacing: 1px;
-  color: rgba(240,236,226,0.5);
+  color: rgba(240, 236, 226, 0.5);
   text-transform: uppercase;
 }
 .bcard__cover-rule {
@@ -97,17 +136,16 @@
 .bcard__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(13,13,26,.72);
+  background: rgba(8, 8, 18, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity .3s;
+  transition: opacity 0.3s ease;
   z-index: 10;
 }
 .bcard:hover .bcard__overlay { opacity: 1; }
 
-/* On touch devices, show a persistent "View" button instead of the hover overlay */
 @media (hover: none) {
   .bcard__overlay {
     opacity: 1;
@@ -115,17 +153,44 @@
     align-items: flex-end;
     padding-bottom: 14px;
   }
-  /* Make the View Book button visible and tappable on touch */
   .bcard__overlay .btn {
     min-height: 44px;
     font-size: 0.78rem;
     padding: 10px 18px;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
   }
+  .bcard__img-wrap::after { height: 28%; }
+}
+
+/* ── Coming soon / draft veil ── */
+.bcard__veil {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 20, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 4;
+  gap: 10px;
+  padding: 12px;
+}
+.bcard__veil-btn {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  font-size: 0.72rem !important;
+  min-height: 34px;
 }
 
 /* ── Badges ── */
-.bcard__new { position: absolute; top: 10px; left: 10px; z-index: 5; }
+.bcard__new {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+}
 .bcard__badges {
   display: inline-flex !important;
   flex-direction: row !important;
@@ -139,53 +204,64 @@
   position: absolute;
   bottom: 10px;
   left: 10px;
-  background: rgba(13,13,26,0.75);
-  border: 1px solid rgba(201,168,76,0.75);
+  background: rgba(13, 13, 26, 0.78);
+  border: 1px solid rgba(201, 168, 76, 0.7);
   color: var(--gold);
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-  padding: 3px 9px;
+  padding: 4px 9px;
   border-radius: 20px;
   z-index: 5;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
 /* ── Card body ── */
-.bcard__body { padding: 16px 18px 18px; }
-.bcard__genre { font-size: .7rem; color: var(--gold); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
-.bcard__title { font-size: 1rem; margin: 6px 0 3px; }
-.bcard__title a { color: var(--text); transition: color .2s; }
+.bcard__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 14px 15px 15px;
+  min-height: 0;
+}
+.bcard__genre {
+  font-size: 0.68rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.bcard__title {
+  font-size: 1.02rem;
+  margin: 6px 0 2px;
+  line-height: 1.28;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.56em;
+}
+.bcard__title a {
+  color: var(--text);
+  transition: color 0.2s;
+}
 .bcard__title a:hover { color: var(--gold); }
-.bcard__author { color: var(--muted); font-size: .8rem; margin-bottom: 8px; }
+.bcard__author {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .bcard__excerpt {
-  color: var(--muted); font-size: .8rem; line-height: 1.5; margin-bottom: 8px;
-  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-
-/* ── Compact card (used in narrow grid columns on mobile) ── */
-@media (max-width: 640px) {
-  .bcard__img-wrap { height: 200px; }
-  .bcard__body { padding: 10px 12px 12px; }
-  .bcard__title { font-size: 0.88rem; }
-  .bcard__author { font-size: 0.74rem; }
-  .bcard__excerpt { display: none; }
-  .bcard__meta { margin-bottom: 10px; }
-}
-@media (max-width: 400px) {
-  .bcard__img-wrap { height: 180px; }
-  .bcard__body { padding: 8px 10px 10px; }
-  .bcard__title { font-size: 0.82rem; }
-  .bcard__footer { flex-direction: column; align-items: flex-start; gap: 6px; }
-}
-.bcard__inspired-note {
-  font-size: 0.73rem;
-  color: rgba(201,168,76,0.7);
-  font-style: italic;
+  color: rgba(148, 144, 160, 0.92);
+  font-size: 0.78rem;
   line-height: 1.5;
   margin-bottom: 10px;
   display: -webkit-box;
@@ -193,70 +269,167 @@
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  flex: 1;
 }
-.bcard__meta { display: flex; justify-content: space-between; margin-bottom: 14px; }
-.bcard__stars { color: var(--gold); font-size: .78rem; }
-.bcard__rating { color: var(--text); font-weight: 600; }
-.bcard__time { color: var(--muted); font-size: .75rem; }
-.bcard__footer { display: flex; align-items: center; justify-content: space-between; }
-.bcard__price { display: flex; align-items: baseline; gap: 3px; }
-.bcard__price small { font-size: .72rem; color: var(--muted); }
-.bcard__price strong { font-size: 1.15rem; font-weight: 700; }
+.bcard__inspired-note {
+  font-size: 0.72rem;
+  color: rgba(201, 168, 76, 0.7);
+  font-style: italic;
+  line-height: 1.45;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
-/* WhatsApp icon button on book card */
+.bcard__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-top: 2px;
+}
+.bcard__stars {
+  color: var(--gold);
+  font-size: 0.76rem;
+  letter-spacing: 0.5px;
+}
+.bcard__rating {
+  color: var(--text);
+  font-weight: 600;
+  margin-left: 2px;
+}
+.bcard__time {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.bcard__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+.bcard__price {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.bcard__price small {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.bcard__price strong {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.bcard__status-note {
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.3;
+}
+.bcard__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.bcard__actions .btn-sm {
+  padding: 7px 12px;
+  font-size: 0.75rem;
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+/* WhatsApp icon button */
 .bcard__wa-btn {
   background: #25d366;
   color: #fff;
   border: none;
-  padding: 6px 8px;
+  padding: 0;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-sm);
   transition: background 0.2s, transform 0.15s;
   flex-shrink: 0;
+  min-height: 34px;
 }
-.bcard__wa-btn:hover { background: #1ebe5d; transform: scale(1.08); color: #fff; }
+.bcard__wa-btn:hover {
+  background: #1ebe5d;
+  transform: scale(1.06);
+  color: #fff;
+}
 
-/* ── Wishlist button on card — top right, always visible ── */
+/* Wishlist — top right */
 .bcard__wishlist-btn {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 6;
 }
-
-/* On hover, slightly pop */
 .bcard:hover .bcard__wishlist-btn .wl-btn:not(.wl-btn--active) {
   opacity: 1;
 }
 
-/* ── Multiple genre tags on card ── */
+/* Genre tags — secondary only */
 .bcard__genre-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 4px;
-  margin-bottom: 4px;
+  margin-top: 5px;
+  margin-bottom: 2px;
 }
 .bcard__genre-tag {
   display: inline-block;
-  padding: 2px 8px;
-  background: rgba(201,168,76,0.07);
-  border: 1px solid rgba(201,168,76,0.18);
+  padding: 2px 7px;
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.16);
   border-radius: 20px;
-  color: rgba(200,196,215,0.7);
-  font-size: 0.65rem;
+  color: rgba(200, 196, 215, 0.65);
+  font-size: 0.62rem;
   font-weight: 500;
   white-space: nowrap;
 }
 .bcard__genre-tag--more {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.04);
   border-color: var(--dim);
   color: var(--muted);
 }
 
-/* ── Sub-genre chip style in library bar ── */
+/* Notify / coming-soon compact CTA */
+.bcard__notify-btn {
+  font-size: 0.72rem !important;
+  padding: 7px 10px !important;
+  min-height: 34px !important;
+  background: rgba(201, 168, 76, 0.1) !important;
+  color: var(--gold) !important;
+  border: 1px solid rgba(201, 168, 76, 0.3) !important;
+  white-space: nowrap;
+}
+.bcard__notify-done {
+  font-size: 0.72rem !important;
+  padding: 7px 10px !important;
+  min-height: 34px !important;
+  background: rgba(46, 204, 113, 0.1) !important;
+  color: var(--ok) !important;
+  border: 1px solid rgba(46, 204, 113, 0.3) !important;
+  cursor: default !important;
+}
+
+/* Sub-genre chip style in library bar */
 .lib-genre-chip--sub {
   font-size: 0.73rem;
   opacity: 0.8;
@@ -265,4 +438,49 @@
 .lib-genre-chip--sub:hover,
 .lib-genre-chip--sub.lib-genre-chip--on {
   opacity: 1;
+}
+
+/* ── Compact card (narrow columns) ── */
+@media (max-width: 640px) {
+  .bcard { border-radius: 12px; }
+  .bcard__body { padding: 11px 11px 12px; }
+  .bcard__title {
+    font-size: 0.88rem;
+    min-height: 2.3em;
+  }
+  .bcard__author { font-size: 0.72rem; margin-bottom: 6px; }
+  .bcard__excerpt,
+  .bcard__inspired-note,
+  .bcard__genre-tags { display: none; }
+  .bcard__meta { margin-bottom: 10px; }
+  .bcard__price strong { font-size: 1rem; }
+  .bcard__actions .btn-sm {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    min-height: 32px;
+  }
+  .bcard__wa-btn { width: 32px; height: 32px; min-height: 32px; }
+}
+
+@media (max-width: 400px) {
+  .bcard__body { padding: 9px 9px 10px; }
+  .bcard__title { font-size: 0.82rem; }
+  .bcard__footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .bcard__actions { justify-content: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bcard,
+  .bcard__cover-photo,
+  .bcard__cover-styled,
+  .bcard__overlay {
+    transition: none !important;
+  }
+  .bcard:hover { transform: none; }
+  .bcard:hover .bcard__cover-photo,
+  .bcard:hover .bcard__cover-styled { transform: none; }
 }

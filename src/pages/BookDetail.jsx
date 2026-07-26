@@ -1414,7 +1414,7 @@ export default function BookDetail() {
             <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:24, marginTop:4 }}>
               {related.length} recommendations based on genre, themes, and your reading style
             </p>
-            <div className="bd-related-grid" style={{ marginTop:'8px', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))' }}>
+            <div className="bd-related-grid" style={{ marginTop: '8px' }}>
               {related.map(b => <BookCard key={b.id} book={b} />)}
             </div>
           </div>

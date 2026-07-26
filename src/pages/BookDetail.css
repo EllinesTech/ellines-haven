@@ -170,7 +170,7 @@
   .bd-meta { gap: 16px; flex-wrap: wrap; }
   .bd-purchase { gap: 16px; }
   .bd-wrap { padding: 96px 0 40px; }
-  .bd-related-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+  .bd-related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .bd-title { font-size: clamp(1.5rem, 5vw, 2.2rem); }
 }
 @media (max-width:480px) {
@@ -862,11 +862,20 @@
   text-align: center;
 }
 
-/* ── Related books grid — capped width so cards don't stretch ── */
+/* ── Related books grid ── */
 .bd-related-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 260px));
-  gap: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+}
+.bd-related-grid > * { min-width: 0; width: 100%; }
+@media (max-width: 1100px) {
+  .bd-related-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+}
+@media (max-width: 700px) {
+  .bd-related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 }
 
 /* ── Admin inline TOC editor ── */

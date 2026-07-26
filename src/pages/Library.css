@@ -302,12 +302,16 @@
 /* ── Main layout ── */
 .lib-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 40px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 28px;
   padding-top: 40px;
   padding-bottom: 80px;
   align-items: start;
   animation: lib-rise .7s ease-out .22s both;
+}
+.lib-main {
+  min-width: 0;
+  width: 100%;
 }
 
 /* ── Sidebar ── */
@@ -429,14 +433,17 @@
 }
 .lib-chip button:hover { opacity: 1; }
 
-/* ── Books grid ── */
+/* ── Books grid — fill the main column evenly ── */
 .lib-books-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 260px));
-  justify-content: start;
-  gap: 26px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+  width: 100%;
 }
 .lib-books-grid > * {
+  min-width: 0;
+  width: 100%;
   animation: lib-rise .5s ease-out both;
 }
 .lib-books-grid > *:nth-child(1) { animation-delay: .02s; }
@@ -524,7 +531,7 @@
    RESPONSIVE
 ════════════════════════════════════════ */
 @media (max-width: 1100px) {
-  .lib-books-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 240px)); justify-content: start; }
+  .lib-books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 }
 
 @media (max-width: 900px) {
@@ -583,7 +590,7 @@
     border-color: var(--gold);
     background: rgba(201,168,76,.08);
   }
-  .lib-books-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+  .lib-books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .lib-layout { padding-top: 24px; }
   .lib-genre-bar__inner {
     flex-wrap: nowrap;

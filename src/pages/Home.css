@@ -666,7 +666,11 @@
   scroll-snap-align: start;
   margin: 0;
 }
-.home-personal__books .bcard__img-wrap { height: 232px; }
+.home-personal__books .bcard__img-wrap {
+  height: auto;
+  aspect-ratio: 3 / 4;
+  max-height: none;
+}
 .home-personal__books .bcard__body { padding: 12px 12px 14px; }
 .home-personal__books .bcard__title { font-size: .9rem; margin: 4px 0 2px; }
 .home-personal__books .bcard__author { font-size: .74rem; margin-bottom: 0; }
@@ -693,7 +697,11 @@
     width: 142px;
     max-width: 142px;
   }
-  .home-personal__books .bcard__img-wrap { height: 196px; }
+  .home-personal__books .bcard__img-wrap {
+    height: auto;
+    aspect-ratio: 3 / 4;
+    max-height: none;
+  }
   .home-mini-card { flex-basis: min(260px, 82vw); }
 }
 
@@ -790,19 +798,24 @@
 .sec-head p { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
 
 /* ════════════════════════════════════════
-   BOOKS GRID
+   BOOKS GRID — equal columns, no overflow
 ════════════════════════════════════════ */
 .books-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 260px));
-  justify-content: start;
-  gap: 28px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
 }
-@media (max-width: 640px) {
-  .books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.books-grid > * { min-width: 0; width: 100%; }
+@media (max-width: 1100px) {
+  .books-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+}
+@media (max-width: 700px) {
+  .books-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 }
 @media (max-width: 400px) {
-  .books-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .books-grid { gap: 10px; }
 }
 
 /* ════════════════════════════════════════

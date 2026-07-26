@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import WishlistButton from './WishlistButton';
 import { bookPath, readPath } from '../utils/slugify';
-import { handlePurchaseAction, getLoginPromptConfig } from '../utils/purchaseHelpers';
+import { getLoginPromptConfig } from '../utils/purchaseHelpers';
 import { getReadingTimeDisplay } from '../utils/readingTime';
 import './BookCard.css';
 
@@ -75,23 +75,23 @@ function buildCustomBadgeMap(book) {
 }
 
 // Render all badges for a book (status + extra badges array)
-// cardMode: keep covers clean — max 2 pills, no status-key duplicates, skip true-story if inspired
-export function BookBadges({ book, style = {}, cardMode = false, maxExtras = cardMode ? 1 : 99 }) {
+// cardMode: one pill only — never stack status + extras + true-story
+export function BookBadges({ book, style = {}, cardMode = false, maxExtras = cardMode ? 0 : 99 }) {
   if (!book) return null;
 
-  const STATUS_KEYS = new Set(Object.keys(STATUS_META).filter(k =>
-    ['complete','ongoing','premium','free-preview','coming-soon','limited','draft'].includes(k)
-  ));
+  const STATUS_KEYS = new Set(
+    ['complete', 'ongoing', 'premium', 'free-preview', 'coming-soon', 'limited', 'draft']
+  );
 
   const showStatus = book.status && (!cardMode || book.status !== 'complete');
   const customMap = buildCustomBadgeMap(book);
   let extras = Array.isArray(book.badges) ? book.badges.filter(Boolean) : [];
 
-  // Never re-render primary status keys as extras; skip true-story when inspired badge shows
   extras = extras.filter(b => {
-    if (STATUS_KEYS.has(b)) return false;
-    if (b === book.status) return false;
-    if (cardMode && book.inspired && (b === 'true-story' || b === 'inspired')) return false;
+    const key = String(b).toLowerCase().trim();
+    if (STATUS_KEYS.has(key)) return false;
+    if (key === String(book.status || '').toLowerCase()) return false;
+    if (cardMode && book.inspired && (key === 'true-story' || key === 'inspired')) return false;
     return true;
   });
 
@@ -213,53 +213,36 @@ function NotifyMeBtn({ book, user }) {
     }
   };
 
-  // If not logged in, show professional login prompt for any notify-type status
   if (!user) {
-    const colors = {
-      'coming-soon': { bg:'rgba(232,131,42,0.08)', border:'rgba(232,131,42,0.25)', text:'#ffb366', label:'Coming Soon' },
-      'limited':     { bg:'rgba(231,76,60,0.08)',  border:'rgba(231,76,60,0.25)',  text:'#ff8a80', label:'Limited Edition' },
-      'ongoing':     { bg:'rgba(74,158,255,0.08)', border:'rgba(74,158,255,0.25)', text:'#7ec8ff', label:'Ongoing' },
-    };
-    const c = colors[book.status] || colors['coming-soon'];
     return (
-      <div style={{
-        display:'flex', flexDirection:'column', gap:6,
-        background: c.bg, border:`1px solid ${c.border}`,
-        borderRadius:'6px', padding:'10px 12px', fontSize:'0.7rem',
-      }}>
-        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-          <span>🔐</span>
-          <strong style={{ color: c.text }}>{c.label}</strong>
-        </div>
-        <p style={{ margin:'0 0 8px 0', fontSize:'0.65rem', color: c.text, opacity:0.85, lineHeight:1.4 }}>
-          Login or register to get notified when this book becomes available.
-        </p>
-        <Link
-          to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
-          className="btn btn-primary btn-sm"
-          style={{ fontSize:'0.65rem', padding:'6px 10px', textAlign:'center' }}
-        >
-          Login or Register
-        </Link>
-      </div>
+      <Link
+        to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}
+        className="btn btn-sm bcard__notify-btn"
+        title="Login to get notified when this book is available"
+      >
+        Notify Me
+      </Link>
     );
   }
 
   if (state === 'done') {
     return (
-      <span className="btn btn-sm" style={{ background:'rgba(46,204,113,0.1)', color:'var(--ok)', border:'1px solid rgba(46,204,113,0.3)', cursor:'default', fontSize:'0.72rem' }}>
-        🔔 Notifying you
+      <span className="btn btn-sm bcard__notify-done">
+        Notifying
       </span>
     );
   }
 
-  const label = book.status === 'ongoing' ? '🔔 Notify When Complete' : '🔔 Notify Me';
+  const label = book.status === 'ongoing' ? 'Notify Me' : 'Notify Me';
 
   return (
-    <button className="btn btn-sm" onClick={handleNotify} disabled={state === 'loading'}
+    <button
+      className="btn btn-sm bcard__notify-btn"
+      onClick={handleNotify}
+      disabled={state === 'loading'}
       title={book.status === 'ongoing' ? 'Get notified when all chapters are ready' : 'Get an email when this book is available'}
-      style={{ background:'rgba(201,168,76,0.1)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.3)', fontSize:'0.72rem' }}>
-      {state === 'loading' ? '⏳' : label}
+    >
+      {state === 'loading' ? '…' : label}
     </button>
   );
 }
@@ -351,7 +334,7 @@ function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
           style={{ color:'#d4b5ff', borderColor:'rgba(168,85,247,0.5)' }}
           title="Read the first chapter free — no login needed"
         >
-          👀 Read Free Chapter
+          Read Free
         </Link>
       );
     }
@@ -361,7 +344,7 @@ function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
         className="btn btn-primary btn-sm"
         title="Login or register to get this book"
       >
-        🔐 Get Book
+        Get Book
       </Link>
     );
   }
@@ -395,7 +378,7 @@ function PurchaseUiPremium({ book, owned, inCart, user, myPerms, addToCart }) {
         style={{ background:'rgba(201,168,76,0.25)', borderColor:'rgba(201,168,76,0.6)' }}
         title="Login or register to access premium content"
       >
-        🔐 Get Book
+        Get Book
       </Link>
     );
   }
@@ -412,28 +395,50 @@ function PurchaseUiPremium({ book, owned, inCart, user, myPerms, addToCart }) {
   );
 }
 
-// ── Free Preview message card ────────────────────────────────────────────────
-function FreePreviewMessage() {
-  return (
-    <div style={{
-      background:'rgba(168,85,247,0.08)',
-      border:'1px solid rgba(168,85,247,0.3)',
-      borderRadius:'8px',
-      padding:'10px 12px',
-      fontSize:'0.72rem',
-      color:'#d4b5ff',
-      textAlign:'center',
-      fontStyle:'italic',
-    }}>
-      👀 Read first chapter for free — get the full book to continue
-    </div>
-  );
-}
-
 export default function BookCard({ book }) {
   const { addToCart, cart, isOwned, myPerms, user } = useApp();
   const inCart = cart.some(b => b.id === book.id);
   const owned = isOwned(book.id);
+
+  const secondaryGenres = (book.genres || [])
+    .filter(g => g && g !== book.genre)
+    .slice(0, 2);
+  const extraGenreCount = Math.max(0, (book.genres || []).filter(g => g && g !== book.genre).length - 2);
+
+  const ongoingReleased = book.status === 'ongoing'
+    ? (book.chaptersReleased > 0
+        ? book.chaptersReleased
+        : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(t)).length || 0))
+    : 0;
+  const ongoingTotal = book.status === 'ongoing'
+    ? (book.totalChapters > 0 ? book.totalChapters : book.chapterCount > 0 ? book.chapterCount : 0)
+    : 0;
+
+  let action = null;
+  if (owned) {
+    action = <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>;
+  } else if (NO_PURCHASE_STATUSES.has(book.status)) {
+    action = <NotifyMeBtn book={book} user={user} />;
+  } else if (book.status === 'complete' || book.status === 'free-preview') {
+    action = <PurchaseUiComplete book={book} owned={owned} inCart={inCart} user={user} myPerms={myPerms} addToCart={addToCart} />;
+  } else if (book.status === 'premium') {
+    action = <PurchaseUiPremium book={book} owned={owned} inCart={inCart} user={user} myPerms={myPerms} addToCart={addToCart} />;
+  } else if (book.status === 'ongoing' && ongoingReleased > 2) {
+    if (inCart) action = <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
+    else if (user && myPerms?.canPurchase === false) action = <span className="btn btn-ghost btn-sm" style={{ opacity: 0.5, cursor: 'default' }}>Restricted</span>;
+    else if (!user) action = <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">Get Book</Link>;
+    else action = <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>;
+  } else if (NOTIFY_STATUSES.has(book.status)) {
+    action = <NotifyMeBtn book={book} user={user} />;
+  } else if (inCart) {
+    action = <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
+  } else if (user && myPerms?.canPurchase === false) {
+    action = <span className="btn btn-ghost btn-sm" style={{ opacity: 0.5, cursor: 'default' }}>Restricted</span>;
+  } else if (!user) {
+    action = <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">Get Book</Link>;
+  } else {
+    action = <button type="button" className="btn btn-primary btn-sm" onClick={() => addToCart(book)}>Add to Cart</button>;
+  }
 
   return (
     <article className="bcard card">
@@ -442,48 +447,52 @@ export default function BookCard({ book }) {
         <div className="bcard__overlay">
           <Link to={bookPath(book)} className="btn btn-primary btn-sm">View Book</Link>
         </div>
-        {/* Wishlist button — top right corner, always visible */}
         <div className="bcard__wishlist-btn" onClick={e => e.stopPropagation()}>
           <WishlistButton book={book} size="sm" />
         </div>
-        {/* Coming Soon / Draft overlay */}
         {NO_PURCHASE_STATUSES.has(book.status) && (
-          <div style={{ position:'absolute', inset:0, background:'rgba(10,10,20,0.55)', backdropFilter:'blur(2px)', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', zIndex:4, gap:8 }}>
-            <BookBadges book={book} cardMode={false} />
-            <Link to={bookPath(book)} className="btn btn-sm" style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'1px solid rgba(255,255,255,0.2)', fontSize:'0.72rem' }}>
+          <div className="bcard__veil">
+            <BookBadges book={book} cardMode maxExtras={0} />
+            <Link to={bookPath(book)} className="btn btn-sm bcard__veil-btn">
               Preview →
             </Link>
           </div>
         )}
-        {book.isNew && <span className="badge badge-gold bcard__new">New</span>}
-        {book.inspired && <span className="bcard__inspired-badge">✦ True Story</span>}
-        {/* One status (+ at most one extra) — never a vertical badge pile */}
-        {book.status && book.status !== 'complete' && !NO_PURCHASE_STATUSES.has(book.status) && (
-          <BookBadges
-            book={book}
-            cardMode
-            style={{ position:'absolute', bottom: book.inspired ? 36 : 10, left:10, right:10, zIndex:5 }}
-          />
+        {book.isNew && !NO_PURCHASE_STATUSES.has(book.status) && (
+          <span className="badge badge-gold bcard__new">New</span>
         )}
-        {/* Complete books can still show a single highlight extra (not a stack) */}
-        {book.status === 'complete' && Array.isArray(book.badges) && book.badges.length > 0 && !book.inspired && (
-          <BookBadges
-            book={{ ...book, status: null }}
-            cardMode
-            maxExtras={1}
-            style={{ position:'absolute', bottom:10, left:10, right:10, zIndex:5 }}
-          />
+        {/* One cover mark only: status if noteworthy, else True Story, else one highlight */}
+        {!NO_PURCHASE_STATUSES.has(book.status) && (
+          book.status && book.status !== 'complete' ? (
+            <BookBadges
+              book={book}
+              cardMode
+              maxExtras={0}
+              style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 5 }}
+            />
+          ) : book.inspired ? (
+            <span className="bcard__inspired-badge">✦ True Story</span>
+          ) : (
+            Array.isArray(book.badges) && book.badges.length > 0 && (
+              <BookBadges
+                book={{ ...book, status: null }}
+                cardMode
+                maxExtras={1}
+                style={{ position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 5 }}
+              />
+            )
+          )
         )}
       </div>
       <div className="bcard__body">
         <span className="bcard__genre">{book.genre}</span>
-        {book.genres && book.genres.length > 0 && (
+        {secondaryGenres.length > 0 && (
           <div className="bcard__genre-tags">
-            {book.genres.slice(0, 2).map(g => (
+            {secondaryGenres.map(g => (
               <span key={g} className="bcard__genre-tag">{g}</span>
             ))}
-            {book.genres.length > 2 && (
-              <span className="bcard__genre-tag bcard__genre-tag--more">+{book.genres.length - 2}</span>
+            {extraGenreCount > 0 && (
+              <span className="bcard__genre-tag bcard__genre-tag--more">+{extraGenreCount}</span>
             )}
           </div>
         )}
@@ -493,79 +502,51 @@ export default function BookCard({ book }) {
         {book.inspired && book.inspiredNote && (
           <p className="bcard__inspired-note">✦ {book.inspiredNote}</p>
         )}
-        
-        {/* Show free preview message for free-preview status */}
-        {book.status === 'free-preview' && <FreePreviewMessage />}
-        
+
         <div className="bcard__meta">
-          <span className="bcard__stars">{'★'.repeat(Math.floor(book.rating))}<span className="bcard__rating"> {book.rating}</span></span>
-          {book.status === 'ongoing'
-            ? (() => {
-                // Auto-compute chapter count from available data sources
-                const released = book.chaptersReleased > 0
-                  ? book.chaptersReleased
-                  : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(t)).length || 0);
-                const total = book.totalChapters > 0 ? book.totalChapters
-                  : book.chapterCount > 0 ? book.chapterCount : 0;
-                if (released > 2) {
-                  return (
-                    <span className="bcard__time bcard__chapters-badge" style={{ color:'#4a9eff' }}>
-                      📖 {released} ch{total > 0 ? ` / ${total}` : ' + ongoing'}
-                    </span>
-                  );
-                }
-                return (
-                  <span className="bcard__time" style={{ color:'#4a9eff' }}>
-                    {released > 0 ? `${released} ch${total > 0 ? ` / ${total}` : ' ongoing'}` : 'Ongoing'}
-                  </span>
-                );
-              })()
-            : <span className="bcard__time">{getReadingTimeDisplay(book)}</span>
-          }
-        </div>
-        <div className="bcard__footer">
-          {NO_PURCHASE_STATUSES.has(book.status)
-            ? <span style={{ fontSize:'0.78rem', color:'var(--muted)', fontStyle:'italic' }}>
-                {book.status === 'coming-soon' ? '🔜 Not available yet' : '📝 In development'}
+          <span className="bcard__stars">
+            {'★'.repeat(Math.floor(book.rating || 0))}
+            <span className="bcard__rating"> {book.rating}</span>
+          </span>
+          {book.status === 'ongoing' ? (
+            ongoingReleased > 2 ? (
+              <span className="bcard__time" style={{ color: '#4a9eff' }}>
+                {ongoingReleased} ch{ongoingTotal > 0 ? ` / ${ongoingTotal}` : '+'}
               </span>
-            : <div className="bcard__price"><small>KSh</small><strong>{book.price}</strong></div>
-          }
-          <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-            {owned
-              ? <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>
-              : NO_PURCHASE_STATUSES.has(book.status)
-                ? <NotifyMeBtn book={book} user={user} />
-                : book.status === 'complete' || book.status === 'free-preview'
-                  ? <PurchaseUiComplete book={book} owned={owned} inCart={inCart} user={user} myPerms={myPerms} addToCart={addToCart} />
-                  : book.status === 'premium'
-                    ? <PurchaseUiPremium book={book} owned={owned} inCart={inCart} user={user} myPerms={myPerms} addToCart={addToCart} />
-                    : book.status === 'ongoing' && (() => {
-                        const released = book.chaptersReleased > 0
-                          ? book.chaptersReleased
-                          : (book.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|SECTION|VOLUME)\s/i.test(t)).length || 0);
-                        return released > 2;
-                      })()
-                      ? inCart
-                        ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
-                        : user && myPerms?.canPurchase === false
-                          ? <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
-                          : !user
-                            ? <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">🔐 Get Book</Link>
-                            : <Link to={bookPath(book)} className="btn btn-primary btn-sm">Buy Chapters</Link>
-                      : NOTIFY_STATUSES.has(book.status)
-                        ? <NotifyMeBtn book={book} user={user} />
-                        : inCart
-                          ? <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>
-                          : user && myPerms?.canPurchase === false
-                            ? <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>
-                            : !user
-                              ? <Link to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`} className="btn btn-primary btn-sm">🔐 Get Book</Link>
-                              : <button className="btn btn-primary btn-sm" onClick={() => addToCart(book)}>Add to Cart</button>
-            }
+            ) : (
+              <span className="bcard__time" style={{ color: '#4a9eff' }}>
+                {ongoingReleased > 0
+                  ? `${ongoingReleased} ch${ongoingTotal > 0 ? ` / ${ongoingTotal}` : ''}`
+                  : 'Ongoing'}
+              </span>
+            )
+          ) : (
+            <span className="bcard__time">{getReadingTimeDisplay(book)}</span>
+          )}
+        </div>
+
+        <div className="bcard__footer">
+          {NO_PURCHASE_STATUSES.has(book.status) ? (
+            <span className="bcard__status-note">
+              {book.status === 'coming-soon' ? 'Coming soon' : 'In development'}
+            </span>
+          ) : (
+            <div className="bcard__price"><small>KSh</small><strong>{book.price}</strong></div>
+          )}
+          <div className="bcard__actions">
+            {action}
             {!owned && !NO_PURCHASE_STATUSES.has(book.status) && (
-              <a href={waOrderLink(book.title, book.price)} target="_blank" rel="noopener noreferrer"
-                className="btn bcard__wa-btn btn-sm" title="Order via WhatsApp" aria-label="Order via WhatsApp">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              <a
+                href={waOrderLink(book.title, book.price)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn bcard__wa-btn btn-sm"
+                title="Order via WhatsApp"
+                aria-label="Order via WhatsApp"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
               </a>
             )}
           </div>

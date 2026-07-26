@@ -208,9 +208,12 @@
 .empty-state .btn { margin-top: 16px; }
 .books-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
 }
+.books-grid > * { min-width: 0; width: 100%; }
 
 /* ── CTA ── */
 .trending-cta {
@@ -243,6 +246,12 @@
   line-height: 1.6;
 }
 
+@media (max-width: 1100px) {
+  .books-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
 @media (max-width: 768px) {
   .trending-hero-wrap { padding: 96px 0 56px; }
   .genre-pills,
@@ -254,7 +263,7 @@
     padding: 24px;
   }
   .books-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 }
