@@ -781,7 +781,7 @@ function MaintenanceGate({ children }) {
         <div style={{ fontSize:'3.5rem' }}>🚧</div>
         <h2 style={{ color:'var(--gold)' }}>Under Maintenance</h2>
         <p style={{ color:'var(--muted)', maxWidth:380 }}>Ellines Haven is currently undergoing scheduled maintenance. We'll be back shortly.</p>
-        <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Contact: haven@ellines.co.ke · Support: support@ellines.co.ke · WhatsApp: 0748 255 466</p>
+        <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Contact: haven@ellines.co.ke (orders) · info@ellines.co.ke (general) · WhatsApp: 0748 255 466</p>
       </main>
     );
   }
@@ -797,7 +797,7 @@ function SuspensionGate({ children }) {
         <div style={{ fontSize:'3.5rem' }}>🚫</div>
         <h2 style={{ color:'#e74c3c' }}>Account Suspended</h2>
         <p style={{ color:'var(--muted)', maxWidth:380 }}>Your account has been suspended. Contact support to reinstate it.</p>
-        <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Contact support: support@ellines.co.ke</p>
+        <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Contact: info@ellines.co.ke (general) · haven@ellines.co.ke (orders)</p>
         <button className="btn btn-ghost btn-sm" onClick={logout}>Sign Out</button>
       </main>
     );

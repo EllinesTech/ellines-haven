@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
@@ -45,11 +45,11 @@ const ChallengesPanel        = lazy(() => import('./admin-panels/ChallengesPanel
 const PanelLoader = () => (
   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', flexDirection:'column', gap:12 }}>
     <div style={{ width:32, height:32, border:'3px solid rgba(201,168,76,0.2)', borderTop:'3px solid var(--gold)', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />
-    <span style={{ color:'var(--muted)', fontSize:'0.82rem' }}>Loading panel…</span>
+    <span style={{ color:'var(--muted)', fontSize:'0.82rem' }}>Loading panel�</span>
   </div>
 );
 
-// ── Auto-Refresh Settings Storage Key ────────────────────────────────────────
+// -- Auto-Refresh Settings Storage Key ----------------------------------------
 const AR_KEY = 'eh_admin_auto_refresh';
 const AR_DEFAULT = { enabled: true, intervalMs: 60000 }; // 1 minute default
 
@@ -75,8 +75,8 @@ const AR_OPTIONS = [
  * AutoRefreshBar
  * Renders the auto-refresh status strip that sits below the dashboard header.
  * Props:
- *   onRefresh   – called when auto-refresh fires or user clicks manual refresh
- *   lastRefresh – Date object of last refresh (used for "Last updated X ago" text)
+ *   onRefresh   � called when auto-refresh fires or user clicks manual refresh
+ *   lastRefresh � Date object of last refresh (used for "Last updated X ago" text)
  */
 function AutoRefreshBar({ onRefresh, lastRefresh }) {
   const [settings, setSettings]   = useState(loadArSettings);
@@ -192,7 +192,7 @@ function AutoRefreshBar({ onRefresh, lastRefresh }) {
           )}
           <text x="11" y="15" textAnchor="middle"
             style={{ fontSize: '7px', fill: settings.enabled ? '#2ecc71' : 'var(--muted)', fontWeight: 700 }}>
-            {settings.enabled ? (countdown < 10 ? `0${countdown}` : countdown > 99 ? '99+' : countdown) : '—'}
+            {settings.enabled ? (countdown < 10 ? `0${countdown}` : countdown > 99 ? '99+' : countdown) : '�'}
           </text>
         </svg>
         {settings.enabled ? 'Auto' : 'Manual'}
@@ -228,7 +228,7 @@ function AutoRefreshBar({ onRefresh, lastRefresh }) {
         style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '3px 10px' }}
         title="Refresh now"
       >
-        🔄 Now
+        ?? Now
       </button>
     </div>
   );
@@ -254,37 +254,37 @@ const EMPTY_BOOK = {
 };
 
 const BOOK_STATUSES = [
-  { value:'complete',     label:'✅ Complete',        color:'#2ecc71', bg:'rgba(46,204,113,0.12)',  desc:'Fully published, all content available'   },
-  { value:'ongoing',      label:'📖 Ongoing',         color:'#4a9eff', bg:'rgba(74,158,255,0.12)',  desc:'Releasing in chapters / being written'     },
-  { value:'premium',      label:'⭐ Premium',          color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Exclusive paid content, no free preview'   },
-  { value:'free-preview', label:'👀 Free Preview',     color:'#a855f7', bg:'rgba(168,85,247,0.12)',  desc:'First chapters free, rest requires purchase'},
-  { value:'coming-soon',  label:'🔜 Coming Soon',      color:'#e8832a', bg:'rgba(232,131,42,0.12)',  desc:'Announced, not yet available'              },
-  { value:'limited',      label:'⏳ Limited Edition',  color:'#e74c3c', bg:'rgba(231,76,60,0.12)',   desc:'Available for a limited time only'         },
-  { value:'draft',        label:'📝 Draft',            color:'#64748b', bg:'rgba(100,116,139,0.12)', desc:'Work in progress — not shown publicly'     },
+  { value:'complete',     label:'? Complete',        color:'#2ecc71', bg:'rgba(46,204,113,0.12)',  desc:'Fully published, all content available'   },
+  { value:'ongoing',      label:'?? Ongoing',         color:'#4a9eff', bg:'rgba(74,158,255,0.12)',  desc:'Releasing in chapters / being written'     },
+  { value:'premium',      label:'? Premium',          color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Exclusive paid content, no free preview'   },
+  { value:'free-preview', label:'?? Free Preview',     color:'#a855f7', bg:'rgba(168,85,247,0.12)',  desc:'First chapters free, rest requires purchase'},
+  { value:'coming-soon',  label:'?? Coming Soon',      color:'#e8832a', bg:'rgba(232,131,42,0.12)',  desc:'Announced, not yet available'              },
+  { value:'limited',      label:'? Limited Edition',  color:'#e74c3c', bg:'rgba(231,76,60,0.12)',   desc:'Available for a limited time only'         },
+  { value:'draft',        label:'?? Draft',            color:'#64748b', bg:'rgba(100,116,139,0.12)', desc:'Work in progress � not shown publicly'     },
 ];
 
 // Extra badges that can stack on top of the primary status
 const EXTRA_BADGES = [
-  { value:'bestseller',   label:'🏆 Bestseller',      color:'#f59e0b', bg:'rgba(245,158,11,0.12)',  desc:'Top-selling book'                          },
-  { value:'award-winner', label:'🥇 Award Winner',    color:'#fbbf24', bg:'rgba(251,191,36,0.12)',  desc:'Has won a literary award'                  },
-  { value:'staff-pick',   label:"❤️ Staff Pick",      color:'#ec4899', bg:'rgba(236,72,153,0.12)',  desc:"Team's favourite pick"                     },
-  { value:'reader-fave',  label:"🌟 Reader's Fave",   color:'#f97316', bg:'rgba(249,115,22,0.12)',  desc:'Highly rated by readers'                   },
-  { value:'new-release',  label:'🆕 New Release',     color:'#06b6d4', bg:'rgba(6,182,212,0.12)',   desc:'Recently released'                         },
-  { value:'true-story',   label:'✦ True Story',       color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Inspired by true events'                   },
-  { value:'exclusive',    label:'💎 Exclusive',        color:'#818cf8', bg:'rgba(129,140,248,0.12)', desc:'Only on Ellines Haven'                     },
-  { value:'age-18',       label:'🔞 18+',              color:'#ef4444', bg:'rgba(239,68,68,0.12)',   desc:'Mature content — adults only'              },
-  { value:'age-16',       label:'🔒 16+',              color:'#f97316', bg:'rgba(249,115,22,0.12)',  desc:'Suitable for 16 and above'                 },
-  { value:'audiobook',    label:'🎧 Audiobook',        color:'#22d3ee', bg:'rgba(34,211,238,0.12)',  desc:'Has audio version available'               },
-  { value:'translated',   label:'🌍 Translated',       color:'#34d399', bg:'rgba(52,211,153,0.12)',  desc:'Available in multiple languages'           },
-  { value:'short-read',   label:'⚡ Short Read',       color:'#a3e635', bg:'rgba(163,230,53,0.12)',  desc:'Under 2 hours to read'                     },
-  { value:'series',       label:'📚 Series',           color:'#38bdf8', bg:'rgba(56,189,248,0.12)',  desc:'Part of a multi-book series'               },
-  { value:'signed-copy',  label:"✍️ Signed Copy",     color:'#e879f9', bg:'rgba(232,121,249,0.12)', desc:'Author-signed edition available'           },
-  { value:'kenya-made',   label:'🇰🇪 Kenya Made',     color:'#16a34a', bg:'rgba(22,163,74,0.12)',   desc:'Proudly Kenyan'                            },
-  { value:'seasonal',     label:'🌸 Seasonal',         color:'#f472b6', bg:'rgba(244,114,182,0.12)', desc:'Limited seasonal release'                 },
+  { value:'bestseller',   label:'?? Bestseller',      color:'#f59e0b', bg:'rgba(245,158,11,0.12)',  desc:'Top-selling book'                          },
+  { value:'award-winner', label:'?? Award Winner',    color:'#fbbf24', bg:'rgba(251,191,36,0.12)',  desc:'Has won a literary award'                  },
+  { value:'staff-pick',   label:"?? Staff Pick",      color:'#ec4899', bg:'rgba(236,72,153,0.12)',  desc:"Team's favourite pick"                     },
+  { value:'reader-fave',  label:"?? Reader's Fave",   color:'#f97316', bg:'rgba(249,115,22,0.12)',  desc:'Highly rated by readers'                   },
+  { value:'new-release',  label:'?? New Release',     color:'#06b6d4', bg:'rgba(6,182,212,0.12)',   desc:'Recently released'                         },
+  { value:'true-story',   label:'? True Story',       color:'#c9a84c', bg:'rgba(201,168,76,0.12)',  desc:'Inspired by true events'                   },
+  { value:'exclusive',    label:'?? Exclusive',        color:'#818cf8', bg:'rgba(129,140,248,0.12)', desc:'Only on Ellines Haven'                     },
+  { value:'age-18',       label:'?? 18+',              color:'#ef4444', bg:'rgba(239,68,68,0.12)',   desc:'Mature content � adults only'              },
+  { value:'age-16',       label:'?? 16+',              color:'#f97316', bg:'rgba(249,115,22,0.12)',  desc:'Suitable for 16 and above'                 },
+  { value:'audiobook',    label:'?? Audiobook',        color:'#22d3ee', bg:'rgba(34,211,238,0.12)',  desc:'Has audio version available'               },
+  { value:'translated',   label:'?? Translated',       color:'#34d399', bg:'rgba(52,211,153,0.12)',  desc:'Available in multiple languages'           },
+  { value:'short-read',   label:'? Short Read',       color:'#a3e635', bg:'rgba(163,230,53,0.12)',  desc:'Under 2 hours to read'                     },
+  { value:'series',       label:'?? Series',           color:'#38bdf8', bg:'rgba(56,189,248,0.12)',  desc:'Part of a multi-book series'               },
+  { value:'signed-copy',  label:"?? Signed Copy",     color:'#e879f9', bg:'rgba(232,121,249,0.12)', desc:'Author-signed edition available'           },
+  { value:'kenya-made',   label:'???? Kenya Made',     color:'#16a34a', bg:'rgba(22,163,74,0.12)',   desc:'Proudly Kenyan'                            },
+  { value:'seasonal',     label:'?? Seasonal',         color:'#f472b6', bg:'rgba(244,114,182,0.12)', desc:'Limited seasonal release'                 },
 ];
 
-// buildUserList — pulls from Firestore-synced localStorage + registered users
-// BASE_ACCOUNTS removed — no hardcoded test users
+// buildUserList � pulls from Firestore-synced localStorage + registered users
+// BASE_ACCOUNTS removed � no hardcoded test users
 function buildUserList(suspendedList = []) {
   const deleted    = JSON.parse(localStorage.getItem('eh_deleted_users')    || '[]');
   const roleChanges= JSON.parse(localStorage.getItem('eh_role_overrides')   || '{}');
@@ -318,7 +318,7 @@ const PROMO_INIT = [
   { id:'p3', code:'VIP20',    discount:'20%',    type:'Percentage', uses: 5, active:false, expires:'2024-12-31' },
 ];
 
-// ── Photo constants & helpers ────────────────────────────────────────────────
+// -- Photo constants & helpers ------------------------------------------------
 
 const PUBLIC_COVERS = [
   { name:'cover-marriage-is-a-scam.png', url:'/cover-marriage-is-a-scam.png?v=front', path:'pub/cover-marriage-is-a-scam.png', uploadedAt:1700000001000, size:0, isPublic:true },
@@ -346,7 +346,7 @@ function fileToBase64(file) {
 const fmtSize     = b => !b ? '' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
 const ALLOWED_IMG = ['image/jpeg','image/png','image/webp','image/svg+xml','image/gif'];
 
-// ── Lightbox viewer with zoom/pan ────────────────────────────────────────────
+// -- Lightbox viewer with zoom/pan --------------------------------------------
 function Lightbox({ photo, onClose }) {
   const [zoom, setZoom] = useState(1);
   const [pos, setPos]   = useState({ x:0, y:0 });
@@ -366,13 +366,13 @@ function Lightbox({ photo, onClose }) {
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.93)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}
       onClick={e=>e.target===e.currentTarget&&onClose()} onMouseMove={mmove} onMouseUp={mup} onWheel={wheel}>
       <div style={{position:'absolute',top:14,right:14,display:'flex',gap:8,zIndex:1}}>
-        <button onClick={()=>setZoom(z=>Math.min(5,z+0.5))} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:'1.1rem'}}>＋</button>
-        <button onClick={()=>setZoom(z=>Math.max(0.5,z-0.5))} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:'1.1rem'}}>－</button>
+        <button onClick={()=>setZoom(z=>Math.min(5,z+0.5))} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:'1.1rem'}}>+</button>
+        <button onClick={()=>setZoom(z=>Math.max(0.5,z-0.5))} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'6px 12px',cursor:'pointer',fontSize:'1.1rem'}}>-</button>
         <button onClick={reset} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'#fff',borderRadius:6,padding:'5px 10px',cursor:'pointer',fontSize:'0.78rem'}}>Reset</button>
-        <button onClick={onClose} style={{background:'rgba(231,76,60,0.8)',border:'none',color:'#fff',borderRadius:6,padding:'6px 14px',cursor:'pointer',fontSize:'1rem',fontWeight:700}}>✕</button>
+        <button onClick={onClose} style={{background:'rgba(231,76,60,0.8)',border:'none',color:'#fff',borderRadius:6,padding:'6px 14px',cursor:'pointer',fontSize:'1rem',fontWeight:700}}>?</button>
       </div>
       <div style={{position:'absolute',bottom:14,left:'50%',transform:'translateX(-50%)',color:'rgba(255,255,255,0.45)',fontSize:'0.72rem',whiteSpace:'nowrap'}}>
-        Scroll to zoom · Drag to pan · ESC to close · {Math.round(zoom*100)}%
+        Scroll to zoom � Drag to pan � ESC to close � {Math.round(zoom*100)}%
       </div>
       <img src={photo.url} alt={photo.name} onMouseDown={mdown}
         style={{maxWidth:'90vw',maxHeight:'90vh',objectFit:'contain',borderRadius:8,
@@ -383,7 +383,7 @@ function Lightbox({ photo, onClose }) {
   );
 }
 
-// ── Image compression + base64 storage (no Firebase Storage auth needed) ────
+// -- Image compression + base64 storage (no Firebase Storage auth needed) ----
 // Compresses image to max 800px wide / 200KB before storing in Firestore
 
 function compressImage(file, maxW = 600, quality = 0.65) {
@@ -398,7 +398,7 @@ function compressImage(file, maxW = 600, quality = 0.65) {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      // SVG files can't be compressed — use original FileReader
+      // SVG files can't be compressed � use original FileReader
       const type = file.type === 'image/svg+xml' ? 'image/svg+xml' : 'image/jpeg';
       if (type === 'image/svg+xml') {
         const reader = new FileReader();
@@ -415,9 +415,9 @@ function compressImage(file, maxW = 600, quality = 0.65) {
 }
 
 async function uploadFileToStorage(file) {
-  // Compress first — keeps base64 well under Firestore's 1MB field limit
+  // Compress first � keeps base64 well under Firestore's 1MB field limit
   const dataUrl = await compressImage(file);
-  // path is local — no Firebase Storage used
+  // path is local � no Firebase Storage used
   const path = `local/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
   return { url: dataUrl, path };
 }
@@ -466,7 +466,7 @@ function usePhotoUpload(fsKey) {
   return { fileRef, uploading, progress, uploadErr, setUploadErr, upload };
 }
 
-// ── Shared drop zone ──────────────────────────────────────────────────────────
+// -- Shared drop zone ----------------------------------------------------------
 function DropZone({uploading,progress,fileRef,onFiles}) {
   const [over,setOver]=useState(false);
   return (
@@ -475,24 +475,24 @@ function DropZone({uploading,progress,fileRef,onFiles}) {
       onDrop={e=>{e.preventDefault();setOver(false);onFiles(e.dataTransfer.files);}}
       onClick={()=>!uploading&&fileRef.current?.click()}>
       {uploading
-        ? <><div className="adm-photo-spinner"/><p style={{marginTop:10,color:'var(--gold)',fontWeight:600}}>{progress}</p><p style={{fontSize:'0.75rem',color:'var(--muted)',marginTop:4}}>Please wait…</p></>
-        : <><span style={{fontSize:'2.5rem'}}>📤</span><p style={{marginTop:10,fontWeight:600}}>Drag &amp; drop or <span style={{color:'var(--gold)'}}>click to browse</span></p><p style={{fontSize:'0.75rem',color:'var(--muted)',marginTop:6}}>JPG · PNG · WebP · SVG · max 10 · Stored in Firebase</p></>}
+        ? <><div className="adm-photo-spinner"/><p style={{marginTop:10,color:'var(--gold)',fontWeight:600}}>{progress}</p><p style={{fontSize:'0.75rem',color:'var(--muted)',marginTop:4}}>Please wait�</p></>
+        : <><span style={{fontSize:'2.5rem'}}>??</span><p style={{marginTop:10,fontWeight:600}}>Drag &amp; drop or <span style={{color:'var(--gold)'}}>click to browse</span></p><p style={{fontSize:'0.75rem',color:'var(--muted)',marginTop:6}}>JPG � PNG � WebP � SVG � max 10 � Stored in Firebase</p></>}
     </div>
   );
 }
 
-// ── Photo thumbnail card ──────────────────────────────────────────────────────
+// -- Photo thumbnail card ------------------------------------------------------
 function PhotoThumb({photo,selected,onToggle,actions,usedBy,onPreview}) {
   const sz = !photo.size?'':photo.size<1048576?(photo.size/1024).toFixed(1)+' KB':(photo.size/1048576).toFixed(1)+' MB';
   return (
     <div className={'adm-photo-card card'+(selected?' adm-photo-selected':'')} style={{cursor:'default'}}>
       <div className="adm-photo-img-wrap" onClick={onPreview} style={{cursor:'zoom-in'}}>
         <img src={photo.url} alt={photo.name} className="adm-photo-img" loading="lazy"/>
-        <div className="adm-photo-preview-hint">🔍 View</div>
+        <div className="adm-photo-preview-hint">?? View</div>
         <div className={'adm-photo-check'+(selected?' on':'')} onClick={e=>{e.stopPropagation();onToggle();}}>
-          {selected?'✓':''}
+          {selected?'?':''}
         </div>
-        {usedBy>0&&<div className="adm-photo-used-badge">✓ {usedBy} book{usedBy!==1?'s':''}</div>}
+        {usedBy>0&&<div className="adm-photo-used-badge">? {usedBy} book{usedBy!==1?'s':''}</div>}
         {photo.isPublic&&<div className="adm-photo-public-badge">Built-in</div>}
       </div>
       <div className="adm-photo-info">
@@ -504,7 +504,7 @@ function PhotoThumb({photo,selected,onToggle,actions,usedBy,onPreview}) {
   );
 }
 
-// ── Novel Covers Tab ──────────────────────────────────────────────────────────
+// -- Novel Covers Tab ----------------------------------------------------------
 function CoversTab({books,saveBook,showToast}) {
   const [photos,setPhotos]         = useState([]);
   const [loading,setLoading]       = useState(true);
@@ -565,14 +565,14 @@ function CoversTab({books,saveBook,showToast}) {
 
   const removeOne = async p=>{ const next=photos.filter(x=>x.path!==p.path); try{await persist(next);}catch{setPhotos(next);} setSelected(s=>s.filter(x=>x!==p.path)); showToast('Cover removed'); setDelOne(null); };
   const removeBulk= async ()=>{ const next=photos.filter(p=>!selected.includes(p.path)); try{await persist(next);}catch{setPhotos(next);} showToast(selected.length+' deleted'); setSelected([]); setBulkDel(false); };
-  const assign    = async b=>{ try { await saveBook({...b,cover:assignTo.url,coverType:'photo'}); showToast('Cover set for "'+b.title+'"'); } catch { showToast('❌ Save failed'); } setAssignTo(null); };
+  const assign    = async b=>{ try { await saveBook({...b,cover:assignTo.url,coverType:'photo'}); showToast('Cover set for "'+b.title+'"'); } catch { showToast('? Save failed'); } setAssignTo(null); };
   const autoAssign = async (book, coverUrl) => {
     try {
       setAutoAssigning(true);
       await saveBook({...book, cover: coverUrl, coverType: 'photo'});
-      showToast(`✓ Cover auto-assigned to "${book.title}"`);
+      showToast(`? Cover auto-assigned to "${book.title}"`);
     } catch (err) {
-      showToast('❌ Auto-assign failed: ' + err.message);
+      showToast('? Auto-assign failed: ' + err.message);
     } finally {
       setAutoAssigning(false);
     }
@@ -597,7 +597,7 @@ function CoversTab({books,saveBook,showToast}) {
             <button className="adm-act-btn" style={{background:'rgba(46,204,113,0.12)',color:'var(--ok)',border:'1px solid rgba(46,204,113,0.35)',fontSize:'0.7rem'}}
               disabled={autoAssigning}
               onClick={() => autoAssign(matchingBooks[0], photo.url)}>
-              🔗 Auto-Assign to {matchingBooks[0].title.split(' ')[0]}
+              ?? Auto-Assign to {matchingBooks[0].title.split(' ')[0]}
             </button>
           )}
           <button className="adm-act-btn adm-act-del" onClick={()=>setDelOne(photo)}>Remove</button>
@@ -613,7 +613,7 @@ function CoversTab({books,saveBook,showToast}) {
           <div className="adm-confirm card" style={{maxWidth:600,textAlign:'left'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
               <h3 style={{fontSize:'1rem'}}>Set as Book Cover</h3>
-              <button className="adm-close-btn" onClick={()=>setAssignTo(null)}>✕</button>
+              <button className="adm-close-btn" onClick={()=>setAssignTo(null)}>?</button>
             </div>
             <div style={{display:'flex',gap:16,marginBottom:20}}>
               <img src={assignTo.url} alt="" style={{width:70,height:98,objectFit:'cover',borderRadius:6,border:'1px solid var(--dim)',flexShrink:0}}/>
@@ -625,7 +625,7 @@ function CoversTab({books,saveBook,showToast}) {
                   {b.cover?<img src={b.cover} alt="" style={{width:26,height:38,objectFit:'cover',objectPosition:'center top',borderRadius:3,flexShrink:0}}/>:<div style={{width:26,height:38,background:b.coverColor||'#1a1a3a',borderRadius:3,flexShrink:0}}/>}
                   <div style={{minWidth:0}}>
                     <div style={{fontSize:'0.78rem',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{b.title}</div>
-                    <div style={{fontSize:'0.68rem',color:b.cover===assignTo.url?'var(--gold)':'var(--muted)'}}>{b.cover===assignTo.url?'✓ Current':'Apply'}</div>
+                    <div style={{fontSize:'0.68rem',color:b.cover===assignTo.url?'var(--gold)':'var(--muted)'}}>{b.cover===assignTo.url?'? Current':'Apply'}</div>
                   </div>
                 </button>
               ))}
@@ -638,24 +638,24 @@ function CoversTab({books,saveBook,showToast}) {
       {bulkDel&&<div className="adm-overlay"><div className="adm-confirm card"><p>Delete <strong style={{color:'var(--gold)'}}>{selected.length} cover(s)</strong>?</p><div className="adm-confirm-btns"><button className="btn btn-primary btn-sm" onClick={removeBulk}>Yes</button><button className="btn btn-ghost btn-sm" onClick={()=>setBulkDel(false)}>Cancel</button></div></div></div>}
 
       <div className="adm-page-head">
-        <div><h1>Novel Covers</h1><span className="adm-page-sub">{photos.length} image(s) — upload covers and assign to books</span></div>
+        <div><h1>Novel Covers</h1><span className="adm-page-sub">{photos.length} image(s) � upload covers and assign to books</span></div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          {selected.length>0&&<><span style={{fontSize:'0.82rem',color:'var(--gold)',fontWeight:600}}>{selected.length} selected</span><button className="btn btn-sm" style={{background:'rgba(231,76,60,0.12)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.35)'}} onClick={()=>setBulkDel(true)}>🗑 Delete</button><button className="btn btn-ghost btn-sm" onClick={()=>setSelected([])}>Clear</button></>}
+          {selected.length>0&&<><span style={{fontSize:'0.82rem',color:'var(--gold)',fontWeight:600}}>{selected.length} selected</span><button className="btn btn-sm" style={{background:'rgba(231,76,60,0.12)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.35)'}} onClick={()=>setBulkDel(true)}>?? Delete</button><button className="btn btn-ghost btn-sm" onClick={()=>setSelected([])}>Clear</button></>}
           {selected.length===0&&photos.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>setSelected(photos.map(p=>p.path))}>Select All</button>}
-          <button className="btn btn-primary" disabled={uploading} onClick={()=>fileRef.current?.click()}>{uploading?'⏳ Uploading…':'+ Upload Covers'}</button>
+          <button className="btn btn-primary" disabled={uploading} onClick={()=>fileRef.current?.click()}>{uploading?'? Uploading�':'+ Upload Covers'}</button>
         </div>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>upload(e.target.files,photos,onSaved)}/>
       </div>
-      {uploadErr&&<div style={{background:'rgba(231,76,60,0.1)',border:'1px solid rgba(231,76,60,0.35)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:16,fontSize:'0.82rem',color:'#e74c3c',display:'flex',justifyContent:'space-between'}}><span>{uploadErr}</span><button onClick={()=>setUploadErr('')} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer'}}>✕</button></div>}
+      {uploadErr&&<div style={{background:'rgba(231,76,60,0.1)',border:'1px solid rgba(231,76,60,0.35)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:16,fontSize:'0.82rem',color:'#e74c3c',display:'flex',justifyContent:'space-between'}}><span>{uploadErr}</span><button onClick={()=>setUploadErr('')} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer'}}>?</button></div>}
       <DropZone uploading={uploading} progress={progress} fileRef={fileRef} onFiles={files=>upload(files,photos,onSaved)}/>
-      {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading…</div>
-        :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>🎨</div><p>No covers yet. Upload above.</p></div>
+      {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading�</div>
+        :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>??</div><p>No covers yet. Upload above.</p></div>
         :<>
           {/* Books needing covers section */}
           {books.some(b=>!b.cover) && (
             <div style={{marginBottom:32,padding:20,background:'rgba(46,204,113,0.06)',border:'1px solid rgba(46,204,113,0.2)',borderRadius:'var(--r)',}}>
               <h3 style={{fontSize:'0.95rem',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:'1.2rem'}}>📚</span> Books Needing Covers
+                <span style={{fontSize:'1.2rem'}}>??</span> Books Needing Covers
               </h3>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
                 {books.filter(b=>!b.cover).map(book => {
@@ -678,11 +678,11 @@ function CoversTab({books,saveBook,showToast}) {
                         <button className="btn btn-sm" style={{width:'100%',background:'rgba(46,204,113,0.12)',color:'var(--ok)',border:'1px solid rgba(46,204,113,0.35)',fontSize:'0.78rem'}}
                           disabled={autoAssigning}
                           onClick={() => autoAssign(book, autoSuggest.url)}>
-                          ✓ Auto-Assign Cover
+                          ? Auto-Assign Cover
                         </button>
                       ) : (
                         <button className="btn btn-ghost btn-sm" style={{width:'100%',fontSize:'0.78rem'}} onClick={()=>setAssignTo(null)}>
-                          Pick Cover…
+                          Pick Cover�
                         </button>
                       )}
                     </div>
@@ -699,7 +699,7 @@ function CoversTab({books,saveBook,showToast}) {
   );
 }
 
-// ── Site Photos Tab ───────────────────────────────────────────────────────────
+// -- Site Photos Tab -----------------------------------------------------------
 function PhotosTab({showToast}) {
   const [photos,setPhotos]     = useState([]);
   const [loading,setLoading]   = useState(true);
@@ -743,19 +743,19 @@ function PhotosTab({showToast}) {
       {bulkDel&&<div className="adm-overlay"><div className="adm-confirm card"><p>Delete <strong style={{color:'var(--gold)'}}>{selected.length} photo(s)</strong>?</p><div className="adm-confirm-btns"><button className="btn btn-primary btn-sm" onClick={removeBulk}>Yes</button><button className="btn btn-ghost btn-sm" onClick={()=>setBulkDel(false)}>Cancel</button></div></div></div>}
 
       <div className="adm-page-head">
-        <div><h1>Site Photos</h1><span className="adm-page-sub">{photos.length} image(s) — banners, author photos, promotional images</span></div>
+        <div><h1>Site Photos</h1><span className="adm-page-sub">{photos.length} image(s) � banners, author photos, promotional images</span></div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          {selected.length>0&&<><span style={{fontSize:'0.82rem',color:'var(--gold)',fontWeight:600}}>{selected.length} selected</span><button className="btn btn-sm" style={{background:'rgba(231,76,60,0.12)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.35)'}} onClick={()=>setBulkDel(true)}>🗑 Delete</button><button className="btn btn-ghost btn-sm" onClick={()=>setSelected([])}>Clear</button></>}
+          {selected.length>0&&<><span style={{fontSize:'0.82rem',color:'var(--gold)',fontWeight:600}}>{selected.length} selected</span><button className="btn btn-sm" style={{background:'rgba(231,76,60,0.12)',color:'#e74c3c',border:'1px solid rgba(231,76,60,0.35)'}} onClick={()=>setBulkDel(true)}>?? Delete</button><button className="btn btn-ghost btn-sm" onClick={()=>setSelected([])}>Clear</button></>}
           {selected.length===0&&photos.length>0&&<button className="btn btn-ghost btn-sm" onClick={()=>setSelected(photos.map(p=>p.path))}>Select All</button>}
-          <button className="btn btn-primary" disabled={uploading} onClick={()=>fileRef.current?.click()}>{uploading?'⏳ Uploading…':'+ Upload Photos'}</button>
+          <button className="btn btn-primary" disabled={uploading} onClick={()=>fileRef.current?.click()}>{uploading?'? Uploading�':'+ Upload Photos'}</button>
         </div>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:'none'}} onChange={e=>upload(e.target.files,photos,onSaved)}/>
       </div>
       {copied&&<div style={{background:'rgba(46,204,113,0.1)',border:'1px solid rgba(46,204,113,0.3)',borderRadius:'var(--r-sm)',padding:'8px 14px',marginBottom:12,fontSize:'0.82rem',color:'var(--ok)'}}>{copied}</div>}
-      {uploadErr&&<div style={{background:'rgba(231,76,60,0.1)',border:'1px solid rgba(231,76,60,0.35)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:16,fontSize:'0.82rem',color:'#e74c3c',display:'flex',justifyContent:'space-between'}}><span>{uploadErr}</span><button onClick={()=>setUploadErr('')} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer'}}>✕</button></div>}
+      {uploadErr&&<div style={{background:'rgba(231,76,60,0.1)',border:'1px solid rgba(231,76,60,0.35)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:16,fontSize:'0.82rem',color:'#e74c3c',display:'flex',justifyContent:'space-between'}}><span>{uploadErr}</span><button onClick={()=>setUploadErr('')} style={{background:'none',border:'none',color:'#e74c3c',cursor:'pointer'}}>?</button></div>}
       <DropZone uploading={uploading} progress={progress} fileRef={fileRef} onFiles={files=>upload(files,photos,onSaved)}/>
-      {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading…</div>
-        :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>🖼️</div><p>No site photos yet. Upload banners or author images above.</p></div>
+      {loading?<div style={{textAlign:'center',padding:60,color:'var(--muted)'}}>Loading�</div>
+        :photos.length===0?<div className="adm-empty"><div style={{fontSize:'3rem',marginBottom:12}}>???</div><p>No site photos yet. Upload banners or author images above.</p></div>
         :<div className="adm-photo-grid">
           {photos.map(photo=>(
             <PhotoThumb key={photo.path} photo={photo} selected={selected.includes(photo.path)}
@@ -831,7 +831,7 @@ function BookForm({ initial, onSave, onCancel }) {
             </div>
 
             <div className="adm-field-group">
-              <label>Subtitle <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional — shown under title on book detail)</span></label>
+              <label>Subtitle <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional � shown under title on book detail)</span></label>
               <input className="field" value={form.subtitle||''} onChange={e=>set('subtitle',e.target.value)} placeholder="e.g. By Elijah M. M."/>
             </div>
 
@@ -841,7 +841,7 @@ function BookForm({ initial, onSave, onCancel }) {
             </div>
 
             <div className="adm-field-group adm-col-2">
-              <div className="adm-section-heading">🎭 Genres <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem',letterSpacing:0,textTransform:'none',marginLeft:8}}>Select presets or add custom — ★ first = primary</span></div>
+              <div className="adm-section-heading">?? Genres <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem',letterSpacing:0,textTransform:'none',marginLeft:8}}>Select presets or add custom � ? first = primary</span></div>
               <div className="adm-genre-grid">
                 {[...GENRES,...(Array.isArray(form._customGenres)?form._customGenres:[])].map(g => {
                   const allSel = Array.from(new Set([...(form.genre?[form.genre]:[]),...(form.genres||[])]));
@@ -856,22 +856,22 @@ function BookForm({ initial, onSave, onCancel }) {
                         const next=cur.includes(g)?cur.filter(x=>x!==g):[...cur,g];
                         setForm(f=>({...f,genre:next[0]||'Drama',genres:next.slice(1)}));
                       }}>
-                      {selected&&<span className="adm-genre-chip-check">{isPrimary?'★':'✓'}</span>}
+                      {selected&&<span className="adm-genre-chip-check">{isPrimary?'?':'?'}</span>}
                       {g}
-                      {isCustom&&!selected&&<span style={{marginLeft:3,opacity:0.5,fontSize:'0.65rem'}} onClick={e=>{e.stopPropagation();setForm(f=>({...f,_customGenres:(f._customGenres||[]).filter(x=>x!==g)}));}}>×</span>}
+                      {isCustom&&!selected&&<span style={{marginLeft:3,opacity:0.5,fontSize:'0.65rem'}} onClick={e=>{e.stopPropagation();setForm(f=>({...f,_customGenres:(f._customGenres||[]).filter(x=>x!==g)}));}}>�</span>}
                     </button>
                   );
                 })}
               </div>
               <div className="adm-tag-add-row" style={{marginTop:10}}>
-                <input id="adm-cg-inp" className="field" style={{flex:1,fontSize:'0.82rem'}} placeholder="Add custom genre… press Enter"
+                <input id="adm-cg-inp" className="field" style={{flex:1,fontSize:'0.82rem'}} placeholder="Add custom genre� press Enter"
                   onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.trim();if(!v)return;if(![...GENRES,...(form._customGenres||[])].includes(v))setForm(f=>({...f,_customGenres:[...(f._customGenres||[]),v]}));e.target.value='';}}}/>
                 <button type="button" className="adm-tag-add-btn" onClick={()=>{const inp=document.getElementById('adm-cg-inp');const v=inp.value.trim();if(!v)return;if(![...GENRES,...(form._customGenres||[])].includes(v))setForm(f=>({...f,_customGenres:[...(f._customGenres||[]),v]}));inp.value='';}}>+ Add</button>
               </div>
               {(form.genre||(form.genres||[]).length>0)&&(
                 <div className="adm-genre-summary">
-                  <span className="adm-gs-label">★</span><span className="adm-gs-primary">{form.genre}</span>
-                  {(form.genres||[]).length>0&&<><span className="adm-gs-sep">·</span>{(form.genres||[]).map(g=><span key={g} className="adm-gs-tag">{g}</span>)}</>}
+                  <span className="adm-gs-label">?</span><span className="adm-gs-primary">{form.genre}</span>
+                  {(form.genres||[]).length>0&&<><span className="adm-gs-sep">�</span>{(form.genres||[]).map(g=><span key={g} className="adm-gs-tag">{g}</span>)}</>}
                 </div>
               )}
             </div>
@@ -976,9 +976,9 @@ function BookForm({ initial, onSave, onCancel }) {
               <input className="field" value={form.inspiredNote} onChange={e=>set('inspiredNote',e.target.value)} placeholder="What real story inspired this?"/>
             </div>
 
-            {/* ── Rich Metadata ── */}
+            {/* -- Rich Metadata -- */}
             <div className="adm-field-group adm-col-2" style={{borderTop:'1px solid var(--dim)',paddingTop:18,marginTop:4}}>
-              <div className="adm-section-heading">📋 Book Details &amp; Metadata</div>
+              <div className="adm-section-heading">?? Book Details &amp; Metadata</div>
               <p style={{fontSize:'0.76rem',color:'var(--muted)',margin:'4px 0 0'}}>Professional publishing info shown on the public book detail page.</p>
             </div>
 
@@ -989,7 +989,7 @@ function BookForm({ initial, onSave, onCancel }) {
             <div className="adm-field-group">
               <label>Audience Rating</label>
               <select className="field" value={form.audienceRating||''} onChange={e=>set('audienceRating',e.target.value)}>
-                <option value="">— Select —</option>
+                <option value="">� Select �</option>
                 <option value="13+">13+</option>
                 <option value="14+">14+</option>
                 <option value="16+">16+</option>
@@ -1002,26 +1002,26 @@ function BookForm({ initial, onSave, onCancel }) {
             </div>
 
             <div className="adm-field-group">
-              <label>Release Date <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— shown as "Released: Aug 2024"</span></label>
+              <label>Release Date <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>� shown as "Released: Aug 2024"</span></label>
               <input className="field" type="date" value={form.date||''} onChange={e=>set('date',e.target.value)}/>
             </div>
             <div className="adm-field-group">
-              <label>Review Count <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— shown next to ★ rating</span></label>
+              <label>Review Count <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>� shown next to ? rating</span></label>
               <input className="field" type="number" min={0} value={form.reviews||0} onChange={e=>set('reviews',Number(e.target.value))} placeholder="e.g. 187"/>
             </div>
             <div className="adm-field-group">
-              <label>Expected Date <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— coming-soon cards only (e.g. "September 2025")</span></label>
+              <label>Expected Date <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>� coming-soon cards only (e.g. "September 2025")</span></label>
               <input className="field" value={form.expectedDate||''} onChange={e=>set('expectedDate',e.target.value)} placeholder="e.g. September 2025"/>
             </div>
 
-            {/* ── Reader Rating Display ── */}
+            {/* -- Reader Rating Display -- */}
             <div className="adm-field-group adm-col-2">
-              <label>Reader Rating Display <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>— shown as ⭐⭐⭐⭐⭐ 4.8/5 on book detail</span></label>
+              <label>Reader Rating Display <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>� shown as ????? 4.8/5 on book detail</span></label>
               <div className="adm-rating-preview">
                 <div className="adm-rating-stars">
                   {[1,2,3,4,5].map(n=>(
                     <span key={n} style={{fontSize:'1.5rem',color:n<=Math.round(Number(form.rating)||0)?'#f5c518':'var(--dim)',cursor:'pointer'}}
-                      onClick={()=>set('rating',n)}>★</span>
+                      onClick={()=>set('rating',n)}>?</span>
                   ))}
                   <span className="adm-rating-num">{Number(form.rating||0).toFixed(1)}/5</span>
                 </div>
@@ -1032,9 +1032,9 @@ function BookForm({ initial, onSave, onCancel }) {
               <small style={{color:'var(--muted)',fontSize:'0.7rem'}}>This quote appears directly below the star rating on the public book page</small>
             </div>
 
-            {/* ── Themes Tag Builder ── */}
+            {/* -- Themes Tag Builder -- */}
             <div className="adm-field-group adm-col-2">
-              <div className="adm-section-heading">🏷️ Themes <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem',letterSpacing:0,textTransform:'none',marginLeft:8}}>Click presets or type custom</span></div>
+              <div className="adm-section-heading">??? Themes <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem',letterSpacing:0,textTransform:'none',marginLeft:8}}>Click presets or type custom</span></div>
               <div className="adm-theme-presets">
                 {['Love','Marriage','Betrayal','Trust','Family','Financial Abuse','Infidelity','Redemption','Parenthood','Emotional Survival',
                   'Grief','Loss','Healing','Identity','Resilience','Trauma','Loneliness','Survival','Ambition','Power',
@@ -1045,13 +1045,13 @@ function BookForm({ initial, onSave, onCancel }) {
                   return(
                     <button key={t} type="button" className={'adm-theme-chip'+(active?' adm-theme-chip--on':'')}
                       onClick={()=>{const c=form.themes||[];set('themes',active?c.filter(x=>x!==t):[...c,t]);}}>
-                      {active&&'✓ '}{t}
+                      {active&&'? '}{t}
                     </button>
                   );
                 })}
               </div>
               <div className="adm-tag-add-row" style={{marginTop:10}}>
-                <input id="adm-ct-inp" className="field" style={{flex:1,fontSize:'0.82rem'}} placeholder="Type custom theme… press Enter or comma"
+                <input id="adm-ct-inp" className="field" style={{flex:1,fontSize:'0.82rem'}} placeholder="Type custom theme� press Enter or comma"
                   onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();const v=e.target.value.trim();if(!v||(form.themes||[]).includes(v))return;set('themes',[...(form.themes||[]),v]);e.target.value='';}}}/>
                 <button type="button" className="adm-tag-add-btn" onClick={()=>{const i=document.getElementById('adm-ct-inp');const v=i.value.trim();if(!v||(form.themes||[]).includes(v))return;set('themes',[...(form.themes||[]),v]);i.value='';}}>+ Add</button>
               </div>
@@ -1059,29 +1059,29 @@ function BookForm({ initial, onSave, onCancel }) {
                 <div className="adm-selected-tags">
                   <span style={{fontSize:'0.7rem',color:'var(--muted)'}}>Selected ({(form.themes||[]).length}):</span>
                   {(form.themes||[]).map(t=>(
-                    <span key={t} className="adm-selected-tag">{t}<button type="button" onClick={()=>set('themes',(form.themes||[]).filter(x=>x!==t))}>×</button></span>
+                    <span key={t} className="adm-selected-tag">{t}<button type="button" onClick={()=>set('themes',(form.themes||[]).filter(x=>x!==t))}>�</button></span>
                   ))}
                   <button type="button" className="adm-clear-tags" onClick={()=>set('themes',[])}>Clear all</button>
                 </div>
               )}
             </div>
 
-            {/* ── Author's Note ── */}
+            {/* -- Author's Note -- */}
             <div className="adm-field-group adm-col-2">
               <label>Author's Note</label>
               <textarea className="field" rows={4} value={form.authorNote||''} onChange={e=>set('authorNote',e.target.value)}
-                placeholder="A personal message from the author about this book's inspiration or writing process…"
+                placeholder="A personal message from the author about this book's inspiration or writing process�"
                 style={{resize:'vertical'}}/>
               <small style={{color:'var(--muted)',fontSize:'0.7rem'}}>Shown in a dedicated "Author's Note" section on the public book detail page</small>
             </div>
 
-            {/* ── Table of Contents ── */}
+            {/* -- Table of Contents -- */}
             <div className="adm-field-group adm-col-2">
               <label>Table of Contents <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.75rem'}}>(one chapter per line)</span></label>
               <textarea className="field" rows={8}
                 value={Array.isArray(form.tableOfContents)?form.tableOfContents.join('\n'):(form.tableOfContents||'')}
                 onChange={e=>set('tableOfContents',e.target.value.split('\n').map(l=>l.trim()).filter(Boolean))}
-                placeholder={'Chapter 1 — The First Meeting\nChapter 2 — Something Like Love\nChapter 3 — The Promise'}
+                placeholder={'Chapter 1 � The First Meeting\nChapter 2 � Something Like Love\nChapter 3 � The Promise'}
                 style={{resize:'vertical',fontFamily:'monospace',fontSize:'0.82rem',lineHeight:1.7}}/>
               <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
                 <small style={{color:'var(--muted)',fontSize:'0.7rem'}}>Each line = one entry in the published TOC</small>
@@ -1107,7 +1107,7 @@ function BookForm({ initial, onSave, onCancel }) {
               </div>
             </div>
 
-            {/* ── Publication Status ── */}
+            {/* -- Publication Status -- */}
             <div className="adm-field-group adm-col-2">
               <label style={{color:'var(--gold)',fontWeight:700,fontSize:'0.82rem',textTransform:'uppercase',letterSpacing:1}}>Publication Status</label>
               <p style={{fontSize:'0.76rem',color:'var(--muted)',marginBottom:12}}>Shown as a badge on the book card and detail page.</p>
@@ -1125,14 +1125,14 @@ function BookForm({ initial, onSave, onCancel }) {
                       <div style={{fontSize:'0.82rem',fontWeight:700,color: form.status===s.value ? s.color : 'var(--text)',marginBottom:2}}>{s.label}</div>
                       <div style={{fontSize:'0.7rem',color:'var(--muted)',lineHeight:1.4}}>{s.desc}</div>
                     </div>
-                    {form.status===s.value && <span style={{color:s.color,fontSize:'0.8rem',flexShrink:0}}>✓</span>}
+                    {form.status===s.value && <span style={{color:s.color,fontSize:'0.8rem',flexShrink:0}}>?</span>}
                   </button>
                 ))}
               </div>
 
-              {/* ── Extra / Additional Badges ── */}
+              {/* -- Extra / Additional Badges -- */}
               <div style={{marginTop:18,padding:'14px 16px',background:'rgba(168,85,247,0.05)',border:'1px solid rgba(168,85,247,0.2)',borderRadius:'var(--r-sm)'}}>
-                <div style={{fontSize:'0.82rem',fontWeight:700,color:'#d4b5ff',marginBottom:4}}>🏷️ Additional Badges <span style={{fontWeight:400,fontSize:'0.72rem',color:'var(--muted)',marginLeft:6}}>Optional — can combine with status above</span></div>
+                <div style={{fontSize:'0.82rem',fontWeight:700,color:'#d4b5ff',marginBottom:4}}>??? Additional Badges <span style={{fontWeight:400,fontSize:'0.72rem',color:'var(--muted)',marginLeft:6}}>Optional � can combine with status above</span></div>
                 <p style={{fontSize:'0.72rem',color:'var(--muted)',marginBottom:10,lineHeight:1.5}}>
                   Select as many as apply. These stack alongside the primary status badge everywhere on the site.
                 </p>
@@ -1158,7 +1158,7 @@ function BookForm({ initial, onSave, onCancel }) {
                         }}
                         title={b.desc}
                       >
-                        {active && <span style={{fontSize:'0.7rem'}}>✓</span>}
+                        {active && <span style={{fontSize:'0.7rem'}}>?</span>}
                         {b.label}
                         {b._custom && !active && (
                           <span
@@ -1171,22 +1171,22 @@ function BookForm({ initial, onSave, onCancel }) {
                                 badges:(f.badges||[]).filter(x=>x!==b.value),
                               }));
                             }}
-                          >×</span>
+                          >�</span>
                         )}
                       </button>
                     );
                   })}
                 </div>
 
-                {/* ── Custom badge creator ── */}
+                {/* -- Custom badge creator -- */}
                 <div style={{marginTop:12,padding:'10px 14px',background:'rgba(255,255,255,0.02)',border:'1px dashed rgba(255,255,255,0.12)',borderRadius:'var(--r-sm)'}}>
-                  <p style={{fontSize:'0.7rem',color:'var(--muted)',marginBottom:8}}>✏️ Create a custom badge — type a label, pick a colour, press <kbd style={{background:'rgba(255,255,255,0.08)',borderRadius:3,padding:'1px 5px',fontSize:'0.65rem'}}>Enter</kbd> or click Add</p>
+                  <p style={{fontSize:'0.7rem',color:'var(--muted)',marginBottom:8}}>?? Create a custom badge � type a label, pick a colour, press <kbd style={{background:'rgba(255,255,255,0.08)',borderRadius:3,padding:'1px 5px',fontSize:'0.65rem'}}>Enter</kbd> or click Add</p>
                   <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                     <input
                       id="adm-cb-inp"
                       className="field"
                       style={{flex:'1 1 160px',fontSize:'0.82rem'}}
-                      placeholder="Badge label… e.g. Staff Pick 2025"
+                      placeholder="Badge label� e.g. Staff Pick 2025"
                       onKeyDown={e=>{
                         if(e.key==='Enter'){
                           e.preventDefault();
@@ -1252,7 +1252,7 @@ function BookForm({ initial, onSave, onCancel }) {
                         }}>
                           {label}
                           <button type="button" onClick={()=>set('badges',(form.badges||[]).filter(x=>x!==b))}
-                            style={{background:'none',border:'none',color,cursor:'pointer',fontSize:'0.8rem',padding:'0 0 0 2px',lineHeight:1}}>×</button>
+                            style={{background:'none',border:'none',color,cursor:'pointer',fontSize:'0.8rem',padding:'0 0 0 2px',lineHeight:1}}>�</button>
                         </span>
                       );
                     })}
@@ -1264,10 +1264,10 @@ function BookForm({ initial, onSave, onCancel }) {
                 )}
               </div>
 
-              {/* Chapter progress — only for Ongoing books */}
+              {/* Chapter progress � only for Ongoing books */}
               {form.status === 'ongoing' && (
                 <div style={{marginTop:14,padding:'14px 16px',background:'rgba(74,158,255,0.06)',border:'1px solid rgba(74,158,255,0.2)',borderRadius:'var(--r-sm)'}}>
-                  <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>📖 Ongoing series — show readers chapter progress (like a TV series)</p>
+                  <p style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:12}}>?? Ongoing series � show readers chapter progress (like a TV series)</p>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                     <div className="adm-field-group" style={{marginBottom:0}}>
                       <label>Chapters Released</label>
@@ -1291,7 +1291,7 @@ function BookForm({ initial, onSave, onCancel }) {
             <div className="adm-field-group adm-col-2" style={{borderTop:'1px solid var(--dim)',paddingTop:18,marginTop:4}}>
               <label style={{color:'var(--gold)',fontWeight:700,fontSize:'0.88rem',textTransform:'uppercase',letterSpacing:1}}>Book Content - Online Reader</label>
               <div style={{background:'rgba(201,168,76,0.06)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',padding:'10px 14px',marginBottom:14,fontSize:'0.76rem',color:'var(--muted)',lineHeight:1.7}}>
-                <strong style={{color:'var(--gold)'}}>How to paste chapters:</strong> Copy the text from Word/Google Docs and paste directly. Paragraphs separated by blank lines will render correctly. Each chapter is saved separately — no size limit.
+                <strong style={{color:'var(--gold)'}}>How to paste chapters:</strong> Copy the text from Word/Google Docs and paste directly. Paragraphs separated by blank lines will render correctly. Each chapter is saved separately � no size limit.
               </div>
               {(form.chapters||[]).map((ch,i)=>{
                 const words = (ch.text||'').trim().split(/\s+/).filter(Boolean).length;
@@ -1301,35 +1301,35 @@ function BookForm({ initial, onSave, onCancel }) {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                       <span style={{fontSize:'0.85rem',color:'var(--gold)',fontWeight:700}}>Chapter {i+1}</span>
                       <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                        {words > 0 && <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>{words.toLocaleString()} words · {(ch.text||'').length.toLocaleString()} chars</span>}
+                        {words > 0 && <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>{words.toLocaleString()} words � {(ch.text||'').length.toLocaleString()} chars</span>}
                         <button type="button" className="adm-act-btn adm-act-del" style={{fontSize:'0.7rem',padding:'2px 8px'}}
                           onClick={()=>set('chapters',form.chapters.filter((_,j)=>j!==i))}>Remove</button>
                       </div>
                     </div>
-                    {/* Part / Section heading — optional, shown in TOC as a divider above this chapter */}
+                    {/* Part / Section heading � optional, shown in TOC as a divider above this chapter */}
                     <div className="adm-field-group" style={{marginBottom:10}}>
-                      <label>Part / Section Heading <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional — e.g. "PART 1" or "PART ONE — BEFORE LOVE". Shown as a divider above this chapter in the TOC)</span></label>
-                      <input className="field" value={ch.part||''} placeholder="e.g. PART 1 · PART TWO — FINDING EACH OTHER · ACT I (leave blank if none)"
+                      <label>Part / Section Heading <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional � e.g. "PART 1" or "PART ONE � BEFORE LOVE". Shown as a divider above this chapter in the TOC)</span></label>
+                      <input className="field" value={ch.part||''} placeholder="e.g. PART 1 � PART TWO � FINDING EACH OTHER � ACT I (leave blank if none)"
                         style={{borderColor: ch.part ? 'rgba(201,168,76,0.5)' : undefined}}
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,part:e.target.value}:c))}/>
                     </div>
                     <div className="adm-field-group" style={{marginBottom:10}}>
                       <label>Chapter Title</label>
-                      <input className="field" value={ch.title||''} placeholder="e.g. Chapter 1 — The Beginning"
+                      <input className="field" value={ch.title||''} placeholder="e.g. Chapter 1 � The Beginning"
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,title:e.target.value}:c))}/>
                     </div>
                     <div className="adm-field-group" style={{marginBottom:10}}>
-                      <label>Chapter Subtitle <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional — appears below chapter title in reader)</span></label>
-                      <input className="field" value={ch.subtitle||''} placeholder="e.g. A Young Man With Big Dreams · Karen, Nairobi — 2013"
+                      <label>Chapter Subtitle <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(optional � appears below chapter title in reader)</span></label>
+                      <input className="field" value={ch.subtitle||''} placeholder="e.g. A Young Man With Big Dreams � Karen, Nairobi � 2013"
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,subtitle:e.target.value}:c))}/>
                     </div>
                     <div className="adm-field-group" style={{marginBottom:10}}>
-                      <label>Text Alignment <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(how paragraph text aligns in the reader — auto-picks best for all screens)</span></label>
+                      <label>Text Alignment <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(how paragraph text aligns in the reader � auto-picks best for all screens)</span></label>
                       <div className="adm-toggle-row">
                         {[
-                          { value: 'justify', label: '⬛ Justify', desc: 'Default — evenly spaced, clean on all devices' },
-                          { value: 'left',    label: '⬛ Left',    desc: 'Ragged right — natural for poetry or fragments' },
-                          { value: 'center',  label: '⬛ Centre',  desc: 'Centred — good for short, lyrical chapters' },
+                          { value: 'justify', label: '? Justify', desc: 'Default � evenly spaced, clean on all devices' },
+                          { value: 'left',    label: '? Left',    desc: 'Ragged right � natural for poetry or fragments' },
+                          { value: 'center',  label: '? Centre',  desc: 'Centred � good for short, lyrical chapters' },
                         ].map(opt => (
                           <button
                             key={opt.value}
@@ -1341,7 +1341,7 @@ function BookForm({ initial, onSave, onCancel }) {
                         ))}
                       </div>
                       <small style={{color:'var(--muted)',fontSize:'0.69rem',marginTop:4,display:'block'}}>
-                        💡 <strong>Justify</strong> is best for most novels — words fill the full line width on every screen size. Use <strong>Left</strong> if long lines are breaking awkwardly on mobile.
+                        ?? <strong>Justify</strong> is best for most novels � words fill the full line width on every screen size. Use <strong>Left</strong> if long lines are breaking awkwardly on mobile.
                       </small>
                     </div>
                     <div className="adm-field-group" style={{marginBottom:0}}>
@@ -1356,10 +1356,10 @@ function BookForm({ initial, onSave, onCancel }) {
                             <div style={{display:'flex',gap:0,marginBottom:0,borderBottom:'1px solid var(--dim)'}}>
                               <button type="button"
                                 style={{padding:'5px 16px',fontSize:'0.76rem',fontWeight: !isPrev?700:400,border:'none',borderBottom: !isPrev?'2px solid var(--gold)':'2px solid transparent',background:'none',color: !isPrev?'var(--gold)':'var(--muted)',cursor:'pointer',transition:'all 0.15s'}}
-                                onClick={()=>set(previewKey,false)}>✏️ Edit</button>
+                                onClick={()=>set(previewKey,false)}>?? Edit</button>
                               <button type="button"
                                 style={{padding:'5px 16px',fontSize:'0.76rem',fontWeight: isPrev?700:400,border:'none',borderBottom: isPrev?'2px solid var(--gold)':'2px solid transparent',background:'none',color: isPrev?'var(--gold)':'var(--muted)',cursor:'pointer',transition:'all 0.15s'}}
-                                onClick={()=>set(previewKey,true)}>👁 Preview ({align})</button>
+                                onClick={()=>set(previewKey,true)}>?? Preview ({align})</button>
                             </div>
                             {!isPrev ? (
                               <textarea className="field" rows={20} value={ch.text||''} placeholder="Paste full chapter text here...&#10;&#10;Paragraphs separated by blank lines will display correctly in the reader."
@@ -1382,7 +1382,7 @@ function BookForm({ initial, onSave, onCancel }) {
                                     textIndent: align === 'justify' ? (pi === 0 ? 0 : '1.6em') : 0,
                                   }}>{p}</p>
                                 )) : (
-                                  <p style={{color:'#aaa',fontStyle:'italic'}}>No text yet — switch to Edit tab and paste your chapter.</p>
+                                  <p style={{color:'#aaa',fontStyle:'italic'}}>No text yet � switch to Edit tab and paste your chapter.</p>
                                 )}
                               </div>
                             )}
@@ -1392,9 +1392,9 @@ function BookForm({ initial, onSave, onCancel }) {
                     </div>
                     <div className="adm-field-group" style={{marginBottom:0,marginTop:10}}>
                       <label>End-of-Chapter Message <span style={{color:'var(--muted)',fontWeight:400,fontSize:'0.72rem'}}>(shown to reader at the bottom of this chapter)</span></label>
-                      <input className="field" value={ch.endMessage||''} placeholder={`— End of Chapter ${i+1} —`}
+                      <input className="field" value={ch.endMessage||''} placeholder={`� End of Chapter ${i+1} �`}
                         onChange={e=>set('chapters',form.chapters.map((c,j)=>j===i?{...c,endMessage:e.target.value}:c))}/>
-                      <span style={{fontSize:'0.68rem',color:'var(--muted)',marginTop:3,display:'block'}}>Leave blank to auto-generate: "— End of Chapter {i+1} —"</span>
+                      <span style={{fontSize:'0.68rem',color:'var(--muted)',marginTop:3,display:'block'}}>Leave blank to auto-generate: "� End of Chapter {i+1} �"</span>
                     </div>
                   </div>
                 );
@@ -1408,7 +1408,7 @@ function BookForm({ initial, onSave, onCancel }) {
           </div>
           <div className="adm-bookform-footer">
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? '⏳ Saving…' : (form.id ? 'Save Changes' : 'Add Book')}
+              {saving ? '? Saving�' : (form.id ? 'Save Changes' : 'Add Book')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button>
           </div>
@@ -1419,7 +1419,7 @@ function BookForm({ initial, onSave, onCancel }) {
 }
 
 
-// ── UserLibrariesTab ─────────────────────────────────────────────────────────
+// -- UserLibrariesTab ---------------------------------------------------------
 function UserLibrariesTab({ users, books, showToast }) {
   const [libs,        setLibs]        = useState({});
   const [loading,     setLoading]     = useState(true);
@@ -1448,7 +1448,7 @@ function UserLibrariesTab({ users, books, showToast }) {
 
   useEffect(() => { loadLibs(users); }, [users]); // eslint-disable-line
 
-  // Deactivate with reason — mode: 'full' | 'read' | 'download'
+  // Deactivate with reason � mode: 'full' | 'read' | 'download'
   const applyDeactivation = async () => {
     if (!deactModal) return;
     const { userEmail, bookId, mode } = deactModal;
@@ -1469,13 +1469,13 @@ function UserLibrariesTab({ users, books, showToast }) {
       });
       await setDoc(ref, { books: updated }, { merge: true });
       setLibs(prev => ({ ...prev, [key]: updated }));
-      showToast('✅ Book access updated for ' + userEmail.split('@')[0]);
+      showToast('? Book access updated for ' + userEmail.split('@')[0]);
       setDeactModal(null); setDeactReason('');
     } catch (e) { showToast('Error: ' + e.message); }
     finally { setBusy(b => { const n={...b}; delete n[busyKey]; return n; }); }
   };
 
-  // Reactivate — restore all access
+  // Reactivate � restore all access
   const reactivateBook = async (userEmail, bookId) => {
     const key = userEmail.toLowerCase();
     const busyKey = key + '_' + bookId;
@@ -1491,7 +1491,7 @@ function UserLibrariesTab({ users, books, showToast }) {
       );
       await setDoc(ref, { books: updated }, { merge: true });
       setLibs(prev => ({ ...prev, [key]: updated }));
-      showToast('✅ Full access restored for ' + userEmail.split('@')[0]);
+      showToast('? Full access restored for ' + userEmail.split('@')[0]);
     } catch (e) { showToast('Error: ' + e.message); }
     finally { setBusy(b => { const n={...b}; delete n[busyKey]; return n; }); }
   };
@@ -1507,7 +1507,7 @@ function UserLibrariesTab({ users, books, showToast }) {
       const updated = (snap.data().books || []).filter(b => b.id !== bookId);
       await setDoc(ref, { books: updated }, { merge: true });
       setLibs(prev => ({ ...prev, [key]: updated }));
-      showToast('📕 Book removed from ' + userEmail.split('@')[0] + "'s library");
+      showToast('?? Book removed from ' + userEmail.split('@')[0] + "'s library");
     } catch (e) { showToast('Error: ' + e.message); }
   };
 
@@ -1522,7 +1522,7 @@ function UserLibrariesTab({ users, books, showToast }) {
       const updated = [...existing, { ...bookToAdd, downloadUnlocked: true, active: true }];
       await setDoc(ref, { books: updated }, { merge: true });
       setLibs(prev => ({ ...prev, [key]: updated }));
-      showToast('✅ "' + bookToAdd.title + '" added to ' + userEmail.split('@')[0] + "'s library");
+      showToast('? "' + bookToAdd.title + '" added to ' + userEmail.split('@')[0] + "'s library");
       setAddModal(null);
     } catch (e) { showToast('Error: ' + e.message); }
   };
@@ -1550,7 +1550,7 @@ function UserLibrariesTab({ users, books, showToast }) {
                 <button key={m} type="button"
                   className={'adm-toggle' + (deactModal.mode === m ? ' on' : '')}
                   onClick={() => setDeactModal(d => ({ ...d, mode: m }))}>
-                  {m === 'full' ? '🔒 Block All' : m === 'read' ? '📖 Block Reading' : '⬇ Block Download'}
+                  {m === 'full' ? '?? Block All' : m === 'read' ? '?? Block Reading' : '? Block Download'}
                 </button>
               ))}
             </div>
@@ -1558,7 +1558,7 @@ function UserLibrariesTab({ users, books, showToast }) {
               <label>Reason shown to user</label>
               <input className="field" value={deactReason}
                 onChange={e => setDeactReason(e.target.value)}
-                placeholder="e.g. Payment issue — contact support to restore access" />
+                placeholder="e.g. Payment issue � contact support to restore access" />
             </div>
             <div className="adm-confirm-btns">
               <button className="btn btn-primary btn-sm" onClick={applyDeactivation}>Apply</button>
@@ -1574,7 +1574,7 @@ function UserLibrariesTab({ users, books, showToast }) {
           <div className="adm-confirm card" style={{ maxWidth:540, textAlign:'left' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
               <h3>Add Book to {addModal.split('@')[0]}'s Library</h3>
-              <button className="adm-close-btn" onClick={() => setAddModal(null)}>✕</button>
+              <button className="adm-close-btn" onClick={() => setAddModal(null)}>?</button>
             </div>
             <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:14 }}>Select a book to grant access. The user will be able to read and download it immediately.</p>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:8, maxHeight:320, overflowY:'auto' }}>
@@ -1605,7 +1605,7 @@ function UserLibrariesTab({ users, books, showToast }) {
       <div className="adm-page-head">
         <div>
           <h1>User Libraries</h1>
-          <span className="adm-page-sub">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} · {totalBooks} total books owned</span>
+          <span className="adm-page-sub">{filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} � {totalBooks} total books owned</span>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={() => { setLoading(true); setLibs({}); loadLibs(users); }}>Refresh</button>
       </div>
@@ -1639,7 +1639,7 @@ function UserLibrariesTab({ users, books, showToast }) {
                   <div style={{ background: userBooks.length > 0 ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.04)', border: userBooks.length > 0 ? '1px solid rgba(201,168,76,0.3)' : '1px solid var(--dim)', borderRadius:20, padding:'3px 12px', fontSize:'0.78rem', fontWeight:600, color: userBooks.length > 0 ? 'var(--gold)' : 'var(--muted)', flexShrink:0 }}>
                     {userBooks.length} book{userBooks.length !== 1 ? 's' : ''}
                   </div>
-                  <span style={{ fontSize:'0.75rem', color:'var(--muted)', flexShrink:0 }}>{isOpen ? '▲' : '▼'}</span>
+                  <span style={{ fontSize:'0.75rem', color:'var(--muted)', flexShrink:0 }}>{isOpen ? '?' : '?'}</span>
                 </div>
 
                 {isOpen && (
@@ -1676,9 +1676,9 @@ function UserLibrariesTab({ users, books, showToast }) {
                                 <strong style={{ fontSize:'0.85rem', display:'block', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</strong>
                                 <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
                                   {lb.downloadUnlocked ? 'Download unlocked' : 'Read only'}
-                                  {isFullOff  && <span style={{ color:'#e74c3c', marginLeft:6 }}>· All access off</span>}
-                                  {!isFullOff && isReadOff   && <span style={{ color:'#e67e22', marginLeft:6 }}>· Reading off</span>}
-                                  {!isFullOff && isDlOff     && <span style={{ color:'#e67e22', marginLeft:6 }}>· Download off</span>}
+                                  {isFullOff  && <span style={{ color:'#e74c3c', marginLeft:6 }}>� All access off</span>}
+                                  {!isFullOff && isReadOff   && <span style={{ color:'#e67e22', marginLeft:6 }}>� Reading off</span>}
+                                  {!isFullOff && isDlOff     && <span style={{ color:'#e67e22', marginLeft:6 }}>� Download off</span>}
                                 </span>
                                 {lb.deactivationReason && <span style={{ display:'block', fontSize:'0.68rem', color:'var(--muted)', fontStyle:'italic', marginTop:2 }}>"{lb.deactivationReason}"</span>}
                               </div>
@@ -1696,7 +1696,7 @@ function UserLibrariesTab({ users, books, showToast }) {
                                 <button disabled={!!busy[busyKey]} className="adm-flag-btn"
                                   style={{ borderColor:'#2ecc71', color:'#2ecc71' }}
                                   onClick={() => reactivateBook(u.email, lb.id)}>
-                                  {busy[busyKey] ? '…' : 'Restore'}
+                                  {busy[busyKey] ? '�' : 'Restore'}
                                 </button>
                               )}
                               {/* Remove button */}
@@ -1718,32 +1718,32 @@ function UserLibrariesTab({ users, books, showToast }) {
 }
 
 
-// ── SiteControlsPanel ────────────────────────────────────────────────────────
+// -- SiteControlsPanel --------------------------------------------------------
 function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper }) {
   const sc = siteControls || {};
   const toggle = async (key) => {
     const updated = { ...sc, [key]: !sc[key] };
     await saveSiteControls(updated);
-    showToast((updated[key] ? '✅ Enabled: ' : '❌ Disabled: ') + key.replace(/([A-Z])/g,' $1').toLowerCase());
+    showToast((updated[key] ? '? Enabled: ' : '? Disabled: ') + key.replace(/([A-Z])/g,' $1').toLowerCase());
   };
 
   const setInterval_ = async (val) => {
     const updated = { ...sc, autoRefreshInterval: val };
     await saveSiteControls(updated);
-    showToast(`✅ Auto-refresh interval set to ${val} minutes`);
+    showToast(`? Auto-refresh interval set to ${val} minutes`);
   };
 
   const controls = [
-    { key:'disableRightClick', icon:'🖱️', label:'Disable Right-Click',       desc:'Blocks context menu site-wide. Prevents image/text saving via right-click.', danger:false },
-    { key:'disableTextSelect', icon:'🔤', label:'Disable Text Selection',     desc:'Users cannot select or highlight any text on the site.', danger:false },
-    { key:'disableCopy',       icon:'📋', label:'Disable Copy & Cut',         desc:'Ctrl+C and Ctrl+X are blocked site-wide.', danger:false },
-    { key:'disableDevTools',   icon:'🔧', label:'Block DevTools Shortcuts',   desc:'Blocks F12, Ctrl+Shift+I/J/C, Ctrl+U to deter code inspection.', danger:false },
-    { key:'disablePrint',      icon:'🖨️', label:'Disable Printing',           desc:'Prevents Ctrl+P and browser print dialog from opening.', danger:false },
-    { key:'watermarkAll',      icon:'💧', label:'Watermark All Content',      desc:'Show user name & email watermark on all book and image content.', danger:false },
-    { key:'maintenanceMode',   icon:'🚧', label:'Maintenance Mode',           desc:'Shows a maintenance page to all non-admin visitors. Use during updates.', danger:true },
-    { key:'disableRegistration',icon:'🚫',label:'Disable New Registrations',  desc:'Prevent new users from creating accounts.', danger:false },
-    { key:'disableOrders',     icon:'🛒', label:'Disable All Orders',         desc:'Block all checkout and payment. No new orders can be placed.', danger:true },
-    { key:'readOnlyMode',      icon:'📖', label:'Read-Only Mode',             desc:'Users can browse but cannot purchase, review, or interact.', danger:false },
+    { key:'disableRightClick', icon:'???', label:'Disable Right-Click',       desc:'Blocks context menu site-wide. Prevents image/text saving via right-click.', danger:false },
+    { key:'disableTextSelect', icon:'??', label:'Disable Text Selection',     desc:'Users cannot select or highlight any text on the site.', danger:false },
+    { key:'disableCopy',       icon:'??', label:'Disable Copy & Cut',         desc:'Ctrl+C and Ctrl+X are blocked site-wide.', danger:false },
+    { key:'disableDevTools',   icon:'??', label:'Block DevTools Shortcuts',   desc:'Blocks F12, Ctrl+Shift+I/J/C, Ctrl+U to deter code inspection.', danger:false },
+    { key:'disablePrint',      icon:'???', label:'Disable Printing',           desc:'Prevents Ctrl+P and browser print dialog from opening.', danger:false },
+    { key:'watermarkAll',      icon:'??', label:'Watermark All Content',      desc:'Show user name & email watermark on all book and image content.', danger:false },
+    { key:'maintenanceMode',   icon:'??', label:'Maintenance Mode',           desc:'Shows a maintenance page to all non-admin visitors. Use during updates.', danger:true },
+    { key:'disableRegistration',icon:'??',label:'Disable New Registrations',  desc:'Prevent new users from creating accounts.', danger:false },
+    { key:'disableOrders',     icon:'??', label:'Disable All Orders',         desc:'Block all checkout and payment. No new orders can be placed.', danger:true },
+    { key:'readOnlyMode',      icon:'??', label:'Read-Only Mode',             desc:'Users can browse but cannot purchase, review, or interact.', danger:false },
   ];
 
   const refreshIntervals = [
@@ -1762,18 +1762,18 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
       <div className="adm-page-head">
         <div>
           <h1>Site Controls</h1>
-          <span className="adm-page-sub">Global security and access controls — changes take effect immediately for all users</span>
+          <span className="adm-page-sub">Global security and access controls � changes take effect immediately for all users</span>
         </div>
       </div>
 
       <div style={{ background:'rgba(201,168,76,0.07)', border:'1px solid rgba(201,168,76,0.25)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginBottom:24, fontSize:'0.84rem' }}>
-        ⚡ <strong style={{ color:'var(--gold)' }}>Real-time:</strong> All changes are saved to Firestore and take effect instantly for every visitor — no page reload required.
+        ? <strong style={{ color:'var(--gold)' }}>Real-time:</strong> All changes are saved to Firestore and take effect instantly for every visitor � no page reload required.
       </div>
 
-      {/* ── Auto Refresh Section ── */}
+      {/* -- Auto Refresh Section -- */}
       <div className="card" style={{ padding:'20px 24px', marginBottom:20, border: sc.autoRefreshEnabled ? '1px solid rgba(74,158,255,0.35)' : '1px solid var(--border)', background: sc.autoRefreshEnabled ? 'rgba(74,158,255,0.04)' : 'rgba(255,255,255,0.02)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-          <span style={{ fontSize:'1.8rem', flexShrink:0 }}>🔄</span>
+          <span style={{ fontSize:'1.8rem', flexShrink:0 }}>??</span>
           <div style={{ flex:1, minWidth:0 }}>
             <strong style={{ fontSize:'0.92rem', display:'block', marginBottom:3 }}>Auto Page Refresh</strong>
             <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>
@@ -1781,7 +1781,7 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
             </span>
             {sc.autoRefreshEnabled && (
               <span style={{ display:'inline-block', marginTop:6, fontSize:'0.72rem', padding:'2px 8px', borderRadius:10, background:'rgba(74,158,255,0.12)', color:'#4a9eff', border:'1px solid rgba(74,158,255,0.3)' }}>
-                🟢 Active — refreshing every {currentInterval} min for all users
+                ?? Active � refreshing every {currentInterval} min for all users
               </span>
             )}
           </div>
@@ -1796,7 +1796,7 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
           </button>
         </div>
 
-        {/* Interval selector — only shown when enabled */}
+        {/* Interval selector � only shown when enabled */}
         {sc.autoRefreshEnabled && (
           <div style={{ marginTop:16, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
             <span style={{ fontSize:'0.82rem', color:'var(--muted)', flexShrink:0 }}>Refresh every:</span>
@@ -1831,7 +1831,7 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
               <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{ctrl.desc}</span>
               {ctrl.danger && sc[ctrl.key] && (
                 <span style={{ display:'inline-block', marginTop:4, fontSize:'0.72rem', padding:'2px 8px', borderRadius:10, background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)' }}>
-                  ⚠ Active — affecting all users
+                  ? Active � affecting all users
                 </span>
               )}
             </div>
@@ -1856,7 +1856,7 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
   );
 }
 
-// ── NotificationsPanel ───────────────────────────────────────────────────────
+// -- NotificationsPanel -------------------------------------------------------
 const REVERT_REASONS = [
   'Sent by mistake',
   'Book not yet available',
@@ -1900,7 +1900,7 @@ function RevertModal({ notif, bookTitle, onConfirm, onClose }) {
         </div>
         {reason === 'Other' && (
           <textarea
-            placeholder="Describe the reason…"
+            placeholder="Describe the reason�"
             value={custom}
             onChange={e => setCustom(e.target.value)}
             rows={2}
@@ -1910,7 +1910,7 @@ function RevertModal({ notif, bookTitle, onConfirm, onClose }) {
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
           <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={busy}>Cancel</button>
           <button className="btn btn-danger btn-sm" onClick={handleConfirm} disabled={busy || !reason || (reason==='Other' && !custom.trim())}>
-            {busy ? '⏳ Reverting…' : '↩ Revert'}
+            {busy ? '? Reverting�' : '? Revert'}
           </button>
         </div>
       </div>
@@ -1927,7 +1927,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
 
   useEffect(() => {
     setFetchErr('');
-    // Read from contact_messages (type='notification') — no orderBy to avoid index requirement
+    // Read from contact_messages (type='notification') � no orderBy to avoid index requirement
     const unsub = onSnapshot(
       collection(db, 'contact_messages'),
       snap => {
@@ -1951,7 +1951,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
   const byBook = {};
   notifs.forEach(n => {
     const bookId = n.bookId;
-    const bookTitle = n.bookTitle || n.subject?.replace('🔔 Book Notification Request — ', '') || 'Unknown';
+    const bookTitle = n.bookTitle || n.subject?.replace('?? Book Notification Request � ', '') || 'Unknown';
     if (!byBook[bookId]) byBook[bookId] = { title: bookTitle, status: n.status, items: [] };
     byBook[bookId].items.push(n);
   });
@@ -1986,7 +1986,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
             userEmail:   (n.email||'').toLowerCase(),
             userId:      n.userId || '',
             type:        'book_ready',
-            title:       `📖 ${group.title} is now available!`,
+            title:       `?? ${group.title} is now available!`,
             message:     msgText,
             bookId:      bookId,
             bookTitle:   group.title,
@@ -2000,8 +2000,8 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
             name:       n.name || n.email,
             email:      (n.email||'').toLowerCase(),
             userId:     n.userId || '',
-            subject:    `📖 "${group.title}" is now available!`,
-            message:    `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '…\n\n' : ''}Head over to your library or click the link below to start reading:\n${bookUrl}\n\nHappy reading! 📚\n— Ellines Haven Team`,
+            subject:    `?? "${group.title}" is now available!`,
+            message:    `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '�\n\n' : ''}Head over to your library or click the link below to start reading:\n${bookUrl}\n\nHappy reading! ??\n� Ellines Haven Team`,
             type:       'direct',
             status:     'replied',
             threadId:   `dm_ready_${inAppKey}`,
@@ -2011,14 +2011,14 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
             lastSender: 'admin',
             userRead:   false,
             fromAdmin:  true,
-            adminEmail: 'orders@ellines.co.ke',
+            adminEmail: 'haven@ellines.co.ke',
             adminName:  'Ellines Haven',
             bookId:     bookId,
             bookTitle:  group.title,
           }).then(() =>
             // Seed the thread subcollection so the user sees the message body
             setDoc(doc(db, 'contact_messages', `dm_ready_${inAppKey}`, 'messages', 'msg_0'), {
-              text:        `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '…\n\n' : ''}Head over to your library or click the link below:\n${bookUrl}\n\nHappy reading! 📚\n— Ellines Haven Team`,
+              text:        `Hi ${n.name || 'there'},\n\n"${group.title}" is now ready for you to read!\n\n${book?.description ? book.description.slice(0, 200) + '�\n\n' : ''}Head over to your library or click the link below:\n${bookUrl}\n\nHappy reading! ??\n� Ellines Haven Team`,
               sender:      'admin',
               senderName:  'Ellines Haven',
               senderEmail: 'haven@ellines.co.ke',
@@ -2029,10 +2029,10 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
       }));
 
       setNotifs(prev => prev.map(n => n.bookId === bookId ? { ...n, notified: true, status: 'notified' } : n));
-      addLog('system', `Notifications sent for "${group.title}" to ${pendingItems.length} user(s) — email + in-app`);
-      showToast(`✅ Notified ${pendingItems.length} user(s) for "${group.title}" — inbox + bell notification sent`);
+      addLog('system', `Notifications sent for "${group.title}" to ${pendingItems.length} user(s) � email + in-app`);
+      showToast(`? Notified ${pendingItems.length} user(s) for "${group.title}" � inbox + bell notification sent`);
     } catch (e) {
-      showToast('❌ Error: ' + e.message);
+      showToast('? Error: ' + e.message);
     }
     setSending(s => ({ ...s, [bookId]: false }));
   };
@@ -2050,10 +2050,10 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
       const notifKey = `notify_${notif.bookId}_${(notif.email||'').replace(/[^a-z0-9]/gi,'_').toLowerCase()}`;
       setDoc(doc(db, 'notifications', notifKey), { notified: false, notifiedAt: null, revertedAt: serverTimestamp(), revertReason: reason }, { merge: true }).catch(() => {});
       setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, notified: false, status: 'pending' } : n));
-      addLog('system', `Notification reverted for "${notif.name || notif.email}" on "${notif.bookTitle || 'book'}" — Reason: ${reason}`);
-      showToast(`↩ Reverted notification for ${notif.name || notif.email}`);
+      addLog('system', `Notification reverted for "${notif.name || notif.email}" on "${notif.bookTitle || 'book'}" � Reason: ${reason}`);
+      showToast(`? Reverted notification for ${notif.name || notif.email}`);
     } catch (e) {
-      showToast('❌ Revert failed: ' + e.message);
+      showToast('? Revert failed: ' + e.message);
     }
   };
 
@@ -2062,25 +2062,25 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
       <div className="adm-page-head">
         <div>
           <h1>Notifications</h1>
-          <span className="adm-page-sub">Users who clicked "Notify Me" — send them a WhatsApp/email when their book is ready</span>
+          <span className="adm-page-sub">Users who clicked "Notify Me" � send them a WhatsApp/email when their book is ready</span>
         </div>
       </div>
 
       <div style={{ background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.2)', borderRadius:'var(--r-sm)', padding:'12px 18px', marginBottom:20, fontSize:'0.82rem' }}>
-        💡 When you mark a book as <strong style={{color:'var(--gold)'}}>Complete</strong> or change its status, click <strong>Send Notifications</strong> to alert all waiting users via WhatsApp. The system opens WhatsApp pre-filled for each user's number.
+        ?? When you mark a book as <strong style={{color:'var(--gold)'}}>Complete</strong> or change its status, click <strong>Send Notifications</strong> to alert all waiting users via WhatsApp. The system opens WhatsApp pre-filled for each user's number.
       </div>
 
       {fetchErr && (
         <div style={{ background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.35)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.82rem', color:'#e74c3c' }}>
-          ⚠️ {fetchErr}
+          ?? {fetchErr}
         </div>
       )}
 
       {loading ? (
-        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading notifications…</div>
+        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading notifications�</div>
       ) : Object.keys(byBook).length === 0 ? (
         <div className="adm-empty">
-          <div style={{ fontSize:'3rem', marginBottom:12 }}>🔔</div>
+          <div style={{ fontSize:'3rem', marginBottom:12 }}>??</div>
           <p>No notification requests yet. When users click "Notify Me" on a book, they'll appear here.</p>
         </div>
       ) : (
@@ -2099,17 +2099,17 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
                   <div style={{ flex:1 }}>
                     <strong style={{ display:'block', marginBottom:4 }}>{group.title}</strong>
                     <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>
-                      {total} request{total!==1?'s':''} · {pending} pending
+                      {total} request{total!==1?'s':''} � {pending} pending
                     </span>
                   </div>
                   {pending > 0 && (
                     <button className="btn btn-primary btn-sm" disabled={!!sending[bookId]}
                       onClick={() => sendNotification(bookId)}>
-                      {sending[bookId] ? '⏳ Sending…' : `📣 Notify ${pending} User${pending!==1?'s':''}`}
+                      {sending[bookId] ? '? Sending�' : `?? Notify ${pending} User${pending!==1?'s':''}`}
                     </button>
                   )}
                   {pending === 0 && total > 0 && (
-                    <span style={{ fontSize:'0.78rem', color:'var(--ok)' }}>✅ All notified</span>
+                    <span style={{ fontSize:'0.78rem', color:'var(--ok)' }}>? All notified</span>
                   )}
                 </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -2123,22 +2123,22 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
                         <span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{n.email}</span>
                       </div>
                       <span style={{ fontSize:'0.7rem', padding:'2px 8px', borderRadius:10, background: n.notified?'rgba(46,204,113,0.1)':'rgba(201,168,76,0.1)', color: n.notified?'var(--ok)':'var(--gold)', border: n.notified?'1px solid rgba(46,204,113,0.3)':'1px solid rgba(201,168,76,0.3)' }}>
-                        {n.notified ? '✓ Notified' : '⏳ Pending'}
+                        {n.notified ? '? Notified' : '? Pending'}
                       </span>
-                      {/* Revert button — only shown when already notified */}
+                      {/* Revert button � only shown when already notified */}
                       {n.notified && (
                         <button
                           onClick={() => setRevertTarget({ notif: n, bookTitle: group.title })}
                           title="Revert notification status back to pending"
                           style={{ fontSize:'0.7rem', padding:'3px 8px', borderRadius:'var(--r-sm)', background:'rgba(231,76,60,0.08)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)', cursor:'pointer', flexShrink:0 }}>
-                          ↩ Revert
+                          ? Revert
                         </button>
                       )}
                       {/* Quick WhatsApp link per user */}
-                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + (n.name||'there') + ', "' + group.title + '" is now available! 📖 ' + window.location.origin + '/book/' + bookId)}`}
+                      <a href={`https://wa.me/254748255466?text=${encodeURIComponent('Hi ' + (n.name||'there') + ', "' + group.title + '" is now available! ?? ' + window.location.origin + '/book/' + bookId)}`}
                         target="_blank" rel="noopener noreferrer"
                         style={{ fontSize:'0.72rem', padding:'3px 8px', borderRadius:'var(--r-sm)', background:'rgba(37,211,102,0.1)', color:'#25D366', border:'1px solid rgba(37,211,102,0.3)', textDecoration:'none', flexShrink:0 }}>
-                        💬 WA
+                        ?? WA
                       </a>
                     </div>
                   ))}
@@ -2162,7 +2162,7 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
   );
 }
 
-// ── PromoCreateForm ───────────────────────────────────────────────────────────
+// -- PromoCreateForm -----------------------------------------------------------
 function PromoCreateForm({ onSave }) {
   const [form, setForm] = useState({
     code: '', discount: '', type: 'Percentage', expires: '', maxUses: '', active: true,
@@ -2202,7 +2202,7 @@ function PromoCreateForm({ onSave }) {
           <div style={{ display:'flex', gap:6 }}>
             <input className="field" value={form.code} onChange={e => setForm(f=>({...f,code:e.target.value.toUpperCase()}))}
               placeholder="e.g. SAVE20" style={{ textTransform:'uppercase', letterSpacing:1 }} />
-            <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink:0 }} onClick={randomCode} title="Generate random code">🎲</button>
+            <button type="button" className="btn btn-ghost btn-sm" style={{ flexShrink:0 }} onClick={randomCode} title="Generate random code">??</button>
           </div>
         </div>
         <div className="adm-field-group" style={{ marginBottom:0 }}>
@@ -2227,7 +2227,7 @@ function PromoCreateForm({ onSave }) {
   );
 }
 
-// ── BulkPromoGenerator ────────────────────────────────────────────────────────
+// -- BulkPromoGenerator --------------------------------------------------------
 function BulkPromoGenerator({ onSave }) {
   const [count,    setCount]    = useState(10);
   const [discount, setDiscount] = useState('10');
@@ -2301,20 +2301,20 @@ function BulkPromoGenerator({ onSave }) {
         </div>
       </div>
       <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-        <button type="button" className="btn btn-outline btn-sm" onClick={generate}>🎲 Preview {count} Codes</button>
+        <button type="button" className="btn btn-outline btn-sm" onClick={generate}>?? Preview {count} Codes</button>
         {preview.length > 0 && (
           <>
-            <button type="button" className="btn btn-primary btn-sm" onClick={save}>💾 Save All {preview.length} Codes</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={save}>?? Save All {preview.length} Codes</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
               const csv = ['Code,Discount,Type,Max Uses,Expires', ...preview.map(c => `${c},${type==='Percentage'?discount+'%':'KSh '+discount},${type},${maxUses},${expires}`)].join('\n');
               const blob = new Blob([csv],{type:'text/csv'});
               const url  = URL.createObjectURL(blob);
               const a    = document.createElement('a'); a.href=url; a.download='bulk-promos.csv'; a.click();
               URL.revokeObjectURL(url);
-            }}>⬇ Export Preview CSV</button>
+            }}>? Export Preview CSV</button>
           </>
         )}
-        {generated && <span style={{ color:'var(--ok)', fontSize:'0.8rem', fontWeight:600 }}>✅ Saved to Firestore</span>}
+        {generated && <span style={{ color:'var(--ok)', fontSize:'0.8rem', fontWeight:600 }}>? Saved to Firestore</span>}
       </div>
       {preview.length > 0 && (
         <div style={{ marginTop:12, maxHeight:160, overflowY:'auto', display:'flex', flexWrap:'wrap', gap:6, padding:'10px', background:'var(--bg)', borderRadius:'var(--r-sm)', border:'1px solid var(--dim)' }}>
@@ -2327,7 +2327,7 @@ function BulkPromoGenerator({ onSave }) {
   );
 }
 
-/* ── ManualUnlockForm ──────────────────────────────────────────────────────*/
+/* -- ManualUnlockForm ------------------------------------------------------*/
 function ManualUnlockForm({ books, showToast, onUnlock }) {
   const [email,    setEmail]    = useState('');
   const [selected, setSelected] = useState([]);
@@ -2377,28 +2377,28 @@ function ManualUnlockForm({ books, showToast, onUnlock }) {
       </div>
       {selected.length > 0 && (
         <p style={{fontSize:'0.78rem',color:'var(--gold)',marginTop:10}}>
-          {selected.length} book{selected.length !== 1 ? 's' : ''} selected — will be unlocked for {email || 'the email above'}
+          {selected.length} book{selected.length !== 1 ? 's' : ''} selected � will be unlocked for {email || 'the email above'}
         </p>
       )}
     </form>
   );
 }
 
-/* ── ArchivesPanel ────────────────────────────────────────────────────────── */
-/* ── TrashPanel / ArchivesPanel — handles ALL content types ─────────────── */
+/* -- ArchivesPanel ---------------------------------------------------------- */
+/* -- TrashPanel / ArchivesPanel � handles ALL content types --------------- */
 const TYPE_LABELS = {
-  order:   { icon:'🛒', label:'Order',   color:'var(--gold)' },
-  book:    { icon:'📚', label:'Book',    color:'#4a9eff'     },
-  user:    { icon:'👤', label:'User',    color:'#a855f7'     },
-  message: { icon:'💬', label:'Message', color:'#25D366'     },
-  review:  { icon:'⭐', label:'Review',  color:'#e8832a'     },
+  order:   { icon:'??', label:'Order',   color:'var(--gold)' },
+  book:    { icon:'??', label:'Book',    color:'#4a9eff'     },
+  user:    { icon:'??', label:'User',    color:'#a855f7'     },
+  message: { icon:'??', label:'Message', color:'#25D366'     },
+  review:  { icon:'?', label:'Review',  color:'#e8832a'     },
 };
 
 function ItemSummary({ item }) {
   const type = item.type || 'order';
   if (type === 'order') return (
     <td style={{ fontSize:'0.78rem' }}>
-      <div><strong>{item.userName || item.userEmail || '—'}</strong></div>
+      <div><strong>{item.userName || item.userEmail || '�'}</strong></div>
       <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.userEmail}</div>
       <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{(item.items||[]).map(b=>b.title).join(', ')}</div>
       {item.total && <div style={{ color:'var(--gold)', fontWeight:700 }}>KSh {item.total.toLocaleString()}</div>}
@@ -2406,32 +2406,32 @@ function ItemSummary({ item }) {
   );
   if (type === 'book') return (
     <td style={{ fontSize:'0.78rem' }}>
-      <strong>{item.title || '—'}</strong>
-      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.genre} · {item.author}</div>
+      <strong>{item.title || '�'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.genre} � {item.author}</div>
     </td>
   );
   if (type === 'user') return (
     <td style={{ fontSize:'0.78rem' }}>
-      <strong>{item.name || '—'}</strong>
+      <strong>{item.name || '�'}</strong>
       <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.email}</div>
     </td>
   );
   if (type === 'message') return (
     <td style={{ fontSize:'0.78rem' }}>
-      <strong>{item.name || item.email || '—'}</strong>
-      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{(item.message||'').slice(0,60)}{(item.message||'').length>60?'…':''}</div>
+      <strong>{item.name || item.email || '�'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{(item.message||'').slice(0,60)}{(item.message||'').length>60?'�':''}</div>
     </td>
   );
   if (type === 'review') return (
     <td style={{ fontSize:'0.78rem' }}>
-      <strong>{item.user || '—'}</strong>
-      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.book} · {'★'.repeat(item.rating||0)}</div>
+      <strong>{item.user || '�'}</strong>
+      <div style={{ color:'var(--muted)', fontSize:'0.72rem' }}>{item.book} � {'?'.repeat(item.rating||0)}</div>
     </td>
   );
   return <td style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{item.id}</td>;
 }
 
-// ── Orders Panel Component ────────────────────────────────────────────────────
+// -- Orders Panel Component ----------------------------------------------------
 function OrdersPanel({
   allOrders, filteredOrders, orderFilter, setOrderFilter,
   pendingCount, revenue, isSuper,
@@ -2480,7 +2480,7 @@ function OrdersPanel({
       } catch {}
     }
     setSelected([]); setBulkBusy(false); setBulkAction('');
-    showToast(`✅ ${label} — ${action} complete`);
+    showToast(`? ${label} � ${action} complete`);
   };
 
   const deleteUnconfirmed = async () => {
@@ -2490,15 +2490,15 @@ function OrdersPanel({
     setBulkBusy(true);
     for (const id of ids) await handleDeleteOrder(id, true);
     setBulkBusy(false);
-    showToast(`🗑️ ${ids.length} unconfirmed orders deleted`);
+    showToast(`??? ${ids.length} unconfirmed orders deleted`);
   };
 
   const BULK_ACTIONS = [
-    { key:'confirm', label:'✅ Confirm', color:'rgba(46,204,113,0.15)',  text:'#2ecc71', border:'rgba(46,204,113,0.4)' },
-    { key:'reject',  label:'✕ Reject',  color:'rgba(231,76,60,0.1)',    text:'#e74c3c', border:'rgba(231,76,60,0.35)' },
-    { key:'refund',  label:'↩ Refund',  color:'rgba(168,85,247,0.1)',   text:'#a855f7', border:'rgba(168,85,247,0.35)' },
-    { key:'archive', label:'📦 Archive',color:'rgba(100,116,139,0.1)',  text:'var(--muted)', border:'var(--dim)' },
-    { key:'delete',  label:'🗑 Delete', color:'rgba(231,76,60,0.1)',    text:'#e74c3c', border:'rgba(231,76,60,0.35)' },
+    { key:'confirm', label:'? Confirm', color:'rgba(46,204,113,0.15)',  text:'#2ecc71', border:'rgba(46,204,113,0.4)' },
+    { key:'reject',  label:'? Reject',  color:'rgba(231,76,60,0.1)',    text:'#e74c3c', border:'rgba(231,76,60,0.35)' },
+    { key:'refund',  label:'? Refund',  color:'rgba(168,85,247,0.1)',   text:'#a855f7', border:'rgba(168,85,247,0.35)' },
+    { key:'archive', label:'?? Archive',color:'rgba(100,116,139,0.1)',  text:'var(--muted)', border:'var(--dim)' },
+    { key:'delete',  label:'?? Delete', color:'rgba(231,76,60,0.1)',    text:'#e74c3c', border:'rgba(231,76,60,0.35)' },
   ];
 
   return (
@@ -2508,12 +2508,12 @@ function OrdersPanel({
         <div>
           <h1>Orders</h1>
           <span className="adm-page-sub">
-            {allOrders.length} orders · KSh {revenue.toLocaleString()} revenue · {pendingCount} pending · {refundCount} refunded
+            {allOrders.length} orders � KSh {revenue.toLocaleString()} revenue � {pendingCount} pending � {refundCount} refunded
           </span>
         </div>
         <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
           <button className="btn btn-sm" style={{ background:'rgba(231,76,60,0.1)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.35)' }}
-            onClick={deleteUnconfirmed} disabled={bulkBusy}>🗑 Delete All Unconfirmed</button>
+            onClick={deleteUnconfirmed} disabled={bulkBusy}>?? Delete All Unconfirmed</button>
           {isSuper && (
             <button className="btn btn-ghost btn-sm" style={{ color:'var(--err)', borderColor:'rgba(231,76,60,0.4)' }}
               onClick={() => { if (!window.confirm('Clear ALL orders?')) return; allOrders.forEach(o => handleDeleteOrder(o.id, true)); showToast('All orders cleared'); }}
@@ -2524,7 +2524,7 @@ function OrdersPanel({
 
       {manualPending.length > 0 && (
         <div className="adm-alert-box" style={{ marginBottom:12 }}>
-          <strong>⚠ {manualPending.length} manual order{manualPending.length > 1 ? 's' : ''} need verification.</strong>
+          <strong>? {manualPending.length} manual order{manualPending.length > 1 ? 's' : ''} need verification.</strong>
           {' '}Check the M-Pesa/Airtel reference and confirm payment to unlock books.
         </div>
       )}
@@ -2550,11 +2550,11 @@ function OrdersPanel({
             <button key={a.key}
               style={{ padding:'5px 12px', background:a.color, color:a.text, border:`1px solid ${a.border}`, borderRadius:6, cursor:'pointer', fontSize:'0.8rem', fontWeight:600, fontFamily:'inherit', opacity:bulkBusy ? 0.5 : 1 }}
               onClick={() => executeBulk(a.key)} disabled={bulkBusy}>
-              {bulkBusy && bulkAction === a.key ? '…' : a.label}
+              {bulkBusy && bulkAction === a.key ? '�' : a.label}
             </button>
           ))}
           <button style={{ marginLeft:'auto', background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.82rem', fontFamily:'inherit' }}
-            onClick={() => setSelected([])}>✕ Clear</button>
+            onClick={() => setSelected([])}>? Clear</button>
         </div>
       )}
 
@@ -2579,9 +2579,9 @@ function OrdersPanel({
               const isCancelled = o.status === 'Cancelled' || o.status === 'PaymentFailed';
               const isRefunded  = o.status === 'Refunded';
               const isAuto      = ['paystack','mpesa_stk'].includes(o.method);
-              const bookNames   = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '—');
+              const bookNames   = o.items ? o.items.map(i => i.title).join(', ') : (o.book || '�');
               const amount      = o.total || o.amount || 0;
-              const customer    = o.userName || o.customer || '—';
+              const customer    = o.userName || o.customer || '�';
               const email       = o.userEmail || o.email || '';
               const isSelected  = selected.includes(o.id);
               const rowBg       = isSelected ? 'rgba(201,168,76,0.09)' : isCancelled ? 'rgba(231,76,60,0.04)' : isRefunded ? 'rgba(168,85,247,0.04)' : isPending && !isAuto ? 'rgba(201,168,76,0.04)' : undefined;
@@ -2590,12 +2590,12 @@ function OrdersPanel({
                   <td style={{ paddingLeft:12 }}>
                     <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(o.id)} style={{ cursor:'pointer' }} />
                   </td>
-                  <td><code className="adm-code" style={{ fontSize:'0.68rem' }}>{(o.id||'').slice(0,14)}…</code></td>
+                  <td><code className="adm-code" style={{ fontSize:'0.68rem' }}>{(o.id||'').slice(0,14)}�</code></td>
                   <td>
                     <strong style={{ fontSize:'0.84rem' }}>{customer}</strong>
                     <span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{email}</span>
                   </td>
-                  <td style={{ maxWidth:130, fontSize:'0.76rem', color:'var(--muted)' }}>{bookNames.length > 40 ? bookNames.slice(0,40)+'…' : bookNames}</td>
+                  <td style={{ maxWidth:130, fontSize:'0.76rem', color:'var(--muted)' }}>{bookNames.length > 40 ? bookNames.slice(0,40)+'�' : bookNames}</td>
                   <td><strong style={{ color:'var(--gold)' }}>KSh {amount.toLocaleString()}</strong></td>
                   <td>
                     <span className="adm-method-badge" style={{ fontSize:'0.7rem' }}>{o.method}</span>
@@ -2603,19 +2603,19 @@ function OrdersPanel({
                   </td>
                   <td>
                     <span className={'adm-status adm-status--' + (o.status||'unknown').toLowerCase()} style={{ fontSize:'0.73rem' }}>
-                      {o.status === 'PaymentFailed' ? '✕ Failed' : o.status}
+                      {o.status === 'PaymentFailed' ? '? Failed' : o.status}
                     </span>
                     {isCancelled && o.failReason && <span style={{ display:'block', fontSize:'0.66rem', color:'var(--err)', marginTop:2 }}>{(o.failReason||'').slice(0,36)}</span>}
                     {isRefunded  && o.refundNote && <span style={{ display:'block', fontSize:'0.66rem', color:'#a855f7', marginTop:2 }}>{(o.refundNote||'').slice(0,36)}</span>}
                   </td>
-                  <td style={{ color:'var(--muted)', fontSize:'0.73rem', whiteSpace:'nowrap' }}>{o.date ? o.date.slice(0,10) : '—'}</td>
+                  <td style={{ color:'var(--muted)', fontSize:'0.73rem', whiteSpace:'nowrap' }}>{o.date ? o.date.slice(0,10) : '�'}</td>
                   <td className="adm-actions" style={{ whiteSpace:'nowrap', gap:3 }}>
-                    {isPending && !isAuto && (<><button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>✅</button><button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>✕</button></>)}
-                    {isPending && isAuto  && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.7, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm">⚡</button>)}
-                    {o.status === 'PaymentFailed' && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.8, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm (payment may have succeeded)">⚡ Fix</button>)}
-                    {isCompleted && (<button className="adm-act-btn" style={{ background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:'0.72rem' }} onClick={() => setRefundModal(o)}>↩ Refund</button>)}
-                    <button className="adm-act-btn adm-act-archive" onClick={() => handleArchiveOrder(o.id)} title="Archive">📦</button>
-                    <button className="adm-act-btn adm-act-del"     onClick={() => handleDeleteOrder(o.id)} title="Delete">🗑️</button>
+                    {isPending && !isAuto && (<><button className="adm-act-btn adm-act-confirm" onClick={() => handleConfirmOrder(o.id, customer)}>?</button><button className="adm-act-btn adm-act-del" onClick={() => handleRejectOrder(o.id)}>?</button></>)}
+                    {isPending && isAuto  && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.7, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm">?</button>)}
+                    {o.status === 'PaymentFailed' && (<button className="adm-act-btn adm-act-confirm" style={{ opacity:0.8, fontSize:'0.68rem' }} onClick={() => handleConfirmOrder(o.id, customer)} title="Force-confirm (payment may have succeeded)">? Fix</button>)}
+                    {isCompleted && (<button className="adm-act-btn" style={{ background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:'0.72rem' }} onClick={() => setRefundModal(o)}>? Refund</button>)}
+                    <button className="adm-act-btn adm-act-archive" onClick={() => handleArchiveOrder(o.id)} title="Archive">??</button>
+                    <button className="adm-act-btn adm-act-del"     onClick={() => handleDeleteOrder(o.id)} title="Delete">???</button>
                   </td>
                 </tr>
               );
@@ -2630,7 +2630,7 @@ function OrdersPanel({
           onConfirm={async (note) => {
             await handleRefundOrder(refundModal.id, note);
             setRefundModal(null);
-            showToast('↩ Refund issued for ' + refundModal.id.slice(0,12));
+            showToast('? Refund issued for ' + refundModal.id.slice(0,12));
           }} />
       )}
 
@@ -2645,16 +2645,16 @@ function OrdersPanel({
             await unlockBooksForBuyer(emailLow, booksToUnlock);
             const mo = { id:'ORD-MANUAL-'+Date.now(), userId:null, userName:emailLow.split('@')[0], userEmail:emailLow, items:booksToUnlock.map(b=>({id:b.id,title:b.title,price:b.price})), total:booksToUnlock.reduce((s,b)=>s+(b.price||0),0), method:'manual', ref:'MANUAL-UNLOCK', status:'Completed', date:new Date().toISOString().slice(0,10), createdAt:serverTimestamp() };
             await setDoc(doc(db,'orders',mo.id), mo);
-            showToast('✅ Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow);
+            showToast('? Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow);
             setTick(t => t+1);
-          } catch (err) { showToast('❌ Unlock failed: ' + err.message); }
+          } catch (err) { showToast('? Unlock failed: ' + err.message); }
         }} />
       </div>
     </div>
   );
 }
 
-// ── Refunds Panel ─────────────────────────────────────────────────────────────
+// -- Refunds Panel -------------------------------------------------------------
 function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
   const [refundModal, setRefundModal] = useState(null);
   const refunded  = allOrders.filter(o => o.status === 'Refunded');
@@ -2667,7 +2667,7 @@ function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
         <div>
           <h1>Refunds</h1>
           <span className="adm-page-sub">
-            {refunded.length} refunded · KSh {totalRefunded.toLocaleString()} total · {completed.length} completed orders eligible
+            {refunded.length} refunded � KSh {totalRefunded.toLocaleString()} total � {completed.length} completed orders eligible
           </span>
         </div>
       </div>
@@ -2697,12 +2697,12 @@ function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
             <tbody>
               {refunded.map(o => (
                 <tr key={o.id} style={{ background:'rgba(168,85,247,0.03)' }}>
-                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{(o.id||'').slice(0,14)}…</code></td>
-                  <td><strong style={{ fontSize:'0.84rem' }}>{o.userName || '—'}</strong><span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{o.userEmail}</span></td>
-                  <td style={{ fontSize:'0.76rem', color:'var(--muted)', maxWidth:120 }}>{(o.items||[]).map(i=>i.title).join(', ') || '—'}</td>
+                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{(o.id||'').slice(0,14)}�</code></td>
+                  <td><strong style={{ fontSize:'0.84rem' }}>{o.userName || '�'}</strong><span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{o.userEmail}</span></td>
+                  <td style={{ fontSize:'0.76rem', color:'var(--muted)', maxWidth:120 }}>{(o.items||[]).map(i=>i.title).join(', ') || '�'}</td>
                   <td><strong style={{ color:'#a855f7' }}>KSh {(o.total||o.amount||0).toLocaleString()}</strong></td>
-                  <td style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{o.refundedAt ? o.refundedAt.slice(0,10) : o.date?.slice(0,10) || '—'}</td>
-                  <td style={{ fontSize:'0.75rem', color:'var(--muted)', maxWidth:120 }}>{o.refundNote || '—'}</td>
+                  <td style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{o.refundedAt ? o.refundedAt.slice(0,10) : o.date?.slice(0,10) || '�'}</td>
+                  <td style={{ fontSize:'0.75rem', color:'var(--muted)', maxWidth:120 }}>{o.refundNote || '�'}</td>
                 </tr>
               ))}
             </tbody>
@@ -2710,10 +2710,10 @@ function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
         </div>
       )}
 
-      {/* Completed orders — can be refunded */}
+      {/* Completed orders � can be refunded */}
       <div className="card" style={{ overflowX:'auto' }}>
         <div style={{ padding:'14px 18px', borderBottom:'1px solid var(--dim)', display:'flex', alignItems:'center', gap:10 }}>
-          <h3 style={{ margin:0, fontSize:'0.95rem' }}>Completed Orders — Issue Refund</h3>
+          <h3 style={{ margin:0, fontSize:'0.95rem' }}>Completed Orders � Issue Refund</h3>
           <span style={{ fontSize:'0.78rem', color:'var(--muted)' }}>{completed.length} eligible</span>
         </div>
         {completed.length === 0 ? (
@@ -2724,17 +2724,17 @@ function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
             <tbody>
               {completed.map(o => (
                 <tr key={o.id}>
-                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{(o.id||'').slice(0,14)}…</code></td>
-                  <td><strong style={{ fontSize:'0.84rem' }}>{o.userName || '—'}</strong><span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{o.userEmail}</span></td>
-                  <td style={{ fontSize:'0.76rem', color:'var(--muted)', maxWidth:120 }}>{(o.items||[]).map(i=>i.title).join(', ') || '—'}</td>
+                  <td><code className="adm-code" style={{ fontSize:'0.7rem' }}>{(o.id||'').slice(0,14)}�</code></td>
+                  <td><strong style={{ fontSize:'0.84rem' }}>{o.userName || '�'}</strong><span style={{ display:'block', fontSize:'0.72rem', color:'var(--muted)' }}>{o.userEmail}</span></td>
+                  <td style={{ fontSize:'0.76rem', color:'var(--muted)', maxWidth:120 }}>{(o.items||[]).map(i=>i.title).join(', ') || '�'}</td>
                   <td><strong style={{ color:'var(--gold)' }}>KSh {(o.total||o.amount||0).toLocaleString()}</strong></td>
                   <td><span className="adm-method-badge" style={{ fontSize:'0.7rem' }}>{o.method}</span></td>
-                  <td style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{o.date?.slice(0,10) || '—'}</td>
+                  <td style={{ fontSize:'0.75rem', color:'var(--muted)' }}>{o.date?.slice(0,10) || '�'}</td>
                   <td>
                     <button className="adm-act-btn"
                       style={{ background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.3)', fontSize:'0.75rem' }}
                       onClick={() => setRefundModal(o)}>
-                      ↩ Refund
+                      ? Refund
                     </button>
                   </td>
                 </tr>
@@ -2755,37 +2755,37 @@ function RefundsPanel({ allOrders, handleRefundOrder, showToast }) {
   );
 }
 
-// ── Refund Modal ──────────────────────────────────────────────────────────────
+// -- Refund Modal --------------------------------------------------------------
 function RefundModal({ order, onClose, onConfirm }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const amount   = order.total || order.amount || 0;
-  const customer = order.userName || order.userEmail || '—';
+  const customer = order.userName || order.userEmail || '�';
   const submit = async e => { e.preventDefault(); setBusy(true); await onConfirm(note); setBusy(false); };
   return (
     <div className="adm-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="adm-confirm card" style={{ maxWidth:460, width:'95vw' }}>
-        <h3 style={{ marginBottom:4 }}>↩ Issue Refund</h3>
+        <h3 style={{ marginBottom:4 }}>? Issue Refund</h3>
         <p style={{ fontSize:'0.84rem', color:'var(--muted)', marginBottom:16 }}>
-          Order <strong style={{ color:'var(--gold)' }}>{order.id?.slice(0,16)}…</strong> · {customer}
+          Order <strong style={{ color:'var(--gold)' }}>{order.id?.slice(0,16)}�</strong> � {customer}
         </p>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, background:'rgba(0,0,0,0.2)', borderRadius:'var(--r-sm)', padding:'12px 16px', marginBottom:16 }}>
           <div><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Amount</span><br/><strong style={{ color:'var(--gold)' }}>KSh {amount.toLocaleString()}</strong></div>
           <div><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Method</span><br/><strong>{order.method}</strong></div>
-          <div style={{ gridColumn:'1/-1' }}><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Books</span><br/><span style={{ fontSize:'0.78rem' }}>{(order.items||[]).map(i=>i.title).join(', ') || '—'}</span></div>
+          <div style={{ gridColumn:'1/-1' }}><span style={{ fontSize:'0.75rem', color:'var(--muted)' }}>Books</span><br/><span style={{ fontSize:'0.78rem' }}>{(order.items||[]).map(i=>i.title).join(', ') || '�'}</span></div>
         </div>
         <div style={{ background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.25)', borderLeft:'3px solid #a855f7', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.82rem', color:'#a855f7' }}>
-          ⚠ This records the refund in the system. Actual money transfer must be done manually via Paystack dashboard or M-Pesa.
+          ? This records the refund in the system. Actual money transfer must be done manually via Paystack dashboard or M-Pesa.
         </div>
         <form onSubmit={submit}>
           <div className="form-group" style={{ marginBottom:16 }}>
             <label style={{ fontSize:'0.82rem' }}>Refund Note (optional)</label>
-            <input className="field" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Customer request, duplicate charge…" />
+            <input className="field" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Customer request, duplicate charge�" />
           </div>
           <div style={{ display:'flex', gap:10 }}>
             <button type="submit" className="btn btn-sm"
               style={{ background:'rgba(168,85,247,0.15)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.4)', flex:1 }}
-              disabled={busy}>{busy ? 'Processing…' : '↩ Confirm Refund'}</button>
+              disabled={busy}>{busy ? 'Processing�' : '? Confirm Refund'}</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} disabled={busy}>Cancel</button>
           </div>
         </form>
@@ -2816,8 +2816,8 @@ function ArchivesPanel({ db, showToast, onRestore }) {
       await deleteDoc(doc(db, 'archives', id));
       setItems(prev => prev.filter(i => i.id !== id));
       onRestore?.({ id, ...data });
-      showToast('✅ Restored');
-    } catch (e) { showToast('❌ Restore failed: ' + e.message); }
+      showToast('? Restored');
+    } catch (e) { showToast('? Restore failed: ' + e.message); }
   };
 
   const permDelete = async (id) => {
@@ -2825,8 +2825,8 @@ function ArchivesPanel({ db, showToast, onRestore }) {
     try {
       await deleteDoc(doc(db, 'archives', id));
       setItems(prev => prev.filter(i => i.id !== id));
-      showToast('🗑️ Permanently deleted');
-    } catch (e) { showToast('❌ ' + e.message); }
+      showToast('??? Permanently deleted');
+    } catch (e) { showToast('? ' + e.message); }
   };
 
   const types = ['all', ...new Set(items.map(i => i.type||'order'))];
@@ -2835,7 +2835,7 @@ function ArchivesPanel({ db, showToast, onRestore }) {
   return (
     <div className="adm-page">
       <div className="adm-page-head">
-        <div><h1>Archives</h1><span className="adm-page-sub">{items.length} archived item{items.length!==1?'s':''} — orders, books, messages, users &amp; reviews</span></div>
+        <div><h1>Archives</h1><span className="adm-page-sub">{items.length} archived item{items.length!==1?'s':''} � orders, books, messages, users &amp; reviews</span></div>
       </div>
       {types.length > 1 && (
         <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
@@ -2854,9 +2854,9 @@ function ArchivesPanel({ db, showToast, onRestore }) {
         </div>
       )}
       {loading ? (
-        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading archives…</div>
+        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading archives�</div>
       ) : filtered.length === 0 ? (
-        <div className="adm-empty"><div style={{ fontSize:'3rem', marginBottom:12 }}>📦</div>
+        <div className="adm-empty"><div style={{ fontSize:'3rem', marginBottom:12 }}>??</div>
           <p>{typeFilter==='all' ? 'No archived items yet.' : `No archived ${typeFilter}s.`}</p>
         </div>
       ) : (
@@ -2871,11 +2871,11 @@ function ArchivesPanel({ db, showToast, onRestore }) {
                     <td><span style={{ background:'rgba(255,255,255,0.06)', border:'1px solid var(--dim)', borderRadius:6, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700, color:tm.color, whiteSpace:'nowrap' }}>{tm.icon} {tm.label}</span></td>
                     <td><code style={{ fontSize:'0.68rem', color:'var(--gold)' }}>{String(item.id).slice(0,16)}</code></td>
                     <ItemSummary item={item} />
-                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.archivedBy||'—'}</td>
-                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.archivedAt?.toDate?.()?.toLocaleDateString?.()||'—'}</td>
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.archivedBy||'�'}</td>
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.archivedAt?.toDate?.()?.toLocaleDateString?.()||'�'}</td>
                     <td className="adm-actions">
-                      <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
-                      <button className="adm-act-btn adm-act-del"     onClick={() => permDelete(item.id)}>✕ Delete Forever</button>
+                      <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>? Restore</button>
+                      <button className="adm-act-btn adm-act-del"     onClick={() => permDelete(item.id)}>? Delete Forever</button>
                     </td>
                   </tr>
                 );
@@ -2888,7 +2888,7 @@ function ArchivesPanel({ db, showToast, onRestore }) {
   );
 }
 
-/* ── TrashPanel ───────────────────────────────────────────────────────────── */
+/* -- TrashPanel ------------------------------------------------------------- */
 function TrashPanel({ db, showToast, onRestore }) {
   const [items,      setItems]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -2911,8 +2911,8 @@ function TrashPanel({ db, showToast, onRestore }) {
       await deleteDoc(doc(db, 'trash', id));
       setItems(prev => prev.filter(i => i.id !== id));
       onRestore?.({ id, ...data });
-      showToast('✅ Restored');
-    } catch (e) { showToast('❌ Restore failed: ' + e.message); }
+      showToast('? Restored');
+    } catch (e) { showToast('? Restore failed: ' + e.message); }
   };
 
   const permDelete = async (id) => {
@@ -2920,8 +2920,8 @@ function TrashPanel({ db, showToast, onRestore }) {
     try {
       await deleteDoc(doc(db, 'trash', id));
       setItems(prev => prev.filter(i => i.id !== id));
-      showToast('🗑️ Permanently deleted');
-    } catch (e) { showToast('❌ ' + e.message); }
+      showToast('??? Permanently deleted');
+    } catch (e) { showToast('? ' + e.message); }
   };
 
   const emptyTrash = async () => {
@@ -2929,8 +2929,8 @@ function TrashPanel({ db, showToast, onRestore }) {
     try {
       await Promise.all(items.map(i => deleteDoc(doc(db, 'trash', i.id))));
       setItems([]);
-      showToast('🗑️ Trash emptied');
-    } catch (e) { showToast('❌ ' + e.message); }
+      showToast('??? Trash emptied');
+    } catch (e) { showToast('? ' + e.message); }
   };
 
   const types = ['all', ...new Set(items.map(i => i.type||'order'))];
@@ -2942,7 +2942,7 @@ function TrashPanel({ db, showToast, onRestore }) {
         <div><h1>Trash</h1><span className="adm-page-sub">{items.length} item{items.length!==1?'s':''} in trash</span></div>
         {items.length > 0 && (
           <button onClick={emptyTrash} style={{ background:'rgba(231,76,60,0.12)', color:'#e74c3c', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'7px 16px', cursor:'pointer', fontWeight:600, fontSize:'0.82rem', fontFamily:'inherit' }}>
-            🗑️ Empty Trash ({items.length})
+            ??? Empty Trash ({items.length})
           </button>
         )}
       </div>
@@ -2963,9 +2963,9 @@ function TrashPanel({ db, showToast, onRestore }) {
         </div>
       )}
       {loading ? (
-        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading trash…</div>
+        <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>Loading trash�</div>
       ) : filtered.length === 0 ? (
-        <div className="adm-empty"><div style={{ fontSize:'3rem', marginBottom:12 }}>🗑️</div>
+        <div className="adm-empty"><div style={{ fontSize:'3rem', marginBottom:12 }}>???</div>
           <p>Trash is empty. Deleted items from Orders, Books, Users, Messages and Reviews appear here.</p>
         </div>
       ) : (
@@ -2980,11 +2980,11 @@ function TrashPanel({ db, showToast, onRestore }) {
                     <td><span style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.25)', borderRadius:6, padding:'2px 8px', fontSize:'0.72rem', fontWeight:700, color:'#e06c5a', whiteSpace:'nowrap' }}>{tm.icon} {tm.label}</span></td>
                     <td><code style={{ fontSize:'0.68rem', color:'#e06c5a' }}>{String(item.id).slice(0,16)}</code></td>
                     <ItemSummary item={item} />
-                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.trashedBy||'—'}</td>
-                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.trashedAt?.toDate?.()?.toLocaleDateString?.()||'—'}</td>
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.trashedBy||'�'}</td>
+                    <td style={{ fontSize:'0.72rem', color:'var(--muted)' }}>{item.trashedAt?.toDate?.()?.toLocaleDateString?.()||'�'}</td>
                     <td className="adm-actions">
-                      <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>↩ Restore</button>
-                      <button className="adm-act-btn adm-act-del"     onClick={() => permDelete(item.id)}>✕ Delete Forever</button>
+                      <button className="adm-act-btn adm-act-confirm" onClick={() => restore(item)}>? Restore</button>
+                      <button className="adm-act-btn adm-act-del"     onClick={() => permDelete(item.id)}>? Delete Forever</button>
                     </td>
                   </tr>
                 );
@@ -3036,7 +3036,7 @@ export default function Admin() {
   // Reset selection when tab changes
   useEffect(() => { clearSelected(); }, [tab]); // eslint-disable-line
 
-  // ── Auto-refresh state ────────────────────────────────────────────────────
+  // -- Auto-refresh state ----------------------------------------------------
   const [lastRefresh, setLastRefresh] = useState(() => new Date());
 
   const doRefresh = () => {
@@ -3045,7 +3045,7 @@ export default function Admin() {
     setLastRefresh(new Date());
   };
 
-  // ── Load reviews + promos from Firestore (persist across refresh) ──────────
+  // -- Load reviews + promos from Firestore (persist across refresh) ----------
   useEffect(() => {
     getDoc(doc(db, 'site_data', 'reviews')).then(snap => {
       if (snap.exists() && snap.data().list?.length) setReviews(snap.data().list);
@@ -3080,7 +3080,7 @@ export default function Admin() {
     try { return JSON.parse(localStorage.getItem('eh_pay_methods')) || []; } catch { return []; }
   });
 
-  // System logs — stored in Firestore so they are real-time and cross-device
+  // System logs � stored in Firestore so they are real-time and cross-device
   const [logFilter, setLogFilter] = useState('all');
   const [systemLogs, setSystemLogs] = useState([]);
   const [deletionAlerts, setDeletionAlerts] = useState([]);
@@ -3092,7 +3092,7 @@ export default function Admin() {
       const entries = snap.exists() ? (snap.data().logs || []) : [];
       setSystemLogs(entries);
     }, () => {
-      // Fallback — try localStorage only (no demo data)
+      // Fallback � try localStorage only (no demo data)
       try { setSystemLogs(JSON.parse(localStorage.getItem('eh_system_logs') || '[]')); } catch {}
     });
     return () => unsub();
@@ -3100,14 +3100,14 @@ export default function Admin() {
   }, []);
 
   // Real-time: sync newly registered users from Firestore into the users list
-  // (handles users who registered on a different device — AppContext writes to localStorage
+  // (handles users who registered on a different device � AppContext writes to localStorage
   //  but Admin.jsx only reads buildUserList on mount; this listener re-syncs it)
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'site_data', 'registered_users'), (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
 
-      // Respect the deletedEmails blocklist — never re-add deleted users
+      // Respect the deletedEmails blocklist � never re-add deleted users
       const deletedEmails = new Set([
         ...(data.deletedEmails || []),
         ...JSON.parse(localStorage.getItem('eh_deleted_users') || '[]'),
@@ -3124,7 +3124,7 @@ export default function Admin() {
       if (data.roleOverrides) {
         localStorage.setItem('eh_role_overrides', JSON.stringify(data.roleOverrides));
       }
-      // Re-build users list — skip deleted emails
+      // Re-build users list � skip deleted emails
       setUsers(prev => {
         const fresh = buildUserList(JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]'))
           .filter(u => !deletedEmails.has(u.email.toLowerCase()));
@@ -3139,8 +3139,8 @@ export default function Admin() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live chat sessions listener — for nav bar badge count
-  // Fetch all contact_messages + filter client-side — no index requirements
+  // Live chat sessions listener � for nav bar badge count
+  // Fetch all contact_messages + filter client-side � no index requirements
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'contact_messages'), snap => {
       const sessions = snap.docs
@@ -3156,7 +3156,7 @@ export default function Admin() {
     return () => unsub();
   }, []);
 
-  // Messages listener — for nav bar badge count
+  // Messages listener � for nav bar badge count
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'contact_messages'), snap => {
       const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -3165,7 +3165,7 @@ export default function Admin() {
     return () => unsub();
   }, []);
 
-  // Helper to add a real log entry — writes to Firestore immediately
+  // Helper to add a real log entry � writes to Firestore immediately
   const addLog = (type, event, status = 'success') => {
     const entry = {
       time: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -3222,7 +3222,7 @@ export default function Admin() {
     });
   }, []);
 
-  // Real-time Firestore listener — orders from ALL users, ALL devices appear instantly
+  // Real-time Firestore listener � orders from ALL users, ALL devices appear instantly
   useEffect(() => {
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q,
@@ -3234,7 +3234,7 @@ export default function Admin() {
         });
         setOrdersState(fsOrders);
         setLiveOrders(fsOrders);
-        // Rebuild users with live book counts — also surface users who exist only in Firestore orders
+        // Rebuild users with live book counts � also surface users who exist only in Firestore orders
         try {
           const bookCounts = {};
           fsOrders.forEach(o => {
@@ -3249,7 +3249,7 @@ export default function Admin() {
           const knownEmails = new Set(baseList.map(u => u.email.toLowerCase()));
 
           // Add any users who appear in Firestore orders but aren't in localStorage yet
-          // (e.g. they registered on a different device — Firestore registered_users listener
+          // (e.g. they registered on a different device � Firestore registered_users listener
           //  will eventually sync them, but orders fire first)
           const suspended = JSON.parse(localStorage.getItem('eh_suspended_fs') || '[]');
           const deletedEmails = new Set([
@@ -3288,7 +3288,7 @@ export default function Admin() {
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3200); };
 
-  // Permissions — wired to AppContext so changes affect the live site immediately
+  // Permissions � wired to AppContext so changes affect the live site immediately
   const getPerms     = (email) => getUserPerms(email);
   const localSetPerm = (email, field, val) => {
     setPermField(email, field, val);
@@ -3302,11 +3302,11 @@ export default function Admin() {
     try {
       await saveBook(book);
       setEditing(null);
-      showToast(book.id ? '✅ Book updated successfully' : '✅ New book added');
+      showToast(book.id ? '? Book updated successfully' : '? New book added');
       addLog('book', (book.id ? 'Book updated: ' : 'Book added: ') + book.title);
     } catch (err) {
       console.error('[handleSaveBook] error:', err);
-      showToast('❌ Save failed: ' + err.message);
+      showToast('? Save failed: ' + err.message);
     }
   };
   const handleDeleteBook = id => {
@@ -3344,7 +3344,7 @@ export default function Admin() {
     showToast('Order rejected');
   };
 
-  // Archive an order — moves it to Firestore archives collection
+  // Archive an order � moves it to Firestore archives collection
   const handleArchiveOrder = async (orderId) => {
     try {
       const order = allOrders.find(o => o.id === orderId);
@@ -3357,11 +3357,11 @@ export default function Admin() {
       });
       await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
       setLiveOrders(prev => prev.filter(o => o.id !== orderId));
-      showToast('📦 Order archived');
-    } catch (e) { showToast('❌ Archive failed: ' + e.message); }
+      showToast('?? Order archived');
+    } catch (e) { showToast('? Archive failed: ' + e.message); }
   };
 
-  // Delete order — moves to trash (soft delete)
+  // Delete order � moves to trash (soft delete)
   const handleDeleteOrder = async (orderId, silent = false) => {
     if (!silent && !window.confirm('Move this order to Trash? It can be restored later.')) return;
     try {
@@ -3372,8 +3372,8 @@ export default function Admin() {
       });
       await deleteDoc(doc(db, 'orders', orderId)).catch(() => {});
       setLiveOrders(prev => prev.filter(o => o.id !== orderId));
-      if (!silent) showToast('🗑️ Order moved to Trash');
-    } catch (e) { showToast('❌ Delete failed: ' + e.message); }
+      if (!silent) showToast('??? Order moved to Trash');
+    } catch (e) { showToast('? Delete failed: ' + e.message); }
   };
 
   // Delete user  persists across refresh via eh_deleted_users blocklist + Firestore
@@ -3381,9 +3381,9 @@ export default function Admin() {
     const emailKey = u.email.toLowerCase();
     const libId    = emailKey.replace(/[^a-z0-9]/g, '_');
 
-    // ── Firestore: hard-delete every doc that belongs to this user ──────────
+    // -- Firestore: hard-delete every doc that belongs to this user ----------
     try {
-      // users collection — try both email-derived ID and the stored u.id
+      // users collection � try both email-derived ID and the stored u.id
       await Promise.all([
         deleteDoc(doc(db, 'users', emailKey)).catch(() => {}),
         deleteDoc(doc(db, 'users', libId)).catch(() => {}),
@@ -3432,7 +3432,7 @@ export default function Admin() {
 
     } catch (e) { console.warn('[deleteUser] Firestore sync failed:', e.message); }
 
-    // ── localStorage: scrub every key that references this user ─────────────
+    // -- localStorage: scrub every key that references this user -------------
     // Deleted blocklist
     const lsDeleted = JSON.parse(localStorage.getItem('eh_deleted_users') || '[]');
     if (!lsDeleted.includes(emailKey))
@@ -3466,10 +3466,10 @@ export default function Admin() {
     const session = JSON.parse(localStorage.getItem('eh_user') || 'null');
     if (session?.email?.toLowerCase() === emailKey) localStorage.removeItem('eh_user');
 
-    // ── Update React state immediately ───────────────────────────────────────
+    // -- Update React state immediately ---------------------------------------
     setUsers(prev => prev.filter(x => x.email.toLowerCase() !== emailKey));
     setTick(t => t + 1);
-    showToast(`🗑 User "${u.name}" permanently deleted`);
+    showToast(`?? User "${u.name}" permanently deleted`);
   };
 
   // Navigate to Books tab with a pre-set status filter
@@ -3493,7 +3493,7 @@ export default function Admin() {
     return matchSearch && matchStatus && matchType;
   });
 
-  // Real orders only — sorted newest first
+  // Real orders only � sorted newest first
   const realOrders = [...liveOrders].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const allOrders = realOrders;
 
@@ -3507,76 +3507,76 @@ export default function Admin() {
     : allOrders.filter(o => o.status.toLowerCase() === orderFilter);
 
   const navItems = [
-    /* ── General admin ── */
-    { k:'dashboard',     label:'Dashboard',        icon:'🏠', group:'admin' },
-    { k:'activity',      label:'Activity Feed',    icon:'📊', group:'admin' },
-    { k:'books',         label:'Books',             icon:'📚', group:'admin' },
-    { k:'series',        label:'Series Manager',    icon:'📖', group:'admin' },
-    { k:'covers',        label:'Novel Covers',      icon:'🖼️', group:'admin' },
-    { k:'photos',        label:'Site Photos',       icon:'📷', group:'admin' },
-    { k:'orders',        label:'Orders' + (pendingCount > 0 ? ` (${pendingCount})` : ''), icon:'🛒', group:'admin' },
-    { k:'refunds',       label:'Refunds' + (refundCount > 0 ? ` (${refundCount})` : ''),  icon:'↩', group:'admin' },
-    { k:'archives',      label:'Archives',          icon:'📦', group:'admin' },
-    { k:'trash',         label:'Trash',             icon:'🗑️', group:'admin' },
-    { k:'users',         label:'Users',             icon:'👥', group:'admin' },
-    { k:'userbooks',     label:'User Libraries',    icon:'📖', group:'admin' },
-    { k:'permissions',   label:'Permissions',       icon:'🔐', group:'admin' },
-    { k:'reviews',       label:'Reviews',           icon:'⭐', group:'admin' },
-    { k:'newsletter',    label:'Newsletter',         icon:'📬', group:'admin' },
-    { k:'promos',        label:'Promo Codes',       icon:'🎟️', group:'admin' },
-    { k:'analytics',     label:'Analytics',         icon:'📊', group:'admin' },
-    { k:'reports',       label:'Reports',           icon:'📈', group:'admin' },
-    { k:'visitors',      label:'Site Visitors',     icon:'🌍', group:'admin' },
-    { k:'online',        label:'Online Users',       icon:'🟢', group:'admin' },
-    { k:'allorders',     label:'All Receipts',       icon:'🧾', group:'admin' },
-    { k:'payments',      label:'Payment Methods',   icon:'💳', group:'admin' },
-    { k:'payfees',       label:'Fee Calculator',    icon:'🧮', group:'admin' },
-    { k:'settings',      label:'Settings',          icon:'⚙️', group:'admin' },
-    { k:'notifications', label:'Notifications',     icon:'🔔', group:'admin' },
-    { k:'messages',      label:'Messages',          icon:'💬', group:'admin' },
-    { k:'livechat',      label:'Live Chat',          icon:'⚡', group:'admin' },
-    { k:'chatsettings',  label:'Chat Settings',      icon:'💬', group:'admin' },
-    { k:'sms',           label:'SMS Broadcast',      icon:'📱', group:'admin' },
-    { k:'social',        label:'Social Media',       icon:'🌐', group:'admin' },
-    { k:'email',         label:'Email Config',      icon:'📧', group:'admin' },
-    { k:'sitecontrols',  label:'Site Controls',     icon:'🎛️', group:'admin' },
-    { k:'freebook',      label:'Free Book Gift',     icon:'🎁', group:'admin' },
-    { k:'devicesettings', label:'Device & Phone',    icon:'📱', group:'admin' },
-    /* ── Power tools — visible to both admin & superadmin ── */
-    { k:'pageeditor',    label:'Page Editor',       icon:'✏️', group:'power' },
-    { k:'design',        label:'Design Studio',     icon:'🎨', group:'power' },
-    { k:'responsive',    label:'Responsive Layout',  icon:'📐', group:'power' },
-    { k:'security',      label:'Security',          icon:'🔒', group:'power' },
-    { k:'contentprotect', label:'Content Protection', icon:'🛡️', group:'power' },
-    { k:'plugins',       label:'Plugins & Tools',   icon:'🧩', group:'power' },
-    { k:'integrations',  label:'Integrations',      icon:'🔌', group:'power' },
-    { k:'logs',          label:'System Logs',       icon:'📋', group:'power' },
-    { k:'backup',        label:'Backup & Restore',  icon:'💾', group:'power' },
-    /* ── Content & Features ── */
-    { k:'authorblog',    label:'Author Blog',       icon:'📝', group:'content' },
-    { k:'bookseries',    label:'Book Series',       icon:'📚', group:'content' },
-    { k:'advancedsearch', label:'Advanced Search',   icon:'🔍', group:'content' },
-    { k:'preorder',      label:'Pre-Orders',        icon:'⏰', group:'content' },
-    { k:'emailnotif',    label:'Email Notifications', icon:'📧', group:'content' },
-    { k:'comments',      label:'Comments',          icon:'💬', group:'content' },
-    { k:'challenges',    label:'Reading Challenges', icon:'📖', group:'content' },
-    /* ── Super admin only ── */
-    { k:'admins',           label:'Admin Control',      icon:'🛡️', group:'super' },
-    { k:'godmode',          label:'God Mode',           icon:'⚡', group:'super' },
-    { k:'chaptergrants',    label:'Chapter Grants',     icon:'🔓', group:'super' },
-    { k:'chapteranalytics', label:'Chapter Analytics',  icon:'📊', group:'super' },
+    /* -- General admin -- */
+    { k:'dashboard',     label:'Dashboard',        icon:'??', group:'admin' },
+    { k:'activity',      label:'Activity Feed',    icon:'??', group:'admin' },
+    { k:'books',         label:'Books',             icon:'??', group:'admin' },
+    { k:'series',        label:'Series Manager',    icon:'??', group:'admin' },
+    { k:'covers',        label:'Novel Covers',      icon:'???', group:'admin' },
+    { k:'photos',        label:'Site Photos',       icon:'??', group:'admin' },
+    { k:'orders',        label:'Orders' + (pendingCount > 0 ? ` (${pendingCount})` : ''), icon:'??', group:'admin' },
+    { k:'refunds',       label:'Refunds' + (refundCount > 0 ? ` (${refundCount})` : ''),  icon:'?', group:'admin' },
+    { k:'archives',      label:'Archives',          icon:'??', group:'admin' },
+    { k:'trash',         label:'Trash',             icon:'???', group:'admin' },
+    { k:'users',         label:'Users',             icon:'??', group:'admin' },
+    { k:'userbooks',     label:'User Libraries',    icon:'??', group:'admin' },
+    { k:'permissions',   label:'Permissions',       icon:'??', group:'admin' },
+    { k:'reviews',       label:'Reviews',           icon:'?', group:'admin' },
+    { k:'newsletter',    label:'Newsletter',         icon:'??', group:'admin' },
+    { k:'promos',        label:'Promo Codes',       icon:'???', group:'admin' },
+    { k:'analytics',     label:'Analytics',         icon:'??', group:'admin' },
+    { k:'reports',       label:'Reports',           icon:'??', group:'admin' },
+    { k:'visitors',      label:'Site Visitors',     icon:'??', group:'admin' },
+    { k:'online',        label:'Online Users',       icon:'??', group:'admin' },
+    { k:'allorders',     label:'All Receipts',       icon:'??', group:'admin' },
+    { k:'payments',      label:'Payment Methods',   icon:'??', group:'admin' },
+    { k:'payfees',       label:'Fee Calculator',    icon:'??', group:'admin' },
+    { k:'settings',      label:'Settings',          icon:'??', group:'admin' },
+    { k:'notifications', label:'Notifications',     icon:'??', group:'admin' },
+    { k:'messages',      label:'Messages',          icon:'??', group:'admin' },
+    { k:'livechat',      label:'Live Chat',          icon:'?', group:'admin' },
+    { k:'chatsettings',  label:'Chat Settings',      icon:'??', group:'admin' },
+    { k:'sms',           label:'SMS Broadcast',      icon:'??', group:'admin' },
+    { k:'social',        label:'Social Media',       icon:'??', group:'admin' },
+    { k:'email',         label:'Email Config',      icon:'??', group:'admin' },
+    { k:'sitecontrols',  label:'Site Controls',     icon:'???', group:'admin' },
+    { k:'freebook',      label:'Free Book Gift',     icon:'??', group:'admin' },
+    { k:'devicesettings', label:'Device & Phone',    icon:'??', group:'admin' },
+    /* -- Power tools � visible to both admin & superadmin -- */
+    { k:'pageeditor',    label:'Page Editor',       icon:'??', group:'power' },
+    { k:'design',        label:'Design Studio',     icon:'??', group:'power' },
+    { k:'responsive',    label:'Responsive Layout',  icon:'??', group:'power' },
+    { k:'security',      label:'Security',          icon:'??', group:'power' },
+    { k:'contentprotect', label:'Content Protection', icon:'???', group:'power' },
+    { k:'plugins',       label:'Plugins & Tools',   icon:'??', group:'power' },
+    { k:'integrations',  label:'Integrations',      icon:'??', group:'power' },
+    { k:'logs',          label:'System Logs',       icon:'??', group:'power' },
+    { k:'backup',        label:'Backup & Restore',  icon:'??', group:'power' },
+    /* -- Content & Features -- */
+    { k:'authorblog',    label:'Author Blog',       icon:'??', group:'content' },
+    { k:'bookseries',    label:'Book Series',       icon:'??', group:'content' },
+    { k:'advancedsearch', label:'Advanced Search',   icon:'??', group:'content' },
+    { k:'preorder',      label:'Pre-Orders',        icon:'?', group:'content' },
+    { k:'emailnotif',    label:'Email Notifications', icon:'??', group:'content' },
+    { k:'comments',      label:'Comments',          icon:'??', group:'content' },
+    { k:'challenges',    label:'Reading Challenges', icon:'??', group:'content' },
+    /* -- Super admin only -- */
+    { k:'admins',           label:'Admin Control',      icon:'???', group:'super' },
+    { k:'godmode',          label:'God Mode',           icon:'?', group:'super' },
+    { k:'chaptergrants',    label:'Chapter Grants',     icon:'??', group:'super' },
+    { k:'chapteranalytics', label:'Chapter Analytics',  icon:'??', group:'super' },
   ];
 
   return (
     <div className={`adm${sidebarCollapsed ? ' adm--collapsed' : ''}${mobileSidebarOpen ? ' adm--mobile-open' : ''}`}>
-      {/* ── Sidebar toggle — hamburger on mobile, collapse arrow on desktop ── */}
+      {/* -- Sidebar toggle � hamburger on mobile, collapse arrow on desktop -- */}
       <button
         className="adm-sidebar-toggle"
         onClick={toggleSidebar}
         title={mobileSidebarOpen ? 'Close menu' : sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         aria-label="Toggle sidebar"
       >
-        <span>{mobileSidebarOpen ? '✕' : '☰'}</span>
+        <span>{mobileSidebarOpen ? '?' : '?'}</span>
         {/* Show current section name in the mobile top bar */}
         {!mobileSidebarOpen && (
           <span className="adm-sidebar-toggle__title" style={{
@@ -3591,7 +3591,7 @@ export default function Admin() {
         )}
       </button>
 
-      {/* ── Mobile backdrop — tap to close sidebar ── */}
+      {/* -- Mobile backdrop � tap to close sidebar -- */}
       {mobileSidebarOpen && (
         <div
           style={{ position:'fixed', inset:0, zIndex:298 }}
@@ -3610,7 +3610,7 @@ export default function Admin() {
           </div>
         </div>
         <nav className="adm-nav">
-          {/* ── Manage section ── */}
+          {/* -- Manage section -- */}
           <div className="adm-nav-section adm-nav-section-admin">
             <span className="adm-nav-section-dot adm-nav-section-dot--admin" />
             <span className="adm-nav-label">Manage</span>
@@ -3642,7 +3642,7 @@ export default function Admin() {
             );
           })}
 
-          {/* ── Book Categories (shown when Books tab is active) ── */}
+          {/* -- Book Categories (shown when Books tab is active) -- */}
           {tab === 'books' && !sidebarCollapsed && (
             <div style={{ marginLeft:12, marginTop:2, marginBottom:4, display:'flex', flexDirection:'column', gap:2 }}>
               {[
@@ -3679,7 +3679,7 @@ export default function Admin() {
             </div>
           )}
 
-          {/* ── Content & Features ── */}
+          {/* -- Content & Features -- */}
           <div className="adm-nav-divider" />
           <div className="adm-nav-section adm-nav-section-content">
             <span className="adm-nav-section-dot adm-nav-section-dot--content" />
@@ -3692,7 +3692,7 @@ export default function Admin() {
             </button>
           ))}
 
-          {/* ── Power Tools — admin & superadmin ── */}
+          {/* -- Power Tools � admin & superadmin -- */}
           <div className="adm-nav-divider" />
           <div className="adm-nav-section adm-nav-section-power">
             <span className="adm-nav-section-dot adm-nav-section-dot--power" />
@@ -3705,7 +3705,7 @@ export default function Admin() {
             </button>
           ))}
 
-          {/* ── Super Admin ── */}
+          {/* -- Super Admin -- */}
           {isSuper && (
             <>
               <div className="adm-nav-divider" />
@@ -3730,39 +3730,39 @@ export default function Admin() {
             <div>
               <strong>{user.name}</strong>
               <span style={{ color: isSuper ? 'var(--gold)' : '#7eb6ff' }}>
-                {isSuper ? '⚡ Super Admin' : '🛡️ Admin'}
+                {isSuper ? '? Super Admin' : '??? Admin'}
               </span>
             </div>
           </div>
           <div style={{ display:'flex', gap:6 }}>
-            <Link to="/profile" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>👤 Profile</Link>
-            <Link to="/" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>← Site</Link>
+            <Link to="/profile" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>?? Profile</Link>
+            <Link to="/" className="adm-back-btn" style={{ flex:1, textAlign:'center' }}>? Site</Link>
           </div>
 
-          {/* ── Payment Dashboards Quick Links ── */}
+          {/* -- Payment Dashboards Quick Links -- */}
           {!sidebarCollapsed && (
             <div style={{ marginTop:10, borderTop:'1px solid var(--border)', paddingTop:10 }}>
               <div style={{ fontSize:'0.65rem', color:'var(--muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:6, paddingLeft:2 }}>
-                💳 Payment Dashboards
+                ?? Payment Dashboards
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                 <a href="https://dashboard.paystack.com" target="_blank" rel="noopener noreferrer"
                   style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 10px', background:'rgba(0,196,140,0.07)', border:'1px solid rgba(0,196,140,0.15)', borderRadius:'var(--r-sm)', textDecoration:'none', color:'#00c48c', fontSize:'0.75rem', fontWeight:600, transition:'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background='rgba(0,196,140,0.14)'}
                   onMouseLeave={e => e.currentTarget.style.background='rgba(0,196,140,0.07)'}>
-                  <span style={{ fontSize:'0.9rem' }}>🟢</span> Paystack
+                  <span style={{ fontSize:'0.9rem' }}>??</span> Paystack
                 </a>
                 <a href="https://www.paypal.com/signin" target="_blank" rel="noopener noreferrer"
                   style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 10px', background:'rgba(0,112,243,0.07)', border:'1px solid rgba(0,112,243,0.15)', borderRadius:'var(--r-sm)', textDecoration:'none', color:'#4a9eff', fontSize:'0.75rem', fontWeight:600, transition:'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background='rgba(0,112,243,0.14)'}
                   onMouseLeave={e => e.currentTarget.style.background='rgba(0,112,243,0.07)'}>
-                  <span style={{ fontSize:'0.9rem' }}>🅿</span> PayPal
+                  <span style={{ fontSize:'0.9rem' }}>??</span> PayPal
                 </a>
                 <a href="https://developer.safaricom.co.ke" target="_blank" rel="noopener noreferrer"
                   style={{ display:'flex', alignItems:'center', gap:7, padding:'6px 10px', background:'rgba(46,204,113,0.07)', border:'1px solid rgba(46,204,113,0.15)', borderRadius:'var(--r-sm)', textDecoration:'none', color:'#2ecc71', fontSize:'0.75rem', fontWeight:600, transition:'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background='rgba(46,204,113,0.14)'}
                   onMouseLeave={e => e.currentTarget.style.background='rgba(46,204,113,0.07)'}>
-                  <span style={{ fontSize:'0.9rem' }}>📱</span> M-Pesa / Daraja
+                  <span style={{ fontSize:'0.9rem' }}>??</span> M-Pesa / Daraja
                 </a>
               </div>
             </div>
@@ -3775,14 +3775,14 @@ export default function Admin() {
         {editing !== null && <BookForm initial={editing} onSave={handleSaveBook} onCancel={() => setEditing(null)} />}
         {deleting && <Confirm msg="Delete this book? This cannot be undone." onYes={() => handleDeleteBook(deleting)} onNo={() => setDeleting(null)} />}
 
-        {/* Messages tab — full height, no padding */}
+        {/* Messages tab � full height, no padding */}
         {tab === 'messages' && (
           <div className="adm-main-messages">
             <MessagesPanel showToast={showToast} users={users} />
           </div>
         )}
 
-        {/* Live Chat tab — full height, no padding */}
+        {/* Live Chat tab � full height, no padding */}
         {tab === 'livechat' && (
           <div className="adm-main-messages">
             <Suspense fallback={<PanelLoader />}>
@@ -3791,7 +3791,7 @@ export default function Admin() {
           </div>
         )}
 
-        {/* SMS Broadcast tab — scrollable */}
+        {/* SMS Broadcast tab � scrollable */}
         {tab === 'sms' && (
           <div className="adm-main-scroll">
             <Suspense fallback={<PanelLoader />}>
@@ -3800,7 +3800,7 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Social Media tab — scrollable */}
+        {/* Social Media tab � scrollable */}
         {tab === 'social' && (
           <div className="adm-main-scroll">
             <Suspense fallback={<PanelLoader />}>
@@ -3809,7 +3809,7 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Chat Settings tab — scrollable */}
+        {/* Chat Settings tab � scrollable */}
         {tab === 'chatsettings' && (
           <div className="adm-main-scroll">
             <Suspense fallback={<PanelLoader />}>
@@ -3818,7 +3818,7 @@ export default function Admin() {
           </div>
         )}
 
-        {/* All other tabs — scrollable with padding */}
+        {/* All other tabs � scrollable with padding */}
         {tab !== 'messages' && tab !== 'livechat' && tab !== 'sms' && tab !== 'social' && tab !== 'chatsettings' && (
           <div className="adm-main-scroll">
         {addUserModal && (
@@ -3826,7 +3826,7 @@ export default function Admin() {
             <div className="adm-confirm card" style={{ maxWidth:440, textAlign:'left' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
                 <h3>Add New {addUserModal === 'admin' ? 'Admin' : 'User'}</h3>
-                <button className="adm-close-btn" onClick={() => { setAddUserModal(null); setAddUserForm({ name:'', email:'', password:'', role: addUserModal === 'admin' ? 'admin' : 'user' }); }}>✕</button>
+                <button className="adm-close-btn" onClick={() => { setAddUserModal(null); setAddUserForm({ name:'', email:'', password:'', role: addUserModal === 'admin' ? 'admin' : 'user' }); }}>?</button>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div className="adm-field-group">
@@ -3855,24 +3855,24 @@ export default function Admin() {
               <div className="adm-confirm-btns" style={{ marginTop:20 }}>
                 <button className="btn btn-primary btn-sm" onClick={async () => {
                   const { name, email, password, role } = addUserForm;
-                  if (!name.trim() || !email.trim() || !password.trim()) { showToast('❌ All fields are required'); return; }
-                  if (password.length < 4) { showToast('❌ Password must be at least 4 characters'); return; }
+                  if (!name.trim() || !email.trim() || !password.trim()) { showToast('? All fields are required'); return; }
+                  if (password.length < 4) { showToast('? Password must be at least 4 characters'); return; }
                   const emailKey = email.trim().toLowerCase();
                   
                   // Check for duplicates in local state
                   const existing = users.find(u => u.email.toLowerCase() === emailKey);
-                  if (existing) { showToast('❌ An account with that email already exists'); return; }
+                  if (existing) { showToast('? An account with that email already exists'); return; }
                   
                   // Also check Firestore users collection directly
                   try {
                     const fsQuery = query(collection(db, 'users'), where('email', '==', emailKey));
                     const fsSnap = await getDocs(fsQuery);
-                    if (!fsSnap.empty) { showToast('❌ An account with that email already exists'); return; }
+                    if (!fsSnap.empty) { showToast('? An account with that email already exists'); return; }
                   } catch (e) { console.warn('[DuplicateCheck]', e.message); }
 
                   const newUser = { id: (addUserModal==='admin'?'adm_':'usr_') + Date.now(), name: name.trim(), email: emailKey, role: addUserModal==='admin' ? role : 'user', joined: new Date().toISOString().slice(0,10) };
 
-                  // 1. Write directly to Firestore users/{id} with passwordHash — works on all devices
+                  // 1. Write directly to Firestore users/{id} with passwordHash � works on all devices
                   try {
                     await setDoc(doc(db, 'users', newUser.id), {
                       id: newUser.id, name: newUser.name, email: emailKey,
@@ -3881,7 +3881,7 @@ export default function Admin() {
                     });
                   } catch (e) { console.warn('[AddUser] users write failed:', e.message); }
 
-                  // 2. Append to registered_users with merge:true — never wipe existing users
+                  // 2. Append to registered_users with merge:true � never wipe existing users
                   try {
                     const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
                     const currentList = regSnap.exists() ? (regSnap.data().registered || []) : [];
@@ -3916,7 +3916,7 @@ export default function Admin() {
                   // Update local UI state
                   setUsers(prev => [...prev, { ...newUser, books:0, status:'Active' }]);
                   addLog('user', (addUserModal==='admin'?'Admin':'User') + ' account created: ' + emailKey);
-                  showToast(`✅ Account created for ${name.trim()}`);
+                  showToast(`? Account created for ${name.trim()}`);
                   
                   // Track activity for admin notification
                   try {
@@ -3960,33 +3960,33 @@ export default function Admin() {
               <div>
                 <h1>Dashboard</h1>
                 <span className="adm-page-sub">
-                  Welcome back, {user.name.split(' ')[0]} ·{' '}
+                  Welcome back, {user.name.split(' ')[0]} �{' '}
                   <span style={{ color:'var(--gold)' }}>{new Date().toLocaleDateString('en-KE',{weekday:'long',day:'numeric',month:'long'})}</span>
                 </span>
               </div>
               <button className="btn btn-outline btn-sm" onClick={() => { doRefresh(); showToast('Dashboard refreshed'); }}>
-                🔄 Refresh
+                ?? Refresh
               </button>
             </div>
 
-            {/* ── Auto-Refresh Bar ── */}
+            {/* -- Auto-Refresh Bar -- */}
             <AutoRefreshBar onRefresh={doRefresh} lastRefresh={lastRefresh} />
 
-            {/* ── Pending alert ── */}
+            {/* -- Pending alert -- */}
             {pendingCount > 0 && (
               <div className="adm-alert-box" style={{ marginBottom:20, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
-                <span>⚠️ You have <strong>{pendingCount} pending order{pendingCount!==1?'s':''}</strong> awaiting payment verification.</span>
-                <button className="btn btn-primary btn-sm" onClick={() => setTab('orders')}>Review Orders →</button>
+                <span>?? You have <strong>{pendingCount} pending order{pendingCount!==1?'s':''}</strong> awaiting payment verification.</span>
+                <button className="btn btn-primary btn-sm" onClick={() => setTab('orders')}>Review Orders ?</button>
               </div>
             )}
 
-            {/* ── KPI row ── */}
+            {/* -- KPI row -- */}
             <div className="adm-stats-grid cols-4" style={{ marginBottom:20 }}>
               {[
-                { icon:'📚', label:'Total Books',     value: books.length,                    color:'#c9a84c', bg:'rgba(201,168,76,0.1)',   click: () => setTab('books') },
-                { icon:'👥', label:'Total Readers',   value: users.length,                    color:'#4a9eff', bg:'rgba(74,158,255,0.1)',    click: () => setTab('users') },
-                { icon:'💰', label:'Total Revenue',   value:'KSh ' + revenue.toLocaleString(), color:'#2ecc71', bg:'rgba(46,204,113,0.1)',   click: () => setTab('analytics') },
-                { icon:'🛒', label:'Pending Orders',  value: pendingCount,                    color:'#e8832a', bg:'rgba(232,131,42,0.1)',    click: () => setTab('orders') },
+                { icon:'??', label:'Total Books',     value: books.length,                    color:'#c9a84c', bg:'rgba(201,168,76,0.1)',   click: () => setTab('books') },
+                { icon:'??', label:'Total Readers',   value: users.length,                    color:'#4a9eff', bg:'rgba(74,158,255,0.1)',    click: () => setTab('users') },
+                { icon:'??', label:'Total Revenue',   value:'KSh ' + revenue.toLocaleString(), color:'#2ecc71', bg:'rgba(46,204,113,0.1)',   click: () => setTab('analytics') },
+                { icon:'??', label:'Pending Orders',  value: pendingCount,                    color:'#e8832a', bg:'rgba(232,131,42,0.1)',    click: () => setTab('orders') },
               ].map(s => (
                 <div key={s.label} className="adm-stat-card card" style={{ cursor:'pointer', transition:'transform .15s' }}
                   onClick={s.click}
@@ -4001,13 +4001,13 @@ export default function Admin() {
               ))}
             </div>
 
-            {/* ── Secondary stats ── */}
+            {/* -- Secondary stats -- */}
             <div className="adm-stats-grid cols-4" style={{ marginBottom:24 }}>
               {[
-                { icon:'✅', label:'Completed Orders',  value: allOrders.filter(o=>o.status==='Completed').length,  color:'#2ecc71', bg:'rgba(46,204,113,0.08)',   click: () => setOrderFilter('completed') || setTab('orders') },
-                { icon:'📖', label:'Featured Books',    value: books.filter(b=>b.featured).length,                 color:'#c9a84c', bg:'rgba(201,168,76,0.08)',   click: () => { setBookStatusFilter('__featured__'); setBookTypeFilter('all'); setTab('books'); } },
-                { icon:'🔜', label:'Coming Soon',       value: books.filter(b=>b.status==='coming-soon').length,   color:'#e8832a', bg:'rgba(232,131,42,0.08)',   click: () => goToBooks('coming-soon') },
-                { icon:'📝', label:'Draft / Hidden',    value: books.filter(b=>b.status==='draft'||b.active===false).length, color:'#64748b', bg:'rgba(100,116,139,0.08)', click: () => goToBooks('draft') },
+                { icon:'?', label:'Completed Orders',  value: allOrders.filter(o=>o.status==='Completed').length,  color:'#2ecc71', bg:'rgba(46,204,113,0.08)',   click: () => setOrderFilter('completed') || setTab('orders') },
+                { icon:'??', label:'Featured Books',    value: books.filter(b=>b.featured).length,                 color:'#c9a84c', bg:'rgba(201,168,76,0.08)',   click: () => { setBookStatusFilter('__featured__'); setBookTypeFilter('all'); setTab('books'); } },
+                { icon:'??', label:'Coming Soon',       value: books.filter(b=>b.status==='coming-soon').length,   color:'#e8832a', bg:'rgba(232,131,42,0.08)',   click: () => goToBooks('coming-soon') },
+                { icon:'??', label:'Draft / Hidden',    value: books.filter(b=>b.status==='draft'||b.active===false).length, color:'#64748b', bg:'rgba(100,116,139,0.08)', click: () => goToBooks('draft') },
               ].map(s => (
                 <div key={s.label} className="adm-stat-card card"
                   style={{ cursor:'pointer', transition:'transform .15s, box-shadow .15s' }}
@@ -4023,10 +4023,10 @@ export default function Admin() {
               ))}
             </div>
 
-            {/* ── Book Status Breakdown ── */}
+            {/* -- Book Status Breakdown -- */}
             <div className="card" style={{ padding:'18px 20px', marginBottom:24 }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-                <h3 style={{ fontSize:'0.92rem', margin:0 }}>📚 Book Catalogue by Status</h3>
+                <h3 style={{ fontSize:'0.92rem', margin:0 }}>?? Book Catalogue by Status</h3>
                 <button className="btn btn-outline btn-sm" onClick={() => goToBooks('all')}>Manage All Books</button>
               </div>
               <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
@@ -4052,22 +4052,22 @@ export default function Admin() {
                 })}
                 <button onClick={() => { setBookStatusFilter('__featured__'); setBookTypeFilter('all'); setTab('books'); }}
                   style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.3)', borderRadius:20, cursor:'pointer', color:'var(--gold)', transition:'all .15s' }}>
-                  ⭐ Featured <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.featured).length}</span>
+                  ? Featured <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.featured).length}</span>
                 </button>
                 <button onClick={() => { setBookTypeFilter('novel'); setBookStatusFilter('all'); setTab('books'); }}
                   style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'rgba(74,158,255,0.06)', border:'1px solid rgba(74,158,255,0.3)', borderRadius:20, cursor:'pointer', color:'#4a9eff', transition:'all .15s' }}>
-                  📖 Novels <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.type==='novel').length}</span>
+                  ?? Novels <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.type==='novel').length}</span>
                 </button>
                 <button onClick={() => { setBookTypeFilter('short-story'); setBookStatusFilter('all'); setTab('books'); }}
                   style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 16px', background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.3)', borderRadius:20, cursor:'pointer', color:'#a855f7', transition:'all .15s' }}>
-                  ✍️ Short Stories <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.type==='short-story').length}</span>
+                  ?? Short Stories <span style={{ fontSize:'0.78rem', fontWeight:700, background:'rgba(0,0,0,0.25)', padding:'1px 7px', borderRadius:10 }}>{books.filter(b=>b.type==='short-story').length}</span>
                 </button>
               </div>
             </div>
 
             <div className="adm-dash-grid">
 
-              {/* ── Recent orders ── */}
+              {/* -- Recent orders -- */}
               <div className="card">
                 <div className="adm-card-head">
                   <h3>Recent Orders</h3>
@@ -4103,10 +4103,10 @@ export default function Admin() {
                 )}
               </div>
 
-              {/* ── Right column: quick stats + actions ── */}
+              {/* -- Right column: quick stats + actions -- */}
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
-                {/* Top books — clickable rows that open book editor */}
+                {/* Top books � clickable rows that open book editor */}
                 <div className="card">
                   <div className="adm-card-head">
                     <h3>Top Books</h3>
@@ -4128,7 +4128,7 @@ export default function Admin() {
                           }
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:'0.8rem', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{b.title}</div>
-                            <div style={{ fontSize:'0.68rem', color:'var(--muted)' }}>KSh {b.price} · {b.genre}</div>
+                            <div style={{ fontSize:'0.68rem', color:'var(--muted)' }}>KSh {b.price} � {b.genre}</div>
                           </div>
                           <span style={{ fontSize:'0.65rem', padding:'2px 7px', borderRadius:10, background:sm.bg, color:sm.color, border:`1px solid ${sm.color}35`, flexShrink:0, whiteSpace:'nowrap' }}>
                             {sm.label.replace(/^[^\s]+\s/,'')}
@@ -4141,30 +4141,30 @@ export default function Admin() {
 
                 {/* Quick Actions */}
                 <div className="card" style={{ padding:20 }}>
-                  <h3 style={{ fontSize:'0.92rem', marginBottom:14 }}>⚡ Quick Actions</h3>
+                  <h3 style={{ fontSize:'0.92rem', marginBottom:14 }}>? Quick Actions</h3>
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     <button className="btn btn-primary btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setEditing({})}>
-                      📚 Add New Book
+                      ?? Add New Book
                     </button>
                     <button className="btn btn-outline btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('orders')}>
-                      🛒 Review Orders {pendingCount>0 && <span style={{ marginLeft:4, background:'var(--gold)', color:'#000', padding:'1px 6px', borderRadius:8, fontSize:'0.7rem', fontWeight:700 }}>{pendingCount}</span>}
+                      ?? Review Orders {pendingCount>0 && <span style={{ marginLeft:4, background:'var(--gold)', color:'#000', padding:'1px 6px', borderRadius:8, fontSize:'0.7rem', fontWeight:700 }}>{pendingCount}</span>}
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('users')}>
-                      👥 Manage Users ({users.length})
+                      ?? Manage Users ({users.length})
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('analytics')}>
-                      📊 View Analytics
+                      ?? View Analytics
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('notifications')}>
-                      🔔 Notifications
+                      ?? Notifications
                     </button>
                     <button className="btn btn-ghost btn-sm" style={{ justifyContent:'flex-start' }} onClick={() => setTab('messages')}>
-                      💬 Messages
+                      ?? Messages
                     </button>
                     {isSuper && (
                       <button className="btn btn-sm" style={{ justifyContent:'flex-start', background:'rgba(201,168,76,0.08)', color:'var(--gold)', border:'1px solid rgba(201,168,76,0.25)' }}
                         onClick={() => setTab('godmode')}>
-                        ⚡ God Mode
+                        ? God Mode
                       </button>
                     )}
                   </div>
@@ -4173,7 +4173,7 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* ── System status bar ── */}
+            {/* -- System status bar -- */}
             <div className="card" style={{ padding:'14px 20px', marginTop:20, display:'flex', alignItems:'center', gap:20, flexWrap:'wrap' }}>
               <span style={{ fontSize:'0.78rem', color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:1 }}>System Status</span>
               {[
@@ -4189,14 +4189,14 @@ export default function Admin() {
               ))}
               <div style={{ marginLeft:'auto', display:'flex', gap:16, alignItems:'center', flexWrap:'wrap' }}>
                 <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
-                  {books.filter(b=>b.active!==false).length} live books · {users.filter(u=>u.status==='Active').length} active users
+                  {books.filter(b=>b.active!==false).length} live books � {users.filter(u=>u.status==='Active').length} active users
                 </span>
                 <span style={{ fontSize:'0.72rem', color:'var(--muted)' }}>
                   Refreshed {lastRefresh.toLocaleTimeString('en-KE', { hour:'2-digit', minute:'2-digit' })}
                 </span>
                 <button className="btn btn-ghost btn-sm" style={{ fontSize:'0.72rem', padding:'3px 10px' }}
                   onClick={() => { doRefresh(); showToast('Refreshed'); }}>
-                  🔄 Sync
+                  ?? Sync
                 </button>
               </div>
             </div>
@@ -4213,7 +4213,7 @@ export default function Admin() {
                   {books.length} titles in the catalogue
                   {bookStatusFilter !== 'all' && (
                     <span style={{ marginLeft:8, color:'var(--gold)' }}>
-                      · Showing: {BOOK_STATUSES.find(s=>s.value===bookStatusFilter)?.label || bookStatusFilter}
+                      � Showing: {BOOK_STATUSES.find(s=>s.value===bookStatusFilter)?.label || bookStatusFilter}
                     </span>
                   )}
                 </span>
@@ -4224,12 +4224,12 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* ── Type Tabs ── */}
+            {/* -- Type Tabs -- */}
             <div style={{ display:'flex', gap:6, marginBottom:12, flexWrap:'wrap' }}>
               {[
                 { value:'all',          label:'All Types',     count: books.length },
-                { value:'novel',        label:'📖 Novels',     count: books.filter(b=>b.type==='novel').length },
-                { value:'short-story',  label:'✍️ Short Stories', count: books.filter(b=>b.type==='short-story').length },
+                { value:'novel',        label:'?? Novels',     count: books.filter(b=>b.type==='novel').length },
+                { value:'short-story',  label:'?? Short Stories', count: books.filter(b=>b.type==='short-story').length },
               ].map(t => (
                 <button key={t.value}
                   className={'adm-filter-btn' + (bookTypeFilter === t.value ? ' on' : '')}
@@ -4240,7 +4240,7 @@ export default function Admin() {
               ))}
             </div>
 
-            {/* ── Status Filter Tabs ── */}
+            {/* -- Status Filter Tabs -- */}
             <div style={{ display:'flex', gap:6, marginBottom:14, flexWrap:'wrap' }}>
               <button className={'adm-filter-btn' + (bookStatusFilter === 'all' ? ' on' : '')}
                 onClick={() => setBookStatusFilter('all')}>
@@ -4265,7 +4265,7 @@ export default function Admin() {
               <button className={'adm-filter-btn' + (bookStatusFilter === '__featured__' ? ' on' : '')}
                 style={{ borderColor:'rgba(201,168,76,0.4)', color: bookStatusFilter==='__featured__' ? 'var(--gold)' : undefined }}
                 onClick={() => setBookStatusFilter('__featured__')}>
-                ⭐ Featured
+                ? Featured
                 <span style={{ marginLeft:6, fontSize:'0.7rem', opacity:0.7 }}>({books.filter(b=>b.featured).length})</span>
               </button>
             </div>
@@ -4275,18 +4275,18 @@ export default function Admin() {
               <span className="adm-toolbar-count">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
               {(bookStatusFilter !== 'all' || bookTypeFilter !== 'all' || search) && (
                 <button className="btn btn-ghost btn-sm" onClick={() => { setBookStatusFilter('all'); setBookTypeFilter('all'); setSearch(''); }}>
-                  ✕ Clear filters
+                  ? Clear filters
                 </button>
               )}
             </div>
             {selectedIds.size > 0 && (
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:8,background:"rgba(201,168,76,0.08)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:"var(--r)",flexWrap:"wrap"}}>
                 <span style={{fontWeight:700,color:"var(--gold)",fontSize:"0.88rem"}}>{selectedIds.size} book{selectedIds.size!==1?"s":""} selected</span>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" book(s)?")){selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)deleteBook(id)});clearSelected();showToast("Deleted "+selectedIds.size+" books")}}}>🗑️ Delete</button>
-                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:false})});clearSelected();showToast("Deactivated")}}>📴 Deactivate</button>
-                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:true})});clearSelected();showToast("Activated")}}>✅ Activate</button>
-                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,featured:true})});clearSelected();showToast("Featured")}}>⭐ Feature</button>
-                <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>✕ Clear</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" book(s)?")){selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)deleteBook(id)});clearSelected();showToast("Deleted "+selectedIds.size+" books")}}}>??? Delete</button>
+                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:false})});clearSelected();showToast("Deactivated")}}>?? Deactivate</button>
+                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,active:true})});clearSelected();showToast("Activated")}}>? Activate</button>
+                <button className="btn btn-ghost btn-sm" onClick={async ()=>{selectedIds.forEach(id=>{const bk=books.find(x=>x.id===id);if(bk)saveBook({...bk,featured:true})});clearSelected();showToast("Featured")}}>? Feature</button>
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>? Clear</button>
               </div>
             )}
             <div className="card" style={{ overflow:'hidden' }}>
@@ -4319,7 +4319,7 @@ export default function Admin() {
                           className="field"
                           style={{ padding:'3px 6px', fontSize:'0.72rem', width:'auto', color: statusMeta.color, background:'rgba(0,0,0,0.3)', border:`1px solid ${statusMeta.color}40` }}
                           value={b.status || 'complete'}
-                          onChange={async e => { const v=e.target.value; try { await saveBook({ ...b, status: v }); addLog('book', `"${b.title}" status → ${v}`); showToast(`Status updated`); } catch { showToast('❌ Save failed'); } }}>
+                          onChange={async e => { const v=e.target.value; try { await saveBook({ ...b, status: v }); addLog('book', `"${b.title}" status ? ${v}`); showToast(`Status updated`); } catch { showToast('? Save failed'); } }}>
                           {BOOK_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </td>
@@ -4336,20 +4336,20 @@ export default function Admin() {
                               try {
                                 await saveBook({ ...b, active: b.active===false ? true : false });
                                 addLog('book', `"${b.title}" ${b.active!==false?'deactivated':'reactivated'}`, b.active!==false?'warning':'success');
-                                showToast(b.active!==false ? '📴 Deactivated' : '✅ Reactivated');
-                              } catch { showToast('❌ Save failed'); }
+                                showToast(b.active!==false ? '?? Deactivated' : '? Reactivated');
+                              } catch { showToast('? Save failed'); }
                             }
                           }}>
                           {b.active!==false ? 'Live' : 'Off'}
                         </button>
                       </td>
                       <td>
-                        <button className={'adm-flag-btn' + (b.featured ? ' on' : '')} onClick={async () => { try { await saveBook({ ...b, featured:!b.featured }); } catch { showToast('❌ Save failed'); } }}>
+                        <button className={'adm-flag-btn' + (b.featured ? ' on' : '')} onClick={async () => { try { await saveBook({ ...b, featured:!b.featured }); } catch { showToast('? Save failed'); } }}>
                           {b.featured ? 'Yes' : 'No'}
                         </button>
                       </td>
                       <td>
-                        <button className={'adm-flag-btn' + (b.isNew ? ' on' : '')} onClick={async () => { try { await saveBook({ ...b, isNew:!b.isNew }); } catch { showToast('❌ Save failed'); } }}>
+                        <button className={'adm-flag-btn' + (b.isNew ? ' on' : '')} onClick={async () => { try { await saveBook({ ...b, isNew:!b.isNew }); } catch { showToast('? Save failed'); } }}>
                           {b.isNew ? 'New' : '-'}
                         </button>
                       </td>
@@ -4413,7 +4413,7 @@ export default function Admin() {
                 refundedBy: user?.email, ...(note ? { refundNote: note } : {}),
               });
               setLiveOrders(prev => prev.map(o => o.id === orderId ? { ...o, status:'Refunded', refundNote: note } : o));
-              showToast('↩ Refund issued');
+              showToast('? Refund issued');
             }}
             showToast={showToast}
           />
@@ -4443,7 +4443,7 @@ export default function Admin() {
                   if (!confirm('This will sync all users from site_data/registered_users to the users collection. Continue?')) return;
                   try {
                     const regSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
-                    if (!regSnap.exists()) { showToast('❌ No registered users found'); return; }
+                    if (!regSnap.exists()) { showToast('? No registered users found'); return; }
                     const regData = regSnap.data();
                     const registered = regData.registered || [];
                     const pwOverrides = regData.pwOverrides || {};
@@ -4466,13 +4466,13 @@ export default function Admin() {
                       });
                       migrated++;
                     }
-                    showToast(`✅ Migration complete: ${migrated} users migrated, ${skipped} skipped (already exist)`);
+                    showToast(`? Migration complete: ${migrated} users migrated, ${skipped} skipped (already exist)`);
                     addLog('system', `User migration: ${migrated} accounts migrated to users collection`);
                   } catch (e) {
-                    showToast('❌ Migration failed: ' + e.message);
+                    showToast('? Migration failed: ' + e.message);
                     console.error('[Migration]', e);
                   }
-                }} title="Sync all users from registered_users to users collection">🔄 Migrate Users</button>
+                }} title="Sync all users from registered_users to users collection">?? Migrate Users</button>
                 <button className="btn btn-primary btn-sm" onClick={() => { setAddUserForm({name:'',email:'',password:'',role:'user'}); setAddUserModal('user'); }}>+ Add User</button>
               </div>
             </div>
@@ -4500,7 +4500,7 @@ export default function Admin() {
                       overrides[email] = pw;
                       localStorage.setItem('eh_pw_overrides', JSON.stringify(overrides));
 
-                      // 2. Find the REAL Firestore user doc by email query — never guess by ID
+                      // 2. Find the REAL Firestore user doc by email query � never guess by ID
                       try {
                         const q = query(collection(db, 'users'), where('email', '==', email));
                         const snap = await getDocs(q);
@@ -4509,7 +4509,7 @@ export default function Admin() {
                             passwordHash: pw, updatedAt: serverTimestamp(),
                           }, { merge: true });
                         } else {
-                          // Not in /users yet — create it so login can find them
+                          // Not in /users yet � create it so login can find them
                           const uid = (resetPwUser.id && resetPwUser.id !== 'admin01')
                             ? resetPwUser.id : ('u_' + Date.now());
                           await setDoc(doc(db, 'users', uid), {
@@ -4529,7 +4529,7 @@ export default function Admin() {
 
                       setUsers(prev => prev.map(u => u.id === resetPwUser.id ? { ...u, password: pw } : u));
                       addLog('user', 'Password reset for ' + email);
-                      showToast('✅ Password updated for ' + resetPwUser.name);
+                      showToast('? Password updated for ' + resetPwUser.name);
                       setResetPwUser(null); setNewPw('');
                     }}>Set Password</button>
                     <button className="btn btn-ghost btn-sm" onClick={() => { setResetPwUser(null); setNewPw(''); }}>Cancel</button>
@@ -4541,10 +4541,10 @@ export default function Admin() {
             {selectedIds.size > 0 && (
               <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",marginBottom:8,background:"rgba(201,168,76,0.08)",border:"1px solid rgba(201,168,76,0.3)",borderRadius:"var(--r)",flexWrap:"wrap"}}>
                 <span style={{fontWeight:700,color:"var(--gold)",fontSize:"0.88rem"}}>{selectedIds.size} user{selectedIds.size!==1?"s":""} selected</span>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)setSuspended?.(u.email,true)});clearSelected();showToast("Suspended "+selectedIds.size+" users")}}>🚫 Suspend</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)setSuspended?.(u.email,false)});clearSelected();showToast("Reinstated users")}}>✓ Reinstate</button>
-                <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" user(s)? Cannot be undone.")){selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)handleDeleteUser(u)});clearSelected()}}}>🗑️ Delete</button>
-                <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>✕ Clear</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)setSuspended?.(u.email,true)});clearSelected();showToast("Suspended "+selectedIds.size+" users")}}>?? Suspend</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)setSuspended?.(u.email,false)});clearSelected();showToast("Reinstated users")}}>? Reinstate</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{if(window.confirm("Delete "+selectedIds.size+" user(s)? Cannot be undone.")){selectedIds.forEach(id=>{const u=users.find(x=>x.id===id);if(u)handleDeleteUser(u)});clearSelected()}}}>??? Delete</button>
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:"auto"}} onClick={clearSelected}>? Clear</button>
               </div>
             )}
             <div className="card" style={{ overflow:'hidden' }}>
@@ -4611,14 +4611,14 @@ export default function Admin() {
                             Reset PW
                           </button>
                         )}
-                        {/* Suspend / Activate — Firestore-backed, takes effect instantly on user's session */}
+                        {/* Suspend / Activate � Firestore-backed, takes effect instantly on user's session */}
                         {u.id !== user.id && u.role !== 'superadmin' && (
                           <button className="adm-act-btn adm-act-edit" style={{ marginLeft:4 }}
                             onClick={async () => {
                               const isSusp = isUserSuspended(u.email);
                               await setSuspended(u.email, !isSusp);
                               setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: !isSusp ? 'Suspended' : 'Active' } : x));
-                              showToast(u.name + (!isSusp ? ' suspended — they will be logged out immediately' : ' reactivated ✅'));
+                              showToast(u.name + (!isSusp ? ' suspended � they will be logged out immediately' : ' reactivated ?'));
                             }}>
                             {isUserSuspended(u.email) ? 'Activate' : 'Suspend'}
                           </button>
@@ -4685,17 +4685,17 @@ export default function Admin() {
             {/* Create promo form */}
             <div className="card" style={{ padding:20, marginBottom:20 }}>
               <h3 style={{ fontSize:'0.92rem', marginBottom:16, color:'var(--gold)' }}>Create Custom Promo Code</h3>
-              <PromoCreateForm onSave={(newPromo) => { const next = [...promos, newPromo]; savePromos(next); showToast('✅ Promo code ' + newPromo.code + ' created'); }} />
+              <PromoCreateForm onSave={(newPromo) => { const next = [...promos, newPromo]; savePromos(next); showToast('? Promo code ' + newPromo.code + ' created'); }} />
             </div>
 
             {/* Bulk generator */}
             <div className="card" style={{ padding:20, marginBottom:20 }}>
-              <h3 style={{ fontSize:'0.92rem', marginBottom:12, color:'var(--gold)' }}>⚡ Bulk Generate Promo Codes</h3>
-              <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:14 }}>Generate multiple unique one-time-use codes at once — useful for campaigns, giveaways, and reader rewards.</p>
+              <h3 style={{ fontSize:'0.92rem', marginBottom:12, color:'var(--gold)' }}>? Bulk Generate Promo Codes</h3>
+              <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:14 }}>Generate multiple unique one-time-use codes at once � useful for campaigns, giveaways, and reader rewards.</p>
               <BulkPromoGenerator onSave={(newCodes) => {
                 const next = [...promos, ...newCodes];
                 savePromos(next);
-                showToast(`✅ ${newCodes.length} codes generated`);
+                showToast(`? ${newCodes.length} codes generated`);
               }} />
             </div>
 
@@ -4712,9 +4712,9 @@ export default function Admin() {
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a'); a.href=url; a.download='promo-codes.csv'; a.click();
                     URL.revokeObjectURL(url);
-                    showToast('📋 Codes exported');
+                    showToast('?? Codes exported');
                   }}
-                >⬇ Export CSV</button>
+                >? Export CSV</button>
               </div>
               <table className="adm-table">
                 <thead><tr><th>Code</th><th>Discount</th><th>Type</th><th>Times Used</th><th>Active</th><th>Expires</th><th>Actions</th></tr></thead>
@@ -4725,7 +4725,7 @@ export default function Admin() {
                         <code className="adm-code" style={{ fontSize:'0.9rem', color:'var(--gold)' }}>{p.code}</code>
                         <button onClick={() => { navigator.clipboard.writeText(p.code); showToast('Code copied!'); }}
                           style={{ marginLeft:8, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'0.72rem' }}>
-                          📋
+                          ??
                         </button>
                       </td>
                       <td><strong>{p.discount}</strong></td>
@@ -4738,7 +4738,7 @@ export default function Admin() {
                         </button>
                       </td>
                       <td style={{ fontSize:'0.8rem', color: p.expires && new Date(p.expires) < new Date() ? '#e74c3c' : 'var(--muted)' }}>
-                        {p.expires || '—'}
+                        {p.expires || '�'}
                         {p.expires && new Date(p.expires) < new Date() && <span style={{ marginLeft:4, fontSize:'0.68rem', color:'#e74c3c' }}>(Expired)</span>}
                       </td>
                       <td>
@@ -4826,7 +4826,7 @@ export default function Admin() {
 
               {/* Payment settings moved to dedicated Payment Methods tab */}
               <div className="card adm-settings-card" style={{ gridColumn:'1/-1' }}>
-                <h3>💳 Payment Settings</h3>
+                <h3>?? Payment Settings</h3>
                 <div className="adm-info-note">
                   Payment method configuration has moved to its own dedicated tab.
                   <button className="btn btn-outline btn-sm" style={{ marginLeft:16 }} onClick={() => setTab('payments')}>
@@ -4837,7 +4837,7 @@ export default function Admin() {
               {/* Admin Security  SuperAdmin only */}
               <div className="card adm-settings-card">
                 <h3>Admin and Security {isSuper && <span style={{ fontSize:'0.68rem', background:'linear-gradient(135deg,#c9a84c,#e8c96d)', color:'#000', padding:'2px 8px', borderRadius:10, marginLeft:8, fontWeight:700, letterSpacing:1 }}>SUPER ADMIN</span>}</h3>
-                <div className="adm-field-group"><label>Admin Email</label><input className="field" defaultValue="orders@ellines.co.ke" /></div>
+                <div className="adm-field-group"><label>Admin Email</label><input className="field" defaultValue="haven@ellines.co.ke" /></div>
                 <div className="adm-field-group"><label>New Password</label><input className="field" type="password" placeholder="Leave blank to keep current" /></div>
                 <div className="adm-field-group"><label>Confirm Password</label><input className="field" type="password" placeholder="Repeat new password" /></div>
                 {isSuper && (
@@ -4848,7 +4848,7 @@ export default function Admin() {
                 <div className="adm-field-group">
                   <label>Two-Factor Authentication</label>
                   <p style={{ fontSize: '0.78rem', color: 'var(--muted)', margin: '4px 0 0' }}>
-                    Configure site-wide 2FA in <strong>Security → 2FA</strong>. Admins can also enable personal 2FA from Profile → Security.
+                    Configure site-wide 2FA in <strong>Security ? 2FA</strong>. Admins can also enable personal 2FA from Profile ? Security.
                   </p>
                 </div>
                 <div className="adm-field-group">
@@ -4891,20 +4891,20 @@ export default function Admin() {
             <div className="adm-page-head">
               <div>
                 <h1>Payment Methods</h1>
-                <span className="adm-page-sub">Activate or deactivate each method — changes show on checkout immediately</span>
+                <span className="adm-page-sub">Activate or deactivate each method � changes show on checkout immediately</span>
               </div>
             </div>
 
-            {/* ── Quick status overview ── */}
+            {/* -- Quick status overview -- */}
             {(() => {
               const activeMethods = sForm.payMethods || ['mpesa','paystack','airtel','card'];
               const allMethods = [
-                { key:'paystack', icon:'🟢', label:'Paystack' },
-                { key:'mpesa',    icon:'📱', label:'M-Pesa STK' },
-                { key:'paypal',   icon:'🅿', label:'PayPal' },
-                { key:'airtel',   icon:'📶', label:'Airtel' },
-                { key:'card',     icon:'💳', label:'Stripe' },
-                { key:'wa',       icon:'💬', label:'WhatsApp' },
+                { key:'paystack', icon:'??', label:'Paystack' },
+                { key:'mpesa',    icon:'??', label:'M-Pesa STK' },
+                { key:'paypal',   icon:'??', label:'PayPal' },
+                { key:'airtel',   icon:'??', label:'Airtel' },
+                { key:'card',     icon:'??', label:'Stripe' },
+                { key:'wa',       icon:'??', label:'WhatsApp' },
               ];
               return (
                 <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20, padding:'12px 16px', background:'var(--surface)', borderRadius:'var(--r)', border:'1px solid var(--border)' }}>
@@ -4948,19 +4948,19 @@ export default function Admin() {
                   const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
                   setSetting('payMethods', next);
                   updateSettings({ ...sForm, payMethods: next });
-                  showToast(isActive ? '📱 M-Pesa hidden from checkout' : '📱 M-Pesa shown at checkout');
+                  showToast(isActive ? '?? M-Pesa hidden from checkout' : '?? M-Pesa shown at checkout');
                 };
                 return (
                   <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                      <h3 style={{ margin:0 }}>📱 M-Pesa STK Push</h3>
+                      <h3 style={{ margin:0 }}>?? M-Pesa STK Push</h3>
                       <button onClick={toggle} style={{
                         padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
                         background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
                         color: isActive ? '#2ecc71' : '#e74c3c',
-                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                      }}>{isActive ? '? Active' : '? Inactive'}</button>
                     </div>
-                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Automatic STK push — customer enters PIN on their phone.</p>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Automatic STK push � customer enters PIN on their phone.</p>
                     <div className="adm-field-group">
                       <label>Send Money Number</label>
                       <input className="field" value={sForm.mpesaPhone || ''} onChange={e => setSetting('mpesaPhone', e.target.value)} placeholder="0748255466" />
@@ -4987,17 +4987,17 @@ export default function Admin() {
                   const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
                   setSetting('payMethods', next);
                   updateSettings({ ...sForm, payMethods: next });
-                  showToast(isActive ? '🟢 Paystack hidden from checkout' : '🟢 Paystack shown at checkout');
+                  showToast(isActive ? '?? Paystack hidden from checkout' : '?? Paystack shown at checkout');
                 };
                 return (
                   <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                      <h3 style={{ margin:0 }}>🟢 Paystack</h3>
+                      <h3 style={{ margin:0 }}>?? Paystack</h3>
                       <button onClick={toggle} style={{
                         padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
                         background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
                         color: isActive ? '#2ecc71' : '#e74c3c',
-                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                      }}>{isActive ? '? Active' : '? Inactive'}</button>
                     </div>
                     <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:8 }}>Accepts M-Pesa, local cards, and bank transfers. Books unlock <strong>automatically</strong>.</p>
                     <div className="adm-info-note" style={{ fontSize:'0.75rem' }}>Public key is hardcoded in Cart.jsx. Update it there if needed.</div>
@@ -5014,19 +5014,19 @@ export default function Admin() {
                   const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
                   setSetting('payMethods', next);
                   updateSettings({ ...sForm, payMethods: next });
-                  showToast(isActive ? '📶 Airtel hidden from checkout' : '📶 Airtel shown at checkout');
+                  showToast(isActive ? '?? Airtel hidden from checkout' : '?? Airtel shown at checkout');
                 };
                 return (
                   <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                      <h3 style={{ margin:0 }}>📶 Airtel Money</h3>
+                      <h3 style={{ margin:0 }}>?? Airtel Money</h3>
                       <button onClick={toggle} style={{
                         padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
                         background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
                         color: isActive ? '#2ecc71' : '#e74c3c',
-                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                      }}>{isActive ? '? Active' : '? Inactive'}</button>
                     </div>
-                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Manual verification required — admin confirms in Orders tab.</p>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Manual verification required � admin confirms in Orders tab.</p>
                     <div className="adm-field-group">
                       <label>Airtel Money Number</label>
                       <input className="field" value={sForm.airtelNum || ''} onChange={e => setSetting('airtelNum', e.target.value)} placeholder="073X XXX XXX" />
@@ -5045,17 +5045,17 @@ export default function Admin() {
                   const next = isActive ? activeMethods.filter(x=>x!==key) : [...activeMethods, key];
                   setSetting('payMethods', next);
                   updateSettings({ ...sForm, payMethods: next });
-                  showToast(isActive ? '💬 WhatsApp hidden from checkout' : '💬 WhatsApp shown at checkout');
+                  showToast(isActive ? '?? WhatsApp hidden from checkout' : '?? WhatsApp shown at checkout');
                 };
                 return (
                   <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                      <h3 style={{ margin:0 }}>💬 WhatsApp Pay</h3>
+                      <h3 style={{ margin:0 }}>?? WhatsApp Pay</h3>
                       <button onClick={toggle} style={{
                         padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
                         background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
                         color: isActive ? '#2ecc71' : '#e74c3c',
-                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                      }}>{isActive ? '? Active' : '? Inactive'}</button>
                     </div>
                     <p style={{ fontSize:'0.82rem', color:'var(--muted)' }}>Customer sends payment then confirms via WhatsApp. Manual unlock required.</p>
                   </div>
@@ -5072,22 +5072,22 @@ export default function Admin() {
                   setSetting('payMethods', next);
                   setSetting('paypalEnabled', !isActive);
                   updateSettings({ ...sForm, payMethods: next, paypalEnabled: !isActive });
-                  showToast(isActive ? '🅿 PayPal hidden from checkout' : '🅿 PayPal shown at checkout');
+                  showToast(isActive ? '?? PayPal hidden from checkout' : '?? PayPal shown at checkout');
                 };
                 return (
                   <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                      <h3 style={{ margin:0 }}>🅿 PayPal</h3>
+                      <h3 style={{ margin:0 }}>?? PayPal</h3>
                       <button onClick={toggle} style={{
                         padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
                         background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
                         color: isActive ? '#2ecc71' : '#e74c3c',
-                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                      }}>{isActive ? '? Active' : '? Inactive'}</button>
                     </div>
-                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>International payments — USD. Books unlock automatically.</p>
+                    <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>International payments � USD. Books unlock automatically.</p>
                     <div className="adm-field-group">
                       <label>PayPal Client ID</label>
-                      <input className="field" value={sForm.paypalClientId || ''} onChange={e => setSetting('paypalClientId', e.target.value)} placeholder="AXxxx…" />
+                      <input className="field" value={sForm.paypalClientId || ''} onChange={e => setSetting('paypalClientId', e.target.value)} placeholder="AXxxx�" />
                     </div>
                     <div className="adm-info-note" style={{ marginTop:8, fontSize:'0.75rem' }}>
                       Set <code>PAYPAL_CLIENT_ID</code>, <code>PAYPAL_CLIENT_SECRET</code>, <code>PAYPAL_MODE</code> as Firebase secrets.
@@ -5107,17 +5107,17 @@ export default function Admin() {
                   setSetting('payMethods', next);
                   setSetting('stripeEnabled', !isActive);
                   updateSettings({ ...sForm, payMethods: next, stripeEnabled: !isActive });
-                  showToast(isActive ? '💳 Stripe hidden from checkout' : '💳 Stripe shown at checkout');
+                  showToast(isActive ? '?? Stripe hidden from checkout' : '?? Stripe shown at checkout');
                 };
                 return (
                   <div className="card adm-settings-card" style={{ borderTop:`3px solid ${isActive?'#2ecc71':'#64748b'}` }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                      <h3 style={{ margin:0 }}>💳 Card / Stripe</h3>
+                      <h3 style={{ margin:0 }}>?? Card / Stripe</h3>
                       <button onClick={toggle} style={{
                         padding:'6px 16px', borderRadius:20, border:'none', cursor:'pointer', fontFamily:'inherit', fontWeight:700, fontSize:'0.8rem',
                         background: isActive ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.12)',
                         color: isActive ? '#2ecc71' : '#e74c3c',
-                      }}>{isActive ? '✓ Active' : '✕ Inactive'}</button>
+                      }}>{isActive ? '? Active' : '? Inactive'}</button>
                     </div>
                     <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Stripe card payments (requires Stripe setup).</p>
                     <div className="adm-field-group">
@@ -5127,9 +5127,9 @@ export default function Admin() {
                     <div className="adm-field-group">
                       <label>Currency</label>
                       <select className="field" value={sForm.currency || 'KES'} onChange={e => setSetting('currency', e.target.value)}>
-                        <option value="KES">KES — Kenyan Shilling</option>
-                        <option value="USD">USD — US Dollar</option>
-                        <option value="EUR">EUR — Euro</option>
+                        <option value="KES">KES � Kenyan Shilling</option>
+                        <option value="USD">USD � US Dollar</option>
+                        <option value="EUR">EUR � Euro</option>
                       </select>
                     </div>
                     <button className="btn btn-primary btn-sm" style={{ marginTop:8 }} onClick={() => saveSettings('Card settings')}>Save Stripe</button>
@@ -5139,7 +5139,7 @@ export default function Admin() {
 
               {/* Custom Payment Methods */}
               <div className="card adm-settings-card" style={{ gridColumn:'1/-1' }}>
-                <h3>➕ Custom Payment Methods</h3>
+                <h3>? Custom Payment Methods</h3>
                 <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Add bank transfer, Pesalink, PayPal, or any other method. They appear at checkout alongside the built-in methods.</p>
                 {customMethods.length > 0 && (
                   <table className="adm-table" style={{ marginBottom:20 }}>
@@ -5263,7 +5263,7 @@ export default function Admin() {
                           disabled={isSuspended}
                           title={isSuspended ? 'User is suspended' : (p[field] ? 'Click to deny' : 'Click to allow')}
                         >
-                          {isSuspended ? '–' : p[field] ? 'ON' : 'OFF'}
+                          {isSuspended ? '�' : p[field] ? 'ON' : 'OFF'}
                         </button>
                       </td>
                     );
@@ -5297,7 +5297,7 @@ export default function Admin() {
                             onClick={async () => {
                               await setSuspended(u.email, !isSuspended);
                               setUsers(prev => prev.map(x => x.id === u.id ? { ...x, status: !isSuspended ? 'Suspended' : 'Active' } : x));
-                              showToast(u.name + (!isSuspended ? ' suspended — logged out instantly' : ' reactivated ✅'));
+                              showToast(u.name + (!isSuspended ? ' suspended � logged out instantly' : ' reactivated ?'));
                             }}>
                             {isSuspended ? 'Suspended' : 'Active'}
                           </button>
@@ -5332,7 +5332,7 @@ export default function Admin() {
                         saveUserPerms(updated); showToast('Reviews disabled site-wide');
                       }},
                       { label:'Reset all user permissions to default', action: () => {
-                        localStorage.removeItem('eh_user_perms'); saveUserPerms({}); showToast('✅ Permissions reset to defaults');
+                        localStorage.removeItem('eh_user_perms'); saveUserPerms({}); showToast('? Permissions reset to defaults');
                       }},
                     ].map(action => (
                       <button key={action.label} className="btn btn-ghost btn-sm" style={{textAlign:'left',justifyContent:'flex-start'}} onClick={action.action}>
@@ -5442,7 +5442,7 @@ export default function Admin() {
                                 const isSusp = isUserSuspended(u.email);
                                 await setSuspended(u.email, !isSusp);
                                 setUsers(prev=>prev.map(x=>x.id===u.id?{...x,status:!isSusp?'Suspended':'Active'}:x));
-                                showToast(u.name + (!isSusp?' suspended':' reactivated ✅'));
+                                showToast(u.name + (!isSusp?' suspended':' reactivated ?'));
                               }}>
                               {isUserSuspended(u.email)?'Activate':'Suspend'}
                             </button>
@@ -5483,10 +5483,10 @@ export default function Admin() {
                     <span style={{fontSize:'0.85rem'}}>{row.feature}</span>
                     <div style={{display:'flex',gap:12}}>
                       <span style={{fontSize:'0.78rem',color:row.admin?'var(--ok)':'var(--err)',fontWeight:600,minWidth:50,textAlign:'center'}}>
-                        {row.admin ? '✅ Admin' : '✗ Admin'}
+                        {row.admin ? '? Admin' : '? Admin'}
                       </span>
                       <span style={{fontSize:'0.78rem',color:'var(--gold)',fontWeight:600,minWidth:70,textAlign:'center'}}>
-                        ✅ Super
+                        ? Super
                       </span>
                     </div>
                   </div>
@@ -5504,7 +5504,7 @@ export default function Admin() {
                   { action:'Settings: M-Pesa number updated',  by:'Super Admin', time:'5 days ago',  type:'edit'   },
                 ].map((a,i) => (
                   <div key={i} style={{display:'flex',gap:10,padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.04)',alignItems:'flex-start'}}>
-                    <span style={{fontSize:'1rem',marginTop:2}}>{a.type==='ok'?'✅':a.type==='warn'?'⚠️':'✏️'}</span>
+                    <span style={{fontSize:'1rem',marginTop:2}}>{a.type==='ok'?'?':a.type==='warn'?'??':'??'}</span>
                     <div>
                       <div style={{fontSize:'0.82rem'}}>{a.action}</div>
                       <div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:2}}>by {a.by}  {a.time}</div>
@@ -5514,7 +5514,7 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Admin Rights Management — Super Admin grants/revokes per-admin capabilities */}
+            {/* Admin Rights Management � Super Admin grants/revokes per-admin capabilities */}
             <div className="card" style={{padding:24,marginTop:24}}>
               <h3 style={{marginBottom:6,fontSize:'0.95rem'}}>Admin Rights Management</h3>
               <p style={{fontSize:'0.78rem',color:'var(--muted)',marginBottom:18}}>
@@ -5588,7 +5588,7 @@ export default function Admin() {
                   const a = document.createElement('a');
                   a.href = url; a.download = 'ellines-haven-logs.csv'; a.click();
                   URL.revokeObjectURL(url);
-                  showToast('✅ Logs exported as CSV');
+                  showToast('? Logs exported as CSV');
                 }}>Export CSV</button>
                 <button className="btn btn-ghost btn-sm" style={{color:'var(--err)',borderColor:'rgba(231,76,60,0.4)'}}
                   onClick={() => {
@@ -5598,7 +5598,7 @@ export default function Admin() {
                     setDoc(doc(db, 'site_data', 'system_logs'), { logs: [], updatedAt: serverTimestamp() }, { merge: false })
                       .catch(() => {});
                     try { localStorage.removeItem('eh_system_logs'); } catch {}
-                    showToast('🗑 System logs cleared');
+                    showToast('?? System logs cleared');
                   }}>Clear Logs</button>
               </div>
             </div>
@@ -5730,21 +5730,21 @@ export default function Admin() {
           </Suspense>
         )}
 
-        {/* -- GOD MODE — superadmin only -- */}
+        {/* -- GOD MODE � superadmin only -- */}
         {tab === 'godmode' && isSuper && (
           <Suspense fallback={<PanelLoader />}>
             <GodModePanel showToast={showToast} books={books} saveBook={saveBook} users={users} isSuper={isSuper} />
           </Suspense>
         )}
 
-        {/* -- CHAPTER GRANTS — admin only -- */}
+        {/* -- CHAPTER GRANTS � admin only -- */}
         {tab === 'chaptergrants' && (
           <Suspense fallback={<PanelLoader />}>
             <ChapterGrantsPanel showToast={showToast} books={books} isSuper={isSuper} />
           </Suspense>
         )}
 
-        {/* -- CHAPTER ANALYTICS — admin only -- */}
+        {/* -- CHAPTER ANALYTICS � admin only -- */}
         {tab === 'chapteranalytics' && (
           <Suspense fallback={<PanelLoader />}>
             <ChapterAnalyticsPanel showToast={showToast} />
@@ -5873,7 +5873,7 @@ export default function Admin() {
             {/* Backup actions */}
             <div className="adm-stats-grid" style={{gridTemplateColumns:'repeat(3,1fr)',marginBottom:28}}>
               <div className="card" style={{padding:28,textAlign:'center'}}>
-                <div style={{fontSize:'2.5rem',marginBottom:12}}>💾</div>
+                <div style={{fontSize:'2.5rem',marginBottom:12}}>??</div>
                 <h3 style={{fontSize:'1rem',marginBottom:8}}>Full Backup</h3>
                 <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>Export all books, orders, users, and settings as a JSON file.</p>
                 <button className="btn btn-primary btn-sm" style={{width:'100%'}} onClick={() => {
@@ -5894,7 +5894,7 @@ export default function Admin() {
                 }}>Download Backup</button>
               </div>
               <div className="card" style={{padding:28,textAlign:'center'}}>
-                <div style={{fontSize:'2.5rem',marginBottom:12}}>📚</div>
+                <div style={{fontSize:'2.5rem',marginBottom:12}}>??</div>
                 <h3 style={{fontSize:'1rem',marginBottom:8}}>Books Only</h3>
                 <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>Export only the books catalogue as JSON.</p>
                 <button className="btn btn-outline btn-sm" style={{width:'100%'}} onClick={() => {
@@ -5907,7 +5907,7 @@ export default function Admin() {
                 }}>Export Books</button>
               </div>
               <div className="card" style={{padding:28,textAlign:'center'}}>
-                <div style={{fontSize:'2.5rem',marginBottom:12}}>🛒</div>
+                <div style={{fontSize:'2.5rem',marginBottom:12}}>??</div>
                 <h3 style={{fontSize:'1rem',marginBottom:8}}>Orders Export</h3>
                 <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:16}}>Export all order records as JSON.</p>
                 <button className="btn btn-outline btn-sm" style={{width:'100%'}} onClick={() => {
@@ -5927,7 +5927,7 @@ export default function Admin() {
                 <h3 style={{marginBottom:8,fontSize:'0.95rem'}}>Restore from Backup</h3>
                 <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:20}}>Upload a previously exported JSON backup file. This will overwrite current data.</p>
                 <div className="adm-restore-zone" onClick={() => document.getElementById('restore-input').click()}>
-                  <div style={{fontSize:'2rem',marginBottom:8}}>📂</div>
+                  <div style={{fontSize:'2rem',marginBottom:8}}>??</div>
                   <p style={{fontSize:'0.85rem',color:'var(--muted)'}}>Click to select backup JSON file</p>
                   <p style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:4}}>Only .json files from Ellines Haven backups</p>
                 </div>
@@ -5955,12 +5955,12 @@ export default function Admin() {
                 <h3 style={{marginBottom:8,fontSize:'0.95rem'}}>Storage Overview</h3>
                 <p style={{fontSize:'0.82rem',color:'var(--muted)',marginBottom:20}}>Current data stored in this browser's localStorage.</p>
                 {[
-                  { key:'eh_books',            label:'Books catalogue',    icon:'📚' },
-                  { key:'eh_orders',           label:'Orders',             icon:'🛒' },
-                  { key:'eh_registered_users', label:'Registered users',   icon:'👥' },
-                  { key:'eh_settings',         label:'Site settings',      icon:'⚙️' },
-                  { key:'eh_pay_methods',      label:'Custom pay methods', icon:'💳' },
-                  { key:'eh_pw_overrides',     label:'Password overrides', icon:'🔑' },
+                  { key:'eh_books',            label:'Books catalogue',    icon:'??' },
+                  { key:'eh_orders',           label:'Orders',             icon:'??' },
+                  { key:'eh_registered_users', label:'Registered users',   icon:'??' },
+                  { key:'eh_settings',         label:'Site settings',      icon:'??' },
+                  { key:'eh_pay_methods',      label:'Custom pay methods', icon:'??' },
+                  { key:'eh_pw_overrides',     label:'Password overrides', icon:'??' },
                 ].map(item => {
                   const raw = localStorage.getItem(item.key);
                   const parsed = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;

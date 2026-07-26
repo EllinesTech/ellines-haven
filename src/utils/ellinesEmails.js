@@ -1,31 +1,21 @@
 /**
  * Public Ellines business emails (customer-facing).
- * Super-admin / Firebase login stays on the internal Gmail account — do not put that on the site.
+ * Super-admin / Firebase login stays on the internal Gmail — never show that on the site.
  *
- * Roles:
- *   info@     — Ellines group inquiries, partnerships, general business
- *   haven@    — Ellines Haven product (primary contact on this site)
- *   support@  — Account help, access issues, technical support
- *   orders@   — Payments, missing books, receipts, order status
+ *   info@ellines.co.ke   — General / group / careers
+ *   haven@ellines.co.ke  — Orders, leads, invoices, project requests
  */
-export const ELLINES_EMAILS = {
-  info: 'info@ellines.co.ke',
-  haven: 'haven@ellines.co.ke',
-  support: 'support@ellines.co.ke',
-  orders: 'orders@ellines.co.ke',
-};
+export const INFO_EMAIL = 'info@ellines.co.ke';
+export const HAVEN_EMAIL = 'haven@ellines.co.ke';
 
-/** Primary contact shown in footer / hero contact chips for Haven */
-export const PRIMARY_CONTACT_EMAIL = ELLINES_EMAILS.haven;
+/** General / group / careers */
+export const SUPPORT_EMAIL = INFO_EMAIL;
 
-/** Default support inbox for “contact support” copy */
-export const SUPPORT_EMAIL = ELLINES_EMAILS.support;
+/** Orders, leads, invoices, project requests */
+export const ORDERS_EMAIL = HAVEN_EMAIL;
 
-/** Orders / payments / unlock issues */
-export const ORDERS_EMAIL = ELLINES_EMAILS.orders;
-
-/** Group-level inquiries (not Haven-specific) */
-export const INFO_EMAIL = ELLINES_EMAILS.info;
+/** Primary chip on Haven site */
+export const PRIMARY_CONTACT_EMAIL = HAVEN_EMAIL;
 
 export function mailto(email, subject) {
   const base = `mailto:${email}`;

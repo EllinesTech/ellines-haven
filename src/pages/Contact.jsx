@@ -6,22 +6,15 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { getSocialLink } from '../utils/socialLinks';
-import {
-  PRIMARY_CONTACT_EMAIL,
-  SUPPORT_EMAIL,
-  ORDERS_EMAIL,
-  INFO_EMAIL,
-} from '../utils/ellinesEmails';
+import { HAVEN_EMAIL, INFO_EMAIL } from '../utils/ellinesEmails';
 import './Contact.css';
 
 const WA_NUMBER = '254748255466';
 const WA_LINK   = `https://wa.me/${WA_NUMBER}`;
 
 const EMAIL_DIRECTORY = [
-  { email: PRIMARY_CONTACT_EMAIL, label: 'Haven', desc: 'Ellines Haven — books, reading, product questions' },
-  { email: SUPPORT_EMAIL, label: 'Support', desc: 'Account help, login, access & technical issues' },
-  { email: ORDERS_EMAIL, label: 'Orders', desc: 'Payments, missing books, receipts, unlocks' },
-  { email: INFO_EMAIL, label: 'Info', desc: 'Ellines group inquiries, partnerships & general business' },
+  { email: INFO_EMAIL, label: 'Info', desc: 'General · group · careers' },
+  { email: HAVEN_EMAIL, label: 'Haven', desc: 'Orders · leads · invoices · project requests' },
 ];
 
 const CONTACT_DEFAULTS = {
@@ -32,7 +25,7 @@ const CONTACT_DEFAULTS = {
   wa_label:        'Chat on WhatsApp',
   wa_sub:          '0748 255 466 — We reply fast',
   phone:           '0748 255 466',
-  email:           PRIMARY_CONTACT_EMAIL,
+  email:           HAVEN_EMAIL,
   location:        'Nairobi, Kenya',
   response_wa:     'Usually within 1 hour',
   response_email:  'Within 24 hours',

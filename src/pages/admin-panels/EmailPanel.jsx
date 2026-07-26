@@ -36,7 +36,7 @@ const DEFAULT = {
   welcomeEnabled: true,
   welcomeSubject: 'Welcome to Ellines Haven!',
   newOrderAdminEnabled: true,
-  newOrderAdminEmail: 'orders@ellines.co.ke',
+  newOrderAdminEmail: 'haven@ellines.co.ke',
 };
 
 function Field({ label, value, onChange, type='text', placeholder='', mono=false, hint='' }) {

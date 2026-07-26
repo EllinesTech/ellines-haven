@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
     { num: '254748255466', label: '0748 255 466', role: 'Primary support' },
     { num: '254728807213', label: '0728 807 213', role: 'Alternate' },
   ],
-  waEmail: 'support@ellines.co.ke',
+  waEmail: 'info@ellines.co.ke',
   waSupportHours: 'Mon–Sat\n8am–8pm EAT',
   waResponseTime: 'Usually under\n1 hour',
 
@@ -382,7 +382,7 @@ export default function ChatSettingsPanel({ showToast }) {
           <div className="adm-settings-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div className="adm-field-group">
               <label>Support Email</label>
-              <input className="field" value={settings.waEmail || ''} onChange={e => set('waEmail', e.target.value)} placeholder="support@ellines.co.ke" />
+              <input className="field" value={settings.waEmail || ''} onChange={e => set('waEmail', e.target.value)} placeholder="info@ellines.co.ke" />
             </div>
             <div className="adm-field-group">
               <label>Response Time (shown in widget)</label>

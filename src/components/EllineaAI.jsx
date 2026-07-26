@@ -185,7 +185,7 @@ function offlineReply(msg, ctx) {
 
   // ── ORDER STATUS ──────────────────────────────────────────────────────────
   if (intents.orderStatus > 0) {
-    return `To check your order:\n\n1. Go to __/profile__ → **Orders** tab\n2. Or check __/my-library__ — if your book is there, it's confirmed ✅\n\nPaid but book isn't showing? Contact us **right away**:\n• 💬 **WhatsApp:** 0748 255 466 _(fastest)_\n• 📧 **Orders:** orders@ellines.co.ke\n\nHave your M-Pesa confirmation code ready — we fix payment issues same day. 📱`;
+    return `To check your order:\n\n1. Go to __/profile__ → **Orders** tab\n2. Or check __/my-library__ — if your book is there, it's confirmed ✅\n\nPaid but book isn't showing? Contact us **right away**:\n• 💬 **WhatsApp:** 0748 255 466 _(fastest)_\n• 📧 **Orders:** haven@ellines.co.ke\n\nHave your M-Pesa confirmation code ready — we fix payment issues same day. 📱`;
   }
 
   // ── SPECIFIC BOOK LOOKUP ──────────────────────────────────────────────────
@@ -218,7 +218,7 @@ function offlineReply(msg, ctx) {
 
   // ── CONTACT / SUPPORT ─────────────────────────────────────────────────────
   if (intents.contact > 0) {
-    return `Here's how to reach us:\n\n• 💬 **WhatsApp:** 0748 255 466 _(fastest — we reply within the hour)_\n• 📧 **Haven:** haven@ellines.co.ke · **Support:** support@ellines.co.ke · **Orders:** orders@ellines.co.ke\n• 📧 **Info (Ellines inquiries):** info@ellines.co.ke\n• 📞 **Phone:** 0748 255 466 · 0728 807 213\n• 📍 **Location:** Nairobi, Kenya\n• 🕐 **Hours:** Mon–Sat, 8am–8pm EAT\n\nFor order issues, always include your M-Pesa confirmation code. Visit __/contact__ for more options. 🤝`;
+    return `Here's how to reach us:\n\n• 💬 **WhatsApp:** 0748 255 466 _(fastest — we reply within the hour)_\n• 📧 **haven@ellines.co.ke** — orders, leads, invoices, project requests\n• 📧 **info@ellines.co.ke** — general, group, careers\n• 📞 **Phone:** 0748 255 466 · 0728 807 213\n• 📍 **Location:** Nairobi, Kenya\n• 🕐 **Hours:** Mon–Sat, 8am–8pm EAT\n\nFor order issues, email haven@ellines.co.ke and include your M-Pesa confirmation code. Visit __/contact__ for more options. 🤝`;
   }
 
   // ── ACCOUNT ───────────────────────────────────────────────────────────────
@@ -243,7 +243,7 @@ function offlineReply(msg, ctx) {
     if (user?.role === 'superadmin' || user?.role === 'admin') {
       return `Welcome back, **${name}**! As ${user.role === 'superadmin' ? '⚡ Super Admin' : '🛡️ Admin'} you have full site access.\n\nHead to __/admin__ to manage books, orders, users, messages, design, and more. 🚀`;
     }
-    return `The admin panel is for authorised staff only. Contact us at support@ellines.co.ke if you need access. 🔒`;
+    return `The admin panel is for authorised staff only. Contact us at info@ellines.co.ke if you need access. 🔒`;
   }
 
   // ── GENRE / RECOMMENDATION ────────────────────────────────────────────────
@@ -304,7 +304,7 @@ function offlineReply(msg, ctx) {
 
   // ── REFUND ────────────────────────────────────────────────────────────────
   if (intents.refund > 0) {
-    return `Books are digital — once unlocked, they're instantly accessible, so we generally can't refund them.\n\n**Exceptions** (we'll always help):\n• You were charged but the book never unlocked\n• You were charged twice\n• Wrong amount deducted\n\nContact us immediately in those cases:\n• 💬 **WhatsApp:** 0748 255 466 _(fastest)_\n• 📧 **Orders:** orders@ellines.co.ke\n\nBring your M-Pesa confirmation. We sort it out the same day. 🤝`;
+    return `Books are digital — once unlocked, they're instantly accessible, so we generally can't refund them.\n\n**Exceptions** (we'll always help):\n• You were charged but the book never unlocked\n• You were charged twice\n• Wrong amount deducted\n\nContact us immediately in those cases:\n• 💬 **WhatsApp:** 0748 255 466 _(fastest)_\n• 📧 **Orders:** haven@ellines.co.ke\n\nBring your M-Pesa confirmation. We sort it out the same day. 🤝`;
   }
 
   // ── PHYSICAL / PRINT ──────────────────────────────────────────────────────
@@ -327,7 +327,7 @@ function offlineReply(msg, ctx) {
     return `We collect: your name, email, purchase records, and messages you send us. That's it.\n\nWe **never** sell your data. Full policy at __/privacy__. 🔒`;
   }
   if (intents.terms > 0) {
-    return `Key points from our terms:\n• Books are for **personal use only** — no sharing or redistribution\n• Downloaded PDFs cannot be uploaded or resold\n• Accounts that violate terms may be suspended\n\nFull terms at __/terms__ — questions? Email support@ellines.co.ke 📄`;
+    return `Key points from our terms:\n• Books are for **personal use only** — no sharing or redistribution\n• Downloaded PDFs cannot be uploaded or resold\n• Accounts that violate terms may be suspended\n\nFull terms at __/terms__ — questions? Email info@ellines.co.ke 📄`;
   }
 
   // ── BOOK LIST (general browse) ────────────────────────────────────────────
@@ -419,7 +419,7 @@ export default function EllineaAI() {
     { num: '254748255466', label: '0748 255 466', role: 'Primary support' },
     { num: '254728807213', label: '0728 807 213', role: 'Alternate' },
   ];
-  const waEmail        = chatSettings?.waEmail         || 'support@ellines.co.ke';
+  const waEmail        = chatSettings?.waEmail         || 'info@ellines.co.ke';
   const waSupportHours = chatSettings?.waSupportHours  || 'Mon–Sat\n8am–8pm EAT';
   const waResponseTime = chatSettings?.waResponseTime  || 'Usually under\n1 hour';
   const liveOnlineMsg  = chatSettings?.liveOnlineMessage  || 'Agent online';
@@ -602,7 +602,7 @@ User: ${ctx.user ? ctx.user.name + ' (' + (ctx.user.role || 'user') + ')' : 'Gue
 Key facts:
 - Payment: M-Pesa STK push to 0748255466, Airtel Money, Visa/Mastercard. Books unlock instantly after payment.
 - Books range KSh 120–500. No subscriptions — buy once, own forever.
-- Support: WhatsApp 0748 255 466 (fastest); haven@ / support@ / orders@ / info@ellines.co.ke; Mon–Sat 8am–8pm EAT
+- Email: haven@ellines.co.ke (orders/leads/invoices); info@ellines.co.ke (general/group/careers); WhatsApp 0748 255 466; Mon–Sat 8am–8pm EAT
 - My Library at /my-library for purchased books (read online or download PDF)
 - Register free at /register, sign in at /login, forgot password via "Forgot password?" link
 - Author: Elijah Mwangi M — Kenyan software engineer, AI developer, author
@@ -621,7 +621,7 @@ Rules:
         reply = offlineReply(msg, ctx);
       }
     } catch (e) {
-      reply = `Sorry, I hit a snag: ${e.message}. Try again or contact support at support@ellines.co.ke 😊`;
+      reply = `Sorry, I hit a snag: ${e.message}. Try again or contact support at info@ellines.co.ke 😊`;
     }
 
     setTyping(false);

@@ -42,7 +42,7 @@ Thank you for being part of the Ellines Haven community.
 Warm regards,
 Elijah Mwangi M
 Ellines Haven
-📞 0748 255 466 · haven@ellines.co.ke · support@ellines.co.ke
+📞 0748 255 466 · haven@ellines.co.ke · info@ellines.co.ke
 https://ellinesgroup.web.app`,
   },
   {
