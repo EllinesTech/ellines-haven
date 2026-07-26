@@ -473,13 +473,23 @@ function patchHtml(template, route) {
     );
   }
 
-  // 7. Crawlable body — without this Google sees an empty SPA and ranks hotels instead
+  // 7. Crawlable body OUTSIDE #root — Google indexes it; users never see a flash
+  //    (visually hidden via #eh-seo-hide in index.html)
   const seoBody = buildSeoBody(route);
-  const rootRe = /<div id="root"[^>]*>[\s\S]*?<\/div>/i;
-  if (!rootRe.test(html)) {
-    console.warn(`[prerender] WARN: #root not found for ${routePath}`);
+  const seoBlock = `<div id="eh-seo-crawl" data-eh-seo="1" aria-hidden="true">${seoBody}</div>`;
+  if (/<div id="eh-seo-crawl"[^>]*>[\s\S]*?<\/div>\s*<div id="root"/i.test(html)) {
+    html = html.replace(
+      /<div id="eh-seo-crawl"[^>]*>[\s\S]*?<\/div>(\s*<div id="root")/i,
+      `${seoBlock}$1`
+    );
+  } else if (/<div id="root"[^>]*>[\s\S]*?<\/div>/i.test(html)) {
+    // Legacy builds: empty #root and insert crawl block before it
+    html = html.replace(
+      /<div id="root"[^>]*>[\s\S]*?<\/div>/i,
+      `${seoBlock}\n    <div id="root"></div>`
+    );
   } else {
-    html = html.replace(rootRe, `<div id="root">${seoBody}</div>`);
+    console.warn(`[prerender] WARN: #root / #eh-seo-crawl not found for ${routePath}`);
   }
 
   return html;

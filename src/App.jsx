@@ -320,79 +320,53 @@ function ScrollToTop() {
   return null;
 }
 
-/* ── Visitor Tracker — server-side real IP via Cloud Function (callable) ── */
+/* ── Visitor Tracker — Firestore visit log (silent in production console) ── */
 function VisitorTracker() {
   const { pathname } = useLocation();
   const { user } = useApp();
 
   useEffect(() => {
-    console.log('[VisitorTracker] Component mounted/updated, pathname:', pathname);
-    
     // Skip admin and reader pages — don't track admin browsing as site visitors
-    if (pathname.startsWith('/admin') || pathname.startsWith('/read')) {
-      console.log('[VisitorTracker] Skipping - admin or read page');
-      return;
-    }
+    if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
     // Track page visits with per-page cooldown (60 seconds per page per session)
     const sessionKey = 'eh_visitor_' + pathname + '_' + (user?.email || 'anon');
     const lastTracked = sessionStorage.getItem(sessionKey);
     const now = Date.now();
-    
+
     // Only track once per page per 60 seconds
-    if (lastTracked && (now - parseInt(lastTracked)) < 60000) {
-      return;
-    };
-    // Mark this tracking attempt
+    if (lastTracked && (now - parseInt(lastTracked)) < 60000) return;
     sessionStorage.setItem(sessionKey, now.toString());
 
     (async () => {
       try {
-        // Import the tracking utility
         const { trackVisitorReliable } = await import('./utils/visitorTracker');
-        console.log('[VisitorTracker] trackVisitorReliable imported successfully');
 
         const ua = navigator.userAgent || '';
         let device = 'Desktop';
         if (/Mobi|Android|iPhone|iPad/i.test(ua)) device = 'Mobile';
         else if (/Tablet|iPad/i.test(ua)) device = 'Tablet';
-        
+
         const referrer = document.referrer
           ? (() => { try { return new URL(document.referrer).hostname; } catch { return document.referrer.slice(0, 100); } })()
           : 'direct';
 
-        const trackData = {
+        const result = await trackVisitorReliable({
           page: pathname,
           referrer,
           userAgent: ua.slice(0, 300),
           device,
           userEmail: user?.email || null,
           userName:  user?.name  || null,
-        };
+        });
 
-        console.log('[VisitorTracker] About to track with data:', trackData);
-        
-        // Use reliable tracking with retry queue
-        const result = await trackVisitorReliable(trackData);
-        
-        console.log('[VisitorTracker] trackVisitorReliable returned:', result);
-        
         if (result.success) {
-          console.log('[VisitorTracker] ✅ Visit tracked successfully');
-          // Cache full geo data for PresenceTracker heartbeats
           try {
             sessionStorage.setItem('eh_last_ip_data', JSON.stringify(result.data));
-          } catch {}
-        } else {
-          console.error('[VisitorTracker] ❌ Failed to track:', result.error);
+          } catch { /* ignore quota */ }
         }
-      } catch (error) {
-        console.error('[VisitorTracker] ❌ Unexpected error:', error);
-        console.error('[VisitorTracker] Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack?.substring(0, 500)
-        });
+      } catch {
+        // Silent — tracking must never disturb the UI or flood the console
       }
     })();
   }, [pathname, user?.email]);

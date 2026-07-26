@@ -14,16 +14,13 @@ export async function trackVisitorReliable(trackData, options = {}) {
   const { isRetry = false } = options;
   
   try {
-    console.log('[visitorTracker] 📤 Tracking visitor:', trackData.page);
-    
     const { db } = await import('../firebase');
     const { collection, addDoc, serverTimestamp, updateDoc, doc } = await import('firebase/firestore');
-    
+
     const ua = trackData.userAgent || '';
 
     // Step 1: Get real IP from client (fast, free service)
     let clientIp = '';
-    let geo = {};
     try {
       const ipRes = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
       const ipData = await ipRes.json();
@@ -52,10 +49,9 @@ export async function trackVisitorReliable(trackData, options = {}) {
       visitedAtMs: Date.now(),
       _needsGeo:   !!clientIp,  // only needs geo if we got an IP
     };
-    
+
     const docRef = await addDoc(collection(db, 'site_visitors'), visitData);
-    console.log('[visitorTracker] ✅ Visit recorded:', docRef.id, clientIp ? `(IP: ${clientIp})` : '(no IP)');
-    
+
     // Step 3: Enrich with geo data if we have an IP (non-blocking)
     if (clientIp) {
       (async () => {
@@ -79,17 +75,15 @@ export async function trackVisitorReliable(trackData, options = {}) {
               timezone:    geoData.timezone || '',
               _needsGeo:   false,
             });
-            console.log('[visitorTracker] 🌍 Geo enriched:', geoData.city, geoData.country);
           }
         } catch { /* silent — geo is best-effort */ }
       })();
     }
-    
+
     clearVisitorQueue();
     return { success: true, data: { ok: true, docId: docRef.id, ip: clientIp } };
-    
+
   } catch (error) {
-    console.error('[visitorTracker] ❌ Failed:', error.message);
     queueForRetry(trackData, isRetry ? 1 : 0);
     return { success: false, error: error.message };
   }

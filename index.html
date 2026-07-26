@@ -326,21 +326,31 @@
         } catch (e) {}
       })();
     </script>
+    <!-- Keep crawlable SEO text invisible so reload never flashes plain HTML before React mounts -->
+    <style id="eh-seo-hide">
+      html,body{background:#05050e;color:#f0ece2;margin:0;}
+      #root{min-height:100vh;}
+      #eh-seo-crawl,[data-eh-seo]{
+        position:absolute!important;width:1px!important;height:1px!important;
+        padding:0!important;margin:-1px!important;overflow:hidden!important;
+        clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;
+        clip-path:inset(50%)!important;
+      }
+    </style>
   </head>
   <body>
-    <div id="root">
-      <!-- Fallback crawlable content (prerender.js replaces this per route at build time) -->
-      <main>
-        <h1>Ellines Haven</h1>
-        <p>Home For The Story Soul — Kenya's premier digital bookstore for original novels and short stories by Elijah Mwangi M.</p>
-        <nav>
-          <a href="/library">Library</a> ·
-          <a href="/about">About</a> ·
-          <a href="/founder">Founder</a> ·
-          <a href="/contact">Contact</a>
-        </nav>
-      </main>
+    <!-- Crawlable copy for Google (prerender fills this). Kept outside #root = no FOUC flash. -->
+    <div id="eh-seo-crawl" data-eh-seo="1" aria-hidden="true">
+      <h1>Ellines Haven</h1>
+      <p>Home For The Story Soul — Kenya's premier digital bookstore for original novels and short stories by Elijah Mwangi M.</p>
+      <nav>
+        <a href="/library">Library</a> ·
+        <a href="/about">About</a> ·
+        <a href="/founder">Founder</a> ·
+        <a href="/contact">Contact</a>
+      </nav>
     </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <!-- Kill-switch SW is registered in <head> at stable /sw.js (never caches /assets/). -->
   </body>
