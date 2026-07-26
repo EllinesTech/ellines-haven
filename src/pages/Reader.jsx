@@ -565,11 +565,8 @@ export default function Reader() {
 
 
 
-  // Free-preview ch0 is always accessible without login
-
-  const isFreePreviewCh0 = (book?.status === 'free-preview' || book?.freeFirstChapter) && chapter === 0;
-
-
+  // Free first chapter is always accessible — guests AND logged-in users
+  const isFreePreviewCh0 = (book?.status === 'free-preview' || book?.freeFirstChapter === true) && chapter === 0;
 
   if (!user && !isFreePreviewCh0) return (
 
@@ -631,7 +628,8 @@ export default function Reader() {
 
 
 
-  if (user && myPerms && myPerms.canReadOnline === false) return (
+  // Free sample chapters stay readable even if online reading is restricted
+  if (user && myPerms && myPerms.canReadOnline === false && !isFreePreviewCh0) return (
 
     <div className="reader-error">
 
@@ -1010,19 +1008,23 @@ export default function Reader() {
         {/* Book cover */}
 
         {book.cover && (
-
           <div className="reader__sidebar-cover">
-
             <picture>
-
-              <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
-
-              <img src={book.cover} alt={book.title} loading="lazy" decoding="async" />
-
+              {/\.png(\?|$)/i.test(book.cover) && (
+                <source srcSet={book.cover.replace(/\.png(\?[^#]*)?/i, '.webp$1')} type="image/webp" />
+              )}
+              <img
+                src={book.cover}
+                alt={book.title}
+                loading="lazy"
+                decoding="async"
+                onLoad={(e) => {
+                  const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                  if (w > h) e.currentTarget.style.objectPosition = 'right center';
+                }}
+              />
             </picture>
-
           </div>
-
         )}
 
 

@@ -593,7 +593,15 @@ export default function UserProfile() {
                   {library.map(b => (
                     <Link key={b.id} to={b.title ? readPath(b) : `/read/${b.id}`} className="up-book-card">
                       {b.cover
-                        ? <img src={b.cover} alt={b.title} className="up-book-card__img" />
+                        ? <img
+                            src={b.cover}
+                            alt={b.title}
+                            className="up-book-card__img"
+                            onLoad={(e) => {
+                              const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                              if (w > h) e.currentTarget.style.objectPosition = 'right center';
+                            }}
+                          />
                         : <div className="up-book-card__img up-book-card__img--styled" style={{background:b.coverColor||'linear-gradient(145deg,#0f0f22,#1a1a3a)'}} />
                       }
                       <div className="up-book-card__info">

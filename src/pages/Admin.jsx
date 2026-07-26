@@ -321,11 +321,11 @@ const PROMO_INIT = [
 // ── Photo constants & helpers ────────────────────────────────────────────────
 
 const PUBLIC_COVERS = [
-  { name:'cover-marriage-is-a-scam.png', url:'/cover-marriage-is-a-scam.png', path:'pub/cover-marriage-is-a-scam.png', uploadedAt:1700000001000, size:0, isPublic:true },
-  { name:'cover-pain.png',               url:'/cover-pain.png',               path:'pub/cover-pain.png',               uploadedAt:1700000002000, size:0, isPublic:true },
-  { name:'cover-chasing-her-ghosts.png', url:'/cover-chasing-her-ghosts.png', path:'pub/cover-chasing-her-ghosts.png', uploadedAt:1700000003000, size:0, isPublic:true },
-  { name:'cover-the-last-chapter.png',   url:'/cover-the-last-chapter.png',   path:'pub/cover-the-last-chapter.png',   uploadedAt:1700000004000, size:0, isPublic:true },
-  { name:'cover-19-days.png',            url:'/cover-19-days.png',            path:'pub/cover-19-days.png',            uploadedAt:1700000005000, size:0, isPublic:true },
+  { name:'cover-marriage-is-a-scam.png', url:'/cover-marriage-is-a-scam.png?v=front', path:'pub/cover-marriage-is-a-scam.png', uploadedAt:1700000001000, size:0, isPublic:true },
+  { name:'cover-pain.png',               url:'/cover-pain.png?v=front',               path:'pub/cover-pain.png',               uploadedAt:1700000002000, size:0, isPublic:true },
+  { name:'cover-chasing-her-ghosts.png', url:'/cover-chasing-her-ghosts.png?v=front', path:'pub/cover-chasing-her-ghosts.png', uploadedAt:1700000003000, size:0, isPublic:true },
+  { name:'cover-the-last-chapter.png',   url:'/cover-the-last-chapter.png?v=front',   path:'pub/cover-the-last-chapter.png',   uploadedAt:1700000004000, size:0, isPublic:true },
+  { name:'cover-19-days.png',            url:'/cover-19-days.png?v=front',            path:'pub/cover-19-days.png',            uploadedAt:1700000005000, size:0, isPublic:true },
   { name:'cover-echoes-savanna.svg',     url:'/cover-echoes-savanna.svg',     path:'pub/cover-echoes-savanna.svg',     uploadedAt:1700000006000, size:0, isPublic:true },
   { name:'cover-seven-sunsets.svg',      url:'/cover-seven-sunsets.svg',      path:'pub/cover-seven-sunsets.svg',      uploadedAt:1700000007000, size:0, isPublic:true },
   { name:'cover-midnight-mombasa.svg',   url:'/cover-midnight-mombasa.svg',   path:'pub/cover-midnight-mombasa.svg',   uploadedAt:1700000008000, size:0, isPublic:true },
@@ -622,7 +622,7 @@ function CoversTab({books,saveBook,showToast}) {
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8,maxHeight:320,overflowY:'auto'}}>
               {books.map(b=>(
                 <button key={b.id} onClick={()=>assign(b)} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',background:b.cover===assignTo.url?'rgba(201,168,76,0.12)':'rgba(255,255,255,0.03)',border:b.cover===assignTo.url?'1px solid rgba(201,168,76,0.5)':'1px solid var(--dim)',borderRadius:'var(--r-sm)',cursor:'pointer',textAlign:'left',width:'100%',transition:'all 0.15s'}}>
-                  {b.coverType==='photo'&&b.cover?<img src={b.cover} alt="" style={{width:26,height:38,objectFit:'cover',borderRadius:3,flexShrink:0}}/>:<div style={{width:26,height:38,background:b.coverColor||'#1a1a3a',borderRadius:3,flexShrink:0}}/>}
+                  {b.cover?<img src={b.cover} alt="" style={{width:26,height:38,objectFit:'cover',objectPosition:'center top',borderRadius:3,flexShrink:0}}/>:<div style={{width:26,height:38,background:b.coverColor||'#1a1a3a',borderRadius:3,flexShrink:0}}/>}
                   <div style={{minWidth:0}}>
                     <div style={{fontSize:'0.78rem',fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{b.title}</div>
                     <div style={{fontSize:'0.68rem',color:b.cover===assignTo.url?'var(--gold)':'var(--muted)'}}>{b.cover===assignTo.url?'✓ Current':'Apply'}</div>
@@ -1584,8 +1584,8 @@ function UserLibrariesTab({ users, books, showToast }) {
               }).map(b => (
                 <button key={b.id} type="button" onClick={() => addBook(addModal, b)}
                   style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', background:'rgba(255,255,255,0.03)', border:'1px solid var(--dim)', borderRadius:'var(--r-sm)', cursor:'pointer', textAlign:'left', width:'100%' }}>
-                  {b.coverType === 'photo' && b.cover
-                    ? <img src={b.cover} alt="" style={{ width:26, height:38, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
+                  {b.cover
+                    ? <img src={b.cover} alt="" style={{ width:26, height:38, objectFit:'cover', objectPosition:'center top', borderRadius:3, flexShrink:0 }} />
                     : <div style={{ width:26, height:38, background:b.coverColor||'#1a1a3a', borderRadius:3, flexShrink:0 }} />
                   }
                   <div style={{ minWidth:0 }}>
@@ -1668,7 +1668,7 @@ function UserLibrariesTab({ users, books, showToast }) {
                           const busyKey    = u.email.toLowerCase() + '_' + lb.id;
                           return (
                             <div key={lb.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderRadius:'var(--r-sm)', background: anyOff ? 'rgba(231,76,60,0.05)' : 'rgba(255,255,255,0.03)', border: anyOff ? '1px solid rgba(231,76,60,0.2)' : '1px solid var(--dim)' }}>
-                              {coverType==='photo' && cover
+                              {cover
                                 ? <img src={cover} alt="" style={{ width:32,height:44,objectFit:'cover',borderRadius:4,flexShrink:0 }} />
                                 : <div style={{ width:32,height:44,background:coverColor,borderRadius:4,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.55rem',color:coverAccent }}>EH</div>
                               }
@@ -2092,8 +2092,8 @@ function NotificationsPanel({ books, showToast, saveBook, addLog }) {
             return (
               <div key={bookId} className="card" style={{ padding:20 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:14 }}>
-                  {book?.cover && book?.coverType === 'photo'
-                    ? <img src={book.cover} alt="" style={{ width:44, height:60, objectFit:'cover', borderRadius:4, flexShrink:0 }} />
+                  {book?.cover
+                    ? <img src={book.cover} alt="" style={{ width:44, height:60, objectFit:'cover', objectPosition:'center top', borderRadius:4, flexShrink:0 }} />
                     : <div style={{ width:44, height:60, background:book?.coverColor||'#1a1a3a', borderRadius:4, flexShrink:0 }} />
                   }
                   <div style={{ flex:1 }}>
@@ -2364,8 +2364,8 @@ function ManualUnlockForm({ books, showToast, onUnlock }) {
           }}>
             <input type="checkbox" checked={selected.includes(b.id)} onChange={() => toggle(b.id)}
               style={{width:14,height:14,accentColor:'var(--gold)',flexShrink:0}} />
-            {b.coverType === 'photo' && b.cover
-              ? <img src={b.cover} alt="" style={{width:28,height:40,objectFit:'cover',borderRadius:3,flexShrink:0}} />
+            {b.cover
+              ? <img src={b.cover} alt="" style={{width:28,height:40,objectFit:'cover',objectPosition:'center top',borderRadius:3,flexShrink:0}} />
               : <div style={{width:28,height:40,background:b.coverColor||'#1a1a3a',borderRadius:3,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.55rem',color:b.coverAccent||'var(--gold)'}}>EH</div>
             }
             <div style={{minWidth:0}}>
@@ -4122,8 +4122,8 @@ export default function Admin() {
                           onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}
                           onMouseLeave={e => e.currentTarget.style.background=''}>
                           <span style={{ width:18, height:18, borderRadius:'50%', background:'rgba(201,168,76,0.12)', color:'var(--gold)', fontWeight:700, fontSize:'0.65rem', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{i+1}</span>
-                          {b.coverType==='photo' && b.cover
-                            ? <img src={b.cover} alt="" style={{ width:26, height:38, objectFit:'cover', borderRadius:3, flexShrink:0 }} />
+                          {b.cover
+                            ? <img src={b.cover} alt="" style={{ width:26, height:38, objectFit:'cover', objectPosition:'center top', borderRadius:3, flexShrink:0 }} />
                             : <div style={{ width:26, height:38, background:b.coverColor||'#1a1a3a', borderRadius:3, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.5rem', color:b.coverAccent||'#c9a84c' }}>EH</div>
                           }
                           <div style={{ flex:1, minWidth:0 }}>
@@ -4302,7 +4302,7 @@ export default function Admin() {
                       <tr key={b.id} style={{ background: isChecked ? 'rgba(201,168,76,0.07)' : undefined }}>
                         <td><input type="checkbox" checked={isChecked} onChange={() => toggleSelect(b.id)} style={{ cursor:'pointer', accentColor:'var(--gold)' }} /></td>
                         <td>
-                        {b.coverType === 'photo' && b.cover
+                        {b.cover
                           ? <img src={b.cover} alt="" className="adm-book-thumb" />
                           : <div className="adm-book-thumb-styled" style={{ background:b.coverColor || '#1a1a3a' }}>
                               <span style={{ fontSize:'0.6rem', color:b.coverAccent || '#c9a84c' }}>EH</span>

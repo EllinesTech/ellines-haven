@@ -8,10 +8,12 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import EditableImage from '../components/EditableImage';
 import NewsletterSignup from '../components/NewsletterSignup';
+import CoverImage from '../components/CoverImage';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAllReadingStats } from '../hooks/useReadingProgress';
 import { bookPath, readPath } from '../utils/slugify';
+import { hasImageCover } from '../utils/bookCovers';
 import { usePageMeta } from '../hooks/usePageMeta';
 import './Home.css';
 
@@ -22,7 +24,7 @@ const HOME_DEFAULTS = {
   hero_btn_primary:    'Start Reading →',
   hero_btn_secondary:  'Meet the Author',
   hero_poster:         '/poster4.png',
-  author_bg_image:     '/cover-the-last-chapter.png',
+  author_bg_image:     '/cover-the-last-chapter.png?v=front', // decorative only — not tied to a catalogue book id
   stat_books:          '50+',
   stat_readers:        '2k+',
   stat_rating:         '4.8★',
@@ -280,8 +282,8 @@ function PersonalisedSection({ user, library, books }) {
                   const ch = (b.progress?.chapter || 0) + 1;
                   return (
                     <Link key={b.id} to={readPath(b)} className="home-mini-card">
-                      {b.cover
-                        ? <img src={b.cover} alt="" className="home-mini-card__img" />
+                      {hasImageCover(b)
+                        ? <CoverImage src={b.cover} alt="" className="home-mini-card__img" />
                         : <div className="home-mini-card__img home-mini-card__img--fallback" style={{ background: b.coverColor || '#1a1a3a' }} />
                       }
                       <div className="home-mini-card__body">
@@ -304,8 +306,8 @@ function PersonalisedSection({ user, library, books }) {
             <div className="home-personal__rail">
               {notStarted.map(b => (
                 <Link key={b.id} to={readPath(b)} className="home-mini-card">
-                  {b.cover
-                    ? <img src={b.cover} alt="" className="home-mini-card__img" />
+                  {hasImageCover(b)
+                    ? <CoverImage src={b.cover} alt="" className="home-mini-card__img" />
                     : <div className="home-mini-card__img home-mini-card__img--fallback" style={{ background: b.coverColor || '#1a1a3a' }} />
                   }
                   <div className="home-mini-card__body">
@@ -571,9 +573,9 @@ export default function Home() {
 
           <div className="hero__visual">
             <div className="hero__shelf">
-              {(featured.filter(b => b.cover).slice(0, 3).length >= 2
-                ? featured.filter(b => b.cover).slice(0, 3)
-                : activeBooks.filter(b => b.cover).slice(0, 3)
+              {(featured.filter(hasImageCover).slice(0, 3).length >= 2
+                ? featured.filter(hasImageCover).slice(0, 3)
+                : activeBooks.filter(hasImageCover).slice(0, 3)
               ).map((b, i) => (
                 <Link
                   key={b.id}
@@ -581,7 +583,7 @@ export default function Home() {
                   className={`hero__shelf-book hero__shelf-book--${i + 1}`}
                   title={b.title}
                 >
-                  <img src={b.cover} alt="" />
+                  <CoverImage src={b.cover} alt="" priority={i === 0} />
                 </Link>
               ))}
             </div>
@@ -703,8 +705,8 @@ export default function Home() {
               {newReleases.map(b => (
                 <Link key={b.id} to={bookPath(b)} className="new-release-card card">
                   <div className="new-release-card__img-wrap">
-                    {b.cover
-                      ? <img src={b.cover} alt={b.title} className="new-release-card__img" />
+                    {hasImageCover(b)
+                      ? <CoverImage src={b.cover} alt={b.title} className="new-release-card__img" />
                       : <div className="new-release-card__img new-release-card__img--styled"
                              style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
                           <img src="/logo-icon.png" alt="" style={{width:40,opacity:0.3}} />
@@ -735,7 +737,7 @@ export default function Home() {
         <div className="promo-banner__bg">
           <EditableImage
             field="author_bg_image"
-            src={c.author_bg_image || '/cover-the-last-chapter.png'}
+            src={c.author_bg_image || '/cover-the-last-chapter.png?v=front'}
             alt=""
             className="promo-banner__bg-img"
             storageFolder="site-images"
@@ -828,8 +830,8 @@ export default function Home() {
               {comingSoon.map((b, i) => (
                 <Link key={b.id} to={bookPath(b)} className={`cs-card${i === 0 ? ' cs-card--hero' : ''}`}>
                   <div className="cs-card__art">
-                    {b.cover
-                      ? <img src={b.cover} alt={b.title} className="cs-card__cover-img" />
+                    {hasImageCover(b)
+                      ? <CoverImage src={b.cover} alt={b.title} className="cs-card__cover-img" />
                       : <div className="cs-card__cover-styled" style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
                           <div className="cs-card__cover-deco" style={{ borderColor: b.coverAccent || '#c9a84c' }} />
                           <img src="/logo-icon.png" alt="" className="cs-card__cover-logo" />

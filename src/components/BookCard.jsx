@@ -2,8 +2,10 @@ import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import WishlistButton from './WishlistButton';
+import CoverImage from './CoverImage';
+import { hasImageCover } from '../utils/bookCovers';
 import { bookPath, readPath } from '../utils/slugify';
-import { getLoginPromptConfig } from '../utils/purchaseHelpers';
+import { getLoginPromptConfig, hasFreeSampleChapter } from '../utils/purchaseHelpers';
 import { getReadingTimeDisplay } from '../utils/readingTime';
 import './BookCard.css';
 
@@ -109,42 +111,16 @@ export function BookBadges({ book, style = {}, cardMode = false, maxExtras = car
   );
 }
 
-// Derive WebP path from a PNG cover path (e.g. /cover-pain.png → /cover-pain.webp)
-function webpSrc(src) {
-  if (!src || typeof src !== 'string') return null;
-  if (src.startsWith('data:') || !/\.png(\?|$)/i.test(src)) return null;
-  return src.replace(/\.png(\?[^#]*)?/i, '.webp$1');
-}
-
-function hasImageCover(book) {
-  const src = book?.cover;
-  if (!src || typeof src !== 'string') return false;
-  if (book.coverType === 'photo') return true;
-  // Use the assigned image even if coverType was left as "styled" in CMS
-  if (src.startsWith('data:image')) return true;
-  return /\.(png|jpe?g|webp|gif|svg)(\?|#|$)/i.test(src);
-}
-
 /** Shared cover used by BookCard, RecommendationWidget, TrendingWidget, etc. */
 export function BookCover({ book, priority = false }) {
   if (hasImageCover(book)) {
-    const webp = webpSrc(book.cover);
     return (
-      <picture>
-        {webp && <source srcSet={webp} type="image/webp" />}
-        <img
-          src={book.cover}
-          alt={book.title}
-          loading={priority ? 'eager' : 'lazy'}
-          decoding="async"
-          className="bcard__cover-photo"
-          onLoad={(e) => {
-            // Wrap-around jackets are landscape; pin crop to the front (right) panel
-            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
-            if (w > h) e.currentTarget.style.objectPosition = 'right center';
-          }}
-        />
-      </picture>
+      <CoverImage
+        src={book.cover}
+        alt={book.title}
+        className="bcard__cover-photo"
+        priority={priority}
+      />
     );
   }
 
@@ -333,28 +309,31 @@ function PurchaseUiComplete({ book, owned, inCart, user, myPerms, addToCart }) {
     return <Link to={readPath(book)} className="btn btn-outline btn-sm">Read</Link>;
   }
 
-  if (user && myPerms?.canPurchase === false) {
+  const freeSample = hasFreeSampleChapter(book);
+
+  if (user && myPerms?.canPurchase === false && !freeSample) {
     return <span className="btn btn-ghost btn-sm" style={{opacity:0.5,cursor:'default'}}>Restricted</span>;
   }
 
-  if (inCart) {
+  if (inCart && !freeSample) {
     return <Link to="/cart" className="btn btn-ghost btn-sm">In Cart</Link>;
   }
 
+  // Guests and logged-in users can both open the free first chapter
+  if (freeSample) {
+    return (
+      <Link
+        to={readPath(book)}
+        className="btn btn-outline btn-sm"
+        style={{ color:'#d4b5ff', borderColor:'rgba(168,85,247,0.5)' }}
+        title="Read the first chapter free"
+      >
+        Read Free
+      </Link>
+    );
+  }
+
   if (!user) {
-    // Free-preview: guests CAN read chapter 1 — show that clearly
-    if (book.status === 'free-preview') {
-      return (
-        <Link
-          to={readPath(book)}
-          className="btn btn-outline btn-sm"
-          style={{ color:'#d4b5ff', borderColor:'rgba(168,85,247,0.5)' }}
-          title="Read the first chapter free — no login needed"
-        >
-          Read Free
-        </Link>
-      );
-    }
     return (
       <Link
         to={`/login?returnTo=${encodeURIComponent(window.location.pathname)}`}

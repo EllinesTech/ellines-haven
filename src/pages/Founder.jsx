@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { getSocialLink } from '../utils/socialLinks';
+import CoverImage from '../components/CoverImage';
 import './Founder.css';
 
 /* ── Firestore key ── */
@@ -118,12 +119,12 @@ const DEFAULT = {
   booksHeading: 'Published Works',
   booksSub: 'Every novel and story written by Elijah Mwangi M — all inspired by true stories, real life experiences, and the people he has met on his journey.',
   books: [
-    { title: 'Marriage Is a Scam', genre: 'Drama Novel',    cover: '/cover-marriage-is-a-scam.png', note: 'A bold, unflinching look at modern Kenyan marriage — drawn from real relationships and real heartbreaks.', color: null, accent: '#c9a84c' },
-    { title: 'Pain',               genre: 'Drama Novel',    cover: '/cover-pain.png',               note: 'His most personal work. Written through loss — every page carries the weight of something truly lived.', color: null, accent: '#e8832a' },
-    { title: 'Echoes of the Savanna', genre: 'Historical',  cover: null, color: 'linear-gradient(145deg,#1a2a0a,#2d4a10)', accent: '#7ab648', note: 'True stories of Kenyan families fighting colonial land seizure — courage preserved in fiction.' },
-    { title: 'Seven Sunsets',      genre: 'Short Stories',  cover: null, color: 'linear-gradient(145deg,#1a0a00,#4a2000)', accent: '#e8832a', note: 'Seven true-to-life moments gifted by real people across East Africa.' },
-    { title: 'Midnight in Mombasa', genre: 'Mystery Novel', cover: null, color: 'linear-gradient(145deg,#00081a,#001a3a)', accent: '#4a9eff', note: 'Inspired by real events on the Swahili coast — power, secrets, family loyalty.' },
-    { title: 'Nairobi Nights',     genre: 'Drama Stories',  cover: null, color: 'linear-gradient(145deg,#0a0005,#1a0010)', accent: '#ff6b9d', note: 'Three nights in Nairobi that Elijah witnessed firsthand — captured as they felt.' },
+    { title: 'Marriage Is a Scam', genre: 'Drama Novel', cover: '/cover-marriage-is-a-scam.png?v=front', note: 'A bold, unflinching look at modern Kenyan marriage — drawn from real relationships and real heartbreaks.', color: null, accent: '#c9a84c' },
+    { title: 'Pain', genre: 'Drama Novel', cover: '/cover-pain.png?v=front', note: 'His most personal work. Written through loss — every page carries the weight of something truly lived.', color: null, accent: '#e8832a' },
+    { title: 'Echoes of the Savanna', genre: 'Historical', cover: '/cover-echoes-savanna.svg', color: 'linear-gradient(145deg,#1a2a0a,#2d4a10)', accent: '#7ab648', note: 'True stories of Kenyan families fighting colonial land seizure — courage preserved in fiction.' },
+    { title: 'Seven Sunsets', genre: 'Short Stories', cover: '/cover-seven-sunsets.svg', color: 'linear-gradient(145deg,#1a0a00,#4a2000)', accent: '#e8832a', note: 'Seven true-to-life moments gifted by real people across East Africa.' },
+    { title: 'Midnight in Mombasa', genre: 'Mystery Novel', cover: '/cover-midnight-mombasa.svg', color: 'linear-gradient(145deg,#00081a,#001a3a)', accent: '#4a9eff', note: 'Inspired by real events on the Swahili coast — power, secrets, family loyalty.' },
+    { title: 'Nairobi Nights', genre: 'Drama Stories', cover: '/cover-nairobi-nights.svg', color: 'linear-gradient(145deg,#0a0005,#1a0010)', accent: '#ff6b9d', note: 'Three nights in Nairobi that Elijah witnessed firsthand — captured as they felt.' },
   ],
   journeyHeading: 'The Journey',
   journeySub: 'From blank notebooks to built platforms — every step that shaped the writer and the builder.',
@@ -174,10 +175,40 @@ const SOCIAL_LABELS = {
   reddit: '◉', whatsapp: 'wa',
 };
 
+function normalizeTitle(t) {
+  return (t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/** Prefer packaged front covers for known titles; fall back to catalogue / CMS. */
+function hydrateFounderBooks(list, catalogue = []) {
+  const defaultsByTitle = new Map(DEFAULT.books.map(b => [normalizeTitle(b.title), b]));
+  const catalogueByTitle = new Map(
+    (catalogue || []).filter(b => b?.title && b?.cover).map(b => [normalizeTitle(b.title), b])
+  );
+
+  return (list || DEFAULT.books).map((b) => {
+    const key = normalizeTitle(b.title);
+    const fromCat = catalogueByTitle.get(key);
+    const fromDefault = defaultsByTitle.get(key);
+    // Seed/public front cover wins for known books (fixes stale Firestore null/wraps)
+    const cover = fromDefault?.cover || fromCat?.cover || b.cover || null;
+    return {
+      ...fromDefault,
+      ...b,
+      cover,
+      accent: b.accent || fromDefault?.accent || fromCat?.coverAccent || '#c9a84c',
+      color: b.color || fromDefault?.color || fromCat?.coverColor || null,
+    };
+  });
+}
+
 export default function Founder() {
-  const { user } = useApp();
+  const { user, books } = useApp();
   const isSA = user?.role === 'superadmin';
-  const [content, setContent] = useState(DEFAULT);
+  const [content, setContent] = useState(() => ({
+    ...DEFAULT,
+    books: hydrateFounderBooks(DEFAULT.books, []),
+  }));
   const [saving,  setSaving]  = useState(false);
   const [toast,   setToast]   = useState('');
   const [activePhoto, setActivePhoto] = useState(0);
@@ -203,13 +234,24 @@ export default function Founder() {
 
   useEffect(() => {
     getDoc(FOUNDER_DOC()).then(snap => {
-      if (snap.exists()) setContent(prev => ({ ...prev, ...snap.data() }));
-    }).catch(() => {});
+      if (!snap.exists()) {
+        setContent(prev => ({ ...prev, books: hydrateFounderBooks(DEFAULT.books, books) }));
+        return;
+      }
+      const data = snap.data();
+      setContent(prev => ({
+        ...prev,
+        ...data,
+        books: hydrateFounderBooks(data.books || DEFAULT.books, books),
+      }));
+    }).catch(() => {
+      setContent(prev => ({ ...prev, books: hydrateFounderBooks(DEFAULT.books, books) }));
+    });
 
     getDoc(doc(db, 'site_data', 'site_controls')).then(snap => {
       if (snap.exists() && snap.data().socialHandles) setSocialHandles(snap.data().socialHandles);
     }).catch(() => {});
-  }, []);
+  }, [books]);
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
@@ -421,10 +463,12 @@ export default function Founder() {
           </div>
           <div className="founder-books-grid">
             {content.books.map((b, i) => (
-              <div key={i} className="founder-book-card">
+              <div key={b.title || i} className="founder-book-card">
                 <div className="founder-book-spine" aria-hidden="true" />
                 {b.cover ? (
-                  <div className="founder-book-cover-photo"><img src={b.cover} alt={b.title} /></div>
+                  <div className="founder-book-cover-photo">
+                    <CoverImage src={b.cover} alt={b.title} />
+                  </div>
                 ) : (
                   <div
                     className="founder-book-cover-styled"

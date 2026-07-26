@@ -3,7 +3,7 @@
 if (typeof window !== 'undefined' && window.__EH_BUILD__ === undefined) {
   window.__EH_BUILD__ = '20260711-T132900-GODMODE';
 }
-// Capture beforeinstallprompt before React mounts (must call prompt() later from UI)
+// PWA install state (does not preventDefault — avoids Chrome "Banner not shown" warning)
 import './utils/pwaBootstrap.js';
 import { createRoot } from 'react-dom/client';
 import { Component } from 'react';

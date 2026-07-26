@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { BOOKS as INITIAL_BOOKS } from '../data/books';
+import { resolveCoverFields } from '../utils/bookCovers';
 import { titleToSlug } from '../utils/slugify';
 import {
   doc, getDoc, setDoc, updateDoc,
@@ -22,10 +23,12 @@ const save = (key, val) => {
   localStorage.setItem(key, JSON.stringify(val));
 };
 
-// Merge local cache with INITIAL_BOOKS — cached version wins for matching ids
+// Merge local cache with INITIAL_BOOKS — cached version wins for matching ids,
+// but public cover files always resolve to the current seed front cover.
 const mergeBooks = (cached) => {
   if (!cached || !cached.length) return INITIAL_BOOKS;
-  const out = [...cached];
+  const initialMap = new Map(INITIAL_BOOKS.map(b => [b.id, b]));
+  const out = cached.map(b => resolveCoverFields(initialMap.get(b.id) || {}, b));
   INITIAL_BOOKS.forEach(b => { if (!out.find(x => x.id === b.id)) out.push(b); });
   return out;
 };
@@ -1002,18 +1005,8 @@ function mergeWithFirestore(local, fsBooks) {
         merged[k] = defaults[k];
       }
     });
-    // Keep public cover files in sync with seed (cache-bust + front-crop paths)
-    if (
-      typeof defaults.cover === 'string' &&
-      defaults.cover.startsWith('/cover-') &&
-      typeof merged.cover === 'string' &&
-      merged.cover.startsWith('/cover-') &&
-      merged.cover.split('?')[0] === defaults.cover.split('?')[0]
-    ) {
-      merged.cover = defaults.cover;
-      if (defaults.coverType) merged.coverType = defaults.coverType;
-    }
-    return merged;
+    // Force current public front covers for known books (unless a remote custom upload)
+    return resolveCoverFields(defaults, merged);
   });
 
   // Add local-only books not in Firestore

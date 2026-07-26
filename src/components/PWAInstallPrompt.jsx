@@ -9,8 +9,9 @@ import {
 } from '../utils/pwaBootstrap';
 
 /**
- * PWA Install Prompt — custom UI that calls beforeinstallprompt.prompt()
- * on a user gesture (required after preventDefault in pwaBootstrap).
+ * PWA Install Prompt — optional custom UI.
+ * Native Chrome install UI is left enabled (no preventDefault) so DevTools
+ * does not log "Banner not shown" on every page.
  */
 
 let _deferredPrompt = getDeferredInstallPrompt();

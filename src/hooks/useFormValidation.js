@@ -171,26 +171,36 @@ export function useFormValidation(initialValues = {}, validationRules = {}, opti
     setErrors(prev => ({ ...prev, [fieldName]: error }));
   }, []);
 
-  // Get field props for easy integration with inputs
+  // Get field props for easy integration with native <input> elements.
+  // Only DOM-safe attrs — never spread hasError / isTouched / error onto the DOM.
   const getFieldProps = useCallback((fieldName, additionalProps = {}) => {
+    const {
+      onChange: extraOnChange,
+      onBlur: extraOnBlur,
+      // Strip React-only meta if callers pass them in additionalProps
+      hasError: _hasError,
+      isTouched: _isTouched,
+      error: _error,
+      ...domSafeExtras
+    } = additionalProps;
+
     return {
       name: fieldName,
+      id: additionalProps.id || fieldName,
       value: values[fieldName] || '',
       onChange: (e) => {
         const value = e.target ? e.target.value : e;
         setValue(fieldName, value);
-        additionalProps.onChange?.(e);
+        extraOnChange?.(e);
       },
       onBlur: (e) => {
         handleBlur(fieldName);
-        additionalProps.onBlur?.(e);
+        extraOnBlur?.(e);
       },
-      error: errors[fieldName],
-      hasError: !!errors[fieldName],
-      isTouched: !!touched[fieldName],
-      ...additionalProps
+      'aria-invalid': !!errors[fieldName] || undefined,
+      ...domSafeExtras,
     };
-  }, [values, errors, touched, setValue, handleBlur]);
+  }, [values, errors, setValue, handleBlur]);
 
   // Effect to notify about validation changes
   useEffect(() => {

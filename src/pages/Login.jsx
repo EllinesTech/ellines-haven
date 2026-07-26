@@ -5,7 +5,7 @@ import { useEditMode } from '../context/EditModeContext';
 import EditableField from '../components/EditableField';
 import { ErrorAlert, SuccessAlert, useToast } from '../components/ErrorDisplay';
 import { useAuthFormValidation } from '../hooks/useFormValidation';
-import { handleAuthError, logError } from '../utils/errorHandler';
+import { handleAuthError, logError, getErrorMessage } from '../utils/errorHandler';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -510,7 +510,13 @@ export default function Login() {
       }
     };
 
-    const security = await getSecuritySettings();
+    let security = {};
+    try {
+      security = await getSecuritySettings();
+    } catch (e) {
+      console.warn('[Login] Security settings unavailable, continuing without 2FA gate:', e?.message);
+    }
+
     const accountFor2FA = {
       ...sessionUser,
       twoFactorEnabled: extras.twoFactorEnabled === true || sessionUser.twoFactorEnabled === true,
@@ -535,13 +541,17 @@ export default function Login() {
       } catch (e) {
         return {
           success: false,
-          error: e?.message || 'Could not send your 2FA code. Please try again or contact support.',
+          error: getErrorMessage(e) || 'Could not send your 2FA code. Please try again or contact support.',
         };
       }
     }
 
     finalizeSession(sessionUser);
-    await logLogin(sessionUser.email, sessionUser.name);
+    try {
+      await logLogin(sessionUser.email, sessionUser.name);
+    } catch (e) {
+      console.warn('[Login] Activity log skipped:', e?.message);
+    }
     if (extras.mustChangePassword) {
       showLoginSuccess(sessionUser.name);
       setTimeout(() => navigate('/change-password', { replace: true }), 1000);
@@ -752,7 +762,7 @@ export default function Login() {
 
       return { success: false, error: 'No account found with that email address. Please check your email or create an account.' };
     } catch (e) {
-      logError(e, { operation: 'login', email: emailKey });
+      // handleAuthError already logs — avoid duplicate MEDIUM SEVERITY console noise
       return handleAuthError(e, 'login');
     }
   };
@@ -846,11 +856,11 @@ export default function Login() {
                 // result.error may be a string or an object from handleAuthError
                 const msg = typeof result.error === 'string'
                   ? result.error
-                  : (result.error?.message || 'An unexpected error occurred. Please try again.');
+                  : (result.error?.message || getErrorMessage(result.error) || 'Sign-in failed. Please try again.');
                 showError(msg);
               }
             } catch (e) {
-              showError('An unexpected error occurred. Please try again.');
+              showError(getErrorMessage(e) || 'Sign-in failed. Please try again.');
             } finally {
               setSubmitting(false);
             }

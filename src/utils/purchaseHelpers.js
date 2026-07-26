@@ -98,6 +98,11 @@ export function getPurchaseUiState(book, user, myPerms, siteControls, inCart, ow
   return { state: 'can-add', label: 'Add to Cart', action: 'add-to-cart' };
 }
 
+/** First chapter is free for guests and logged-in users (no purchase). */
+export function hasFreeSampleChapter(book) {
+  return book?.status === 'free-preview' || book?.freeFirstChapter === true;
+}
+
 /**
  * Professional login prompt message component
  * Shows when user needs to log in to purchase

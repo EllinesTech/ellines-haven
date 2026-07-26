@@ -33,12 +33,18 @@ const ErrorMessages = {
   // Authentication errors
   'auth/user-not-found': 'No account found with this email address. Please check your email or create an account.',
   'auth/wrong-password': 'Incorrect password. Please check your password and try again.',
+  'auth/invalid-credential': 'Incorrect email or password. Please check your details and try again.',
+  'auth/invalid-login-credentials': 'Incorrect email or password. Please check your details and try again.',
   'auth/invalid-email': 'Please enter a valid email address.',
   'auth/weak-password': 'Password should be at least 6 characters long.',
   'auth/email-already-in-use': 'An account with this email already exists. Please sign in instead.',
   'auth/too-many-requests': 'Too many failed attempts. Please wait a few minutes before trying again.',
   'auth/network-request-failed': 'Network connection failed. Please check your internet connection and try again.',
   'auth/internal-error': 'Something went wrong on our end. Please try again in a moment.',
+  'auth/missing-password': 'Please enter your password.',
+  'functions/unavailable': 'Verification service is temporarily unavailable. Please try again in a moment.',
+  'functions/internal': 'Could not complete sign-in verification. Please try again.',
+  'functions/deadline-exceeded': 'Sign-in timed out. Please try again.',
   
   // Firestore errors
   'permission-denied': 'You don\'t have permission to access this resource. Please sign in or contact support.',
@@ -152,16 +158,48 @@ export function classifyError(error) {
  * @returns {string} User-friendly error message
  */
 export function getErrorMessage(error) {
-  const errorCode = typeof error === 'string' ? error : (error?.code || error?.message || 'unknown');
-  
+  // Already a human message from login/register — show it as-is
+  if (typeof error === 'string') {
+    const trimmed = error.trim();
+    if (!trimmed) return ErrorMessages.unknown;
+    // Machine codes get mapped; plain sentences pass through
+    if (ErrorMessages[trimmed]) return ErrorMessages[trimmed];
+    if (!/^(auth|functions|validation|permission|firestore)\//i.test(trimmed)
+        && !/^[a-z0-9_-]+$/i.test(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  const rawCode = typeof error === 'string' ? error : (error?.code || '');
+  const rawMsg = typeof error === 'string' ? error : (error?.message || '');
+  const errorCode = rawCode || 'unknown';
+
   // Direct lookup first
   if (ErrorMessages[errorCode]) {
     return ErrorMessages[errorCode];
   }
 
+  // Prefer an explicit message on the error object when it's already readable
+  if (rawMsg && ErrorMessages[rawMsg]) {
+    return ErrorMessages[rawMsg];
+  }
+  if (rawMsg && !/^(auth|functions|validation|permission|firestore)\//i.test(rawMsg)
+      && !/^Firebase:/i.test(rawMsg)
+      && rawMsg.length > 12
+      && rawMsg.includes(' ')) {
+    return rawMsg;
+  }
+
+  // Firebase often embeds the code in the message: "Firebase: Error (auth/invalid-credential)."
+  const embedded = String(rawMsg).match(/\((auth\/[a-z0-9-]+)\)/i)
+    || String(rawMsg).match(/\((functions\/[a-z0-9-]+)\)/i);
+  if (embedded && ErrorMessages[embedded[1]]) {
+    return ErrorMessages[embedded[1]];
+  }
+
   // Partial matches for Firebase auth errors
-  const authCodeMatch = Object.keys(ErrorMessages).find(key => 
-    key.startsWith('auth/') && errorCode.includes(key.replace('auth/', ''))
+  const authCodeMatch = Object.keys(ErrorMessages).find(key =>
+    key.startsWith('auth/') && String(errorCode).includes(key.replace('auth/', ''))
   );
   if (authCodeMatch) {
     return ErrorMessages[authCodeMatch];
@@ -392,7 +430,13 @@ export function handleAuthError(authError, operation = 'authentication') {
     }
   }
 
-  logError(authError, context);
+  // Expected credential mistakes shouldn't spam the local console
+  const code = String(authError?.code || authError?.message || '');
+  const expectedAuthFail =
+    /auth\/(invalid-credential|invalid-login-credentials|wrong-password|user-not-found|invalid-email|missing-password)/i.test(code)
+    || /invalid.credential|wrong.password|user.not.found/i.test(code);
+
+  logError(authError, context, expectedAuthFail);
   return createErrorResponse(authError, context);
 }
 

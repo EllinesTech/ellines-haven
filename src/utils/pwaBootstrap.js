@@ -1,7 +1,12 @@
 /**
- * Capture beforeinstallprompt as early as possible (before React mounts).
- * Chrome fires this once; if we miss it, Install never works and DevTools
- * complains that preventDefault ran without a later prompt().
+ * PWA install bootstrap.
+ *
+ * Do NOT call beforeinstallprompt.preventDefault() — Chrome then logs on every
+ * page: "Banner not shown: beforeinstallpromptevent.preventDefault() called..."
+ * and the mini-infobar stays hidden until prompt() runs.
+ *
+ * We still listen so the app can detect installability / installed state.
+ * Custom Install buttons use the browser’s own UI (or prompt() when available).
  */
 
 let deferredPrompt = null;
@@ -28,8 +33,8 @@ if (typeof window !== 'undefined') {
   }
 
   window.addEventListener('beforeinstallprompt', (e) => {
-    // Required to use a custom install UI and call prompt() later.
-    e.preventDefault();
+    // Intentionally no e.preventDefault() — keeps Chrome's native install UI
+    // and avoids the DevTools "Banner not shown" warning on every route.
     deferredPrompt = e;
     window.__EH_DEFERRED_INSTALL__ = e;
     notify();
@@ -72,13 +77,16 @@ export function subscribePwaBootstrap(fn) {
 export async function promptPwaInstall() {
   const promptEvent = getDeferredInstallPrompt();
   if (!promptEvent || typeof promptEvent.prompt !== 'function') return false;
-  promptEvent.prompt();
-  const { outcome } = await promptEvent.userChoice;
-  if (outcome === 'accepted') {
-    markPwaInstalled();
-    return true;
+  try {
+    promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    if (outcome === 'accepted') {
+      markPwaInstalled();
+      return true;
+    }
+  } catch {
+    // Browser already showed native UI / event consumed — fine
   }
-  // Choice made — event cannot be reused
   clearDeferredInstallPrompt();
   return false;
 }

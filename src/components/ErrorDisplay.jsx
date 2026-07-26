@@ -270,11 +270,11 @@ export function useToast() {
   };
 
   const showError = (error, duration) => {
+    // Pass friendly strings through unchanged (don't remap to "unexpected error")
     const message = getErrorMessage(error);
     showToast(message, 'error', duration);
-    
-    // Log the error for debugging
-    logError(error, { source: 'toast' });
+    // Quiet log for already-handled user messages
+    logError(error, { source: 'toast' }, typeof error === 'string');
   };
 
   const showSuccess = (message, duration) => {
