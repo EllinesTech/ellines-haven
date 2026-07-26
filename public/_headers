@@ -53,6 +53,18 @@
   CDN-Cache-Control: public, max-age=86400, must-revalidate
   Content-Type: text/plain
 
+# IndexNow key (Bing / Yandex / others)
+/1b9faca8a192e88f7c3d4e5b6a708192.txt
+  Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
+  Content-Type: text/plain; charset=utf-8
+
+# Google Search Console verification file
+/google17caeb8194dadb8a.html
+  Cache-Control: public, max-age=3600, must-revalidate
+  CDN-Cache-Control: public, max-age=3600, must-revalidate
+  Content-Type: text/html; charset=utf-8
+
 # Images
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate

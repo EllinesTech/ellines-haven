@@ -2,6 +2,33 @@
 # Serving index.html for .js/.css causes "Unable to preload CSS" / MIME crashes.
 /assets/*  /404.html  404
 
-# SPA fallback for client routes. Cloudflare Pages still serves real files first
-# (e.g. /library/index.html from prerender) before this rewrite applies.
+# Keep Google Search Console HTML verification on the exact .html URL
+# (Cloudflare "pretty URLs" otherwise 308-strips the extension).
+/google17caeb8194dadb8a.html  /google17caeb8194dadb8a.html  200!
+
+# Explicit SPA app routes — ensure 200 + index.html (not custom 404.html).
+# Cloudflare can serve /404.html for unmatched paths when only a bare /* rewrite exists.
+/trending               /index.html  200
+/trending/              /index.html  200
+/recommendations        /index.html  200
+/recommendations/       /index.html  200
+/challenges             /index.html  200
+/challenges/            /index.html  200
+/wishlist               /index.html  200
+/wishlist/              /index.html  200
+/cart                   /index.html  200
+/cart/                  /index.html  200
+/my-library             /index.html  200
+/my-library/            /index.html  200
+/reader-profile         /index.html  200
+/reader-profile/        /index.html  200
+/admin-profile          /index.html  200
+/admin-profile/         /index.html  200
+/change-password        /index.html  200
+/change-password/       /index.html  200
+/admin                  /index.html  200
+/admin/                 /index.html  200
+/admin/*                /index.html  200
+
+# SPA fallback for any other client route
 /*    /index.html   200

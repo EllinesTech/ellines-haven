@@ -19,5 +19,8 @@ Disallow: /wishlist
 Disallow: /reader-profile
 Disallow: /admin-profile
 Disallow: /change-password
+Disallow: /challenges
+Disallow: /login
+Disallow: /register
 
 Sitemap: https://haven.ellines.co.ke/sitemap.xml
