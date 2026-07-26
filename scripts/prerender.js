@@ -270,7 +270,9 @@ function buildBookRoutes() {
     description: b.description,
     image: b.image || '/og-image.png',
     type: 'book',
-    schema: b.rating ? {
+    bookTitle: b.title,
+    bookPrice: b.price,
+    schema: {
       '@context': 'https://schema.org',
       '@type': 'Book',
       name: b.title,
@@ -300,7 +302,7 @@ function buildBookRoutes() {
         url: `${ORIGIN}/book/${b.slug}`,
         seller: { '@type': 'Organization', name: SITE },
       } : undefined,
-    } : undefined,
+    },
   }));
 }
 
@@ -312,6 +314,88 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/** Crawlable body Google can index before React mounts (React replaces #root). */
+function buildSeoBody(route) {
+  const books = buildBookRoutes();
+  const nav = `
+    <nav aria-label="Site">
+      <a href="/">Home</a> ·
+      <a href="/library">Library</a> ·
+      <a href="/about">About</a> ·
+      <a href="/founder">Founder</a> ·
+      <a href="/contact">Contact</a> ·
+      <a href="/faq">FAQ</a>
+    </nav>`;
+
+  if (route.path.startsWith('/book/')) {
+    const book = books.find(b => b.path === route.path);
+    const name = escapeHtml(book?.bookTitle || book?.schema?.name || route.title.split(' by ')[0]);
+    const desc = escapeHtml(route.description);
+    const price = book?.bookPrice ?? book?.schema?.offers?.price;
+    const priceLine = price != null
+      ? `<p>Price: KES ${escapeHtml(String(price))} — buy once, read forever on Ellines Haven.</p>`
+      : '';
+    return `
+<main data-eh-seo="1">
+  <p><a href="/">Ellines Haven</a> — Kenya's digital bookstore</p>
+  ${nav}
+  <article>
+    <h1>${name}</h1>
+    <p>By <a href="/founder">Elijah Mwangi M</a></p>
+    <p>${desc}</p>
+    ${priceLine}
+    <p><a href="${escapeHtml(route.path)}">Open book page</a> · <a href="/library">Browse the library</a></p>
+  </article>
+</main>`;
+  }
+
+  if (route.path === '/') {
+    const list = books
+      .filter(b => b.bookPrice != null)
+      .slice(0, 10)
+      .map(b => {
+        const name = escapeHtml(b.bookTitle || b.schema.name);
+        const href = escapeHtml(b.path);
+        const blurb = escapeHtml(b.description.slice(0, 140));
+        return `<li><a href="${href}"><strong>${name}</strong></a> — ${blurb}</li>`;
+      })
+      .join('\n');
+    return `
+<main data-eh-seo="1">
+  <h1>Ellines Haven</h1>
+  <p>Home For The Story Soul — Kenya's premier digital bookstore for original novels and short stories by Elijah Mwangi M, inspired by true East African stories. Buy once, read forever.</p>
+  ${nav}
+  <h2>Featured books</h2>
+  <ul>${list}</ul>
+  <p>Not a hotel or vacation rental — Ellines Haven is an online bookstore based in Kenya.</p>
+</main>`;
+  }
+
+  if (route.path === '/library') {
+    const list = books.map(b => {
+      const name = escapeHtml(b.bookTitle || b.schema?.name || b.title.split(' by ')[0]);
+      return `<li><a href="${escapeHtml(b.path)}">${name}</a></li>`;
+    }).join('\n');
+    return `
+<main data-eh-seo="1">
+  <p><a href="/">Ellines Haven</a></p>
+  ${nav}
+  <h1>The Library</h1>
+  <p>${escapeHtml(route.description)}</p>
+  <ul>${list}</ul>
+</main>`;
+  }
+
+  return `
+<main data-eh-seo="1">
+  <p><a href="/">Ellines Haven</a> — Home For The Story Soul</p>
+  ${nav}
+  <h1>${escapeHtml(route.title.replace(` — ${SITE}`, '').replace(` | ${SITE}`, ''))}</h1>
+  <p>${escapeHtml(route.description)}</p>
+  <p>Ellines Haven is Kenya's digital bookstore for original African literature by Elijah Mwangi M.</p>
+</main>`;
 }
 
 function patchHtml(template, route) {
@@ -380,14 +464,22 @@ function patchHtml(template, route) {
   twPatch('twitter:description', description.slice(0, 200));
   twPatch('twitter:image',       absImage);
 
-  // 6. JSON-LD structured data — inject per-route schema replacing the generic WebSite one
+  // 6. JSON-LD structured data — inject per-route schema
   if (schema) {
     const schemaJson = JSON.stringify(schema, null, 2);
-    // Insert just before </head>
     html = html.replace(
       '</head>',
       `  <script type="application/ld+json" id="eh-route-schema">\n${schemaJson}\n  </script>\n</head>`
     );
+  }
+
+  // 7. Crawlable body — without this Google sees an empty SPA and ranks hotels instead
+  const seoBody = buildSeoBody(route);
+  const rootRe = /<div id="root"[^>]*>[\s\S]*?<\/div>/i;
+  if (!rootRe.test(html)) {
+    console.warn(`[prerender] WARN: #root not found for ${routePath}`);
+  } else {
+    html = html.replace(rootRe, `<div id="root">${seoBody}</div>`);
   }
 
   return html;
