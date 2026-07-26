@@ -597,8 +597,8 @@ function OfflineBooks({ user, catalog, onCountChange }) {
         author: full.author,
         cover: full.cover,
         slug: full.slug,
-      }, full.chapters);
-      setPackMsg(`Downloaded ${result.filename} — keep this file; it survives clearing browser data.`);
+      }, full.chapters, user.name || '');
+      setPackMsg(`Downloaded ${result.filename} — personal license; it won’t open for other accounts.`);
     } catch (e) {
       setPackMsg(e?.message || 'Could not create pack.');
     } finally {
@@ -661,8 +661,8 @@ function OfflineBooks({ user, catalog, onCountChange }) {
         <h3>No books on this device yet</h3>
         <p>
           Open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> for quick reading,
-          or <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> to download a <code>.ehbook</code> file
-          that survives clearing browser data — then import it here anytime.
+          or <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> for a locked <code>.ehbook</code> file
+          that survives browser cleans — and <strong>will not open if shared</strong> with anyone else.
         </p>
         <Link to="/library" className="btn btn-primary">Browse Books</Link>
       </div>
@@ -685,7 +685,7 @@ function OfflineBooks({ user, catalog, onCountChange }) {
             </span>
           </h2>
           <p style={{ fontSize:'0.8rem', color:'var(--muted)', margin:'4px 0 0' }}>
-            Quick cache survives refresh. Use <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> for a file that survives browser cleans.
+            Quick cache survives refresh. <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> packs are personal — locked to your account, not shareable.
           </p>
         </div>
       </div>

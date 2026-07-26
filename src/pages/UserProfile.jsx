@@ -374,8 +374,8 @@ export default function UserProfile() {
         author: full.author,
         cover: full.cover,
         slug: full.slug,
-      }, full.chapters);
-      showToast(`Downloaded ${result.filename}`);
+      }, full.chapters, user.name || '');
+      showToast(`Downloaded ${result.filename} (personal — not shareable)`);
     } catch (e) {
       showToast(e?.message || 'Download failed', 'err');
     }
@@ -712,7 +712,7 @@ export default function UserProfile() {
                     ))}
                   </div>
                   <div style={{padding:'14px 16px',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',fontSize:'0.78rem',color:'var(--muted)'}}>
-                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Quick saves live in this browser. <strong style={{color:'#6eb6ff'}}>Keep forever</strong> downloads an encrypted <code>.ehbook</code> to your Files/Downloads — that file survives clearing site data. Import it back while signed in to the same account.
+                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Quick saves live in this browser. <strong style={{color:'#6eb6ff'}}>Keep forever</strong> downloads a locked <code>.ehbook</code> that survives clearing site data. The unlock key stays on our servers — if someone else gets the file, it will not open.
                   </div>
                 </div>
               )}

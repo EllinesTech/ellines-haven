@@ -252,6 +252,12 @@ service cloud.firestore {
       allow delete: if false;         // No deletes
     }
 
+    // ── ehbook license keys (AES keys for Keep forever packs) ────────────────
+    // Cloud Functions / Admin SDK only — never expose keys to clients.
+    match /ehbook_licenses/{keyId} {
+      allow read, write: if false;
+    }
+
     // ── Catch-all: DENY everything not explicitly allowed ─────────────────────
     // Principle of least privilege: deny by default
     match /{collection}/{document} {

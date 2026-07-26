@@ -905,10 +905,10 @@ export default function Reader() {
       await saveBookOffline(user.email, book.id, book, chapters);
       setOfflineSaved(true);
       setOfflineChapters(chapters);
-      const result = await downloadEhbookPack(user.email, book, chapters);
+      const result = await downloadEhbookPack(user.email, book, chapters, user.name || '');
       setOfflineMsgTone('ok');
       setOfflineSaveMsg(
-        `Downloaded ${result.filename} · keep this file; import it anytime after a browser clean`
+        `Downloaded ${result.filename} · personal license only — won’t open if shared`
       );
     } catch (e) {
       setOfflineMsgTone('err');

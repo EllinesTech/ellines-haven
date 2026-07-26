@@ -2482,3 +2482,140 @@ exports.updateChallengeProgress = onCall(
 );
 
 console.log("[CloudFunctions] ✅ Reading Challenges system initialized - Phase 5-6");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── .ehbook keep-forever packs — server-held keys (anti-sharing) ─────────────
+// Ciphertext can be downloaded, but the AES key never lives in the file.
+// Only the licensed owner (who still owns the book) can fetch the unlock key.
+// ─────────────────────────────────────────────────────────────────────────────
+const SUPER_ADMIN_EMAIL = "ellines.haven@gmail.com";
+
+async function userOwnsBookForEhbook(email, bookId) {
+  const emailKey = String(email || "").toLowerCase().trim();
+  const id = String(bookId || "");
+  if (!emailKey || !id) return false;
+  if (emailKey === SUPER_ADMIN_EMAIL) return true;
+
+  const libSnap = await db.collection("libraries").doc(libDocId(emailKey)).get();
+  if (libSnap.exists) {
+    const books = libSnap.data().books || [];
+    if (books.some((b) => String(b.id) === id || String(b.bookId) === id)) return true;
+  }
+
+  try {
+    const grants = await db.collection("user_chapter_grants")
+      .where("userEmail", "==", emailKey)
+      .where("bookId", "==", id)
+      .limit(1)
+      .get();
+    if (!grants.empty) return true;
+  } catch (e) {
+    console.warn("[ehbook] grant check failed:", e.message);
+  }
+  return false;
+}
+
+/**
+ * issueEhbookExportKey — create a random AES key stored server-side for a pack.
+ * Client encrypts chapters with this key; the key is NOT written into the .ehbook file.
+ */
+exports.issueEhbookExportKey = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const emailKey = String(request.data?.email || "").toLowerCase().trim();
+    const bookId = String(request.data?.bookId || "").trim();
+    const title = String(request.data?.title || "").slice(0, 200);
+
+    if (!emailKey || !bookId) {
+      throw new HttpsError("invalid-argument", "email and bookId are required");
+    }
+    if (!(await userOwnsBookForEhbook(emailKey, bookId))) {
+      throw new HttpsError(
+        "permission-denied",
+        "You can only create a keep-forever pack for books you own."
+      );
+    }
+
+    const keyId = crypto.randomBytes(16).toString("hex");
+    const contentKey = crypto.randomBytes(32); // AES-256
+    const contentKeyB64 = contentKey.toString("base64");
+
+    await db.collection("ehbook_licenses").doc(keyId).set({
+      keyId,
+      email: emailKey,
+      bookId,
+      title,
+      contentKeyB64,
+      revoked: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAtMs: Date.now(),
+      lastExportAtMs: Date.now(),
+    });
+
+    console.log(`[ehbook] export key issued for ${emailKey} book=${bookId} keyId=${keyId}`);
+    return { keyId, contentKeyB64, version: 2 };
+  }
+);
+
+/**
+ * issueEhbookImportKey — return the unlock key only to the licensed owner.
+ * Shared files cannot be opened by another account.
+ */
+exports.issueEhbookImportKey = onCall(
+  {
+    region: "us-central1",
+    allowInvalidAppCheckToken: true,
+    invoker: "public",
+  },
+  async (request) => {
+    const emailKey = String(request.data?.email || "").toLowerCase().trim();
+    const bookId = String(request.data?.bookId || "").trim();
+    const keyId = String(request.data?.keyId || "").trim();
+
+    if (!emailKey || !bookId || !keyId) {
+      throw new HttpsError("invalid-argument", "email, bookId, and keyId are required");
+    }
+
+    const snap = await db.collection("ehbook_licenses").doc(keyId).get();
+    if (!snap.exists) {
+      throw new HttpsError(
+        "not-found",
+        "This pack is not recognized. It may be damaged or was not created by Ellines Haven."
+      );
+    }
+
+    const lic = snap.data() || {};
+    if (lic.revoked === true) {
+      throw new HttpsError("permission-denied", "This pack has been revoked. Download a new one from your library.");
+    }
+    if (String(lic.email || "").toLowerCase() !== emailKey) {
+      throw new HttpsError(
+        "permission-denied",
+        "This pack is licensed to another account and cannot be shared."
+      );
+    }
+    if (String(lic.bookId || "") !== bookId) {
+      throw new HttpsError("permission-denied", "This pack does not match the requested book.");
+    }
+    if (!(await userOwnsBookForEhbook(emailKey, bookId))) {
+      throw new HttpsError(
+        "permission-denied",
+        "Your library no longer includes this book, so the pack cannot be unlocked."
+      );
+    }
+
+    await snap.ref.set({
+      lastImportAtMs: Date.now(),
+      importCount: admin.firestore.FieldValue.increment(1),
+    }, { merge: true }).catch(() => {});
+
+    console.log(`[ehbook] import key issued for ${emailKey} book=${bookId} keyId=${keyId}`);
+    return { contentKeyB64: lic.contentKeyB64, version: 2 };
+  }
+);
+
+console.log("[CloudFunctions] ✅ ehbook anti-sharing license keys initialized");

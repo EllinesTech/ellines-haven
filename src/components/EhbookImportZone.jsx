@@ -66,10 +66,11 @@ export default function EhbookImportZone({
     <div className={`ehbook-import ${compact ? 'ehbook-import--compact' : ''} ${className}`}>
       {!compact && (
         <div className="ehbook-import__copy">
-          <strong>Keep-forever packs</strong>
+          <strong>Keep-forever packs (personal license)</strong>
           <p>
-            Download a <code>.ehbook</code> file to your phone or computer. It survives clearing
-            browser data — import it anytime while signed in to the same account.
+            Download a locked <code>.ehbook</code> file to your phone or computer. It survives clearing
+            browser data — but it <strong>will not open for anyone else</strong>. Only your signed-in
+            account can unlock it (you must still own the book).
           </p>
         </div>
       )}
@@ -90,7 +91,7 @@ export default function EhbookImportZone({
           {busy ? 'Importing…' : 'Import .ehbook'}
         </button>
         {compact && (
-          <span className="ehbook-import__hint">Restores a pack after browser clean</span>
+          <span className="ehbook-import__hint">Personal license · won’t open for other accounts</span>
         )}
       </div>
       {msg && (
