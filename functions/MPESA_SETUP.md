@@ -63,28 +63,39 @@ For a **Till number**, change `TransactionType` in `functions/index.js` to `Cust
 
 ## Part 2 — Paystack
 
-Paystack is **already live** on the site using the public key in `Cart.jsx`.
+Paystack is **already live** on the site using the shared Ellines group keys (same as tech.ellines.co.ke / ellines.co.ke).
+
+Public key (frontend / Cloudflare / `.env.production`):
+`pk_live_081be2d1bdd05a16be4cc91b1267553a6444b463`
 
 ### What's wired:
 - Frontend: `js.paystack.co/v1/inline.js` popup for M-Pesa, Visa, Mastercard, bank
-- Backend: `paystackWebhook` Cloud Function verifies HMAC-SHA512 signature
-- Backend: `verifyPaystackPayment` callable — frontend double-check after popup closes
+- Backend: `verifyPaystackPayment` callable — confirms payment + unlocks books after checkout
+- Shared group webhook (hub): receives Paystack `charge.success` for the whole Ellines account
+- Optional backup: Haven still has a `paystackWebhook` Cloud Function if you ever add a second endpoint
 
-### To set the webhook secret:
+### To set the webhook secret (must match the hub live secret):
 
 ```bash
 firebase functions:secrets:set PAYSTACK_SECRET
 ```
 
-Enter your Paystack **Secret Key** (`sk_live_…`).
+Enter the same Paystack **Secret Key** (`sk_live_…`) used by tech.ellines.co.ke / ellines.co.ke.
 
-### Register webhook URL in Paystack Dashboard:
+### Register webhook URL in Paystack Dashboard (Live):
+
+Use the **shared hub webhook** (same as tech.ellines.co.ke):
 
 ```
-https://us-central1-ellines-haven-web.cloudfunctions.net/paystackWebhook
+https://ellines.co.ke/api/paystack/webhook
 ```
 
 Events to subscribe: `charge.success`
+
+Set this in: [Paystack Dashboard](https://dashboard.paystack.com) → Settings → API Keys & Webhooks → Live → Webhook URL.
+
+Do **not** point the main account webhook at the old Haven-only URL  
+(`…cloudfunctions.net/paystackWebhook`) when using the shared group account.
 
 ---
 

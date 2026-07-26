@@ -443,6 +443,9 @@ exports.queryPaymentStatus = onCall(
 // ── Paystack Webhook ──────────────────────────────────────────────────────────
 // Paystack POSTs here after every payment event.
 // We verify the signature, then unlock books on charge.success.
+// Shared Ellines Paystack account: primary webhook is the hub
+// https://ellines.co.ke/api/paystack/webhook (same as tech.ellines.co.ke).
+// Haven unlocks mainly via verifyPaystackPayment; this endpoint is optional backup.
 exports.paystackWebhook = onRequest(
   { secrets: [PAYSTACK_SECRET], region: "us-central1" },
   async (req, res) => {
