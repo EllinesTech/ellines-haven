@@ -1,62 +1,82 @@
 # ── Security + Cache headers for Cloudflare Pages ───────────────────────────
 # IMPORTANT: Only ONE block per path pattern. Later blocks override earlier ones.
+# Always set CDN-Cache-Control on specific routes — /* bleeds otherwise.
 #
-# HTML must be cacheable for Google indexing (public) but still revalidate so
+# HTML must be cacheable for Google indexing (public) but always revalidate so
 # browsers never keep a stale index.html that points at old hashed JS chunks.
-# NEVER use no-store here — it blocks Google from indexing the site.
+# NEVER use no-store on HTML — it blocks Google from indexing the site.
 
-# HTML pages — cacheable + always revalidate (SEO + fresh deploys)
+# Default — HTML + unhashed files: revalidate every time (browser + CDN)
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Cache-Control: public, max-age=0, must-revalidate
-  CDN-Cache-Control: public, max-age=3600, must-revalidate
+  CDN-Cache-Control: public, max-age=0, must-revalidate
 
 # Hashed JS/CSS bundles — safe to cache forever (Vite content-hashes filenames)
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
 
-# Service Worker — never cache
+# Service Worker — never cache (kill-switch must reach clients immediately)
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  CDN-Cache-Control: no-store
   Pragma: no-cache
+
+# Deploy version stamp — never cache (app polls this to detect new deploys)
+/version.json
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+  CDN-Cache-Control: no-store
+  Pragma: no-cache
+  Content-Type: application/json
 
 # PWA manifest — short cache
 /manifest.json
   Cache-Control: public, max-age=3600, must-revalidate
+  CDN-Cache-Control: public, max-age=3600, must-revalidate
   Content-Type: application/json
 
 # Sitemap — 1 day cache (SEO: Google caches this anyway)
 /sitemap.xml
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
   Content-Type: application/xml
 
 # Robots
 /robots.txt
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
   Content-Type: text/plain
 
 # Images
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.jpg
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.jpeg
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.webp
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.svg
   Cache-Control: public, max-age=86400, must-revalidate
+  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 # Fonts
 /*.woff2
   Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable
 
 /*.woff
   Cache-Control: public, max-age=31536000, immutable
+  CDN-Cache-Control: public, max-age=31536000, immutable

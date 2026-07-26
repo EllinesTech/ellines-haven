@@ -2,22 +2,58 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- CRITICAL: Kill any service worker IMMEDIATELY before anything else loads -->
-    <!-- This prevents stale SW cache from breaking JS chunk loading -->
+    <!-- CRITICAL: Displace stale SWs + clear Cache Storage before modules load.
+         Old builds registered /sw.js?v=STAMP — those never auto-update to the
+         kill-switch. We register /sw.js (stable URL) so it can take over, clear
+         caches, and self-unregister. Unregister alone cannot run if a caching SW
+         is still serving a stale index.html from Cache Storage. -->
     <script>
       (function(){
         try {
-          if ('serviceWorker' in navigator) {
-            // Synchronously check and unregister SWs
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              regs.forEach(function(r) { r.unregister(); });
+          if (!('serviceWorker' in navigator)) return;
+
+          var hadController = !!navigator.serviceWorker.controller;
+          var reloadKey = 'eh_sw_kill_reload';
+
+          // One reload after an old controlling SW is replaced — not on first install.
+          navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (!hadController) return;
+            if (sessionStorage.getItem(reloadKey)) return;
+            if (location.pathname.indexOf('/read') === 0) return;
+            sessionStorage.setItem(reloadKey, '1');
+            var u = location.pathname + '?_eh=' + Date.now() + (location.hash || '');
+            location.replace(u);
+          });
+
+          navigator.serviceWorker.addEventListener('message', function(e) {
+            if (!e.data || e.data.type !== 'EH_SW_KILLED') return;
+            if (!hadController) return;
+            if (sessionStorage.getItem(reloadKey)) return;
+            if (location.pathname.indexOf('/read') === 0) return;
+            sessionStorage.setItem(reloadKey, '1');
+            location.replace(location.pathname + '?_eh=' + Date.now() + (location.hash || ''));
+          });
+
+          // Register kill-switch at a stable URL (updateViaCache:none bypasses HTTP cache)
+          navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+            .then(function(reg) { return reg.update(); })
+            .catch(function() {});
+
+          // Drop legacy registrations that used ?v= query stamps (different script URL)
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) {
+              var src = (r.active && r.active.scriptURL)
+                || (r.waiting && r.waiting.scriptURL)
+                || (r.installing && r.installing.scriptURL)
+                || '';
+              if (src.indexOf('sw.js?') !== -1) r.unregister();
             });
-            // Nuke all caches
-            if ('caches' in self) {
-              caches.keys().then(function(keys) {
-                keys.forEach(function(k) { caches.delete(k); });
-              });
-            }
+          });
+
+          if ('caches' in self) {
+            caches.keys().then(function(keys) {
+              keys.forEach(function(k) { caches.delete(k); });
+            });
           }
         } catch(e) {}
       })();
@@ -300,22 +336,25 @@
     </script>
     <!-- CRITICAL: Stale deploy guard — MUST be in <head> BEFORE module scripts.
          Vite moves <script type="module"> into <head> during build, so this guard
-         must also be in <head> to run first and redirect stale browsers. -->
+         must also be in <head> to run first and redirect stale browsers.
+         Do NOT throw (races chunk error handlers). Do NOT write the new stamp
+         until a clean load — writing early made Refresh skip this guard. -->
     <script>
       (function(){
         var STAMP = '__BUILD_STAMP__';
         var KEY   = 'eh_build_v';
         var stored = sessionStorage.getItem(KEY);
         if (stored && stored !== STAMP) {
-          sessionStorage.setItem(KEY, STAMP);
+          window.__EH_RELOADING__ = true;
+          var target = window.location.pathname + '?v=' + encodeURIComponent(STAMP) + (window.location.hash || '');
+          var go = function(){ window.location.replace(target); };
           if ('caches' in window) {
             caches.keys().then(function(k){ return Promise.all(k.map(function(n){ return caches.delete(n); })); })
-              .then(function(){ window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP); })
-              .catch(function(){ window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP); });
+              .then(go).catch(go);
           } else {
-            window.location.replace(window.location.href.split('?')[0] + '?v=' + STAMP);
+            go();
           }
-          throw new Error('Stale build — reloading for ' + STAMP);
+          return;
         }
         sessionStorage.setItem(KEY, STAMP);
       })();
@@ -324,20 +363,6 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <!-- Service Worker: DISABLED — causes cache corruption across deploys -->
-    <!-- The site is hosted on Cloudflare Pages CDN which handles caching natively. -->
-    <!-- A faulty SW is worse than no SW. PWA install still works via manifest.json. -->
-    <script>
-      // Unregister any old service workers so users who had them get cleaned up
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          regs.forEach(r => r.unregister());
-        });
-        // Clear all SW caches
-        if ('caches' in window) {
-          caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
-        }
-      }
-    </script>
+    <!-- Kill-switch SW is registered in <head> at stable /sw.js (never caches /assets/). -->
   </body>
 </html>

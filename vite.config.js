@@ -47,11 +47,8 @@ function stampPublicAssets() {
           return `${attr}="${base}?v=${BUILD_STAMP}"`;
         }
       );
-      // ── Stamp the SW registration URL ──────────────────────────────────────
-      html = html.replace(
-        /\/sw\.js(\?v=[\w]+)?/g,
-        `/sw.js?v=${BUILD_STAMP}`
-      );
+      // Keep /sw.js at a STABLE URL (no ?v=). Query-stamped registrations never
+      // received kill-switch updates, trapping users on old cached HTML.
       // ── Inject unique build stamp comment so Cloudflare always serves fresh index.html ──
       html = html.replace(
         '</head>',

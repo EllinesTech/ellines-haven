@@ -1,40 +1,44 @@
 /**
  * ELLINES HAVEN — Service Worker (KILL SWITCH)
- * 
- * This SW does ONE thing: immediately unregisters itself and clears all caches.
- * We disabled the SW to prevent cache corruption on deploys.
- * This file exists only to clean up old SW instances that are still running.
+ *
+ * Never caches anything (CDN owns /assets/ hashed bundles).
+ * Purpose: displace any lingering old caching SW, clear Cache Storage,
+ * claim clients, then unregister so refresh always hits the network.
  */
 
-// Immediately clear all caches and unregister
 self.addEventListener('install', (event) => {
-  // Skip waiting so this version activates immediately
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    Promise.all([
-      // Delete ALL caches
-      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))),
-      // Claim all clients
-      self.clients.claim(),
-    ]).then(() => {
-      // Unregister this service worker from all clients
-      return self.registration.unregister();
-    }).catch(() => {
-      // Silently fail if unregister isn't available
-    })
-  );
+  event.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch (_) { /* ignore */ }
+
+    try {
+      await self.clients.claim();
+    } catch (_) { /* ignore */ }
+
+    try {
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of clients) {
+        client.postMessage({ type: 'EH_SW_KILLED' });
+      }
+    } catch (_) { /* ignore */ }
+
+    try {
+      await self.registration.unregister();
+    } catch (_) { /* ignore */ }
+  })());
 });
 
-// Silently handle any messages to prevent "message channel closed" errors
 self.addEventListener('message', (event) => {
-  // Don't send async responses - just ignore all messages
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
-// Pass ALL requests through without interception
-self.addEventListener('fetch', () => {
-  // Do nothing — let browser handle everything natively
-});
-
+// Never intercept — do not call event.respondWith(). Browser/CDN handle all fetches.
+self.addEventListener('fetch', () => {});

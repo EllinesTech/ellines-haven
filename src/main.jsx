@@ -51,85 +51,97 @@ if (typeof window !== 'undefined') {
     }
   };
 
+  const forceFreshNavigation = () => {
+    if (window.__EH_RELOADING__) return;
+    window.__EH_RELOADING__ = true;
+    try { sessionStorage.removeItem('eh_build_v'); } catch { /* ignore */ }
+    const bust = () => {
+      window.location.replace(window.location.pathname + '?_eh=' + Date.now() + (window.location.hash || ''));
+    };
+    const cleanup = Promise.all([
+      'serviceWorker' in navigator
+        ? navigator.serviceWorker
+            .register('/sw.js', { scope: '/', updateViaCache: 'none' })
+            .then((reg) => reg.update())
+            .catch(() => {})
+            .then(() =>
+              navigator.serviceWorker.getRegistrations().then((regs) =>
+                Promise.all(
+                  regs.map((r) => {
+                    const src =
+                      r.active?.scriptURL || r.waiting?.scriptURL || r.installing?.scriptURL || '';
+                    return src.includes('sw.js?') ? r.unregister() : Promise.resolve();
+                  })
+                )
+              )
+            )
+        : Promise.resolve(),
+      'caches' in window
+        ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        : Promise.resolve(),
+    ]);
+    const timer = setTimeout(bust, 800);
+    cleanup.then(() => { clearTimeout(timer); bust(); }).catch(() => { clearTimeout(timer); bust(); });
+  };
+
+  // True stale-chunk / MIME failures only — do NOT match every /assets/ runtime error
+  const isStaleChunkMessage = (msg = '', error = null) =>
+    msg.includes('Loading chunk') ||
+    msg.includes('Loading CSS chunk') ||
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('error loading dynamically imported module') ||
+    msg.includes('Unable to preload CSS') ||
+    /MIME type .* text\/html/i.test(msg) ||
+    /Unexpected token '<'/.test(msg) ||
+    error?.name === 'ChunkLoadError';
+
   // Global error event handler
   window.addEventListener('error', (e) => {
-    const isChunkError = 
-      e.message?.includes('Loading chunk') || 
-      e.message?.includes('Failed to fetch dynamically imported module') ||
-      e.message?.includes('Importing a module script failed') ||
-      e.message?.includes('error loading dynamically imported module') ||
-      e.filename?.includes('/assets/') ||
-      (e.error && (
-        e.error.name === 'ChunkLoadError' ||
-        e.error.message?.includes('chunk')
-      ));
-    
-    if (isChunkError) {
-      console.warn('[Global Chunk Error Handler] Detected stale chunk:', e.message);
-      
-      // Never reload while user is reading — they'd lose their progress
-      if (window.location.pathname.startsWith('/read')) {
-        console.warn('[Global Chunk Error Handler] Skipping reload - user is reading');
-        return;
-      }
-      
-      if (!shouldAllowReload()) {
-        console.warn('[Global Chunk Error Handler] Too many reloads, showing manual refresh UI');
-        return;
-      }
-      
-      recordReload();
-      
-      console.log('[Global Chunk Error Handler] Auto-reloading to fetch fresh chunks...');
-      
-      // Clear all caches and reload
-      if ('caches' in window) {
-        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-          .then(() => window.location.reload())
-          .catch(() => window.location.reload());
-      } else {
-        window.location.reload();
-      }
+    if (window.__EH_RELOADING__) return;
+    if (!isStaleChunkMessage(e.message || '', e.error)) return;
+
+    console.warn('[Global Chunk Error Handler] Detected stale chunk:', e.message);
+
+    // Never reload while user is reading — they'd lose their progress
+    if (window.location.pathname.startsWith('/read')) {
+      console.warn('[Global Chunk Error Handler] Skipping reload - user is reading');
+      return;
     }
+
+    if (!shouldAllowReload()) {
+      console.warn('[Global Chunk Error Handler] Too many reloads, showing manual refresh UI');
+      return;
+    }
+
+    recordReload();
+    console.log('[Global Chunk Error Handler] Auto-reloading to fetch fresh chunks...');
+    forceFreshNavigation();
   });
 
   // Promise rejection handler for dynamic imports
   window.addEventListener('unhandledrejection', (e) => {
-    const isChunkError = 
-      e.reason?.message?.includes('Failed to fetch dynamically imported module') ||
-      e.reason?.message?.includes('Loading chunk') ||
-      e.reason?.name === 'ChunkLoadError';
-      
-    if (isChunkError) {
-      console.warn('[Promise Rejection Handler] Detected chunk error:', e.reason?.message);
-      
-      // Don't reload while reading
-      if (window.location.pathname.startsWith('/read')) {
-        console.warn('[Promise Rejection Handler] Skipping reload - user is reading');
-        return;
-      }
-      
-      if (!shouldAllowReload()) {
-        console.warn('[Promise Rejection Handler] Too many reloads, skipping');
-        return;
-      }
-      
-      recordReload();
-      
-      console.log('[Promise Rejection Handler] Auto-reloading...');
-      
-      // Clear caches and reload
-      if ('caches' in window) {
-        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-          .then(() => window.location.reload())
-          .catch(() => window.location.reload());
-      } else {
-        window.location.reload();
-      }
-      
-      // Prevent the error from bubbling up
-      e.preventDefault();
+    if (window.__EH_RELOADING__) return;
+    const reason = e.reason;
+    const msg = reason?.message || String(reason || '');
+    if (!isStaleChunkMessage(msg, reason)) return;
+
+    console.warn('[Promise Rejection Handler] Detected chunk error:', msg);
+
+    if (window.location.pathname.startsWith('/read')) {
+      console.warn('[Promise Rejection Handler] Skipping reload - user is reading');
+      return;
     }
+
+    if (!shouldAllowReload()) {
+      console.warn('[Promise Rejection Handler] Too many reloads, skipping');
+      return;
+    }
+
+    recordReload();
+    console.log('[Promise Rejection Handler] Auto-reloading...');
+    forceFreshNavigation();
+    e.preventDefault();
   });
 }
 

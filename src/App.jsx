@@ -45,22 +45,70 @@ import { db } from './firebase';
 
 import './App.css';
 
-/* ── Reliable reload helper — clears all SW caches then hard-reloads ─────────
-   Works on iOS Safari, Android Chrome, and all desktop browsers.
-   The setTimeout(0) ensures reload fires even if caches.keys() is slow.
+/* ── Reliable reload helper — bust caches and force a fresh HTML fetch ───────
+   location.reload() is NOT enough after a deploy: browsers/CDN can keep serving
+   the same stale index.html that points at deleted /assets/* chunk hashes.
+   We navigate to a cache-busted URL and clear the build stamp so the head guard
+   can reconcile against freshly fetched HTML.
 ────────────────────────────────────────────────────────────────────────── */
 function hardReload() {
-  localStorage.removeItem('eh_chunk_reload');
-  if ('caches' in window) {
-    // Start cache clearing but don't wait — reload regardless after 600ms
-    const clearTimer = setTimeout(() => window.location.reload(), 600);
-    caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
-      .then(() => { clearTimeout(clearTimer); window.location.reload(); })
-      .catch(() => { clearTimeout(clearTimer); window.location.reload(); });
-  } else {
-    window.location.reload();
-  }
+  if (typeof window === 'undefined' || window.__EH_RELOADING__) return;
+  window.__EH_RELOADING__ = true;
+
+  try {
+    localStorage.removeItem('eh_chunk_reload');
+    localStorage.removeItem('eh_chunk_reload_global');
+    sessionStorage.removeItem('eh_build_v');
+  } catch { /* ignore */ }
+
+  const bust = () => {
+    window.location.replace(window.location.pathname + '?_eh=' + Date.now() + (window.location.hash || ''));
+  };
+
+  // Register kill-switch so it can displace a still-controlling caching SW before
+  // navigation. Plain unregister() does not stop the current controller mid-flight.
+  const cleanup = Promise.all([
+    'serviceWorker' in navigator
+      ? navigator.serviceWorker
+          .register('/sw.js', { scope: '/', updateViaCache: 'none' })
+          .then((reg) => reg.update())
+          .catch(() => {})
+          .then(() =>
+            navigator.serviceWorker.getRegistrations().then((regs) =>
+              Promise.all(
+                regs.map((r) => {
+                  const src =
+                    r.active?.scriptURL || r.waiting?.scriptURL || r.installing?.scriptURL || '';
+                  // Drop legacy ?v= stamped registrations; leave stable /sw.js to activate
+                  return src.includes('sw.js?') ? r.unregister() : Promise.resolve();
+                })
+              )
+            )
+          )
+      : Promise.resolve(),
+    'caches' in window
+      ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      : Promise.resolve(),
+  ]);
+
+  const clearTimer = setTimeout(bust, 800);
+  cleanup.then(() => { clearTimeout(clearTimer); bust(); }).catch(() => { clearTimeout(clearTimer); bust(); });
+}
+
+function isChunkLoadError(err) {
+  const msg = String(err?.message || err || '');
+  return (
+    err?.name === 'ChunkLoadError' ||
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Importing a module script failed') ||
+    msg.includes('error loading dynamically imported module') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('Loading CSS chunk') ||
+    msg.includes('Unable to preload CSS') ||
+    msg.includes('error loading CSS') ||
+    /MIME type .* text\/html/i.test(msg) ||
+    /Unexpected token '<'/.test(msg)
+  );
 }
 
 /* ── Chunk error boundary — auto-reloads on stale deploy cache ──────────────
@@ -74,13 +122,7 @@ class ChunkErrorBoundary extends Component {
     this.state = { hasError: false, isChunkError: false };
   }
   static getDerivedStateFromError(err) {
-    const isChunkError =
-      err?.name === 'ChunkLoadError' ||
-      (err?.message || '').includes('Failed to fetch dynamically imported module') ||
-      (err?.message || '').includes('Importing a module script failed') ||
-      (err?.message || '').includes('error loading dynamically imported module');
-
-    if (isChunkError) {
+    if (isChunkLoadError(err)) {
       const reloadKey = 'eh_chunk_reload';
       const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
       const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
@@ -142,8 +184,8 @@ class ChunkErrorBoundary extends Component {
         }}>
           <div style={{ fontSize: '2.5rem' }}>⚠️</div>
           <h2 style={{ color: '#c9a84c', margin: 0, fontSize: '1.1rem' }}>Something went wrong</h2>
-          <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 320, margin: 0, fontSize: '0.85rem' }}>
-            An unexpected error occurred. Try refreshing the page.
+          <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340, margin: 0, fontSize: '0.85rem' }}>
+            A site update may be loading. Refresh to fetch the latest version.
           </p>
           <button
             style={{
@@ -190,16 +232,28 @@ class PageErrorBoundary extends Component {
           <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340, margin: 0, fontSize: '0.83rem' }}>
             {this.state.error?.message || 'An unexpected error occurred.'}
           </p>
-          <button
-            style={{
-              marginTop: 8, padding: '9px 22px', background: 'rgba(201,168,76,0.12)',
-              color: '#c9a84c', border: '1px solid rgba(201,168,76,0.3)',
-              borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
-            }}
-            onClick={() => this.setState({ hasError: false, error: null })}
-          >
-            Try Again
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
+            <button
+              style={{
+                padding: '9px 22px', background: 'rgba(201,168,76,0.12)',
+                color: '#c9a84c', border: '1px solid rgba(201,168,76,0.3)',
+                borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
+              }}
+              onClick={() => this.setState({ hasError: false, error: null })}
+            >
+              Try Again
+            </button>
+            <button
+              style={{
+                padding: '9px 22px', background: '#c9a84c', color: '#000',
+                border: 'none', borderRadius: 6, cursor: 'pointer',
+                fontWeight: 700, fontSize: '0.85rem',
+              }}
+              onClick={hardReload}
+            >
+              Refresh Page
+            </button>
+          </div>
         </div>
       );
     }
@@ -719,12 +773,7 @@ function SWUpdateBanner() {
           // New deploy detected — don't interrupt readers
           const isReading = location.pathname.startsWith('/read');
           if (isReading) return;
-
-          // Clear all caches then reload to serve the new version
-          if ('caches' in window) {
-            await caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
-          }
-          window.location.reload();
+          hardReload();
         }
       } catch {
         // Network error — ignore, will retry next interval
@@ -814,7 +863,7 @@ function AutoRefresh() {
     if (!enabled || isAdmin || isReading) return;
 
     const ms = interval * 60 * 1000; // minutes → ms
-    const timer = setTimeout(() => window.location.reload(), ms);
+    const timer = setTimeout(() => hardReload(), ms);
     return () => clearTimeout(timer);
   }, [siteControls?.autoRefreshEnabled, siteControls?.autoRefreshInterval, user?.role, pathname]);
 
@@ -860,17 +909,17 @@ export default function App() {
                     <Route path="/*" element={
                       <Layout>
                         <Routes>
-                          <Route path="/"              element={<Home />} />
-                          <Route path="/library"       element={<Library />} />
+                          <Route path="/"              element={<PageErrorBoundary label="Home failed to load"><Home /></PageErrorBoundary>} />
+                          <Route path="/library"       element={<PageErrorBoundary label="Library failed to load"><Library /></PageErrorBoundary>} />
                           <Route path="/trending"      element={<PageErrorBoundary label="Trending failed to load"><Trending /></PageErrorBoundary>} />
-                          <Route path="/book/:id"      element={<BookDetail />} />
-                          <Route path="/cart"          element={<Cart />} />
+                          <Route path="/book/:id"      element={<PageErrorBoundary label="Book failed to load"><BookDetail /></PageErrorBoundary>} />
+                          <Route path="/cart"          element={<PageErrorBoundary label="Cart failed to load"><Cart /></PageErrorBoundary>} />
                           <Route path="/login"         element={<Login />} />
                           <Route path="/register"      element={<Register />} />
                           <Route path="/my-library"    element={<PageErrorBoundary label="My Library failed to load"><MyLibrary /></PageErrorBoundary>} />
-                          <Route path="/about"         element={<About />} />
-                          <Route path="/founder"       element={<Founder />} />
-                          <Route path="/contact"       element={<Contact />} />
+                          <Route path="/about"         element={<PageErrorBoundary label="About failed to load"><About /></PageErrorBoundary>} />
+                          <Route path="/founder"       element={<PageErrorBoundary label="Founder failed to load"><Founder /></PageErrorBoundary>} />
+                          <Route path="/contact"       element={<PageErrorBoundary label="Contact failed to load"><Contact /></PageErrorBoundary>} />
                           <Route path="/profile"       element={<PageErrorBoundary label="Profile failed to load"><UserProfile /></PageErrorBoundary>} />
                           <Route path="/reader/:email" element={<PageErrorBoundary label="Reader Profile failed to load"><ReaderProfile /></PageErrorBoundary>} />
                           <Route path="/admin-profile" element={<PageErrorBoundary label="Admin Profile failed to load"><AdminProfile /></PageErrorBoundary>} />
