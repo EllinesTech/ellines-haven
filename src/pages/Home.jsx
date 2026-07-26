@@ -515,17 +515,24 @@ export default function Home() {
     <main className="home-page">
 
       {/* ══════════════════════════════════════
-          HERO — brand first, one job: start reading
+          HERO — cinematic, brand-first
       ══════════════════════════════════════ */}
       <section className="hero">
-        <div className="hero__glow hero__glow--a" aria-hidden="true" />
-        <div className="hero__glow hero__glow--b" aria-hidden="true" />
-        <div className="hero__glow hero__glow--c" aria-hidden="true" />
+        <div className="hero__bg" aria-hidden="true">
+          <img
+            src={c.hero_poster || '/poster4.png'}
+            alt=""
+            className="hero__bg-img"
+          />
+          <div className="hero__bg-veil" />
+          <div className="hero__bg-glow" />
+        </div>
         <div className="hero__grain" aria-hidden="true" />
 
         <div className="container hero__inner">
           <div className="hero__copy">
             <p className="hero__brand">Ellines Haven</p>
+            <span className="hero__rule" aria-hidden="true" />
             <p className="hero__eyebrow">
               <EditableField field="eyebrow">{c.eyebrow}</EditableField>
             </p>
@@ -545,11 +552,11 @@ export default function Home() {
                 <EditableField field="hero_btn_primary">{c.hero_btn_primary}</EditableField>
               </Link>
               {sampleBook ? (
-                <Link to={readPath(sampleBook)} className="btn btn-outline">
-                  Free Chapter
+                <Link to={readPath(sampleBook)} className="btn btn-outline hero__cta-secondary">
+                  Read a Free Chapter
                 </Link>
               ) : (
-                <Link to="/founder" className="btn btn-outline">
+                <Link to="/founder" className="btn btn-outline hero__cta-secondary">
                   <EditableField field="hero_btn_secondary">{c.hero_btn_secondary}</EditableField>
                 </Link>
               )}
@@ -563,7 +570,21 @@ export default function Home() {
           </div>
 
           <div className="hero__visual">
-            <div className="hero__visual-glow" aria-hidden="true" />
+            <div className="hero__shelf">
+              {(featured.filter(b => b.cover).slice(0, 3).length >= 2
+                ? featured.filter(b => b.cover).slice(0, 3)
+                : activeBooks.filter(b => b.cover).slice(0, 3)
+              ).map((b, i) => (
+                <Link
+                  key={b.id}
+                  to={bookPath(b)}
+                  className={`hero__shelf-book hero__shelf-book--${i + 1}`}
+                  title={b.title}
+                >
+                  <img src={b.cover} alt="" />
+                </Link>
+              ))}
+            </div>
             <div className="hero__poster-frame">
               <EditableImage
                 field="hero_poster"
@@ -584,7 +605,7 @@ export default function Home() {
           onClick={() => document.getElementById('home-hook')?.scrollIntoView({ behavior: 'smooth' })}
           aria-label="Scroll to featured story"
         >
-          <span>Keep reading</span>
+          <span>Discover stories</span>
           <div className="hero__scroll-arrow" />
         </button>
       </section>
