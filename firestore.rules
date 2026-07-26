@@ -90,6 +90,14 @@ service cloud.firestore {
       }
     }
 
+    // ── Cached book recommendations (keyed by user email) ─────────────────────
+    match /book_recommendations/{emailId} {
+      allow read:   if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn();
+      allow delete: if false;
+    }
+
     // ── Notifications (user-facing) ───────────────────────────────────────────
     match /user_notifications/{d} {
       allow read:   if isLoggedIn();  // User can read their own notifications (app enforces)

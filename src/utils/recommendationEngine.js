@@ -1,82 +1,61 @@
-import { collection, query, where, getDocs, limit, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { BOOKS } from '../data/books';
 
+const libDocId = (email) => (email || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+function bookGenres(book) {
+  if (Array.isArray(book?.genres) && book.genres.length) return book.genres;
+  if (book?.genre) return [book.genre];
+  return [];
+}
+
 /**
  * Get user's reading profile (genres, avg rating, books read)
+ * Libraries are one doc per user: libraries/{sanitizedEmail} → { books: [...] }
  */
 export async function getUserReadingProfile(userEmail) {
   try {
-    const libraryQuery = query(
-      collection(db, 'libraries'),
-      where('email', '==', userEmail.toLowerCase())
-    );
-    const libraryDocs = await getDocs(libraryQuery);
-    
-    if (libraryDocs.empty) {
-      return null; // No reading history
-    }
+    const snap = await getDoc(doc(db, 'libraries', libDocId(userEmail)));
+    if (!snap.exists()) return null;
+
+    const owned = snap.data().books || [];
+    if (!owned.length) return null;
 
     const genres = {};
     const ratings = [];
-    let totalBooks = 0;
 
-    libraryDocs.forEach(doc => {
-      const book = doc.data();
-      totalBooks++;
-      
-      // Track genres
-      if (book.genres && Array.isArray(book.genres)) {
-        book.genres.forEach(genre => {
-          genres[genre] = (genres[genre] || 0) + 1;
-        });
-      }
-      
-      // Track ratings
-      if (book.rating && typeof book.rating === 'number') {
-        ratings.push(book.rating);
-      }
+    owned.forEach((lb) => {
+      const cat = BOOKS.find((b) => b.id === lb.id) || lb;
+      bookGenres(cat).forEach((g) => {
+        genres[g] = (genres[g] || 0) + 1;
+      });
+      const rating = typeof cat.rating === 'number' ? cat.rating : null;
+      if (rating != null) ratings.push(rating);
     });
 
-    // Get review data
-    const reviewsQuery = query(
-      collection(db, 'book_reviews'),
-      where('email', '==', userEmail.toLowerCase())
-    );
-    const reviewDocs = await getDocs(reviewsQuery);
-    
-    reviewDocs.forEach(doc => {
-      const review = doc.data();
-      if (review.rating && typeof review.rating === 'number') {
-        ratings.push(review.rating);
-      }
-      if (review.genres && Array.isArray(review.genres)) {
-        review.genres.forEach(genre => {
-          genres[genre] = (genres[genre] || 0) + 0.5; // Lower weight for reviews
-        });
-      }
-    });
-
-    const avgRating = ratings.length > 0 
-      ? ratings.reduce((a, b) => a + b, 0) / ratings.length 
+    const avgRating = ratings.length > 0
+      ? ratings.reduce((a, b) => a + b, 0) / ratings.length
       : 3.5;
 
     return {
       email: userEmail.toLowerCase(),
       genres,
       avgRating,
-      booksRead: totalBooks,
+      booksRead: owned.length,
+      ownedIds: new Set(owned.map((b) => b.id)),
       lastUpdated: new Date(),
       preferences: {
         genreWeight: 0.5,
         ratingWeight: 0.2,
         popularityWeight: 0.15,
         authorWeight: 0.1,
-        typeWeight: 0.05
-      }
+        typeWeight: 0.05,
+      },
     };
   } catch (error) {
-    console.error('Error getting reading profile:', error);
+    // Permission / network — caller falls back to trending
+    if (import.meta.env.DEV) console.warn('Error getting reading profile:', error?.code || error);
     return null;
   }
 }
@@ -84,63 +63,49 @@ export async function getUserReadingProfile(userEmail) {
 /**
  * Find similar books based on genre, rating, and other factors
  */
-export async function findSimilarBooks(bookId, limit = 6) {
+export async function findSimilarBooks(bookId, limitCount = 6) {
   try {
-    const book = BOOKS.find(b => b.id === bookId);
+    const book = BOOKS.find((b) => b.id === bookId);
     if (!book) return [];
 
-    const similarBooks = BOOKS.filter(b => {
-      if (b.id === bookId) return false; // Exclude the book itself
-      
-      // Must have overlapping genres
-      const hasCommonGenre = book.genres?.some(g => b.genres?.includes(g));
-      return hasCommonGenre;
+    const sourceGenres = bookGenres(book);
+    const similarBooks = BOOKS.filter((b) => {
+      if (b.id === bookId) return false;
+      return sourceGenres.some((g) => bookGenres(b).includes(g));
     });
 
-    // Score books by similarity
-    const scoredBooks = similarBooks.map(b => {
+    const scoredBooks = similarBooks.map((b) => {
       let score = 0;
+      const bGenres = bookGenres(b);
 
-      // Genre match (0-50 points)
-      if (book.genres && b.genres) {
-        const commonGenres = book.genres.filter(g => b.genres.includes(g));
-        score += (commonGenres.length / Math.max(book.genres.length, b.genres.length)) * 50;
+      if (sourceGenres.length && bGenres.length) {
+        const commonGenres = sourceGenres.filter((g) => bGenres.includes(g));
+        score += (commonGenres.length / Math.max(sourceGenres.length, bGenres.length)) * 50;
       }
 
-      // Rating similarity (0-20 points)
       const bookRating = book.rating || 3.5;
       const bookRating2 = b.rating || 3.5;
-      const ratingDiff = Math.abs(bookRating - bookRating2);
-      score += Math.max(0, 20 - ratingDiff * 5);
+      score += Math.max(0, 20 - Math.abs(bookRating - bookRating2) * 5);
 
-      // Popularity (0-15 points)
       const bookPopularity = book.reviews || 0;
       const bookPopularity2 = b.reviews || 0;
       score += Math.min(15, (bookPopularity2 / Math.max(bookPopularity, 1)) * 10);
 
-      // Author (0-10 points)
-      if (book.author && b.author && book.author === b.author) {
-        score += 10;
-      }
-
-      // Type match (0-5 points)
-      if (book.type && b.type && book.type === b.type) {
-        score += 5;
-      }
+      if (book.author && b.author && book.author === b.author) score += 10;
+      if (book.type && b.type && book.type === b.type) score += 5;
 
       return { book: b, score };
     });
 
-    // Sort by score and return top N
     return scoredBooks
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(item => ({
+      .slice(0, limitCount)
+      .map((item) => ({
         ...item.book,
-        similarityScore: Math.round(item.score)
+        similarityScore: Math.round(item.score),
       }));
   } catch (error) {
-    console.error('Error finding similar books:', error);
+    if (import.meta.env.DEV) console.warn('Error finding similar books:', error);
     return [];
   }
 }
@@ -148,79 +113,64 @@ export async function findSimilarBooks(bookId, limit = 6) {
 /**
  * Calculate recommendations for a user
  */
-export async function calculateRecommendations(userEmail, limit = 10) {
+export async function calculateRecommendations(userEmail, limitCount = 10) {
   try {
-    // Get user's reading profile
     const profile = await getUserReadingProfile(userEmail);
-    
+
     if (!profile || Object.keys(profile.genres).length === 0) {
-      // No history - return trending/featured books instead
-      return getTrendingBooks(limit);
+      return getTrendingBooks(limitCount);
     }
 
     const recommendations = [];
-    const seenBookIds = new Set();
+    const seenBookIds = new Set(profile.ownedIds || []);
 
-    // Get books by preferred genres
     const genreEntries = Object.entries(profile.genres)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3); // Top 3 genres
+      .slice(0, 3);
 
-    for (const [genre, count] of genreEntries) {
-      BOOKS.forEach(book => {
+    for (const [genre] of genreEntries) {
+      BOOKS.forEach((book) => {
         if (seenBookIds.has(book.id)) return;
-        
+        if (book.active === false || book.status === 'coming-soon' || book.status === 'draft') return;
+
         let score = 0;
+        const genres = bookGenres(book);
 
-        // Genre match (weight: 50%)
-        if (book.genres?.includes(genre)) {
-          score += 50;
-        }
+        if (genres.includes(genre)) score += 50;
 
-        // Rating match (weight: 20%)
         if (book.rating) {
           const ratingDiff = Math.abs(book.rating - profile.avgRating);
           score += Math.max(0, 20 - ratingDiff * 3);
         }
 
-        // Popularity (weight: 15%)
-        const popularity = (book.reviews || 0) / 100;
-        score += Math.min(15, popularity * 5);
-
-        // Featured books bonus (weight: 10%)
-        if (book.featured) {
-          score += 10;
-        }
-
-        // New releases bonus (weight: 5%)
-        if (book.status === 'new' || book.type === 'series-starter') {
-          score += 5;
-        }
+        score += Math.min(15, ((book.reviews || 0) / 100) * 5);
+        if (book.featured) score += 10;
+        if (book.status === 'new' || book.type === 'series-starter') score += 5;
 
         if (score > 0) {
+          seenBookIds.add(book.id);
           recommendations.push({
             bookId: book.id,
             bookTitle: book.title,
             author: book.author,
             cover: book.cover,
-            genres: book.genres,
+            genres,
             rating: book.rating,
             reviews: book.reviews,
             reason: generateRecommendationReason(book, genre, profile),
             score: Math.round(score),
-            createdAt: new Date()
+            createdAt: new Date(),
           });
         }
       });
     }
 
-    // Sort by score and return top N
     return recommendations
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+      .slice(0, limitCount);
   } catch (error) {
-    console.error('Error calculating recommendations:', error);
-    return getTrendingBooks(limit);
+    if (import.meta.env.DEV) console.warn('Error calculating recommendations:', error);
+    return getTrendingBooks(limitCount);
   }
 }
 
@@ -229,12 +179,11 @@ export async function calculateRecommendations(userEmail, limit = 10) {
  */
 export async function getCachedRecommendations(userEmail) {
   try {
-    const docRef = doc(db, 'book_recommendations', userEmail.toLowerCase());
+    const docRef = doc(db, 'book_recommendations', libDocId(userEmail));
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       const data = docSnap.data();
-      // Check if cache is still valid (24 hours)
       const createdAt = data.createdAt?.toDate?.() || new Date(0);
       const ageMs = Date.now() - createdAt.getTime();
       const cacheValidMs = 24 * 60 * 60 * 1000;
@@ -244,7 +193,7 @@ export async function getCachedRecommendations(userEmail) {
       }
     }
   } catch (error) {
-    console.error('Error getting cached recommendations:', error);
+    if (import.meta.env.DEV) console.warn('Error getting cached recommendations:', error?.code || error);
   }
   return null;
 }
@@ -254,16 +203,16 @@ export async function getCachedRecommendations(userEmail) {
  */
 export async function saveRecommendations(userEmail, recommendations) {
   try {
-    const docRef = doc(db, 'book_recommendations', userEmail.toLowerCase());
+    const docRef = doc(db, 'book_recommendations', libDocId(userEmail));
     await setDoc(docRef, {
       email: userEmail.toLowerCase(),
       recommendations,
       createdAt: serverTimestamp(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
     return true;
   } catch (error) {
-    console.error('Error saving recommendations:', error);
+    if (import.meta.env.DEV) console.warn('Error saving recommendations:', error?.code || error);
     return false;
   }
 }
@@ -271,127 +220,73 @@ export async function saveRecommendations(userEmail, recommendations) {
 /**
  * Get trending books based on various metrics
  */
-export function getTrendingBooks(limit = 10) {
+export function getTrendingBooks(limitCount = 10) {
   try {
-    const scoredBooks = BOOKS.map(book => {
+    const scoredBooks = BOOKS.filter(
+      (b) => b.active !== false && b.status !== 'coming-soon' && b.status !== 'draft'
+    ).map((book) => {
       let score = 0;
 
-      // Rating (0-30 points)
-      if (book.rating) {
-        score += (book.rating / 5) * 30;
-      }
+      if (book.rating) score += (book.rating / 5) * 30;
+      score += Math.min(30, (book.reviews || 0) / 10);
+      if (book.featured) score += 20;
+      if (book.status === 'new' || book.type === 'series-starter') score += 15;
 
-      // Reviews/engagement (0-30 points)
-      const engagementScore = Math.min(30, (book.reviews || 0) / 10);
-      score += engagementScore;
-
-      // Featured bonus (0-20 points)
-      if (book.featured) {
-        score += 20;
-      }
-
-      // New release bonus (0-15 points)
-      if (book.status === 'new' || book.type === 'series-starter') {
-        score += 15;
-      }
-
-      // Popular genres bonus (0-5 points)
       const popularGenres = ['Romance', 'Fantasy', 'Mystery', 'Sci-Fi'];
-      if (book.genres?.some(g => popularGenres.includes(g))) {
-        score += 5;
-      }
+      if (bookGenres(book).some((g) => popularGenres.includes(g))) score += 5;
 
       return { book, score };
     });
 
     return scoredBooks
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(item => ({
+      .slice(0, limitCount)
+      .map((item) => ({
         ...item.book,
-        trendingScore: Math.round(item.score)
+        trendingScore: Math.round(item.score),
       }));
   } catch (error) {
-    console.error('Error getting trending books:', error);
-    return books.slice(0, limit);
+    if (import.meta.env.DEV) console.warn('Error getting trending books:', error);
+    return BOOKS.slice(0, limitCount);
   }
 }
 
 /**
  * Generate human-readable recommendation reason
  */
-function generateRecommendationReason(book, genre, profile) {
-  const reasons = [
-    `You love ${genre} books!`,
-    `Popular in ${genre}`,
-    `Highly rated (${book.rating?.toFixed(1)} ⭐)`,
-    `Trending now`,
-    `Readers like you enjoyed this`,
-    `Similar to your favorites`,
-    `Matches your reading style`
-  ];
-
-  // Pick reason based on book attributes
-  if (book.featured) {
-    return 'Featured & highly rated';
-  }
-  if (book.rating >= 4.5) {
-    return `Highly rated in ${genre}`;
-  }
-  if ((book.reviews || 0) > 50) {
-    return `Popular ${genre} book`;
-  }
-  
-  return reasons[Math.floor(Math.random() * reasons.length)];
+function generateRecommendationReason(book, genre) {
+  if (book.featured) return 'Featured & highly rated';
+  if (book.rating >= 4.5) return `Highly rated in ${genre}`;
+  if ((book.reviews || 0) > 50) return `Popular ${genre} book`;
+  return `You love ${genre} books!`;
 }
 
 /**
  * Get trending books by category/genre
  */
-export function getTrendingByCategory(genre, limit = 20) {
+export function getTrendingByCategory(genre, limitCount = 20) {
   try {
-    const genreBooks = BOOKS.filter(book => {
-      if (book.genres) {
-        return book.genres.includes(genre);
-      }
-      return book.genre === genre;
-    });
+    const genreBooks = BOOKS.filter((book) => bookGenres(book).includes(genre));
 
-    const scoredBooks = genreBooks.map(book => {
+    const scoredBooks = genreBooks.map((book) => {
       let score = 0;
-
-      // Rating (0-30 points)
-      if (book.rating) {
-        score += (book.rating / 5) * 30;
-      }
-
-      // Reviews/engagement (0-30 points)
-      const engagementScore = Math.min(30, (book.reviews || 0) / 10);
-      score += engagementScore;
-
-      // Featured bonus (0-20 points)
-      if (book.featured) {
-        score += 20;
-      }
-
-      // New release bonus (0-15 points)
-      if (book.status === 'new' || book.type === 'series-starter') {
-        score += 15;
-      }
-
+      if (book.rating) score += (book.rating / 5) * 30;
+      score += Math.min(30, (book.reviews || 0) / 10);
+      if (book.featured) score += 20;
+      if (book.status === 'new' || book.type === 'series-starter') score += 15;
       return { book, score };
     });
 
     return scoredBooks
       .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(item => ({
+      .slice(0, limitCount)
+      .map((item) => ({
         ...item.book,
         trendingScore: Math.round(item.score),
-        genre
+        genre,
       }));
   } catch (error) {
-    console.error('Error getting trending books by category:', error);
+    if (import.meta.env.DEV) console.warn('Error getting trending books by category:', error);
     return [];
   }
 }
@@ -405,10 +300,10 @@ export function calculateTrendingScores(timeframe = '7d') {
     reviews: 0.25,
     featured: 0.2,
     newRelease: 0.15,
-    popularity: 0.1
+    popularity: 0.1,
   };
 
-  return BOOKS.map(book => {
+  return BOOKS.map((book) => {
     let score = 0;
     score += (book.rating || 0) * 5 * weights.rating;
     score += Math.min(50, (book.reviews || 0) / 5) * weights.reviews;
@@ -420,7 +315,7 @@ export function calculateTrendingScores(timeframe = '7d') {
       id: book.id,
       title: book.title,
       score: Math.round(score),
-      timeframe
+      timeframe,
     };
   }).sort((a, b) => b.score - a.score);
 }
@@ -432,5 +327,5 @@ export default {
   getCachedRecommendations,
   saveRecommendations,
   getTrendingBooks,
-  calculateTrendingScores
+  calculateTrendingScores,
 };
