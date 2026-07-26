@@ -1,9 +1,9 @@
 /**
- * AudioPlayer — Web Speech API listen mode for the Reader.
- * Voice selection by name, localStorage persistence, neural-first sorting,
- * iOS cancel/resume pause, Chrome keep-alive (non-iOS).
+ * AudioPlayer — floating, draggable Web Speech listen dock for the Reader.
+ * Minimize / maximize / close; does not push page content.
  */
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 const AUDIO_PREFS_KEY = 'eh_audio_prefs';
 
@@ -61,12 +61,16 @@ const IcoGear = () => (
   </svg>
 );
 
+function isEnglishVoice(v) {
+  return /^en([-_]|$)/i.test(v?.lang || '');
+}
+
 function isNeuralVoice(v) {
   if (!v) return false;
   if (/microsoft.*(jenny|aria|guy|davis|emma|brian|ana|andrew|ryan|sonia|libby|mia|neerja|ravi|clara|liam|natasha|olivia|james|luna|neural)/i.test(v.name)) return true;
   if (/^google /i.test(v.name)) return true;
   if (/\b(neural|natural|enhanced|premium|wavenet|studio)\b/i.test(v.name)) return true;
-  if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|frederica|joana|mariana|luciana|isabel|paola|soledad|monica|jorge|juan|pablo|diego|enrique|carlos|ximena|angelica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
+  if (/^(ava|allison|samantha|karen|moira|tessa|fiona|victoria|nicky|frederica|joana|mariana|luciana|isabel|paola|soledad|monica|jorge|juan|pablo|diego|enrique|carlos|ximena|angelica)/i.test(v.name) && isEnglishVoice(v)) return true;
   if (/samsung/i.test(v.name) && /female|male|neural|enhanced/i.test(v.name)) return true;
   if (v.voiceURI && /x-nob|x-sfg|x-iob|x-tpf|x-iom/i.test(v.voiceURI)) return true;
   return false;
@@ -84,12 +88,40 @@ function isRoboticDesktop(v) {
   return false;
 }
 
+const FEMALE_NAME_RE = /\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia|almudena|marta|zosia|ewa|ioana|laila|fatima|tamar|leila|hessa|linh|naayf|yan|meijia|tingting|sinji|milena|yelena|irina|katya|anna|vicki|alice|amelie|julie|aurelie|petra|katrin|hanna|lotte|claire|ellen|nora|carmit|sara|yuna|kyoko|caroline|catherine|denise|hortense|elise|marie|linda|heami|nanami|ayumi|haruka|seo-hyeon|sun-hi)\b/i;
+const MALE_NAME_RE = /\b(guy|davis|brian|andrew|ryan|mark|david|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|enrique|carlos|juan|william|liam|thomas|oliver|harry|arthur|richard|christopher|eric|steffan|geraint|gordon|wayne)\b/i;
+
+function isFemaleVoice(v) {
+  if (!v) return false;
+  const n = (v.name || '').toLowerCase();
+  const uri = (v.voiceURI || '').toLowerCase();
+  if (/\bfemale\b|\bwoman\b|\bfemme\b/.test(n) || /\bfemale\b/.test(uri)) return true;
+  if (/\bmale\b/.test(n) && !/\bfemale\b/.test(n)) return false;
+  if (FEMALE_NAME_RE.test(n)) return true;
+  if (/^google uk english female/i.test(v.name) || /samsung.*female/i.test(v.name)) return true;
+  return false;
+}
+
+function isMaleVoice(v) {
+  if (!v) return false;
+  const n = (v.name || '').toLowerCase();
+  const uri = (v.voiceURI || '').toLowerCase();
+  // Never use includes('man') — it false-matches German, Romanian, etc.
+  if (/\bfemale\b|\bwoman\b|\bfemme\b/.test(n) || /\bfemale\b/.test(uri)) return false;
+  if (/\bmale\b/.test(n) || /\bhomme\b/.test(n) || (/\bmale\b/.test(uri) && !/\bfemale\b/.test(uri))) return true;
+  if (MALE_NAME_RE.test(n)) return true;
+  if (/^google uk english male/i.test(v.name) || /samsung.*male/i.test(v.name)) return true;
+  return false;
+}
+
 function voiceQualityScore(v) {
-  if (isNeuralVoice(v)) return 0;
-  if (v.lang?.startsWith('en') && v.localService) return 1;
-  if (v.lang?.startsWith('en')) return 2;
-  if (isRoboticDesktop(v)) return 4;
-  return 3;
+  // Prefer English for this English-language library
+  if (isEnglishVoice(v) && isNeuralVoice(v)) return 0;
+  if (isEnglishVoice(v) && v.localService) return 1;
+  if (isEnglishVoice(v)) return 2;
+  if (isNeuralVoice(v)) return 3;
+  if (isRoboticDesktop(v)) return 5;
+  return 4;
 }
 
 function sortVoicesNeuralFirst(list) {
@@ -103,6 +135,8 @@ function sortVoicesNeuralFirst(list) {
 
 function pickBestVoice(voiceList) {
   if (!voiceList.length) return null;
+  const english = voiceList.filter(isEnglishVoice);
+  const pool = english.length ? english : voiceList;
   const PRIORITY = [
     'Microsoft Jenny', 'Microsoft Aria', 'Microsoft Emma', 'Microsoft Sonia',
     'Microsoft Libby', 'Microsoft Mia', 'Microsoft Ana', 'Microsoft Neerja',
@@ -113,10 +147,30 @@ function pickBestVoice(voiceList) {
     'Samsung English Female', 'Samsung English Male',
   ];
   for (const name of PRIORITY) {
-    const v = voiceList.find(x => x.name.startsWith(name));
+    const v = pool.find(x => x.name.startsWith(name));
     if (v) return v;
   }
-  return sortVoicesNeuralFirst(voiceList)[0] || voiceList[0];
+  return sortVoicesNeuralFirst(pool)[0] || pool[0];
+}
+
+function defaultPanelPos(size = 'normal') {
+  if (typeof window === 'undefined') return { x: 24, y: 24 };
+  const w = size === 'min' ? 300 : size === 'max' ? Math.min(440, window.innerWidth - 24) : 360;
+  const h = size === 'min' ? 64 : size === 'max' ? 420 : 200;
+  return {
+    x: Math.max(12, window.innerWidth - w - 20),
+    y: Math.max(12, window.innerHeight - h - 96),
+  };
+}
+
+function clampPos(pos, size = 'normal') {
+  if (typeof window === 'undefined' || !pos) return pos;
+  const w = size === 'min' ? 300 : size === 'max' ? Math.min(440, window.innerWidth - 24) : 360;
+  const h = size === 'min' ? 64 : size === 'max' ? Math.min(520, window.innerHeight - 24) : 220;
+  return {
+    x: Math.min(Math.max(8, pos.x), Math.max(8, window.innerWidth - w - 8)),
+    y: Math.min(Math.max(8, pos.y), Math.max(8, window.innerHeight - Math.min(h, 120) - 8)),
+  };
 }
 
 export default function AudioPlayer({
@@ -125,6 +179,7 @@ export default function AudioPlayer({
   onChapterChange,
   canAccessChapter,
   onChapterBlocked,
+  onClose,
 }) {
   const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const saved = loadAudioPrefs();
@@ -144,11 +199,23 @@ export default function AudioPlayer({
   const [voicesReady, setVoicesReady] = useState(false);
   const [rate, setRate] = useState(() => (typeof saved.rate === 'number' ? saved.rate : 1.0));
   const [pitch, setPitch] = useState(() => (typeof saved.pitch === 'number' ? saved.pitch : 1.0));
-  const [showCfg, setShowCfg] = useState(false);
+  const [panelSize, setPanelSize] = useState(() => (
+    ['min', 'normal', 'max'].includes(saved.panelSize) ? saved.panelSize : 'normal'
+  ));
+  const [pos, setPos] = useState(() => {
+    if (saved.panelPos?.x != null && saved.panelPos?.y != null) {
+      return clampPos(saved.panelPos, saved.panelSize || 'normal');
+    }
+    return null;
+  });
+  const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
   const [progress, setProgress] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState('all');
+  // Books are English — default the picker to English voices so users aren't stuck on fr-CA etc.
+  const [langScope, setLangScope] = useState('en');
   const [voiceDdOpen, setVoiceDdOpen] = useState(false);
   const [selectedName, setSelectedName] = useState(() => saved.voiceName || '');
 
@@ -165,6 +232,86 @@ export default function AudioPlayer({
   const boundarySeenRef = useRef(false);
   const speakFromRef = useRef(0);
   const ddWrapRef = useRef(null);
+  const panelRef = useRef(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const posRef = useRef(pos);
+  const panelSizeRef = useRef(panelSize);
+
+  useEffect(() => { posRef.current = pos; }, [pos]);
+  useEffect(() => { panelSizeRef.current = panelSize; }, [panelSize]);
+
+  // Place dock once on mount if no saved position
+  useEffect(() => {
+    if (pos) return undefined;
+    const next = defaultDockPos(panelSize);
+    setPos(next);
+    posRef.current = next;
+    return undefined;
+  }, [pos, panelSize]);
+
+  // Keep dock on-screen when viewport changes
+  useEffect(() => {
+    const onResize = () => {
+      setPos((p) => clampPos(p || defaultDockPos(panelSizeRef.current), panelSizeRef.current));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  function persistPanel(nextSize, nextPos) {
+    const size = nextSize ?? panelSizeRef.current;
+    const p = nextPos ?? posRef.current;
+    saveAudioPrefs({ panelSize: size, panelPos: p });
+  }
+
+  function setPanelSizeAndPersist(size) {
+    setPanelSize(size);
+    panelSizeRef.current = size;
+    setVoiceDdOpen(false);
+    setPos((p) => {
+      const next = clampPos(p || defaultDockPos(size), size);
+      posRef.current = next;
+      persistPanel(size, next);
+      return next;
+    });
+  }
+
+  function onDragPointerDown(e) {
+    if (e.button != null && e.button !== 0) return;
+    if (e.target.closest?.('button, a, input, select, textarea, [role="listbox"], [role="option"]')) return;
+    const current = posRef.current || defaultDockPos(panelSizeRef.current);
+    dragOffset.current = { x: e.clientX - current.x, y: e.clientY - current.y };
+    draggingRef.current = true;
+    setDragging(true);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }
+
+  function onDragPointerMove(e) {
+    if (!draggingRef.current) return;
+    const next = clampPos({
+      x: e.clientX - dragOffset.current.x,
+      y: e.clientY - dragOffset.current.y,
+    }, panelSizeRef.current);
+    posRef.current = next;
+    setPos(next);
+  }
+
+  function onDragPointerUp(e) {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    setDragging(false);
+    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
+    persistPanel(panelSizeRef.current, posRef.current);
+  }
+
+  function handleClose() {
+    if (synth) synth.cancel();
+    clearInterval(timerRef.current);
+    clearInterval(keepAliveRef.current);
+    setPlaying(false);
+    playingRef.current = false;
+    onClose?.();
+  }
 
   const chapterText = chapters[currentChapter]?.text || '';
 
@@ -187,7 +334,9 @@ export default function AudioPlayer({
 
     if (selectedNameRef.current) {
       const found = sorted.find(x => x.name === selectedNameRef.current);
-      if (found) {
+      // Keep a saved English voice; migrate away from non-English picks (e.g. fr-CA Caroline)
+      // so Listen mode defaults to voices that match the library language.
+      if (found && isEnglishVoice(found)) {
         setSelectedName(found.name);
         return;
       }
@@ -306,35 +455,12 @@ export default function AudioPlayer({
 
   function filteredVoices() {
     if (!voices.length) return [];
-    if (filter === 'all') return voices;
-    if (filter === 'neural') return voices.filter(isNeuralVoice);
-
-    return voices.filter(v => {
-      const n = v.name.toLowerCase();
-      const uri = (v.voiceURI || '').toLowerCase();
-
-      if (filter === 'female') {
-        if (n.includes('female') || n.includes('woman') || n.includes('femme')) return true;
-        if (/\b(jenny|aria|emma|sonia|libby|mia|ana|neerja|zira|hazel|susan|karen|samantha|victoria|fiona|moira|tessa|veena|raveena|heera|manjari|lekha|kalpana|asha|ava|allison|joana|mariana|luciana|isabel|paola|soledad|monica|angelica|ximena|paulina|lucia|almudena|marta|zosia|ewa|ioana|laila|fatima|tamar|leila|hessa|linh|naayf|yan|meijia|tingting|sinji|milena|yelena|irina|katya|anna|vicki|alice|amelie|julie|aurelie|petra|katrin|hanna|lotte|claire|ellen|nora|carmit|sara|yuna|kyoko)\b/.test(n)) return true;
-        if (/^(ava|allison|victoria|fiona|karen|moira|tessa|samantha|nicky|frederica)/i.test(v.name) && v.lang?.startsWith('en')) return true;
-        if (/google uk english female/i.test(v.name)) return true;
-        if (/samsung.*female/i.test(v.name)) return true;
-        if (/female/i.test(uri)) return true;
-        return false;
-      }
-
-      if (filter === 'male') {
-        if ((n.includes('male') && !n.includes('female')) || n.includes('man') || n.includes('homme')) return true;
-        if (/\b(guy|davis|brian|andrew|ryan|mark|david|daniel|alex|james|george|reed|fred|rishi|luca|diego|jorge|pablo|miguel|ivan|enrique|carlos|juan|william|liam|thomas|oliver|harry|arthur)\b/.test(n)) return true;
-        if (/^(daniel|oliver|arthur|thomas|fred|junior|alex)/i.test(v.name) && v.lang?.startsWith('en')) return true;
-        if (/google uk english male/i.test(v.name)) return true;
-        if (/samsung.*male/i.test(v.name)) return true;
-        if (/male/i.test(uri) && !/female/i.test(uri)) return true;
-        return false;
-      }
-
-      return true;
-    });
+    let list = voices;
+    if (langScope === 'en') list = list.filter(isEnglishVoice);
+    if (filter === 'neural') return list.filter(isNeuralVoice);
+    if (filter === 'female') return list.filter(isFemaleVoice);
+    if (filter === 'male') return list.filter(isMaleVoice);
+    return list;
   }
 
   function getSelectedVoice() {
@@ -530,229 +656,338 @@ export default function AudioPlayer({
   };
 
   const available = typeof window !== 'undefined' && 'speechSynthesis' in window;
-  if (!available) {
-    return (
-      <div className="audio-player audio-player--unsupported">
-        Text-to-speech is not supported in this browser. Try Chrome, Edge, or Safari.
-      </div>
-    );
-  }
-
   const dispVoices = filteredVoices();
   const activeVoice = getSelectedVoice();
-  const activeInFilter = dispVoices.find(v => v.name === selectedNameRef.current) || activeVoice;
+  const englishCount = voices.filter(isEnglishVoice).length;
+  const showSettings = panelSize === 'max';
+  const dockPos = pos || defaultDockPos(panelSize);
 
-  return (
-    <div className="audio-player">
-      <div className="audio-player__header">
-        <div className="audio-player__info">
+  const progressBlock = (
+    <div className="audio-player__progress-row">
+      <span className="audio-player__time">{fmtTime(elapsed)}</span>
+      <div
+        className="audio-player__track"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          seekToChar(Math.round(pct * chapterText.length));
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const touch = e.changedTouches[0];
+          const pct = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+          seekToChar(Math.round(pct * chapterText.length));
+        }}
+      >
+        <div className="audio-player__fill" style={{ width: `${progress}%` }} />
+        <div className="audio-player__thumb" style={{ left: `${progress}%` }} />
+      </div>
+      <span className="audio-player__time">{fmtTime(total)}</span>
+    </div>
+  );
+
+  const windowControls = (
+    <div className="audio-float__win">
+      <button
+        type="button"
+        className="audio-float__win-btn"
+        title="Minimize"
+        aria-label="Minimize player"
+        onClick={() => setPanelSizeAndPersist('min')}
+      >
+        <span aria-hidden="true">─</span>
+      </button>
+      <button
+        type="button"
+        className="audio-float__win-btn"
+        title={panelSize === 'max' ? 'Restore' : 'Maximize'}
+        aria-label={panelSize === 'max' ? 'Restore player' : 'Maximize player'}
+        onClick={() => setPanelSizeAndPersist(panelSize === 'max' ? 'normal' : 'max')}
+      >
+        <span aria-hidden="true">{panelSize === 'max' ? '❐' : '□'}</span>
+      </button>
+      <button
+        type="button"
+        className="audio-float__win-btn audio-float__win-btn--close"
+        title="Close listen player"
+        aria-label="Close listen player"
+        onClick={handleClose}
+      >
+        <span aria-hidden="true">✕</span>
+      </button>
+    </div>
+  );
+
+  const panel = !available ? (
+    <div
+      className="audio-player audio-float audio-float--normal audio-player--unsupported"
+      style={{ left: dockPos.x, top: dockPos.y }}
+      role="dialog"
+      aria-label="Listen player"
+    >
+      <div className="audio-float__chrome">
+        <span className="audio-float__drag-hint">Listen</span>
+        {windowControls}
+      </div>
+      <p className="audio-float__unsupported-msg">
+        Text-to-speech is not supported in this browser. Try Chrome, Edge, or Safari.
+      </p>
+    </div>
+  ) : (
+    <div
+      ref={panelRef}
+      className={[
+        'audio-player',
+        'audio-float',
+        `audio-float--${panelSize}`,
+        dragging ? 'audio-float--dragging' : '',
+        playing ? 'audio-float--playing' : '',
+      ].filter(Boolean).join(' ')}
+      style={{ left: dockPos.x, top: dockPos.y }}
+      role="dialog"
+      aria-label="Listen player"
+      aria-modal="false"
+    >
+      <div
+        className="audio-float__chrome"
+        onPointerDown={onDragPointerDown}
+        onPointerMove={onDragPointerMove}
+        onPointerUp={onDragPointerUp}
+        onPointerCancel={onDragPointerUp}
+      >
+        <div className="audio-float__drag">
+          <span className="audio-float__grip" aria-hidden="true">⋮⋮</span>
           <span className="audio-player__icon"><IcoHeadphones /></span>
-          <div>
-            <strong className="audio-player__title">{chapters[currentChapter]?.title || 'Listening…'}</strong>
-            <span className="audio-player__sub">Ch {currentChapter + 1} of {chapters.length}</span>
+          <div className="audio-float__titles">
+            <strong className="audio-player__title">
+              {chapters[currentChapter]?.title || 'Listening…'}
+            </strong>
+            {panelSize !== 'min' && (
+              <span className="audio-player__sub">
+                Ch {currentChapter + 1} of {chapters.length}
+                {playing ? ' · Playing' : ''}
+              </span>
+            )}
           </div>
         </div>
-        <button
-          className={'audio-btn audio-btn--gear' + (showCfg ? ' on' : '')}
-          onClick={() => setShowCfg(s => !s)}
-          title={`Voice settings${voices.length ? ` (${voices.length} voices)` : ''}`}
-          type="button"
-        >
-          <IcoGear />
-        </button>
+        {windowControls}
       </div>
 
-      <div className="audio-player__centre">
-        <div className="audio-player__controls">
-          <button className="audio-btn" title="Rewind 15s" onClick={handleRewind} type="button"><IcoRewind /></button>
-          <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay} type="button">
-            {playing ? <IcoPause /> : <IcoPlay />}
-          </button>
-          <button className="audio-btn" title="Stop" onClick={handleStop} type="button"><IcoStop /></button>
+      {panelSize === 'min' ? (
+        <div className="audio-float__mini">
           <button
-            className="audio-btn"
-            title="Next chapter"
-            onClick={handleSkip}
-            disabled={currentChapter >= chapters.length - 1}
+            className="audio-btn audio-btn--play"
+            title={playing ? 'Pause' : 'Play'}
+            onClick={handlePlay}
             type="button"
           >
-            <IcoSkip />
+            {playing ? <IcoPause /> : <IcoPlay />}
+          </button>
+          <div className="audio-float__mini-main">
+            <span className="audio-float__mini-meta">
+              {fmtTime(elapsed)} / {fmtTime(total)} · {rate}×
+            </span>
+            {progressBlock}
+          </div>
+          <button
+            type="button"
+            className="audio-float__expand"
+            title="Expand player"
+            onClick={() => setPanelSizeAndPersist('normal')}
+          >
+            Expand
           </button>
         </div>
-
-        <div className="audio-player__progress-row">
-          <span className="audio-player__time">{fmtTime(elapsed)}</span>
-          <div
-            className="audio-player__track"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-              seekToChar(Math.round(pct * chapterText.length));
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              const rect = e.currentTarget.getBoundingClientRect();
-              const touch = e.changedTouches[0];
-              const pct = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-              seekToChar(Math.round(pct * chapterText.length));
-            }}
-          >
-            <div className="audio-player__fill" style={{ width: `${progress}%` }} />
-            <div className="audio-player__thumb" style={{ left: `${progress}%` }} />
-          </div>
-          <span className="audio-player__time">{fmtTime(total)}</span>
-        </div>
-      </div>
-
-      <div className="audio-player__right">
-        <div className="audio-speed-pills">
-          {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
-            <button
-              key={r}
-              type="button"
-              className={'audio-speed-pill' + (rate === r ? ' on' : '')}
-              onClick={() => updateRate(r)}
-              title={`${r}× speed`}
-            >
-              {r === 1.0 ? '1×' : `${r}×`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {!voicesReady && voices.length === 0 && (
-        <div className="audio-player__hint">Loading voices… Tap play to start listening.</div>
-      )}
-
-      {showCfg && (
-        <div className="audio-settings">
-          <div className="audio-settings__row">
-            <label>Voice filter</label>
-            <div className="audio-filter-group">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'neural', label: '✨ Neural' },
-                { id: 'female', label: '♀ Female' },
-                { id: 'male', label: '♂ Male' },
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  className={'audio-filter-btn' + (filter === f.id ? ' on' : '')}
-                  onClick={() => setFilter(f.id)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="audio-settings__row">
-            <label>Voice</label>
-            <div className="audio-custom-dd" ref={ddWrapRef} style={{ flex: 1 }}>
-              <button
-                className="audio-custom-dd__trigger"
-                type="button"
-                aria-expanded={voiceDdOpen}
-                aria-label="Select voice"
-                onClick={() => setVoiceDdOpen(o => !o)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setVoiceDdOpen(o => !o);
-                  } else if (e.key === 'Escape') {
-                    setVoiceDdOpen(false);
-                  } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !voiceDdOpen) {
-                    e.preventDefault();
-                    setVoiceDdOpen(true);
-                  }
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {activeInFilter?.name || selectedName || 'Select voice'}
-                    {activeInFilter && isGoogleNeural(activeInFilter) && (
-                      <span className="audio-neural-badge audio-neural-badge--google"> Neural</span>
-                    )}
-                    {activeInFilter && !isGoogleNeural(activeInFilter) && isNeuralVoice(activeInFilter) && (
-                      <span className="audio-neural-badge"> Neural</span>
-                    )}
-                    {' '}
-                    <small style={{ opacity: 0.5, fontSize: '0.65rem' }}>{activeInFilter?.lang}</small>
-                  </span>
-                  <span className="audio-active-tag">Active</span>
-                </span>
-                <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
+      ) : (
+        <>
+          <div className="audio-player__centre">
+            <div className="audio-player__controls">
+              <button className="audio-btn" title="Rewind 15s" onClick={handleRewind} type="button"><IcoRewind /></button>
+              <button className="audio-btn audio-btn--play" title={playing ? 'Pause' : 'Play'} onClick={handlePlay} type="button">
+                {playing ? <IcoPause /> : <IcoPlay />}
               </button>
-
-              {voiceDdOpen && (
-                <div className="audio-custom-dd__list" role="listbox">
-                  {dispVoices.length === 0 && (
-                    <div className="audio-custom-dd__empty">No voices found for this filter</div>
-                  )}
-                  {dispVoices.map((v) => (
-                    <button
-                      key={v.voiceURI || v.name}
-                      type="button"
-                      role="option"
-                      aria-selected={selectedNameRef.current === v.name}
-                      className={'audio-custom-dd__item' + (selectedNameRef.current === v.name ? ' on' : '')}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        selectVoice(v);
-                      }}
-                    >
-                      <span className="audio-custom-dd__name">
-                        {v.name}
-                        {isGoogleNeural(v) && (
-                          <span className="audio-neural-badge audio-neural-badge--google"> Neural</span>
-                        )}
-                        {!isGoogleNeural(v) && isNeuralVoice(v) && (
-                          <span className="audio-neural-badge"> Neural</span>
-                        )}
-                      </span>
-                      <span className="audio-custom-dd__lang">{v.lang}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <button className="audio-btn" title="Stop" onClick={handleStop} type="button"><IcoStop /></button>
+              <button
+                className="audio-btn"
+                title="Next chapter"
+                onClick={handleSkip}
+                disabled={currentChapter >= chapters.length - 1}
+                type="button"
+              >
+                <IcoSkip />
+              </button>
+              <button
+                className={'audio-btn audio-btn--gear' + (showSettings ? ' on' : '')}
+                onClick={() => setPanelSizeAndPersist(showSettings ? 'normal' : 'max')}
+                title={`Voice settings${voices.length ? ` (${voices.length} voices)` : ''}`}
+                type="button"
+              >
+                <IcoGear />
+              </button>
             </div>
-          </div>
-
-          <div className="audio-settings__row">
-            <label>Speed × {rate}×</label>
-            <div className="audio-speed-pills">
-              {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
+            {progressBlock}
+            <div className="audio-float__speed-row">
+              {[0.75, 1.0, 1.25, 1.5, 2.0].map(r => (
                 <button
                   key={r}
                   type="button"
                   className={'audio-speed-pill' + (rate === r ? ' on' : '')}
                   onClick={() => updateRate(r)}
+                  title={`${r}× speed`}
                 >
-                  {r}×
+                  {r === 1.0 ? '1×' : `${r}×`}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="audio-settings__row">
-            <label>Pitch × {pitch.toFixed(1)}</label>
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={pitch}
-              className="audio-slider"
-              onChange={(e) => updatePitch(parseFloat(e.target.value))}
-            />
-          </div>
+          {!voicesReady && voices.length === 0 && (
+            <div className="audio-player__hint">Loading voices… Tap play to start.</div>
+          )}
 
-          <p className="audio-settings__note">
-            Voices depend on your device and browser. Neural voices are listed first. Chrome / Edge on Windows or Android offer the most choices; on iPhone/iPad use Safari for the best system voices. Your voice, speed, and pitch are saved on this device.
-          </p>
-        </div>
+          {showSettings && (
+            <div className="audio-settings">
+              <div className="audio-settings__row">
+                <label>Language</label>
+                <div className="audio-filter-group">
+                  {[
+                    { id: 'en', label: `English (${englishCount})` },
+                    { id: 'all', label: `All (${voices.length})` },
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={'audio-filter-btn' + (langScope === f.id ? ' on' : '')}
+                      onClick={() => { setLangScope(f.id); setVoiceDdOpen(true); }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="audio-settings__row">
+                <label>Filter</label>
+                <div className="audio-filter-group">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'neural', label: 'Neural' },
+                    { id: 'female', label: 'Female' },
+                    { id: 'male', label: 'Male' },
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={'audio-filter-btn' + (filter === f.id ? ' on' : '')}
+                      onClick={() => { setFilter(f.id); setVoiceDdOpen(true); }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="audio-settings__row">
+                <label>Voice ({dispVoices.length})</label>
+                <div className="audio-custom-dd" ref={ddWrapRef}>
+                  <button
+                    className="audio-custom-dd__trigger"
+                    type="button"
+                    aria-expanded={voiceDdOpen}
+                    aria-label={`Select voice — ${dispVoices.length} available`}
+                    onClick={() => setVoiceDdOpen(o => !o)}
+                  >
+                    <span className="audio-custom-dd__trigger-text">
+                      {activeVoice?.name || selectedName || 'Select voice'}
+                      {activeVoice && isNeuralVoice(activeVoice) && (
+                        <span className={'audio-neural-badge' + (isGoogleNeural(activeVoice) ? ' audio-neural-badge--google' : '')}>
+                          {' '}Neural
+                        </span>
+                      )}
+                      <small>{activeVoice?.lang}</small>
+                    </span>
+                    <span className="audio-active-tag">Active</span>
+                    <span className={'audio-custom-dd__arrow' + (voiceDdOpen ? ' open' : '')}>▾</span>
+                  </button>
+
+                  {voiceDdOpen && (
+                    <div className="audio-custom-dd__list" role="listbox">
+                      {dispVoices.length === 0 && (
+                        <div className="audio-custom-dd__empty">
+                          {langScope === 'en'
+                            ? 'No English voices for this filter. Try All languages.'
+                            : 'No voices found for this filter'}
+                        </div>
+                      )}
+                      {dispVoices.map((v) => (
+                        <button
+                          key={v.voiceURI || v.name}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedNameRef.current === v.name}
+                          className={'audio-custom-dd__item' + (selectedNameRef.current === v.name ? ' on' : '')}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            selectVoice(v);
+                          }}
+                        >
+                          <span className="audio-custom-dd__name">
+                            {v.name}
+                            {isNeuralVoice(v) && (
+                              <span className={'audio-neural-badge' + (isGoogleNeural(v) ? ' audio-neural-badge--google' : '')}>
+                                {' '}Neural
+                              </span>
+                            )}
+                          </span>
+                          <span className="audio-custom-dd__lang">{v.lang}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="audio-settings__row">
+                <label>Speed {rate}×</label>
+                <div className="audio-speed-pills">
+                  {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      className={'audio-speed-pill' + (rate === r ? ' on' : '')}
+                      onClick={() => updateRate(r)}
+                    >
+                      {r}×
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="audio-settings__row">
+                <label>Pitch {pitch.toFixed(1)}</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={pitch}
+                  className="audio-slider"
+                  onChange={(e) => updatePitch(parseFloat(e.target.value))}
+                />
+              </div>
+
+              <p className="audio-settings__note">
+                {voices.length ? `${englishCount} English / ${voices.length} total · ` : ''}
+                Drag the header to move. Minimize to keep reading. Close returns to Read mode.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(panel, document.body);
 }

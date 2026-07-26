@@ -1739,20 +1739,14 @@ export default function Reader() {
 
 
 
-            {/* Audio player */}
-
+            {/* Floating listen dock (portal) — does not push chapter text */}
             <AudioPlayer
-
               chapters={chapters}
-
               currentChapter={chapter}
-
               canAccessChapter={canAccessChapter}
-
               onChapterBlocked={() => setChapterGate(true)}
-
               onChapterChange={ch => { setChapter(ch); window.scrollTo(0, 0); }}
-
+              onClose={() => setMode('text')}
             />
 
 

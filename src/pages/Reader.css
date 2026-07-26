@@ -1069,12 +1069,204 @@
   color: #4a9eff;
 }
 
-/* Dimmer text when in listen mode — focus is on audio */
+/* Listen mode keeps full-readability text; player floats above */
 .reader__text--listen {
-  opacity: 0.55;
+  opacity: 1;
 }
 
-/* ── Audio Player card ── */
+/* ── Floating listen dock ── */
+.audio-player.audio-float {
+  position: fixed !important;
+  z-index: 12000;
+  width: min(360px, calc(100vw - 16px));
+  margin: 0;
+  padding: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  background: linear-gradient(160deg, rgba(28, 22, 42, 0.96) 0%, rgba(14, 12, 24, 0.98) 100%);
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  border-radius: 14px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  color: #e8e0f0;
+  overflow: visible;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  touch-action: none;
+  user-select: none;
+}
+.audio-float--max {
+  width: min(420px, calc(100vw - 16px));
+  max-height: min(560px, calc(100vh - 16px));
+  overflow-y: auto;
+  overflow-x: visible;
+  touch-action: auto;
+}
+.audio-float--min {
+  width: min(320px, calc(100vw - 16px));
+  padding-bottom: 8px;
+}
+.audio-float--dragging {
+  opacity: 0.92;
+  cursor: grabbing;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+.audio-float--playing {
+  border-color: rgba(74, 158, 255, 0.45);
+}
+
+.audio-float__chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  touch-action: none;
+}
+.audio-float--dragging .audio-float__chrome { cursor: grabbing; }
+.audio-float__drag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.audio-float__grip {
+  color: rgba(232, 224, 240, 0.28);
+  font-size: 0.7rem;
+  letter-spacing: -2px;
+  flex-shrink: 0;
+}
+.audio-float__titles {
+  min-width: 0;
+  flex: 1;
+}
+.audio-float__titles .audio-player__title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.audio-float__win {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.audio-float__win-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(232, 224, 240, 0.7);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.audio-float__win-btn:hover {
+  background: rgba(201, 168, 76, 0.18);
+  border-color: rgba(201, 168, 76, 0.4);
+  color: #f0e6c8;
+}
+.audio-float__win-btn--close:hover {
+  background: rgba(220, 80, 80, 0.25);
+  border-color: rgba(220, 80, 80, 0.5);
+  color: #ffb4b4;
+}
+.audio-float__mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 4px;
+  user-select: none;
+  touch-action: manipulation;
+}
+.audio-float__mini .audio-btn--play {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.audio-float__mini-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.audio-float__mini-meta {
+  font-size: 0.65rem;
+  color: rgba(232, 224, 240, 0.45);
+}
+.audio-float__expand {
+  border: 1px solid rgba(201, 168, 76, 0.35);
+  background: rgba(201, 168, 76, 0.12);
+  color: #e8d5a3;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.audio-float__expand:hover {
+  background: rgba(201, 168, 76, 0.22);
+}
+.audio-float__speed-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin-top: 4px;
+}
+.audio-float__unsupported-msg {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 0.82rem;
+  color: rgba(232, 224, 240, 0.65);
+  line-height: 1.45;
+}
+.audio-float .audio-player__centre {
+  padding: 12px 14px 0;
+  width: 100%;
+  min-width: 0;
+  flex: none;
+  touch-action: manipulation;
+  user-select: none;
+}
+.audio-float .audio-settings {
+  padding: 12px 14px 4px;
+  margin-top: 8px;
+  touch-action: manipulation;
+  user-select: none;
+}
+.audio-float .audio-custom-dd__trigger-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audio-float .audio-custom-dd__trigger-text small {
+  opacity: 0.5;
+  font-size: 0.65rem;
+  margin-left: 4px;
+}
+.audio-float .audio-custom-dd__list {
+  bottom: auto;
+  top: calc(100% + 4px);
+  max-height: min(280px, 40vh);
+}
+
 .audio-player {
   background: linear-gradient(135deg, #1a1228 0%, #0f0d1a 100%);
   border: 1px solid rgba(74,158,255,0.25);
@@ -1088,8 +1280,8 @@
   position: relative;
   box-shadow: 0 4px 24px rgba(74,158,255,0.08), 0 2px 8px rgba(0,0,0,0.3);
   color: #e8e0f0;
-  overflow: visible; /* must stay visible so voice dropdown can escape the box */
-  z-index: 10;       /* ensure player sits above the text content below it */
+  overflow: visible;
+  z-index: 10;
 }
 
 .audio-player--unsupported {
@@ -1453,7 +1645,7 @@
   background: #1e1630;
   border: 1px solid rgba(74,158,255,0.3);
   border-radius: 8px;
-  max-height: 220px;
+  max-height: min(360px, 50vh);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   z-index: 9999;
@@ -1677,17 +1869,23 @@
 
 /* ── Mobile & Tablet responsive ── */
 @media (max-width: 768px) {
-  /* Full-width card, stack everything vertically */
-  .audio-player {
+  /* Legacy inline card styles — floating dock keeps fixed positioning */
+  .audio-player:not(.audio-float) {
     flex-direction: column;
     flex-wrap: nowrap;
     padding: 16px 14px 14px;
     gap: 12px;
     align-items: stretch;
-    /* Important: prevent overflow of voice dropdown */
     overflow: visible;
     position: relative;
     z-index: 100;
+  }
+  .audio-player.audio-float {
+    width: min(360px, calc(100vw - 12px));
+    padding-bottom: 10px;
+  }
+  .audio-float--min {
+    width: min(300px, calc(100vw - 12px));
   }
 
   /* Header (info + gear) — stays as a single row */
