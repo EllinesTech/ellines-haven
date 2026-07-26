@@ -286,28 +286,18 @@ function ForgotPasswordModal({ onClose }) {
             </p>
 
             {/* Countdown timer */}
-            <div style={{
-              display:'flex', alignItems:'center', justifyContent:'space-between',
-              background: countdown > 60 ? 'rgba(201,168,76,0.08)' : 'rgba(231,76,60,0.08)',
-              border: `1px solid ${countdown > 60 ? 'rgba(201,168,76,0.25)' : 'rgba(231,76,60,0.3)'}`,
-              borderRadius:8, padding:'10px 14px', marginBottom:14, fontSize:'0.84rem',
-            }}>
-              <span style={{color: countdown > 60 ? 'var(--gold)' : '#e74c3c'}}>
+            <div className={`auth-otp-timer${countdown <= 60 ? ' is-urgent' : ''}`}>
+              <span className="auth-otp-timer-label">
                 {countdown > 0
                   ? <>⏱ Code expires in <strong>{fmtCountdown(countdown)}</strong></>
-                  : <span style={{color:'#e74c3c'}}>⛔ Code expired</span>
+                  : <>⛔ Code expired</>
                 }
               </span>
               <button
                 type="button"
+                className="auth-resend-btn"
                 onClick={handleResend}
                 disabled={resendCooldown > 0 || sending || countdown > 0 && resendCooldown > 0}
-                style={{
-                  background:'none', border:'none', padding:0,
-                  color: resendCooldown > 0 ? 'var(--muted)' : 'var(--gold)',
-                  fontSize:'0.82rem', cursor: resendCooldown > 0 ? 'default' : 'pointer',
-                  textDecoration: resendCooldown > 0 ? 'none' : 'underline', fontWeight:600,
-                }}
               >
                 {sending ? '⏳' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : '🔄 Resend'}
               </button>
@@ -315,10 +305,9 @@ function ForgotPasswordModal({ onClose }) {
 
             {err && <div className="form-error auth-alert" role="alert"><span className="auth-alert-icon">⚠️</span>{err}</div>}
             <div className="form-group"><label>Enter 6-Digit Code</label>
-              <input className="field" type="text" inputMode="numeric" pattern="[0-9]*" maxLength="6"
+              <input className="field auth-otp-input" type="text" inputMode="numeric" pattern="[0-9]*" maxLength="6"
                 value={enteredCode} onChange={e=>setEnteredCode(e.target.value.replace(/\D/g,''))}
-                placeholder="123456" required autoFocus
-                style={{letterSpacing:4,fontSize:'1.2rem',textAlign:'center'}} /></div>
+                placeholder="123456" required autoFocus /></div>
             <button type="submit" className="btn btn-primary" style={{width:'100%'}} disabled={countdown <= 0}>
               {countdown <= 0 ? 'Code Expired — Resend' : 'Verify Code'}
             </button>
@@ -624,7 +613,11 @@ export default function Login() {
       <div className="auth-wrap">
         <div className="auth-card card">
           <div className="auth-top">
-            <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
+            <Link to="/" className="auth-logo-link" aria-label="Ellines Haven home">
+              <img src="/logo-nobg3.png" alt="" className="auth-logo-img" />
+            </Link>
+            <p className="auth-brand">Ellines Haven</p>
+            <hr className="auth-brand-rule" />
             <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
             <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>

@@ -68,6 +68,24 @@ const GENRE_ICONS = {
 
 const PRIMARY_GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
 
+const IconSearch = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+const IconEmpty = () => (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="13" y2="12"/>
+  </svg>
+);
+
+const IconLock = () => (
+  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+
 export default function Library() {
   const { books: allBooks, myPerms } = useApp();
   usePageMeta({
@@ -103,10 +121,10 @@ export default function Library() {
 
   if (myPerms && myPerms.canBrowse === false) {
     return (
-      <main style={{ minHeight:'60vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:40, textAlign:'center' }}>
-        <div style={{ fontSize:'3rem' }}>🔒</div>
+      <main className="lib-restricted">
+        <div className="lib-restricted__icon"><IconLock /></div>
         <h2>Library Access Restricted</h2>
-        <p style={{ color:'var(--muted)' }}>You don't have permission to browse the library.</p>
+        <p>You don't have permission to browse the library.</p>
         <Link to="/" className="btn btn-primary">Go Home</Link>
       </main>
     );
@@ -149,33 +167,43 @@ export default function Library() {
     <main className="lib-page">
 
       {/* ── Hero Header ── */}
-      <div className="lib-hero">
-        <div className="lib-hero__glow lib-hero__glow--a" />
-        <div className="lib-hero__glow lib-hero__glow--b" />
+      <header className="lib-hero">
+        <div className="lib-hero__glow" aria-hidden="true" />
+        <div className="lib-hero__orb lib-hero__orb--1" aria-hidden="true" />
+        <div className="lib-hero__orb lib-hero__orb--2" aria-hidden="true" />
         <div className="container lib-hero__inner">
-          <div className="lib-hero__copy">
-            <span className="badge badge-gold">
-              <EditableField field="hero_badge">{cv.hero_badge}</EditableField>
-            </span>
-            <h1>The <span className="gold-text">Library</span></h1>
-            <p>Every novel &amp; short story by <strong>Elijah Mwangi M</strong> — <EditableField field="hero_sub" multiline>{cv.hero_sub.replace(/^Every novel.*?— ?/,'')}</EditableField></p>
-          </div>
-          {/* Big search bar in hero */}
+          <p className="lib-hero__brand">Ellines Haven</p>
+          <span className="lib-hero__badge">
+            <EditableField field="hero_badge">{cv.hero_badge}</EditableField>
+          </span>
+          <h1>The <span className="gold-text">Library</span></h1>
+          <p className="lib-hero__sub">
+            Every novel &amp; short story by <strong>Elijah Mwangi M</strong> —{' '}
+            <EditableField field="hero_sub" multiline>
+              {cv.hero_sub.replace(/^Every novel.*?— ?/, '')}
+            </EditableField>
+          </p>
           <div className="lib-hero__search">
-            <span className="lib-hero__search-icon">🔍</span>
+            <span className="lib-hero__search-icon"><IconSearch /></span>
             <input
               ref={searchRef}
               className="lib-hero__search-input"
               placeholder={cv.search_placeholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
+              aria-label="Search books"
             />
             {search && (
-              <button className="lib-hero__search-clear" onClick={() => setSearch('')}>✕</button>
+              <button
+                type="button"
+                className="lib-hero__search-clear"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+              >✕</button>
             )}
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ── Type tabs (sticky) ── */}
       <div className="lib-type-bar">
@@ -184,6 +212,7 @@ export default function Library() {
             {TYPE_TABS.map(t => (
               <button
                 key={t.value}
+                type="button"
                 className={`lib-type-tab${type === t.value ? ' lib-type-tab--on' : ''}`}
                 onClick={() => setType(t.value)}
               >{t.label}</button>
@@ -192,13 +221,15 @@ export default function Library() {
           <div className="lib-type-bar__right">
             <span className="lib-count">
               <strong>{books.length}</strong> {books.length === 1 ? 'book' : 'books'}
-              {hasFilters && <button className="lib-clear-inline" onClick={clear}>× Clear</button>}
+              {hasFilters && (
+                <button type="button" className="lib-clear-inline" onClick={clear}>× Clear</button>
+              )}
             </span>
-            <select className="lib-sort-select" value={sort} onChange={e => setSort(e.target.value)}>
+            <select className="lib-sort-select" value={sort} onChange={e => setSort(e.target.value)} aria-label="Sort books">
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <button className="lib-filter-toggle" onClick={() => setSidebarOpen(s => !s)}>
-              ☰ Filters {hasFilters && <span className="lib-filter-dot" />}
+            <button type="button" className="lib-filter-toggle" onClick={() => setSidebarOpen(s => !s)}>
+              Filters {hasFilters && <span className="lib-filter-dot" />}
             </button>
           </div>
         </div>
@@ -208,12 +239,14 @@ export default function Library() {
       <div className="lib-genre-bar">
         <div className="container lib-genre-bar__inner">
           <button
+            type="button"
             className={`lib-genre-chip${!genre ? ' lib-genre-chip--on' : ''}`}
             onClick={() => setGenre('')}
           >All</button>
           {GENRES.map(g => (
             <button
               key={g}
+              type="button"
               className={`lib-genre-chip${genre === g ? ' lib-genre-chip--on' : ''}${!PRIMARY_GENRES.includes(g) ? ' lib-genre-chip--sub' : ''}`}
               onClick={() => setGenre(g)}
             >
@@ -230,7 +263,7 @@ export default function Library() {
         <aside className={`lib-sidebar${sidebarOpen ? ' lib-sidebar--open' : ''}`}>
           <div className="lib-sidebar__header">
             <span>Filters</span>
-            <button className="lib-sidebar__close" onClick={() => setSidebarOpen(false)}>✕</button>
+            <button type="button" className="lib-sidebar__close" onClick={() => setSidebarOpen(false)} aria-label="Close filters">✕</button>
           </div>
 
           <div className="lib-sidebar__section">
@@ -238,6 +271,7 @@ export default function Library() {
             {STATUS_FILTERS.map(({ value, label, icon }) => (
               <button
                 key={value}
+                type="button"
                 className={`lib-filt-btn${status === value ? ' lib-filt-btn--on' : ''}`}
                 onClick={() => { setStatus(value); setSidebarOpen(false); }}
               >
@@ -249,12 +283,14 @@ export default function Library() {
           <div className="lib-sidebar__section">
             <h4 className="lib-sidebar__heading">Genre</h4>
             <button
+              type="button"
               className={`lib-filt-btn${!genre ? ' lib-filt-btn--on' : ''}`}
               onClick={() => { setGenre(''); setSidebarOpen(false); }}
             >📚 All Genres</button>
             {GENRES.map(g => (
               <button
                 key={g}
+                type="button"
                 className={`lib-filt-btn${genre === g ? ' lib-filt-btn--on' : ''}`}
                 onClick={() => { setGenre(g); setSidebarOpen(false); }}
               >
@@ -264,7 +300,11 @@ export default function Library() {
           </div>
 
           {hasFilters && (
-            <button className="btn btn-ghost btn-sm lib-sidebar__clear" onClick={() => { clear(); setSidebarOpen(false); }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm lib-sidebar__clear"
+              onClick={() => { clear(); setSidebarOpen(false); }}
+            >
               × Clear All Filters
             </button>
           )}
@@ -279,18 +319,18 @@ export default function Library() {
           {/* Active filter chips */}
           {hasFilters && (
             <div className="lib-active-filters">
-              {genre && <span className="lib-chip">{GENRE_ICONS[genre]} {genre} <button onClick={() => setGenre('')}>×</button></span>}
-              {status && activeStatusMeta && <span className="lib-chip">{activeStatusMeta.icon} {activeStatusMeta.label} <button onClick={() => setStatus('')}>×</button></span>}
-              {search && <span className="lib-chip">🔍 "{search}" <button onClick={() => setSearch('')}>×</button></span>}
+              {genre && <span className="lib-chip">{GENRE_ICONS[genre]} {genre} <button type="button" onClick={() => setGenre('')}>×</button></span>}
+              {status && activeStatusMeta && <span className="lib-chip">{activeStatusMeta.icon} {activeStatusMeta.label} <button type="button" onClick={() => setStatus('')}>×</button></span>}
+              {search && <span className="lib-chip">"{search}" <button type="button" onClick={() => setSearch('')}>×</button></span>}
             </div>
           )}
 
           {books.length === 0 ? (
             <div className="lib-empty">
-              <div className="lib-empty__icon">📭</div>
+              <div className="lib-empty__icon"><IconEmpty /></div>
               <h3><EditableField field="empty_heading">{cv.empty_heading}</EditableField></h3>
               <p><EditableField field="empty_sub">{cv.empty_sub}</EditableField></p>
-              <button className="btn btn-outline" onClick={clear}>Clear Filters</button>
+              <button type="button" className="btn btn-outline lib-empty__cta" onClick={clear}>Clear Filters</button>
             </div>
           ) : (
             <div className="lib-books-grid">

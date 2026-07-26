@@ -30,8 +30,15 @@ export default function ChangePassword() {
       <main className="auth-page">
         <div className="auth-wrap">
           <div className="auth-card card" style={{ textAlign: 'center' }}>
+            <div className="auth-top">
+              <Link to="/" className="auth-logo-link" aria-label="Ellines Haven home">
+                <img src="/logo-nobg3.png" alt="" className="auth-logo-img" />
+              </Link>
+              <p className="auth-brand">Ellines Haven</p>
+              <hr className="auth-brand-rule" />
+            </div>
             <p style={{ color: 'var(--muted)', marginBottom: 20 }}>You need to be logged in to change your password.</p>
-            <Link to="/login" className="btn btn-primary" style={{ display: 'inline-block' }}>Sign In</Link>
+            <Link to="/login" className="btn btn-primary">Sign In</Link>
           </div>
         </div>
       </main>
@@ -102,7 +109,11 @@ export default function ChangePassword() {
       <main className="auth-page">
         <div className="auth-wrap">
           <div className="auth-card card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>✅</div>
+            <div className="auth-top">
+              <p className="auth-brand">Ellines Haven</p>
+              <hr className="auth-brand-rule" />
+            </div>
+            <div className="auth-done-icon" aria-hidden="true">✅</div>
             <h2 style={{ color: 'var(--gold)', marginBottom: 8 }}>Password Updated</h2>
             <p style={{ color: 'var(--muted)' }}>Your new password has been saved. Taking you to Ellines Haven…</p>
           </div>
@@ -116,24 +127,19 @@ export default function ChangePassword() {
       <div className="auth-wrap">
         <div className="auth-card card">
           <div className="auth-top">
-            <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
+            <Link to="/" className="auth-logo-link" aria-label="Ellines Haven home">
+              <img src="/logo-nobg3.png" alt="" className="auth-logo-img" />
+            </Link>
+            <p className="auth-brand">Ellines Haven</p>
+            <hr className="auth-brand-rule" />
             <h2>Set New Password</h2>
-            <p style={{ color: 'var(--muted)' }}>
+            <p>
               Your password was reset by an admin. Please choose a new password to continue.
             </p>
           </div>
 
-          {/* Security notice */}
-          <div style={{
-            background: 'rgba(201,168,76,0.1)',
-            border: '1px solid rgba(201,168,76,0.35)',
-            borderRadius: 8,
-            padding: '12px 16px',
-            marginBottom: 20,
-            fontSize: '0.84rem',
-            color: 'var(--text)',
-          }}>
-            <strong style={{ color: 'var(--gold)' }}>🔒 Action Required</strong>
+          <div className="auth-secure-notice">
+            <strong>🔒 Action Required</strong>
             <br />
             For your security, you must set a new password before accessing your account.
           </div>
@@ -145,7 +151,7 @@ export default function ChangePassword() {
               </div>
             )}
 
-            <div className="form-group" style={{ marginBottom: 16 }}>
+            <div className="form-group">
               <label>New Password</label>
               <div className="auth-pw-wrap">
                 <input
@@ -180,7 +186,7 @@ export default function ChangePassword() {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={busy}>
+            <button type="submit" className="btn btn-primary auth-submit-btn" disabled={busy}>
               {busy ? '⏳ Saving…' : '🔐 Set New Password'}
             </button>
           </form>
@@ -188,8 +194,8 @@ export default function ChangePassword() {
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <button
               type="button"
+              className="auth-signout-link"
               onClick={() => { logout(); navigate('/login', { replace: true }); }}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '0.82rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Sign out instead
             </button>

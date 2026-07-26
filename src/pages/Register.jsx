@@ -91,12 +91,19 @@ export default function Register() {
       <main className="auth-page">
         <div className="auth-wrap">
           <div className="auth-card card" style={{ textAlign:'center' }}>
-            <div style={{ fontSize:'3rem', marginBottom:16 }}>🚫</div>
+            <div className="auth-top">
+              <Link to="/" className="auth-logo-link" aria-label="Ellines Haven home">
+                <img src="/logo-nobg3.png" alt="" className="auth-logo-img" />
+              </Link>
+              <p className="auth-brand">Ellines Haven</p>
+              <hr className="auth-brand-rule" />
+            </div>
+            <div className="auth-closed-icon" aria-hidden="true">🚫</div>
             <h2>Registrations Closed</h2>
             <p style={{ color:'var(--muted)', marginTop:8, marginBottom:20 }}>
               <EditableField field="closed_sub">{cv.closed_sub}</EditableField>
             </p>
-            <Link to="/login" className="btn btn-primary" style={{ width:'100%' }}>Sign In Instead</Link>
+            <Link to="/login" className="btn btn-primary">Sign In Instead</Link>
           </div>
         </div>
       </main>
@@ -299,7 +306,11 @@ export default function Register() {
       <div className="auth-wrap">
         <div className="auth-card card">
           <div className="auth-top">
-            <Link to="/"><img src="/logo-nobg3.png" alt="Ellines Haven" className="auth-logo-img" /></Link>
+            <Link to="/" className="auth-logo-link" aria-label="Ellines Haven home">
+              <img src="/logo-nobg3.png" alt="" className="auth-logo-img" />
+            </Link>
+            <p className="auth-brand">Ellines Haven</p>
+            <hr className="auth-brand-rule" />
             <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
             <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
@@ -316,49 +327,52 @@ export default function Register() {
             )}
 
             {/* Name */}
-            <div className="form-group" style={{ marginBottom:'15px' }}>
+            <div className="form-group">
               <label>Full Name</label>
               <input className="field" type="text" placeholder="Mark Joseph" value={form.name} onChange={e => f('name', e.target.value)} required />
             </div>
 
             {/* Email */}
-            <div className="form-group" style={{ marginBottom:'15px' }}>
+            <div className="form-group">
               <label>Email</label>
-              <div style={{ position:'relative' }}>
-                <input className="field" type="email" placeholder="your@email.com" value={form.email}
+              <div className="auth-email-status">
+                <input
+                  className={`field${emailStatus === 'taken' ? ' field--error' : ''}`}
+                  type="email"
+                  placeholder="your@email.com"
+                  value={form.email}
                   onChange={e => { f('email', e.target.value); setEmailStatus(''); }}
                   onBlur={e => checkEmailExists(e.target.value)}
                   required
-                  style={{ paddingRight: emailStatus ? 36 : undefined,
-                           borderColor: emailStatus === 'taken' ? '#e74c3c' : emailStatus === 'ok' ? '#2ecc71' : undefined }}
+                  style={emailStatus === 'ok' ? { borderColor: '#2ecc71' } : undefined}
                 />
                 {emailStatus === 'checking' && (
-                  <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:'0.8rem', color:'var(--muted)' }}>⏳</span>
+                  <span className="auth-email-status-icon" style={{ color:'var(--muted)' }}>⏳</span>
                 )}
                 {emailStatus === 'taken' && (
-                  <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:'1rem' }}>❌</span>
+                  <span className="auth-email-status-icon">❌</span>
                 )}
                 {emailStatus === 'ok' && (
-                  <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:'1rem' }}>✅</span>
+                  <span className="auth-email-status-icon">✅</span>
                 )}
               </div>
               {emailStatus === 'taken' && (
-                <p style={{ color:'#e74c3c', fontSize:'0.78rem', marginTop:5, marginBottom:0 }}>
+                <p className="auth-email-status-msg is-taken">
                   ⚠️ An account with this email already exists.{' '}
-                  <a href="/login" style={{ color:'var(--gold)' }}>Sign in instead?</a>
+                  <a href="/login">Sign in instead?</a>
                 </p>
               )}
             </div>
 
             {/* Phone (optional, used for SMS password reset) */}
-            <div className="form-group" style={{ marginBottom:'15px' }}>
-              <label>Phone Number <span style={{ color:'var(--muted)', fontWeight:400, fontSize:'0.78rem' }}>(for SMS password reset — optional)</span></label>
+            <div className="form-group">
+              <label>Phone Number <span className="auth-field-hint">(for SMS password reset — optional)</span></label>
               <input className="field" type="tel" placeholder="+254 7XX XXX XXX" value={form.phone}
                 onChange={e => f('phone', e.target.value)} />
             </div>
 
             {/* Password */}
-            <div className="form-group" style={{ marginBottom:'15px' }}>
+            <div className="form-group">
               <label>Password</label>
               <div className="auth-pw-wrap">
                 <input
@@ -373,16 +387,19 @@ export default function Register() {
                   <EyeIcon open={show.password} />
                 </button>
               </div>
-              {/* Password strength indicator */}
               {form.password.length > 0 && (
-                <div style={{ marginTop:7 }}>
-                  <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+                <div className="auth-pw-meter">
+                  <div className="auth-pw-meter-bars">
                     {[1,2,3,4].map(i => (
-                      <div key={i} style={{ flex:1, height:4, borderRadius:3, background: i <= pwStrength ? pwColors[pwStrength] : 'rgba(255,255,255,0.1)', transition:'background 0.2s' }} />
+                      <div
+                        key={i}
+                        className="auth-pw-meter-bar"
+                        style={{ background: i <= pwStrength ? pwColors[pwStrength] : undefined }}
+                      />
                     ))}
                   </div>
                   {pwStrength > 0 && (
-                    <span style={{ fontSize:'0.72rem', color: pwColors[pwStrength], fontWeight:600 }}>
+                    <span className="auth-pw-meter-label" style={{ color: pwColors[pwStrength] }}>
                       {pwLabels[pwStrength]} password
                       {pwStrength < 3 && ' — add uppercase, numbers or symbols to strengthen it'}
                     </span>
@@ -392,7 +409,7 @@ export default function Register() {
             </div>
 
             {/* Confirm Password */}
-            <div className="form-group" style={{ marginBottom:'15px' }}>
+            <div className="form-group">
               <label>Confirm Password</label>
               <div className="auth-pw-wrap">
                 <input
@@ -438,7 +455,7 @@ export default function Register() {
               </label>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width:'100%', marginTop:'6px' }} disabled={busy}>
+            <button type="submit" className="btn btn-primary auth-submit-btn" style={{ marginTop:'6px' }} disabled={busy}>
               {busy ? 'Creating Account…' : cv.btn}
             </button>
           </form>

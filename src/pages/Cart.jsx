@@ -118,7 +118,7 @@ function StkWaiting({ order, onSuccess, onFailed, onCancel }) {
 
   if (status === 'timeout') return (
     <div className="done-box" style={{ textAlign:'center', padding:'40px 20px' }}>
-      <div style={{ fontSize:'3rem', marginBottom:16 }}>⏱</div>
+      <div className="done-box__check pending-icon">⏱</div>
       <h2>Request Timed Out</h2>
       <p style={{ color:'var(--muted)' }}>
         No response received. If you already paid, contact us with your M-Pesa code.
@@ -132,27 +132,23 @@ function StkWaiting({ order, onSuccess, onFailed, onCancel }) {
 
   // ── Waiting for customer to approve on phone ──
   return (
-    <div className="done-box" style={{ textAlign:'center', padding:'40px 20px' }}>
-      <div style={{ fontSize:'3.5rem', marginBottom:16, animation:'pulse 1.5s infinite' }}>📱</div>
+    <div className="done-box cart-stk-wait">
+      <div className="cart-stk-wait__pulse" aria-hidden="true" />
       <h2>Check Your Phone</h2>
-      <p style={{ color:'var(--muted)', maxWidth:380, margin:'0 auto 16px' }}>
+      <p className="cart-stk-wait__lede">
         An M-Pesa payment prompt has been sent to your phone.
         Enter your <strong>M-Pesa PIN</strong> to complete the payment.
       </p>
-      <div style={{
-        background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.25)',
-        borderRadius:'var(--r-sm)', padding:'14px 20px', marginBottom:20,
-        display:'inline-block', minWidth:220,
-      }}>
-        <div style={{ fontSize:'1.5rem', fontWeight:700, color:'var(--gold)' }}>
+      <div className="cart-stk-wait__amount">
+        <div className="cart-stk-wait__kes">
           KSh {order?.total?.toLocaleString()}
         </div>
-        <div style={{ fontSize:'0.8rem', color:'var(--muted)', marginTop:4 }}>
+        <div className="cart-stk-wait__order">
           Order {order?.id}
         </div>
       </div>
-      <p style={{ color:'var(--muted)', fontSize:'.82rem', marginBottom:20 }}>
-        Waiting for confirmation… <span style={{ animation:'pulse 1s infinite', display:'inline-block' }}>●</span>
+      <p className="cart-stk-wait__status">
+        Waiting for confirmation… <span className="cart-stk-wait__dot" aria-hidden="true">●</span>
       </p>
       <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
     </div>
@@ -235,13 +231,13 @@ function VerifyingScreen({ orderId, paystackRef, userEmail, onDone, onGiveUp }) 
 
   return (
     <main className="cart-page">
-      <div className="container" style={{ maxWidth:480, margin:'80px auto', textAlign:'center' }}>
-        <div style={{ fontSize:'3.5rem', marginBottom:16, animation:'pulse 1.2s infinite' }}>🔄</div>
+      <div className="cart-status-screen">
+        <div className="cart-status-screen__spinner" aria-hidden="true" />
         <h2>Confirming Payment{dots}</h2>
-        <p style={{ color:'var(--muted)', maxWidth:380, margin:'0 auto', lineHeight:1.7 }}>
+        <p>
           Your payment is being processed. For M-Pesa this can take up to 30 seconds after entering your PIN.
         </p>
-        <p style={{ color:'var(--gold)', fontSize:'0.82rem', marginTop:16 }}>
+        <p className="cart-status-screen__hint">
           {elapsed < 10 ? 'Waiting for confirmation…' :
            elapsed < 20 ? 'Still waiting — M-Pesa is processing…' :
            elapsed < 35 ? 'Almost there — confirming with Paystack…' :
@@ -431,20 +427,24 @@ export default function Cart() {
 
   // ── Permission / site-control gates ─────────────────────────────────────
   if (user && myPerms?.canPurchase === false) return (
-    <main style={{ minHeight:'60vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:40, textAlign:'center' }}>
-      <div style={{ fontSize:'3rem' }}>🔒</div>
-      <h2>Purchasing Restricted</h2>
-      <p style={{ color:'var(--muted)' }}>You don't have permission to make purchases. Contact support.</p>
-      <Link to="/library" className="btn btn-primary">Browse Books</Link>
+    <main className="cart-page">
+      <div className="cart-gate">
+        <div className="cart-gate__icon" aria-hidden="true">!</div>
+        <h2>Purchasing Restricted</h2>
+        <p>You don't have permission to make purchases. Contact support.</p>
+        <Link to="/library" className="btn btn-primary">Browse Books</Link>
+      </div>
     </main>
   );
 
   if (siteControls?.disableOrders) return (
-    <main style={{ minHeight:'60vh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:40, textAlign:'center' }}>
-      <div style={{ fontSize:'3rem' }}>🛒</div>
-      <h2>Orders Temporarily Disabled</h2>
-      <p style={{ color:'var(--muted)' }}>We are not accepting orders right now. Please check back soon.</p>
-      <Link to="/library" className="btn btn-primary">Browse Books</Link>
+    <main className="cart-page">
+      <div className="cart-gate">
+        <div className="cart-gate__icon" aria-hidden="true">—</div>
+        <h2>Orders Temporarily Disabled</h2>
+        <p>We are not accepting orders right now. Please check back soon.</p>
+        <Link to="/library" className="btn btn-primary">Browse Books</Link>
+      </div>
     </main>
   );
 
@@ -746,18 +746,18 @@ export default function Cart() {
   // ── PayPal modal screen ───────────────────────────────────────────────────
   if (step === 'paypal_modal') return (
     <main className="cart-page">
-      <div className="container" style={{ maxWidth:520, margin:'60px auto' }}>
-        <div className="card" style={{ padding:'30px 24px', textAlign:'center' }}>
-          <div style={{ fontSize:'2.5rem', marginBottom:12 }}>🅿</div>
-          <h2 style={{ marginBottom:6 }}>Pay with PayPal</h2>
-          <p style={{ color:'var(--muted)', fontSize:'0.85rem', marginBottom:8 }}>
-            You'll be charged <strong style={{ color:'var(--gold)' }}>USD ~${(effectiveTotal * 0.0077).toFixed(2)}</strong>
-            <span style={{ color:'var(--muted)', fontSize:'0.78rem' }}> (≈ KSh {effectiveTotal.toLocaleString()})</span>
+      <div className="container cart-modal-wrap">
+        <div className="card cart-modal-card">
+          <p className="cart-modal-card__brand">PayPal</p>
+          <h2>Complete Payment</h2>
+          <p className="cart-modal-card__amount">
+            You'll be charged <strong>USD ~${(effectiveTotal * 0.0077).toFixed(2)}</strong>
+            <span> (≈ KSh {effectiveTotal.toLocaleString()})</span>
           </p>
-          <p style={{ color:'var(--muted)', fontSize:'0.78rem', marginBottom:20 }}>Complete your payment securely via PayPal.</p>
+          <p className="cart-modal-card__sub">Complete your payment securely via PayPal.</p>
           <div id="paypal-button-container" style={{ minHeight:48 }} />
-          <button className="btn btn-ghost btn-sm" style={{ marginTop:16, width:'100%' }} onClick={() => setStep('pay')}>
-            ← Back to Payment Options
+          <button className="btn btn-ghost btn-sm cart-modal-card__back" onClick={() => setStep('pay')}>
+            Back to Payment Options
           </button>
         </div>
       </div>
@@ -966,44 +966,32 @@ export default function Cart() {
     };
     return (
     <main className="cart-page">
-      <div className="page-header"><div className="container"><h1><EditableField field="checkout_heading">Checkout</EditableField></h1></div></div>
+      <header className="cart-hero">
+        <div className="cart-hero__glow" aria-hidden="true" />
+        <div className="cart-hero__orb cart-hero__orb--1" aria-hidden="true" />
+        <div className="container cart-hero__inner">
+          <p className="cart-hero__brand">Ellines Haven</p>
+          <h1><EditableField field="checkout_heading">Check<span className="gold-text">out</span></EditableField></h1>
+          <p>Secure payment · Instant unlock</p>
+        </div>
+      </header>
       <div className="container">
         <div className="pay-layout">
           <div className="pay-form card">
 
             {/* ── Accepted payment labels ── */}
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:20, paddingBottom:16, borderBottom:'1px solid var(--dim)' }}>
-              {[
-                { icon:'📱', label:'M-Pesa' },
-                { icon:'💳', label:'Visa / Mastercard' },
-                { icon:'🏦', label:'Bank Transfer' },
-                { icon:'🌍', label:'International Cards' },
-                { icon:'🅿', label:'PayPal' },
-              ].map(({ icon, label }) => (
-                <span key={label} style={{
-                  display:'inline-flex', alignItems:'center', gap:6,
-                  padding:'5px 11px', borderRadius:20,
-                  background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)',
-                  fontSize:'0.78rem', color:'var(--muted)', fontWeight:600,
-                }}>
-                  {icon} {label}
-                </span>
+            <div className="pay-accepted">
+              {['M-Pesa', 'Visa / Mastercard', 'Bank Transfer', 'International Cards', 'PayPal'].map(label => (
+                <span key={label} className="pay-accepted__chip">{label}</span>
               ))}
-              <span style={{
-                display:'inline-flex', alignItems:'center', gap:6,
-                padding:'5px 11px', borderRadius:20,
-                background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.2)',
-                fontSize:'0.78rem', color:'var(--ok)', fontWeight:600,
-              }}>
-                ✓ Secure · Instant unlock
-              </span>
+              <span className="pay-accepted__chip pay-accepted__chip--ok">Secure · Instant unlock</span>
             </div>
 
             {/* ── PayPal tab (only if enabled) ── */}
             {show.paypal && (
-              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                <button className={'pay-btn' + (method !== 'paypal' ? '' : ' pay-btn--on')} onClick={() => { setMethod('paystack'); setStkError(''); }} style={{ flex:1 }}>💳 Card / M-Pesa</button>
-                <button className={'pay-btn' + (method === 'paypal' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paypal'); setStkError(''); }} style={{ flex:1 }}>🅿 PayPal</button>
+              <div className="pay-method-tabs">
+                <button className={'pay-btn' + (method !== 'paypal' ? '' : ' pay-btn--on')} onClick={() => { setMethod('paystack'); setStkError(''); }} type="button">Card / M-Pesa</button>
+                <button className={'pay-btn' + (method === 'paypal' ? ' pay-btn--on' : '')} onClick={() => { setMethod('paypal'); setStkError(''); }} type="button">PayPal</button>
               </div>
             )}
 
@@ -1011,44 +999,34 @@ export default function Cart() {
             {method !== 'paypal' && (
               <form onSubmit={submitPaystack}>
                 <div className="pay-mpesa-box">
-                  <div style={{ background:'rgba(46,204,113,0.08)', border:'1px solid rgba(46,204,113,0.25)', borderLeft:'3px solid var(--ok)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
-                    ⚡ <strong style={{ color:'var(--ok)' }}>Instant unlock</strong> — books unlock automatically the moment payment confirms.
+                  <div className="pay-instant-note">
+                    <strong>Instant unlock</strong> — books unlock automatically the moment payment confirms.
                   </div>
 
                   {/* Payment method selector — shows total per option, no fee language */}
-                  <p style={{ fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.8px' }}>
+                  <p className="pay-channel-label">
                     Payment method
                   </p>
-                  <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:18 }}>
+                  <div className="pay-channel-list">
                     {[
-                      { key:'mpesa',     icon:'📱', label:'Pay with M-Pesa' },
-                      { key:'card',      icon:'💳', label:'Pay with Local Card' },
-                      { key:'intl_card', icon:'🌍', label:'Pay with International Card' },
-                    ].map(({ key, icon, label }) => {
-                      const totalKes = calcPaystackAmount(effectiveTotal, key) / 100;
+                      { key:'mpesa',     label:'Pay with M-Pesa' },
+                      { key:'card',      label:'Pay with Local Card' },
+                      { key:'intl_card', label:'Pay with International Card' },
+                    ].map(({ key, label }) => {
                       const active   = paystackChannel === key;
                       return (
-                        <label key={key} style={{
-                          display:'flex', alignItems:'center', justifyContent:'space-between',
-                          padding:'12px 16px', borderRadius:'var(--r-sm)', cursor:'pointer',
-                          border: active ? '2px solid var(--gold)' : '1px solid var(--dim)',
-                          background: active ? 'rgba(201,168,76,0.07)' : 'transparent',
-                          transition:'all 0.15s',
-                        }}>
-                          <span style={{ display:'flex', alignItems:'center', gap:10 }}>
+                        <label key={key} className={'pay-channel' + (active ? ' pay-channel--on' : '')}>
+                          <span className="pay-channel__left">
                             <input
                               type="radio"
                               name="paystackChannel"
                               value={key}
                               checked={active}
                               onChange={() => setPaystackChannel(key)}
-                              style={{ accentColor:'var(--gold)', width:15, height:15 }}
                             />
-                            <span style={{ fontSize:'0.9rem', color: active ? 'var(--text)' : 'var(--muted)', fontWeight: active ? 600 : 400 }}>
-                              {icon} {label}
-                            </span>
+                            <span className="pay-channel__label">{label}</span>
                           </span>
-                          <span style={{ fontWeight: 700, fontSize:'0.95rem', color: active ? 'var(--gold)' : 'var(--muted)' }}>
+                          <span className="pay-channel__price">
                             KSh {(calcPaystackAmount(effectiveTotal, key) / 100).toFixed(2)}
                           </span>
                         </label>
@@ -1056,7 +1034,7 @@ export default function Cart() {
                     })}
                   </div>
 
-                  {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:4, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
+                  {stkError && <div className="pay-error">{stkError}</div>}
                 </div>
                 <div className="pay-total">
                   <span>Total</span>
@@ -1064,41 +1042,39 @@ export default function Cart() {
                 </div>
                 {/* ── Promo code on pay screen ── */}
                 {promoApplied && (
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', marginTop:8, background: promoApplied.type === 'Referral' ? 'rgba(52,152,219,0.1)' : 'rgba(46,204,113,0.08)', border: promoApplied.type === 'Referral' ? '1px solid rgba(52,152,219,0.3)' : '1px solid rgba(46,204,113,0.25)', borderRadius:'var(--r-sm)', fontSize:'0.79rem' }}>
-                    <span style={{ color: promoApplied.type === 'Referral' ? '#3498db' : 'var(--ok)' }}>
-                      {promoApplied.type === 'Referral' ? '🎁' : '🎟'} <strong>{promoApplied.code}</strong> applied
-                      {promoApplied.referrerName && <span style={{ marginLeft: 6, color: 'var(--muted)', fontSize: '0.75rem' }}>from {promoApplied.referrerName}</span>}
+                  <div className={'pay-promo-applied' + (promoApplied.type === 'Referral' ? ' pay-promo-applied--ref' : '')}>
+                    <span>
+                      <strong>{promoApplied.code}</strong> applied
+                      {promoApplied.referrerName && <span className="pay-promo-applied__from"> from {promoApplied.referrerName}</span>}
                     </span>
-                    <span style={{ color: promoApplied.type === 'Referral' ? '#3498db' : '#2ecc71', fontWeight:700 }}>−KSh {discountAmount.toLocaleString()}</span>
+                    <span className="pay-promo-applied__amt">−KSh {discountAmount.toLocaleString()}</span>
                   </div>
                 )}
                 {/* ── No-refund acknowledgement ── */}
-                <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
+                <label className="pay-refund-ack">
                   <input
                     type="checkbox"
                     checked={refundAcked}
                     onChange={e => setRefundAcked(e.target.checked)}
-                    style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }}
                   />
-                  <span style={{ color:'var(--muted)' }}>
-                    I understand that <strong style={{ color:'var(--text)' }}>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Read refund policy →</Link>
+                  <span>
+                    I understand that <strong>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank">Read refund policy →</Link>
                   </span>
                 </label>
 
                 {/* ── M-Pesa heads-up ── */}
-                <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'10px 13px', background:'rgba(201,168,76,0.06)', border:'1px solid rgba(201,168,76,0.18)', borderRadius:'var(--r-sm)', marginBottom:12, fontSize:'0.79rem', color:'var(--muted)', lineHeight:1.6 }}>
-                  <span style={{ fontSize:'1rem', flexShrink:0, marginTop:1 }}>💡</span>
+                <div className="pay-help-note">
                   <span>
                     Your book unlocks automatically after payment. If it doesn't appear in your library, go to{' '}
-                    <strong style={{ color:'var(--gold)' }}>My Library → Orders</strong> and tap{' '}
-                    <strong style={{ color:'var(--text)' }}>Retry Activation</strong>.
+                    <strong className="gold-text">My Library → Orders</strong> and tap{' '}
+                    <strong>Retry Activation</strong>.
                   </span>
                 </div>
 
-                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px' }} disabled={busy || !refundAcked}>
-                  {busy ? 'Opening payment…' : `⚡ Pay KSh ${(calcPaystackAmount(effectiveTotal, paystackChannel) / 100).toFixed(2)}`}
+                <button type="submit" className="btn btn-primary pay-submit" disabled={busy || !refundAcked}>
+                  {busy ? 'Opening payment…' : `Pay KSh ${(calcPaystackAmount(effectiveTotal, paystackChannel) / 100).toFixed(2)}`}
                 </button>
-                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
+                <button type="button" className="btn btn-ghost btn-sm pay-back" onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
             )}
 
@@ -1106,29 +1082,29 @@ export default function Cart() {
             {method === 'paypal' && (
               <form onSubmit={submitPayPal}>
                 <div className="pay-mpesa-box">
-                  <div style={{ background:'rgba(0,112,240,0.07)', border:'1px solid rgba(0,112,240,0.2)', borderLeft:'3px solid #0070f0', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:16, fontSize:'0.83rem' }}>
-                    🅿 <strong style={{ color:'#0070f0' }}>PayPal</strong> — pay with your PayPal balance, linked bank, Visa, or Mastercard. Globally accepted.
+                  <div className="pay-paypal-note">
+                    <strong>PayPal</strong> — pay with your PayPal balance, linked bank, Visa, or Mastercard. Globally accepted.
                   </div>
                   <div className="pay-detail-row"><span>Amount (KES)</span><strong className="pay-highlight">KSh {effectiveTotal.toLocaleString()}</strong></div>
-                  <div className="pay-detail-row"><span>Amount (USD approx.)</span><strong style={{ color:'#0070f0' }}>~${(effectiveTotal * 0.0077).toFixed(2)}</strong></div>
+                  <div className="pay-detail-row"><span>Amount (USD approx.)</span><strong className="pay-paypal-usd">~${(effectiveTotal * 0.0077).toFixed(2)}</strong></div>
                   <div className="pay-detail-row"><span>Accepted</span><strong>PayPal · Visa · Mastercard · Bank</strong></div>
-                  <p style={{ color:'var(--muted)', fontSize:'0.76rem', marginTop:10 }}>
+                  <p className="pay-paypal-hint">
                     Note: PayPal processes in USD. The USD amount shown is approximate.
                   </p>
-                  {stkError && <div style={{ background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginTop:12, fontSize:'0.83rem', color:'#e74c3c' }}>⚠ {stkError}</div>}
+                  {stkError && <div className="pay-error">{stkError}</div>}
                 </div>
                 <div className="pay-total"><span>Total</span><strong>KSh {effectiveTotal.toLocaleString()}</strong></div>
                 {/* ── No-refund acknowledgement ── */}
-                <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
-                  <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }} />
-                  <span style={{ color:'var(--muted)' }}>
-                    I understand that <strong style={{ color:'var(--text)' }}>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Read refund policy →</Link>
+                <label className="pay-refund-ack">
+                  <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} />
+                  <span>
+                    I understand that <strong>all digital book purchases are final and non-refundable</strong>. Once payment is confirmed and my book is unlocked, no refund can be issued. <Link to="/terms#refund" target="_blank">Read refund policy →</Link>
                   </span>
                 </label>
-                <button type="submit" className="btn btn-primary" style={{ width:'100%', fontSize:'1rem', padding:'14px', background:'#0070f0', borderColor:'#0070f0' }} disabled={busy || !refundAcked}>
-                  {busy ? 'Connecting to PayPal…' : `🅿 Pay with PayPal`}
+                <button type="submit" className="btn btn-primary pay-submit pay-submit--paypal" disabled={busy || !refundAcked}>
+                  {busy ? 'Connecting to PayPal…' : 'Pay with PayPal'}
                 </button>
-                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
+                <button type="button" className="btn btn-ghost btn-sm pay-back" onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
             )}
 
@@ -1144,12 +1120,12 @@ export default function Cart() {
                 </div>
                 <div className="pay-total"><span>Total</span><strong>KSh {effectiveTotal.toLocaleString()}</strong></div>
                 {/* ── No-refund acknowledgement ── */}
-                <label style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'12px 14px', background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'var(--r-sm)', cursor:'pointer', marginBottom:12, fontSize:'0.82rem', lineHeight:1.55 }}>
-                  <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} style={{ marginTop:2, accentColor:'var(--gold)', flexShrink:0, width:15, height:15 }} />
-                  <span style={{ color:'var(--muted)' }}>I understand that <strong style={{ color:'var(--text)' }}>all digital purchases are final and non-refundable</strong>. <Link to="/terms#refund" target="_blank" style={{ color:'var(--gold)' }}>Refund policy →</Link></span>
+                <label className="pay-refund-ack">
+                  <input type="checkbox" checked={refundAcked} onChange={e => setRefundAcked(e.target.checked)} />
+                  <span>I understand that <strong>all digital purchases are final and non-refundable</strong>. <Link to="/terms#refund" target="_blank">Refund policy →</Link></span>
                 </label>
-                <button type="submit" className="btn btn-primary" style={{ width:'100%' }} disabled={busy || !refundAcked}>{busy ? 'Submitting…' : 'Submit Payment'}</button>
-                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
+                <button type="submit" className="btn btn-primary pay-submit" disabled={busy || !refundAcked}>{busy ? 'Submitting…' : 'Submit Payment'}</button>
+                <button type="button" className="btn btn-ghost btn-sm pay-back" onClick={() => setStep('cart')}>Back to Cart</button>
               </form>
             )}
 
@@ -1164,7 +1140,7 @@ export default function Cart() {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{flexShrink:0}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                   Order via WhatsApp
                 </a>
-                <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop:12, width:'100%' }} onClick={() => setStep('cart')}>Back to Cart</button>
+                <button type="button" className="btn btn-ghost btn-sm pay-back" onClick={() => setStep('cart')}>Back to Cart</button>
               </div>
             )}
           </div>
@@ -1178,9 +1154,9 @@ export default function Cart() {
               </div>
             ))}
             {discountAmount > 0 && (
-              <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', borderTop:'1px solid var(--dim)', fontSize:'0.82rem' }}>
-                <span style={{ color:'var(--ok)' }}>🎟 {promoApplied?.code}</span>
-                <strong style={{ color:'#2ecc71' }}>−KSh {discountAmount.toLocaleString()}</strong>
+              <div className="pay-summary-discount">
+                <span>{promoApplied?.code}</span>
+                <strong>−KSh {discountAmount.toLocaleString()}</strong>
               </div>
             )}
             <div className="pay-total">
@@ -1189,9 +1165,9 @@ export default function Cart() {
             </div>
             <div className="pay-trust">
               {method === 'paystack'
-                ? <><span>⚡ Books unlock instantly after payment</span><span>M-Pesa · Card · Bank supported</span></>
+                ? <><span>Books unlock instantly after payment</span><span>M-Pesa · Card · Bank supported</span></>
                 : method === 'paypal'
-                ? <><span>🅿 PayPal secure checkout</span><span>Books unlock automatically on payment</span></>
+                ? <><span>PayPal secure checkout</span><span>Books unlock automatically on payment</span></>
                 : <><span>Books unlock after payment is verified</span><span>Usually within minutes</span></>
               }
             </div>

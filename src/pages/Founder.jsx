@@ -40,6 +40,50 @@ function EditableText({ value, onSave, tag: Tag = 'p', className, style, multili
   );
 }
 
+/* ── Icons ── */
+const IconPhone = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+);
+const IconMail = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+  </svg>
+);
+const IconGlobe = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+);
+const IconArrow = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+  </svg>
+);
+const IconBook = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+const IconSpark = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6L12 2z"/>
+  </svg>
+);
+const IconBolt = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+);
+const IconChair = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6 11h12v3a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-3z"/><path d="M8 11V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4"/><path d="M8 16v3M16 16v3M5 22h14"/>
+  </svg>
+);
+
+const WORK_ICONS = [IconBolt, IconBook, IconChair];
+
 /* ── Default content ── */
 const DEFAULT = {
   founderPhoto: '/mwangi.png',
@@ -124,6 +168,12 @@ const HERO_PHOTOS = [
   { src: '/mwangi5.png', alt: 'Elijah Mwangi M — vision & purpose', caption: 'Vision & purpose'        },
 ];
 
+const SOCIAL_LABELS = {
+  facebook: 'f', instagram: 'ig', twitter: '𝕏', tiktok: '♪', youtube: '▶',
+  linkedin: 'in', telegram: '✈', discord: '◈', snapchat: '◈', pinterest: 'P',
+  reddit: '◉', whatsapp: 'wa',
+};
+
 export default function Founder() {
   const { user } = useApp();
   const isSA = user?.role === 'superadmin';
@@ -140,12 +190,10 @@ export default function Founder() {
     url: '/founder',
   });
 
-  /* Navigate to a photo with a smooth crossfade */
   const goToPhoto = (idx) => {
     setActivePhoto(idx);
   };
 
-  /* Auto-cycle photos every 5 seconds */
   useEffect(() => {
     const timer = setInterval(() => {
       setActivePhoto(p => (p + 1) % HERO_PHOTOS.length);
@@ -187,14 +235,8 @@ export default function Founder() {
       tag={tag} className={cls} style={sty} multiline={multi} />
   );
 
-  const SOCIAL_ICONS = {
-    facebook: '📘', instagram: '📸', twitter: '𝕏', tiktok: '🎵', youtube: '📺',
-    linkedin: '💼', telegram: '✈️', discord: '💬', snapchat: '👻', pinterest: '📌',
-    reddit: '🔴', whatsapp: '💬',
-  };
-
   return (
-    <main>
+    <main className="founder-page">
       {(toast || saving) && (
         <div className="sa-toast">{saving ? '⏳ Saving…' : toast}</div>
       )}
@@ -202,10 +244,12 @@ export default function Founder() {
       {/* ── Hero ── */}
       <section className="founder-hero">
         <div className="founder-hero-bg" aria-hidden="true" />
+        <div className="founder-hero__glow" aria-hidden="true" />
+        <div className="founder-hero__orb founder-hero__orb--1" aria-hidden="true" />
+        <div className="founder-hero__orb founder-hero__orb--2" aria-hidden="true" />
         <div className="founder-hero-content">
           <div className="founder-photo-wrap">
             <div className="founder-photo-ring">
-              {/* Stack all photos — CSS opacity transition handles the crossfade */}
               {HERO_PHOTOS.map((photo, i) => (
                 <picture key={i} className={`founder-photo-layer${activePhoto === i ? ' active' : ''}`}>
                   <source srcSet={photo.src.replace(/\.png$/i, '.webp')} type="image/webp" />
@@ -220,7 +264,6 @@ export default function Founder() {
               ))}
               <span className="founder-badge-float">{HERO_PHOTOS[activePhoto].caption}</span>
             </div>
-            {/* Dot indicators */}
             <div className="founder-photo-dots">
               {HERO_PHOTOS.map((_, i) => (
                 <button
@@ -233,7 +276,8 @@ export default function Founder() {
             </div>
           </div>
           <div className="founder-bio">
-            <span className="founder-tag"><span>✦</span> Founder, Ellines Group</span>
+            <p className="founder-brand">Ellines Haven</p>
+            <span className="founder-tag">Founder, Ellines Group</span>
             <h1 className="founder-name">
               {EA('heroTitle', 'span', undefined, undefined, false)}
             </h1>
@@ -241,7 +285,6 @@ export default function Founder() {
             <div className="founder-roles">
               {content.roles.map((r, i) => (
                 <span key={i} className="founder-role-chip">
-                  <span className="chip-icon">{r.icon}</span>
                   {isSA
                     ? <EditableText value={r.label} onSave={v => patchArr('roles', i, 'label', v)} tag="span" />
                     : r.label
@@ -249,14 +292,16 @@ export default function Founder() {
                 </span>
               ))}
             </div>
-            <div className="founder-contact-strip">
-              <a href="tel:+254748255466" className="founder-contact-item"><span>📞</span> 0748 255 466</a>
-              <a href="mailto:ellines.haven@gmail.com" className="founder-contact-item"><span>📧</span> ellines.haven@gmail.com</a>
-              <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-contact-item"><span>🌐</span> ellinestech.co.ke</a>
-            </div>
             <div className="founder-cta-row">
-              <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="btn btn-primary">🌐 Visit Ellines Tech</a>
+              <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                <IconGlobe size={15} /> Visit Ellines Tech
+              </a>
               <Link to="/contact" className="btn btn-outline">Get in Touch</Link>
+            </div>
+            <div className="founder-contact-strip">
+              <a href="tel:+254748255466" className="founder-contact-item"><IconPhone /> 0748 255 466</a>
+              <a href="mailto:ellines.haven@gmail.com" className="founder-contact-item"><IconMail /> ellines.haven@gmail.com</a>
+              <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-contact-item"><IconGlobe /> ellinestech.co.ke</a>
             </div>
           </div>
         </div>
@@ -284,9 +329,8 @@ export default function Founder() {
       <section className="founder-section">
         <div className="founder-inner">
           <div className="founder-story-full">
-            {/* Left: text + quote */}
             <div className="founder-story-text-col">
-              <span className="founder-story-eyebrow">✦ His Story</span>
+              <span className="founder-story-eyebrow">His Story</span>
               <h2 className="founder-story-h2">
                 {EA('storyHeading', 'span', 'gold-text')}
               </h2>
@@ -296,25 +340,27 @@ export default function Founder() {
                 {EA('storyQuote', 'span', undefined, undefined, true)}
               </blockquote>
             </div>
-            {/* Right: what he built */}
             <div className="founder-story-built-col">
               <p className="founder-story-built-label">What he built</p>
-              {content.works.map((w, i) => (
-                <a
-                  key={i}
-                  href={w.link}
-                  target={w.link.startsWith('http') ? '_blank' : '_self'}
-                  rel="noopener noreferrer"
-                  className="founder-built-card"
-                >
-                  <span className="founder-built-icon">{w.icon}</span>
-                  <div className="founder-built-body">
-                    <strong>{w.title}</strong>
-                    <span>{w.tag}</span>
-                  </div>
-                  <span className="founder-built-arrow">→</span>
-                </a>
-              ))}
+              {content.works.map((w, i) => {
+                const WorkIcon = WORK_ICONS[i % WORK_ICONS.length];
+                return (
+                  <a
+                    key={i}
+                    href={w.link}
+                    target={w.link.startsWith('http') ? '_blank' : '_self'}
+                    rel="noopener noreferrer"
+                    className="founder-built-card"
+                  >
+                    <span className="founder-built-icon"><WorkIcon /></span>
+                    <div className="founder-built-body">
+                      <strong>{w.title}</strong>
+                      <span>{w.tag}</span>
+                    </div>
+                    <span className="founder-built-arrow"><IconArrow /></span>
+                  </a>
+                );
+              })}
               <div className="founder-story-since">
                 <span className="founder-story-since-n">2020</span>
                 <span className="founder-story-since-l">Building since</span>
@@ -333,9 +379,9 @@ export default function Founder() {
           </div>
           <div className="founder-writing-row">
             <div className="founder-writing-main">
-              {EA('writerPara', 'p', undefined, { lineHeight: 1.85, color: 'var(--muted)' }, true)}
+              {EA('writerPara', 'p', 'founder-writing-lede', undefined, true)}
               <div className="founder-true-stories-banner">
-                <div className="founder-tsb-icon">✦</div>
+                <div className="founder-tsb-icon"><IconSpark /></div>
                 <div className="founder-tsb-content">
                   <h3>All Stories Are True Stories</h3>
                   <p>Every novel Elijah has written is grounded in reality — assembled from real life experiences, people he has met, conversations he has heard, places he has lived, and moments that refused to leave him. The names change. The truth at the core does not.</p>
@@ -367,7 +413,10 @@ export default function Founder() {
       <section className="founder-section">
         <div className="founder-inner">
           <div className="founder-section-title">
-            <h2>📚 {EA('booksHeading', 'span', 'gold-text')}</h2>
+            <h2 className="founder-section-title-with-icon">
+              <IconBook />
+              {EA('booksHeading', 'span', 'gold-text')}
+            </h2>
             {EA('booksSub', 'p', 'about-section-sub', undefined, true)}
           </div>
           <div className="founder-books-grid">
@@ -377,10 +426,13 @@ export default function Founder() {
                 {b.cover ? (
                   <div className="founder-book-cover-photo"><img src={b.cover} alt={b.title} /></div>
                 ) : (
-                  <div className="founder-book-cover-styled" style={{ background: b.color }}>
-                    <span style={{ color: b.accent, fontSize:'0.58rem', fontWeight:700, letterSpacing:'2px', textTransform:'uppercase' }}>{b.genre}</span>
-                    <strong style={{ fontFamily:"'Playfair Display',serif", fontSize:'0.88rem', color:'#f0ece2', textAlign:'center', lineHeight:1.3 }}>{b.title}</strong>
-                    <div style={{ width:28, height:2, background: b.accent, borderRadius:2, opacity:0.8 }} />
+                  <div
+                    className="founder-book-cover-styled"
+                    style={{ '--book-bg': b.color, '--book-accent': b.accent }}
+                  >
+                    <span className="founder-book-cover-genre">{b.genre}</span>
+                    <strong className="founder-book-cover-title">{b.title}</strong>
+                    <div className="founder-book-cover-rule" />
                   </div>
                 )}
                 <div className="founder-book-body">
@@ -393,7 +445,7 @@ export default function Founder() {
                     ? <EditableText value={b.note} onSave={v => patchArr('books', i, 'note', v)} tag="p" multiline />
                     : <p>{b.note}</p>
                   }
-                  <span className="founder-book-true-badge">✦ Inspired by True Stories</span>
+                  <span className="founder-book-true-badge">Inspired by True Stories</span>
                 </div>
               </div>
             ))}
@@ -405,7 +457,7 @@ export default function Founder() {
       <section className="founder-section founder-section-alt">
         <div className="founder-inner">
           <div className="founder-section-title">
-            <h2>The <span className="gold-text">{EA('journeyHeading', 'span')}</span></h2>
+            <h2>{EA('journeyHeading', 'span', 'gold-text')}</h2>
             {EA('journeySub', 'p', undefined, undefined, false)}
           </div>
           <div className="founder-tl-rail">
@@ -440,7 +492,7 @@ export default function Founder() {
           <div className="founder-skills-grid">
             {content.skills.map((s, i) => (
               <div key={i} className="founder-skill-card">
-                <div className="skill-icon">{s.icon}</div>
+                <div className="skill-icon" aria-hidden="true">{s.icon}</div>
                 {isSA
                   ? <EditableText value={s.title} onSave={v => patchArr('skills', i, 'title', v)} tag="h3" />
                   : <h3>{s.title}</h3>
@@ -455,35 +507,77 @@ export default function Founder() {
         </div>
       </section>
 
+      {/* ── Companies / Ellines Group ── */}
+      <section className="founder-section founder-section-alt">
+        <div className="founder-inner">
+          <div className="founder-section-title">
+            <h2>{EA('worksHeading', 'span', 'gold-text')}</h2>
+            {EA('worksSub', 'p', undefined, undefined, false)}
+          </div>
+          <div className="founder-works-grid">
+            {content.works.map((w, i) => {
+              const WorkIcon = WORK_ICONS[i % WORK_ICONS.length];
+              return (
+                <article key={i} className="founder-work-block">
+                  <div className="founder-work-meta">
+                    <span className="founder-work-icon"><WorkIcon /></span>
+                    <span className="founder-work-tag">{w.tag}</span>
+                  </div>
+                  {isSA
+                    ? <EditableText value={w.title} onSave={v => patchArr('works', i, 'title', v)} tag="h3" />
+                    : <h3>{w.title}</h3>
+                  }
+                  {isSA
+                    ? <EditableText value={w.story} onSave={v => patchArr('works', i, 'story', v)} tag="p" multiline />
+                    : <p>{w.story}</p>
+                  }
+                  <a
+                    href={w.link}
+                    target={w.link.startsWith('http') ? '_blank' : '_self'}
+                    rel="noopener noreferrer"
+                    className="founder-work-link"
+                  >
+                    {w.linkLabel}
+                    <IconArrow />
+                  </a>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* ── Work with Elijah CTA ── */}
       <section className="founder-cta-section">
         <div className="founder-inner">
           <h2>{EA('ctaHeading', 'span', undefined, undefined, false)}</h2>
           {EA('ctaSub', 'p', undefined, undefined, true)}
           <div className="founder-cta-contact">
-            <a href="tel:+254748255466" className="founder-cta-chip">📞 0748 255 466</a>
-            <a href="mailto:ellines.haven@gmail.com" className="founder-cta-chip">📧 ellines.haven@gmail.com</a>
-            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-cta-chip">🌐 ellinestech.co.ke</a>
+            <a href="tel:+254748255466" className="founder-cta-chip"><IconPhone /> 0748 255 466</a>
+            <a href="mailto:ellines.haven@gmail.com" className="founder-cta-chip"><IconMail /> ellines.haven@gmail.com</a>
+            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-cta-chip"><IconGlobe /> ellinestech.co.ke</a>
           </div>
           <div className="founder-cta-buttons">
-            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="btn btn-primary">🌐 Ellines Tech</a>
-            <Link to="/contact" className="btn btn-outline">✉️ Contact Us</Link>
-            <Link to="/library" className="btn btn-ghost">📚 Read His Books</Link>
+            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+              <IconGlobe size={15} /> Ellines Tech
+            </a>
+            <Link to="/contact" className="btn btn-outline">Contact Us</Link>
+            <Link to="/library" className="btn btn-ghost">Read His Books</Link>
           </div>
         </div>
       </section>
 
       {/* Social Media Section */}
       {Object.keys(socialHandles).length > 0 && (
-        <section className="section" style={{ background: 'var(--surface)', paddingTop: 56 }}>
-          <div className="founder-inner" style={{ textAlign: 'center' }}>
-            <h2 style={{ fontSize: 'clamp(1.8rem, 3vw, 2.4rem)', marginBottom: 8 }}>
+        <section className="founder-social-section">
+          <div className="founder-inner founder-social-inner">
+            <h2>
               Connect with <span className="gold-text">Elijah</span>
             </h2>
-            <p style={{ color: 'var(--muted)', marginBottom: 32, fontSize: '0.95rem' }}>
+            <p className="founder-social-lede">
               Follow Elijah Mwangi on social media for insights on technology, literature, and building in Africa.
             </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div className="founder-social-links">
               {Object.entries(socialHandles).map(([platform, handle]) => {
                 if (!handle || !handle.trim()) return null;
                 return (
@@ -493,30 +587,9 @@ export default function Founder() {
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`Follow on ${platform.charAt(0).toUpperCase() + platform.slice(1)}`}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '12px 20px',
-                      background: 'rgba(201,168,76,0.08)',
-                      border: '1px solid rgba(201,168,76,0.25)',
-                      borderRadius: 'var(--r)',
-                      color: 'var(--gold)',
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = 'rgba(201,168,76,0.15)';
-                      e.currentTarget.style.borderColor = 'rgba(201,168,76,0.5)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'rgba(201,168,76,0.08)';
-                      e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)';
-                    }}
+                    className="founder-social-link"
                   >
-                    <span style={{ fontSize: '1.2rem' }}>{SOCIAL_ICONS[platform] || '🌐'}</span>
+                    <span className="founder-social-glyph">{SOCIAL_LABELS[platform] || '◈'}</span>
                     {platform.charAt(0).toUpperCase() + platform.slice(1)}
                   </a>
                 );

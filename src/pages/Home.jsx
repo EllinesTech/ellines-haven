@@ -425,9 +425,6 @@ export default function Home() {
     .filter(b => b.isNew)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  // Hero spotlight = most recently dated new release with any cover
-  const spotlight = newReleases.find(b => b.cover) || null;
-
   const [tagIdx, setTagIdx] = useState(0);
   const [fade,   setFade]   = useState(true);
 
@@ -453,16 +450,18 @@ export default function Home() {
           HERO
       ══════════════════════════════════════ */}
       <section className="hero">
-        <div className="hero__glow hero__glow--a" />
-        <div className="hero__glow hero__glow--b" />
-        <div className="hero__glow hero__glow--c" />
+        <div className="hero__glow hero__glow--a" aria-hidden="true" />
+        <div className="hero__glow hero__glow--b" aria-hidden="true" />
+        <div className="hero__glow hero__glow--c" aria-hidden="true" />
+        <div className="hero__grain" aria-hidden="true" />
 
         <div className="container hero__inner">
           {/* LEFT — copy */}
           <div className="hero__copy">
-            <span className="badge badge-gold hero__eyebrow">
+            <p className="hero__brand">Ellines Haven</p>
+            <p className="hero__eyebrow">
               <EditableField field="eyebrow">{c.eyebrow}</EditableField>
-            </span>
+            </p>
 
             <h1 className="hero__h1">
               <span className={`hero__tagline${fade ? ' hero__tagline--in' : ' hero__tagline--out'}`}>
@@ -482,18 +481,11 @@ export default function Home() {
                 <EditableField field="hero_btn_secondary">{c.hero_btn_secondary}</EditableField>
               </Link>
             </div>
-
-            <div className="hero__stats">
-              <div><strong><EditableField field="stat_books">{c.stat_books}</EditableField></strong><span>Books</span></div>
-              <div className="hero__stat-bar" />
-              <div><strong><EditableField field="stat_readers">{c.stat_readers}</EditableField></strong><span>Readers</span></div>
-              <div className="hero__stat-bar" />
-              <div><strong><EditableField field="stat_rating">{c.stat_rating}</EditableField></strong><span>Rating</span></div>
-            </div>
           </div>
 
-          {/* RIGHT — poster + floating badge */}
+          {/* RIGHT — atmospheric poster */}
           <div className="hero__visual">
+            <div className="hero__visual-glow" aria-hidden="true" />
             <div className="hero__poster-frame">
               <EditableImage
                 field="hero_poster"
@@ -502,18 +494,9 @@ export default function Home() {
                 className="hero__poster"
                 storageFolder="site-images"
               />
-              <div className="hero__poster-shine" />
+              <div className="hero__poster-vignette" aria-hidden="true" />
+              <div className="hero__poster-shine" aria-hidden="true" />
             </div>
-            {spotlight && (
-              <Link to={bookPath(spotlight)} className="hero__float-card">
-                <img src={spotlight.cover} alt={spotlight.title} className="hero__float-cover" />
-                <div className="hero__float-info">
-                  <span className="badge badge-gold" style={{fontSize:'.6rem'}}>New Release</span>
-                  <strong>{spotlight.title}</strong>
-                  <span>by {spotlight.author}</span>
-                </div>
-              </Link>
-            )}
           </div>
         </div>
 
@@ -522,6 +505,28 @@ export default function Home() {
           <div className="hero__scroll-arrow" />
         </div>
       </section>
+
+      {/* ══════════════════════════════════════
+          STATS (below fold — keeps hero uncluttered)
+      ══════════════════════════════════════ */}
+      <div className="home-stats">
+        <div className="container home-stats__inner">
+          <div className="home-stats__item">
+            <strong><EditableField field="stat_books">{c.stat_books}</EditableField></strong>
+            <span>Books</span>
+          </div>
+          <div className="home-stats__bar" aria-hidden="true" />
+          <div className="home-stats__item">
+            <strong><EditableField field="stat_readers">{c.stat_readers}</EditableField></strong>
+            <span>Readers</span>
+          </div>
+          <div className="home-stats__bar" aria-hidden="true" />
+          <div className="home-stats__item">
+            <strong><EditableField field="stat_rating">{c.stat_rating}</EditableField></strong>
+            <span>Rating</span>
+          </div>
+        </div>
+      </div>
 
       {/* ══════════════════════════════════════
           TRUST BAR

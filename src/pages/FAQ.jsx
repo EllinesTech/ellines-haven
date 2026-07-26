@@ -1,16 +1,66 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import EditableField from '../components/EditableField';
-import { useEditMode } from '../context/EditModeContext';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { usePageMeta } from '../hooks/usePageMeta';
 import './FAQ.css';
+
+const IconCard = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+  </svg>
+);
+const IconBook = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+const IconUser = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  </svg>
+);
+const IconPen = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+);
+const IconGear = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+const IconSearch = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+const IconSearchEmpty = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/>
+  </svg>
+);
+const IconChat = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+);
+const IconWa = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+);
+
+const CATEGORY_ICONS = {
+  Payments: IconCard,
+  'Accessing Your Books': IconBook,
+  Accounts: IconUser,
+  'Books & Content': IconPen,
+  Technical: IconGear,
+};
 
 const FAQS = [
   {
     category: 'Payments',
-    icon: '💳',
     items: [
       {
         q: 'How do I pay for a book?',
@@ -48,7 +98,6 @@ const FAQS = [
   },
   {
     category: 'Accessing Your Books',
-    icon: '📚',
     items: [
       {
         q: 'How do I access a book after purchasing?',
@@ -78,7 +127,6 @@ const FAQS = [
   },
   {
     category: 'Accounts',
-    icon: '👤',
     items: [
       {
         q: 'Do I need an account to browse books?',
@@ -100,7 +148,6 @@ const FAQS = [
   },
   {
     category: 'Books & Content',
-    icon: '✍️',
     items: [
       {
         q: 'Who writes the books on Ellines Haven?',
@@ -130,7 +177,6 @@ const FAQS = [
   },
   {
     category: 'Technical',
-    icon: '⚙️',
     items: [
       {
         q: 'Which browsers are supported?',
@@ -157,10 +203,14 @@ function FAQItem({ q, a }) {
   return (
     <div className={`faq-item${open ? ' faq-item--open' : ''}`}>
       <button className="faq-q" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <span>{q}</span>
-        <span className="faq-chevron" aria-hidden="true">{open ? '−' : '+'}</span>
+        <span className="faq-q__text">{q}</span>
+        <span className="faq-chevron" aria-hidden="true" />
       </button>
-      {open && <div className="faq-a"><p>{a}</p></div>}
+      {open && (
+        <div className="faq-a">
+          <p>{a}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -176,7 +226,7 @@ export default function FAQ() {
     const faqSchema = {
       '@context': 'https://schema.org',
       '@type': 'FAQPage',
-      'mainEntity': FAQS.flatMap(cat => 
+      'mainEntity': FAQS.flatMap(cat =>
         cat.items.map(item => ({
           '@type': 'Question',
           'name': item.q,
@@ -223,45 +273,53 @@ export default function FAQ() {
     <main className="faq-page">
 
       {/* ── Hero ── */}
-      <div className="faq-hero">
-        <div className="faq-hero__glow" />
+      <header className="faq-hero">
+        <div className="faq-hero__glow" aria-hidden="true" />
+        <div className="faq-hero__orb faq-hero__orb--1" aria-hidden="true" />
+        <div className="faq-hero__orb faq-hero__orb--2" aria-hidden="true" />
         <div className="container faq-hero__inner">
-          <span className="badge badge-gold">Help Centre</span>
+          <p className="faq-hero__brand">Ellines Haven</p>
           <h1>Frequently Asked <span className="gold-text">Questions</span></h1>
           <p><EditableField field="faq_sub">Everything you need to know about Ellines Haven — payments, reading, accounts, and more.</EditableField></p>
 
-          {/* Search */}
           <div className="faq-search">
-            <span className="faq-search__icon">🔍</span>
+            <span className="faq-search__icon"><IconSearch /></span>
             <input
               className="faq-search__input"
               placeholder="Search questions…"
               value={search}
               onChange={e => setSearch(e.target.value)}
+              aria-label="Search FAQ questions"
             />
             {search && (
-              <button className="faq-search__clear" onClick={() => setSearch('')}>✕</button>
+              <button type="button" className="faq-search__clear" onClick={() => setSearch('')} aria-label="Clear search">✕</button>
             )}
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ── Category tabs ── */}
       <div className="faq-cats">
         <div className="container faq-cats__inner">
           <button
+            type="button"
             className={`faq-cat-btn${!activeCategory ? ' faq-cat-btn--on' : ''}`}
             onClick={() => setActiveCategory('')}
           >All Topics</button>
-          {FAQS.map(cat => (
-            <button
-              key={cat.category}
-              className={`faq-cat-btn${activeCategory === cat.category ? ' faq-cat-btn--on' : ''}`}
-              onClick={() => setActiveCategory(c => c === cat.category ? '' : cat.category)}
-            >
-              {cat.icon} {cat.category}
-            </button>
-          ))}
+          {FAQS.map(cat => {
+            const CatIcon = CATEGORY_ICONS[cat.category];
+            return (
+              <button
+                type="button"
+                key={cat.category}
+                className={`faq-cat-btn${activeCategory === cat.category ? ' faq-cat-btn--on' : ''}`}
+                onClick={() => setActiveCategory(c => c === cat.category ? '' : cat.category)}
+              >
+                {CatIcon && <span className="faq-cat-btn__icon"><CatIcon /></span>}
+                {cat.category}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -269,50 +327,55 @@ export default function FAQ() {
       <div className="container faq-body">
         {search && (
           <p className="faq-results-note">
-            {totalMatches} result{totalMatches !== 1 ? 's' : ''} for "<strong>{search}</strong>"
+            {totalMatches} result{totalMatches !== 1 ? 's' : ''} for “<strong>{search}</strong>”
           </p>
         )}
 
         {filtered.length === 0 ? (
           <div className="faq-empty">
-            <div className="faq-empty__icon">🤷</div>
+            <div className="faq-empty__icon"><IconSearchEmpty /></div>
             <h3>No results found</h3>
             <p>Try a different search term, or contact us directly.</p>
-            <a href="https://wa.me/254748255466" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-              Ask on WhatsApp
+            <a href="https://wa.me/254748255466" target="_blank" rel="noopener noreferrer" className="btn btn-primary faq-empty__cta">
+              <IconWa size={16} /> Ask on WhatsApp
             </a>
           </div>
         ) : (
           <div className="faq-sections">
-            {filtered.map(cat => (
-              <section key={cat.category} className="faq-section">
-                <div className="faq-section__head">
-                  <span className="faq-section__icon">{cat.icon}</span>
-                  <h2>{cat.category}</h2>
-                </div>
-                <div className="faq-section__items">
-                  {cat.items.map((item, i) => (
-                    <FAQItem key={i} q={item.q} a={item.a} />
-                  ))}
-                </div>
-              </section>
-            ))}
+            {filtered.map(cat => {
+              const CatIcon = CATEGORY_ICONS[cat.category];
+              return (
+                <section key={cat.category} className="faq-section">
+                  <div className="faq-section__head">
+                    <span className="faq-section__icon">{CatIcon && <CatIcon />}</span>
+                    <h2>{cat.category}</h2>
+                  </div>
+                  <div className="faq-section__items">
+                    {cat.items.map((item, i) => (
+                      <FAQItem key={i} q={item.q} a={item.a} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
 
         {/* Still need help */}
-        <div className="faq-still-need-help">
-          <div className="faq-snh__inner">
-            <div className="faq-snh__icon">💬</div>
-            <div className="faq-snh__copy">
+        <div className="faq-cta">
+          <div className="faq-cta__glow" aria-hidden="true" />
+          <div className="faq-cta__inner">
+            <span className="faq-cta__icon"><IconChat /></span>
+            <div className="faq-cta__copy">
               <h3>Still need help?</h3>
-              <p>Our team in Nairobi is available on WhatsApp — we reply fast.</p>
+              <p>Our team in Nairobi is available on WhatsApp — we reply fast. Or send a note through the contact form.</p>
             </div>
-            <div className="faq-snh__actions">
-              <a href="https://wa.me/254748255466" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+            <div className="faq-cta__actions">
+              <a href="https://wa.me/254748255466" target="_blank" rel="noopener noreferrer" className="faq-cta__wa">
+                <IconWa size={18} />
                 Chat on WhatsApp
               </a>
-              <Link to="/contact" className="btn btn-outline">Contact Form</Link>
+              <Link to="/contact" className="faq-cta__contact">Contact Form</Link>
             </div>
           </div>
         </div>

@@ -120,6 +120,43 @@ const DEFAULT_CONTENT = {
   promiseQuote: '"We are not building a bookstore. We are building a legacy — one story at a time."',
 };
 
+/* ── Inline icons ── */
+const IconTarget = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+  </svg>
+);
+const IconStar = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+  </svg>
+);
+const IconMail = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+  </svg>
+);
+const IconPhone = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+);
+const IconGlobe = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  </svg>
+);
+const IconMap = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+  </svg>
+);
+const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
 /* ── Inline editor ── */
 function EditableText({ value, onSave, tag: Tag = 'p', className, style, multiline = false }) {
   const { user } = useApp();
@@ -145,19 +182,18 @@ function EditableText({ value, onSave, tag: Tag = 'p', className, style, multili
   return (
     <Tag className={`${className || ''} sa-editable`} style={style}
       title="Click to edit (super admin)" onClick={() => { setDraft(value); setEditing(true); }}>
-      {value}<span className="sa-edit-hint">✏️</span>
+      {value}<span className="sa-edit-hint">✎</span>
     </Tag>
   );
 }
 
-/* ── Decorative poster card ── */
+/* ── Decorative poster ── */
 function AboutPoster() {
   return (
     <div className="about-poster-card">
       <div className="apc-orb apc-orb1" aria-hidden="true" />
       <div className="apc-orb apc-orb2" aria-hidden="true" />
       <div className="apc-orb apc-orb3" aria-hidden="true" />
-      <span className="apc-tag">Est. Kenya</span>
       <div className="apc-logo-wrap">
         <img src="/logo-icon.png" alt="Ellines Haven logo mark" className="apc-logo-img" />
         <div className="apc-logo-glow" aria-hidden="true" />
@@ -221,22 +257,26 @@ export default function About() {
   );
 
   return (
-    <main>
+    <main className="about-page">
       {(toast || saving) && (
-        <div className="sa-toast">{saving ? '⏳ Saving…' : toast}</div>
+        <div className="sa-toast">{saving ? 'Saving…' : toast}</div>
       )}
 
-      {/* ── Header ── */}
-      <div className="page-header">
-        <div className="container">
-          <h1>About <span className="gold-text">Ellines Haven</span></h1>
-          {EA('heroTagline', 'p', undefined, undefined, false)}
+      {/* ── Hero ── */}
+      <header className="about-hero">
+        <div className="about-hero__glow" aria-hidden="true" />
+        <div className="about-hero__orb about-hero__orb--1" aria-hidden="true" />
+        <div className="about-hero__orb about-hero__orb--2" aria-hidden="true" />
+        <div className="container about-hero__inner">
+          <p className="about-hero__brand">Ellines Haven</p>
+          <h1>About <span className="gold-text">Our Haven</span></h1>
+          {EA('heroTagline', 'p', 'about-hero__sub', undefined, false)}
         </div>
-      </div>
+      </header>
 
       {/* ── Story + poster ── */}
-      <section className="section">
-        <div className="container about-grid">
+      <section className="section about-story-section">
+        <div className="container about-grid about-rise">
           <div className="about-img">
             <AboutPoster />
           </div>
@@ -244,8 +284,8 @@ export default function About() {
             <h2>{EA('storyHeading', 'span', 'gold-text')}</h2>
             {EA('storyPara1', 'p', undefined, undefined, true)}
             {EA('storyPara2', 'p', undefined, undefined, true)}
-            {EA('storyPara3', 'p', undefined, { fontStyle:'italic', borderLeft:'4px solid var(--gold)', paddingLeft:'16px', color:'var(--text)', opacity:0.9 }, true)}
-            <Link to="/library" className="btn btn-primary" style={{ marginTop:'28px' }}>Browse Our Books →</Link>
+            {EA('storyPara3', 'p', 'about-story-pull', undefined, true)}
+            <Link to="/library" className="btn btn-primary about-cta">Browse Our Books →</Link>
           </div>
         </div>
       </section>
@@ -253,7 +293,7 @@ export default function About() {
       {/* ── Stats strip ── */}
       <section className="section about-stats-sec">
         <div className="container">
-          <div className="about-stats">
+          <div className="about-stats about-rise about-rise--delay">
             {content.stats.map((s, i) => (
               <div key={i} className="about-stat">
                 {isSA ? (
@@ -273,14 +313,14 @@ export default function About() {
       {/* ── Why Africa Needs This ── */}
       <section className="section about-why-section">
         <div className="container">
-          <div className="about-section-title">
+          <div className="about-section-title about-rise">
             <h2>{EA('whyHeading', 'span', 'gold-text')}</h2>
             {EA('whySub', 'p', 'about-section-sub', undefined, true)}
           </div>
           <div className="about-why-grid">
             {content.whyPoints.map((p, i) => (
-              <div key={i} className="about-why-card">
-                <div className="about-why-icon">{p.icon}</div>
+              <div key={i} className="about-why-item">
+                <div className="about-mark" aria-hidden="true">{p.icon}</div>
                 <div>
                   {isSA
                     ? <EditableText value={p.title} onSave={v => patchArray('whyPoints', i, 'title', v)} tag="h4" />
@@ -300,14 +340,14 @@ export default function About() {
       {/* ── Mission & Vision ── */}
       <section className="section about-mv-section">
         <div className="container">
-          <div className="about-mv-grid">
-            <div className="about-mv-card">
-              <div className="about-mv-icon">🎯</div>
+          <div className="about-mv-grid about-rise">
+            <div className="about-mv-block">
+              <div className="about-mv-icon" aria-hidden="true"><IconTarget /></div>
               <h3>{EA('missionHeading', 'span')}</h3>
               {EA('missionText', 'p', undefined, undefined, true)}
             </div>
-            <div className="about-mv-card">
-              <div className="about-mv-icon">🌟</div>
+            <div className="about-mv-block">
+              <div className="about-mv-icon" aria-hidden="true"><IconStar /></div>
               <h3>{EA('visionHeading', 'span')}</h3>
               {EA('visionText', 'p', undefined, undefined, true)}
             </div>
@@ -318,13 +358,13 @@ export default function About() {
       {/* ── What We Stand For ── */}
       <section className="section about-values-section">
         <div className="container">
-          <div className="about-section-title">
+          <div className="about-section-title about-rise">
             <h2>{EA('valuesHeading', 'span', 'gold-text')}</h2>
           </div>
           <div className="about-values-grid">
             {content.values.map((v, i) => (
-              <div key={i} className="about-value-card">
-                <div className="about-value-icon">{v.icon}</div>
+              <div key={i} className="about-value-item">
+                <div className="about-mark about-mark--sm" aria-hidden="true">{v.icon}</div>
                 <div>
                   {isSA
                     ? <EditableText value={v.title} onSave={val => patchArray('values', i, 'title', val)} tag="h4" />
@@ -344,15 +384,14 @@ export default function About() {
       {/* ── The Experience ── */}
       <section className="section about-experience-section">
         <div className="container">
-          <div className="about-section-title">
+          <div className="about-section-title about-rise">
             <h2>{EA('experienceHeading', 'span', 'gold-text')}</h2>
             {EA('experienceSub', 'p', 'about-section-sub', undefined, true)}
           </div>
           <div className="about-experience-grid">
             {content.experiences.map((e, i) => (
-              <div key={i} className="about-experience-card">
+              <div key={i} className="about-experience-step">
                 <div className="about-exp-step">{e.step}</div>
-                <div className="about-exp-icon">{e.icon}</div>
                 {isSA
                   ? <EditableText value={e.title} onSave={v => patchArray('experiences', i, 'title', v)} tag="h4" />
                   : <h4>{e.title}</h4>
@@ -369,13 +408,13 @@ export default function About() {
 
       {/* ── What We Offer ── */}
       <section className="section about-offer-section">
-        <div className="container about-offer-grid">
+        <div className="container about-offer-grid about-rise">
           <div className="about-offer-text">
             <h2>{EA('offerHeading', 'span', 'gold-text')}</h2>
-            <ul className="about-list" style={{ marginTop:'20px' }}>
+            <ul className="about-list">
               {content.offers.map((item, i) => (
                 <li key={i}>
-                  <span className="about-check">✓</span>
+                  <span className="about-check" aria-hidden="true"><IconCheck /></span>
                   {isSA
                     ? <EditableText value={item} onSave={val => { const arr = [...content.offers]; arr[i] = val; patch('offers', arr); }} tag="span" />
                     : item
@@ -383,15 +422,27 @@ export default function About() {
                 </li>
               ))}
             </ul>
-            <Link to="/library" className="btn btn-primary" style={{ marginTop:'28px' }}>Start Reading →</Link>
+            <Link to="/library" className="btn btn-primary about-cta">Start Reading →</Link>
           </div>
           <div className="about-offer-aside">
             <div className="about-offer-card">
-              <h4>📞 Get in Touch</h4>
-              <div className="about-contact-row"><span>📧</span><a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a></div>
-              <div className="about-contact-row"><span>📱</span><a href="tel:+254748255466">0748 255 466</a></div>
-              <div className="about-contact-row"><span>🌐</span><a href="https://haven.ellines.co.ke" target="_blank" rel="noopener noreferrer">haven.ellines.co.ke</a></div>
-              <div className="about-contact-row"><span>📍</span><span>Nairobi, Kenya</span></div>
+              <h4>Get in Touch</h4>
+              <div className="about-contact-row">
+                <span className="about-contact-icon"><IconMail /></span>
+                <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>
+              </div>
+              <div className="about-contact-row">
+                <span className="about-contact-icon"><IconPhone /></span>
+                <a href="tel:+254748255466">0748 255 466</a>
+              </div>
+              <div className="about-contact-row">
+                <span className="about-contact-icon"><IconGlobe /></span>
+                <a href="https://haven.ellines.co.ke" target="_blank" rel="noopener noreferrer">haven.ellines.co.ke</a>
+              </div>
+              <div className="about-contact-row">
+                <span className="about-contact-icon"><IconMap /></span>
+                <span>Nairobi, Kenya</span>
+              </div>
             </div>
           </div>
         </div>
@@ -400,14 +451,14 @@ export default function About() {
       {/* ── Ellines Group ── */}
       <section className="section about-group-section">
         <div className="container">
-          <div className="about-section-title">
+          <div className="about-section-title about-rise">
             <h2>{EA('groupHeading', 'span', 'gold-text')}</h2>
             {EA('groupIntro', 'p', 'about-section-sub', undefined, true)}
           </div>
           <div className="about-group-grid">
             {content.groupCompanies.map((co, i) => (
               <div key={i} className={`about-group-card${co.highlight ? ' highlight' : ''}`}>
-                <div className="about-group-icon">{co.icon}</div>
+                <div className="about-mark" aria-hidden="true">{co.icon}</div>
                 <div className="about-group-body">
                   <span className="about-group-tag">{co.tag}</span>
                   {isSA
@@ -433,14 +484,14 @@ export default function About() {
       {/* ── Our Promise ── */}
       <section className="section about-promise-section">
         <div className="container">
-          <div className="about-promise-inner">
+          <div className="about-promise-inner about-rise">
             <div className="about-promise-text">
               <h2>{EA('promiseHeading', 'span', 'gold-text')}</h2>
               {EA('promisePara1', 'p', undefined, undefined, true)}
               {EA('promisePara2', 'p', undefined, undefined, true)}
             </div>
             <div className="about-promise-quote">
-              <div className="about-promise-quote-mark">"</div>
+              <div className="about-promise-quote-mark" aria-hidden="true">"</div>
               {EA('promiseQuote', 'p', undefined, undefined, true)}
               <div className="about-promise-attribution">— Elijah Mwangi M, Founder</div>
             </div>
@@ -451,7 +502,7 @@ export default function About() {
       {/* ── Founder teaser ── */}
       <section className="section about-founder-teaser">
         <div className="container">
-          <div className="about-founder-strip">
+          <div className="about-founder-strip about-rise">
             <div className="about-founder-photo-wrap">
               {isSA ? (
                 <EditableImage
@@ -479,10 +530,10 @@ export default function About() {
               )}
             </div>
             <div className="about-founder-text">
-              <span className="about-founder-label">✦ The Founder</span>
+              <span className="about-founder-label">The Founder</span>
               <h2>Elijah <span className="gold-text">Mwangi M</span></h2>
               {EA('founderTeaser', 'p', undefined, undefined, true)}
-              <Link to="/founder" className="btn btn-primary" style={{ marginTop:'20px' }}>
+              <Link to="/founder" className="btn btn-primary about-cta about-cta--sm">
                 Meet the Founder →
               </Link>
             </div>

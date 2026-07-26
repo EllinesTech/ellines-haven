@@ -5,21 +5,44 @@ import './Legal.css';
 
 const LAST_UPDATED = 'July 2026';
 
+const TOC = [
+  { id: 'who', label: 'Who We Are' },
+  { id: 'collect', label: 'Data We Collect' },
+  { id: 'use', label: 'How We Use It' },
+  { id: 'store', label: 'Storage' },
+  { id: 'sharing', label: 'Sharing' },
+  { id: 'drm', label: 'Watermarking' },
+  { id: 'cookies', label: 'Local Storage' },
+  { id: 'rights', label: 'Your Rights' },
+  { id: 'children', label: 'Children' },
+  { id: 'links', label: 'Third-Party Links' },
+  { id: 'changes', label: 'Changes' },
+  { id: 'contact', label: 'Contact' },
+];
+
 export default function Privacy() {
   usePageMeta({ title: 'Privacy Policy', description: 'How Ellines Haven collects, uses, and protects your personal data. Read our full Privacy Policy.' });
   return (
     <main className="legal-page">
-      <div className="legal-hero">
-        <div className="container">
-          <span className="badge badge-gold">Legal</span>
+      <header className="legal-hero">
+        <div className="legal-hero__glow" aria-hidden="true" />
+        <div className="legal-hero__orb legal-hero__orb--1" aria-hidden="true" />
+        <div className="legal-hero__orb legal-hero__orb--2" aria-hidden="true" />
+        <div className="container legal-hero__inner">
+          <p className="legal-hero__brand">Ellines Haven</p>
           <h1>Privacy <span className="gold-text">Policy</span></h1>
-          <p>Last updated: {LAST_UPDATED}</p>
+          <p className="legal-hero__meta">
+            <span>Legal</span>
+            <span className="legal-hero__meta-dot" aria-hidden="true" />
+            <span>Last updated {LAST_UPDATED}</span>
+          </p>
+          <div className="legal-hero__rule" aria-hidden="true" />
         </div>
-      </div>
+      </header>
 
       <div className="container legal-body">
 
-        <div className="legal-intro card">
+        <div className="legal-intro">
           <p>
             <EditableField field="privacy_intro">At <strong>Ellines Haven</strong>, we take your privacy seriously. This Privacy Policy explains what information we collect, how we use it, and your rights regarding your personal data.</EditableField>
           </p>
@@ -28,15 +51,28 @@ export default function Privacy() {
           </p>
         </div>
 
+        <nav className="legal-toc" aria-label="On this page">
+          <span className="legal-toc__label">On this page</span>
+          <ul className="legal-toc__list">
+            {TOC.map((item) => (
+              <li key={item.id}>
+                <a href={`#${item.id}`}>{item.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         <div className="legal-sections">
 
-          <section className="legal-section">
-            <h2>1. Who We Are</h2>
+          <section className="legal-section" id="who">
+            <span className="legal-section__num">Section 01</span>
+            <h2>Who We Are</h2>
             <p>Ellines Haven is operated by Elijah Mwangi M under the Ellines Group, based in Nairobi, Kenya. We are the data controller for information collected through this platform.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>2. Information We Collect</h2>
+          <section className="legal-section" id="collect">
+            <span className="legal-section__num">Section 02</span>
+            <h2>Information We Collect</h2>
             <h3>Information you provide directly:</h3>
             <ul>
               <li><strong>Account information</strong> — your name, email address, and password when you register.</li>
@@ -54,8 +90,9 @@ export default function Privacy() {
             </ul>
           </section>
 
-          <section className="legal-section">
-            <h2>3. How We Use Your Information</h2>
+          <section className="legal-section" id="use">
+            <span className="legal-section__num">Section 03</span>
+            <h2>How We Use Your Information</h2>
             <ul>
               <li>To create and manage your account.</li>
               <li>To process and verify your purchases.</li>
@@ -68,15 +105,17 @@ export default function Privacy() {
             </ul>
           </section>
 
-          <section className="legal-section">
-            <h2>4. How We Store Your Data</h2>
+          <section className="legal-section" id="store">
+            <span className="legal-section__num">Section 04</span>
+            <h2>How We Store Your Data</h2>
             <p>Your account and library data is stored securely using <strong>Google Firebase Firestore</strong> — a cloud database operated by Google LLC. Firebase applies industry-standard security measures to protect your data.</p>
             <p>Some preferences and session data are stored in your browser's local storage on your device and are not transmitted to our servers.</p>
             <p>Payment transaction references (e.g., M-Pesa codes) are stored only for order verification purposes and are accessible only to authorised Ellines Haven staff.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>5. Data Sharing</h2>
+          <section className="legal-section" id="sharing">
+            <span className="legal-section__num">Section 05</span>
+            <h2>Data Sharing</h2>
             <p>We do not sell, rent, or trade your personal information to any third party.</p>
             <p>We may share your data in the following limited circumstances:</p>
             <ul>
@@ -86,14 +125,16 @@ export default function Privacy() {
             </ul>
           </section>
 
-          <section className="legal-section">
-            <h2>6. Digital Rights Management and Watermarking</h2>
+          <section className="legal-section" id="drm">
+            <span className="legal-section__num">Section 06</span>
+            <h2>Digital Rights Management and Watermarking</h2>
             <p>Books purchased on Ellines Haven are watermarked with your name and email address. This is applied to protect the intellectual property of our author. The watermark is visible within the reader and on PDF downloads to discourage unauthorised sharing.</p>
             <p>This information is used solely for content protection and is not shared with third parties.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>7. Cookies and Local Storage</h2>
+          <section className="legal-section" id="cookies">
+            <span className="legal-section__num">Section 07</span>
+            <h2>Cookies and Local Storage</h2>
             <p>Ellines Haven uses browser local storage (not traditional cookies) to:</p>
             <ul>
               <li>Keep you signed in between sessions.</li>
@@ -104,8 +145,9 @@ export default function Privacy() {
             <p>You can clear this data at any time by signing out or clearing your browser's local storage. Clearing it will sign you out and reset your preferences.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>8. Your Rights</h2>
+          <section className="legal-section" id="rights">
+            <span className="legal-section__num">Section 08</span>
+            <h2>Your Rights</h2>
             <p>You have the right to:</p>
             <ul>
               <li><strong>Access</strong> — request a copy of the personal data we hold about you.</li>
@@ -116,23 +158,27 @@ export default function Privacy() {
             <p>To exercise any of these rights, contact us at <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>9. Children's Privacy</h2>
+          <section className="legal-section" id="children">
+            <span className="legal-section__num">Section 09</span>
+            <h2>Children's Privacy</h2>
             <p>Ellines Haven is not intended for children under 13. We do not knowingly collect personal data from children under 13. If you believe a child under 13 has registered on our platform, please contact us and we will promptly delete the account.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>10. Third-Party Links</h2>
+          <section className="legal-section" id="links">
+            <span className="legal-section__num">Section 10</span>
+            <h2>Third-Party Links</h2>
             <p>Our platform may contain links to third-party websites such as Ellines Tech or social platforms. We are not responsible for the privacy practices of those sites and encourage you to review their privacy policies.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>11. Changes to This Policy</h2>
+          <section className="legal-section" id="changes">
+            <span className="legal-section__num">Section 11</span>
+            <h2>Changes to This Policy</h2>
             <p>We may update this Privacy Policy periodically. We will notify you of material changes by posting a notice on the platform or sending an email to registered users. Continued use of the platform after changes constitutes acceptance.</p>
           </section>
 
-          <section className="legal-section">
-            <h2>12. Contact</h2>
+          <section className="legal-section" id="contact">
+            <span className="legal-section__num">Section 12</span>
+            <h2>Contact</h2>
             <p>For any privacy-related questions or requests:</p>
             <ul>
               <li>Email: <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a></li>
@@ -144,9 +190,9 @@ export default function Privacy() {
         </div>
 
         <div className="legal-footer-nav">
-          <Link to="/terms" className="btn btn-outline btn-sm">Terms of Service →</Link>
-          <Link to="/faq" className="btn btn-ghost btn-sm">FAQ →</Link>
-          <Link to="/contact" className="btn btn-ghost btn-sm">Contact Us →</Link>
+          <Link to="/terms" className="btn btn-outline btn-sm">Terms of Service</Link>
+          <Link to="/faq" className="btn btn-ghost btn-sm">FAQ</Link>
+          <Link to="/contact" className="btn btn-ghost btn-sm">Contact</Link>
         </div>
 
       </div>
