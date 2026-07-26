@@ -751,12 +751,13 @@ export function AppProvider({ children }) {
   // ── Orders ────────────────────────────────────────────────────────────────
   const syncOrders = () => {};
 
-  const placeOrder = async (items, method, ref, phone, promoApplied = null) => {
+  const placeOrder = async (items, method, ref, phone, promoApplied = null, extras = {}) => {
     const baseTotal = items.reduce((s,b) => s + b.price, 0);
     const discountAmount = promoApplied?.discountValue || 0;
     const effectiveTotal = Math.max(0, baseTotal - discountAmount);
+    const orderId = extras.id || ('ORD-' + Date.now());
     const order = {
-      id: 'ORD-' + Date.now(), userId: user?.id || null, userName: user?.name || 'Guest',
+      id: orderId, userId: user?.id || null, userName: user?.name || 'Guest',
       userEmail: user?.email?.toLowerCase() || null,
       items: items.map(b => ({
         id: b.id,
@@ -775,6 +776,9 @@ export function AppProvider({ children }) {
       promoCode: promoApplied?.code || null,
       method, ref: ref || '', phone: phone || '',
       status: 'Pending', date: new Date().toISOString().slice(0,10), createdAt: Date.now(),
+      ...(extras.paystackRef ? { paystackRef: extras.paystackRef } : {}),
+      ...(extras.paystackChannel ? { paystackChannel: extras.paystackChannel } : {}),
+      ...(extras.expectedGrossKes != null ? { expectedGrossKes: extras.expectedGrossKes } : {}),
     };
     // Always write to Firestore — localStorage fallback causes orders to be invisible to buyer
     await setDoc(doc(db,'orders',order.id), { ...order, createdAt: serverTimestamp() });

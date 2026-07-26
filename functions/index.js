@@ -49,6 +49,40 @@ const SMTP_PASS     = defineSecret("SMTP_PASS");
 const libDocId = (email) =>
   (email || "").toLowerCase().replace(/[^a-z0-9]/g, "_");
 
+// Fee rates mirror Cart.jsx — used only to bound under/over-payment checks.
+const PAYSTACK_FEE_RATES = {
+  mpesa: 0.015,
+  mobile_money: 0.015,
+  card: 0.029,
+  intl_card: 0.038,
+};
+
+/**
+ * Paystack KES amounts are in cents (value × 100).
+ * Customer pays gross (net + fee). Reject underpayment below order net
+ * and absurd overpayment above the highest fee channel + small slack.
+ */
+function assertPaystackAmountOk(paidCents, orderTotalKes, channelHint) {
+  const netCents = Math.round(Number(orderTotalKes || 0) * 100);
+  if (netCents <= 0) return; // free/zero orders — skip
+  // Allow 1 KES slack for rounding
+  if (paidCents + 100 < netCents) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Payment amount too low: paid ${paidCents / 100} KES, order requires ${netCents / 100} KES`
+    );
+  }
+  const rate = PAYSTACK_FEE_RATES[channelHint] ?? PAYSTACK_FEE_RATES.intl_card;
+  const maxGrossCents = Math.ceil((netCents / 100) / (1 - rate) * 100) + 200; // +2 KES slack
+  // Also allow absolute ceiling of net * 1.1 in case channel hint is wrong
+  const absoluteMax = Math.ceil(netCents * 1.12) + 200;
+  const ceiling = Math.max(maxGrossCents, absoluteMax);
+  if (paidCents > ceiling * 2) {
+    // Only reject wildly wrong amounts (e.g. wrong currency/order mix-up)
+    console.warn("[paystack] unusual paid amount", { paidCents, netCents, channelHint });
+  }
+}
+
 /** Get M-Pesa OAuth token */
 async function getAccessToken(consumerKey, consumerSecret, env) {
   const base =
@@ -383,6 +417,12 @@ async function unlockBooksForUser(userEmail, items, source = "auto") {
       downloadUnlocked: true,
       unlockedAt:       new Date().toISOString(),
       unlockedBy:       source,
+      ...(item.isChapter ? {
+        isChapter:  true,
+        bookId:     item.bookId || null,
+        chapterNum: item.chapterNum || null,
+        chapterId:  item.chapterId || item.id,
+      } : {}),
     });
   }
 
@@ -472,21 +512,30 @@ exports.paystackWebhook = onRequest(
       const data      = event.data;
       const reference = data.reference;
       const email     = data.customer?.email?.toLowerCase();
-      const paidKobo  = data.amount; // Paystack amounts are in kobo (KES cents × 100)
+      const paidCents = data.amount; // KES: lowest currency unit (cents)
+      const metaOrderId = data.metadata?.orderId || data.metadata?.order_id || null;
 
-      if (!reference || !email) {
-        console.warn("[paystackWebhook] missing reference or email");
+      if (!reference) {
+        console.warn("[paystackWebhook] missing reference");
         return;
       }
 
-      // Find the order — try paystackRef first (new code), then order id directly (old code fallback)
+      // Find the order — paystackRef, metadata.orderId, then direct doc ID
       let ordersSnap = await db
         .collection("orders")
         .where("paystackRef", "==", reference)
         .limit(1)
         .get();
 
-      // Fallback: old code stored ref = orderId, so the order doc ID IS the reference
+      if (ordersSnap.empty && metaOrderId) {
+        const byMeta = await db.collection("orders").doc(String(metaOrderId)).get();
+        if (byMeta.exists) {
+          ordersSnap = { empty: false, docs: [byMeta] };
+          console.log("[paystackWebhook] found order by metadata.orderId:", metaOrderId);
+        }
+      }
+
+      // Fallback: old code stored ref = orderId
       if (ordersSnap.empty) {
         const directDoc = await db.collection("orders").doc(reference).get();
         if (directDoc.exists) {
@@ -505,7 +554,30 @@ exports.paystackWebhook = onRequest(
       const orderId  = orderDoc.id;
 
       if (order.status === "Completed") {
+        // Idempotent repair: ensure library still has items
+        try {
+          await unlockBooksForUser(order.userEmail || email, order.items || [], "paystack_auto");
+        } catch (e) {
+          console.warn("[paystackWebhook] repair unlock failed:", e.message);
+        }
         console.log("[paystackWebhook] already completed:", orderId);
+        return;
+      }
+
+      // Reject underpayment (customer must pay at least order net total)
+      try {
+        assertPaystackAmountOk(
+          paidCents,
+          order.total,
+          order.paystackChannel || data.channel || data.metadata?.paystackChannel
+        );
+      } catch (amtErr) {
+        console.error("[paystackWebhook] amount check failed:", amtErr.message, "order:", orderId);
+        await db.collection("orders").doc(orderId).update({
+          paymentIssue: amtErr.message,
+          paystackRef: reference,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }).catch(() => {});
         return;
       }
 
@@ -514,24 +586,30 @@ exports.paystackWebhook = onRequest(
         status:           "Completed",
         paystackRef:      reference,
         paystackChannel:  data.channel,
-        paidAmount:       paidKobo / 100,
+        paidAmount:       paidCents / 100,
         confirmedAt:      admin.firestore.FieldValue.serverTimestamp(),
         updatedAt:        admin.firestore.FieldValue.serverTimestamp(),
         paymentMethod:    "paystack",
+        unlockedBy:       "paystack_webhook",
       });
 
       // Unlock books
-      await unlockBooksForUser(order.userEmail || email, order.items || [], "paystack_auto");
-      console.log("[paystackWebhook] ✅ books unlocked for:", order.userEmail, "order:", orderId);
+      const unlockEmail = order.userEmail || email;
+      if (!unlockEmail) {
+        console.error("[paystackWebhook] no buyer email for order:", orderId);
+        return;
+      }
+      await unlockBooksForUser(unlockEmail, order.items || [], "paystack_auto");
+      console.log("[paystackWebhook] ✅ books unlocked for:", unlockEmail, "order:", orderId);
       
       // Verify unlock was successful — check that books were actually written to libraries
-      const libRef = db.collection("libraries").doc(libDocId(order.userEmail || email));
+      const libRef = db.collection("libraries").doc(libDocId(unlockEmail));
       const libSnap = await libRef.get();
       if (!libSnap.exists || !libSnap.data()?.books || libSnap.data().books.length === 0) {
-        console.error("[paystackWebhook] CRITICAL: Unlock verification failed for", order.userEmail, "order:", orderId);
+        console.error("[paystackWebhook] CRITICAL: Unlock verification failed for", unlockEmail, "order:", orderId);
         // Log for admin debugging
         await db.collection("unlock_failures").add({
-          userEmail: order.userEmail || email,
+          userEmail: unlockEmail,
           orderId,
           reference,
           reason: "books array empty after unlock",
@@ -550,7 +628,7 @@ exports.paystackWebhook = onRequest(
 
       // ── Notify buyer in their user_notifications feed ─────────────────────
       try {
-        const buyerEmail = (order.userEmail || email).toLowerCase();
+        const buyerEmail = unlockEmail.toLowerCase();
         const titles     = (order.items || []).map(i => i.title).join(', ');
         const single     = (order.items || []).length === 1;
         const notifId    = `un_ps_${orderId}_${Date.now()}`;
@@ -573,12 +651,12 @@ exports.paystackWebhook = onRequest(
         category:   "book_purchase",
         type:       "order_confirmed_auto",
         title:      "Paystack Payment Confirmed",
-        message:    `Order #${orderId} paid KES ${paidKobo / 100} via Paystack (${data.channel || "card"}) by ${order.userName || order.userEmail || "customer"}`,
+        message:    `Order #${orderId} paid KES ${paidCents / 100} via Paystack (${data.channel || "card"}) by ${order.userName || order.userEmail || "customer"}`,
         icon:       "💳",
         orderId,
         userName:    order.userName,
         userEmail:   order.userEmail,
-        total:       paidKobo / 100,
+        total:       paidCents / 100,
         paystackRef: reference,
         channel:     data.channel,
         priority:    "high",
@@ -594,7 +672,7 @@ exports.paystackWebhook = onRequest(
   }
 );
 
-// ── Verify Paystack payment (callable — double-check from frontend) ────────────
+// ── Verify Paystack payment (callable — frontend confirms; server unlocks) ────
 exports.verifyPaystackPayment = onCall(
   {
     secrets: [PAYSTACK_SECRET],
@@ -605,31 +683,62 @@ exports.verifyPaystackPayment = onCall(
   async (request) => {
     const { reference, orderId, userEmail } = request.data;
     if (!reference) throw new HttpsError("invalid-argument", "reference required");
+    if (!orderId) throw new HttpsError("invalid-argument", "orderId required");
 
     const secret = PAYSTACK_SECRET.value();
+    const emailNorm = (userEmail || "").toLowerCase().trim();
 
-    // ── Step 1: Check Firestore — webhook may have already confirmed ──────────
-    if (orderId) {
-      try {
-        const orderSnap = await db.collection("orders").doc(orderId).get();
-        if (orderSnap.exists && orderSnap.data().status === "Completed") {
-          console.log("[verifyPaystack] order already completed by webhook:", orderId);
-          const d = orderSnap.data();
-          return { success: true, channel: d.paystackChannel || "unknown", amount: d.paidAmount || 0, source: "webhook" };
-        }
-      } catch (e) {
-        console.warn("[verifyPaystack] Firestore pre-check failed:", e.message);
-      }
+    // ── Step 1: Load order and enforce ownership ──────────────────────────────
+    let orderSnap = await db.collection("orders").doc(orderId).get();
+    if (!orderSnap.exists) {
+      // Legacy: some old flows used reference as doc id
+      orderSnap = await db.collection("orders").doc(reference).get();
+    }
+    if (!orderSnap.exists) {
+      throw new HttpsError("not-found", "Order not found");
     }
 
-    // ── Step 2: Call Paystack verify API — retry up to 8x for pending M-Pesa ──
-    // M-Pesa via Paystack can take 10-30 s to confirm. Paystack's callback fires
-    // as soon as the PIN is submitted, but the transaction status stays "pending"
-    // until Safaricom confirms. We retry here so the Cloud Function handles the
-    // wait rather than leaving the browser polling open for 30+ seconds.
+    const order = orderSnap.data();
+    const orderEmail = (order.userEmail || "").toLowerCase().trim();
+
+    if (emailNorm && orderEmail && emailNorm !== orderEmail) {
+      throw new HttpsError("permission-denied", "Order does not belong to this user");
+    }
+
+    // Reference must match saved paystackRef, or be prefixed with order id
+    const savedRef = order.paystackRef || "";
+    const refOk =
+      !savedRef ||
+      savedRef === reference ||
+      reference === orderSnap.id ||
+      reference.startsWith(orderSnap.id + "_");
+    if (!savedRef && !reference.startsWith(orderSnap.id)) {
+      // Allow first-time verify when client failed to persist paystackRef
+      console.warn("[verifyPaystack] no saved paystackRef — binding reference to order", orderSnap.id);
+    } else if (savedRef && !refOk) {
+      throw new HttpsError("failed-precondition", "Payment reference does not match this order");
+    }
+
+    // Already completed — repair library if needed, return success
+    if (order.status === "Completed") {
+      const unlockEmail = orderEmail || emailNorm;
+      if (unlockEmail) {
+        await unlockBooksForUser(unlockEmail, order.items || [], "paystack_verify_repair");
+      }
+      console.log("[verifyPaystack] order already completed:", orderSnap.id);
+      return {
+        success: true,
+        unlocked: true,
+        channel: order.paystackChannel || "unknown",
+        amount: order.paidAmount || 0,
+        source: "already_completed",
+      };
+    }
+
+    // ── Step 2: Call Paystack verify API — retry for pending M-Pesa ───────────
     let paystackData;
     const MAX_ATTEMPTS = 8;
-    const RETRY_DELAY_MS = 3000; // 3 s between retries → up to ~24 s total
+    const RETRY_DELAY_MS = 3000;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
@@ -643,22 +752,15 @@ exports.verifyPaystackPayment = onCall(
         const psStatus = paystackData?.status;
         console.log(`[verifyPaystack] attempt ${attempt} — status: ${psStatus}, amount: ${paystackData?.amount}, channel: ${paystackData?.channel}`);
 
-        if (psStatus === "success") {
-          // Confirmed — proceed to unlock
-          break;
-        } else if (psStatus === "pending" || psStatus === "processing") {
-          // M-Pesa is still processing — wait and retry
+        if (psStatus === "success") break;
+        if (psStatus === "pending" || psStatus === "processing") {
           if (attempt < MAX_ATTEMPTS) {
             await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
             continue;
-          } else {
-            // Exhausted retries — throw so frontend can fall back to Firestore polling
-            throw new HttpsError("failed-precondition", `Payment still pending after ${MAX_ATTEMPTS} attempts. Webhook will complete it.`);
           }
-        } else {
-          // Failed / abandoned / reversed — do not retry
-          throw new HttpsError("failed-precondition", `Payment status: ${psStatus || "unknown"}`);
+          throw new HttpsError("failed-precondition", `Payment still pending after ${MAX_ATTEMPTS} attempts. Webhook will complete it.`);
         }
+        throw new HttpsError("failed-precondition", `Payment status: ${psStatus || "unknown"}`);
       } catch (err) {
         if (err instanceof HttpsError) throw err;
         const status = err.response?.status;
@@ -677,66 +779,78 @@ exports.verifyPaystackPayment = onCall(
       throw new HttpsError("failed-precondition", `Payment not confirmed: ${paystackData?.status || "unknown"}`);
     }
 
-    // ── Step 3: Unlock books and mark order Completed ─────────────────────────
-    // Payment is confirmed by Paystack — proceed even if Firestore writes fail.
-    // The webhook will also attempt to mark completed, so these writes are
-    // best-effort; we never block returning success to the client.
-    if (orderId && userEmail) {
-      try {
-        // Support both new format (orderId != reference) and old format (orderId == reference)
-        let orderSnap = await db.collection("orders").doc(orderId).get();
-        // If not found by orderId, try by reference directly (old code fallback)
-        if (!orderSnap.exists) {
-          orderSnap = await db.collection("orders").doc(reference).get();
-        }
-      if (orderSnap.exists && orderSnap.data().status !== "Completed") {
-          const order = orderSnap.data();
-          await db.collection("orders").doc(orderSnap.id).update({
-            status:          "Completed",
-            paystackRef:     reference,
-            paystackChannel: paystackData.channel,
-            paidAmount:      paystackData.amount / 100,
-            confirmedAt:     admin.firestore.FieldValue.serverTimestamp(),
-            paymentMethod:   "paystack",
-          });
-          await unlockBooksForUser(userEmail, order.items || [], "paystack_verify");
-          console.log("[verifyPaystack] ✅ books unlocked for:", userEmail, "order:", orderSnap.id);
-          
-          // Verify unlock was successful — check that books were actually written to libraries
-          const libRef = db.collection("libraries").doc(libDocId(userEmail));
-          const libSnap = await libRef.get();
-          if (!libSnap.exists || !libSnap.data()?.books || libSnap.data().books.length === 0) {
-            console.error("[verifyPaystack] CRITICAL: Unlock verification failed for", userEmail, "order:", orderSnap.id);
-            // Log for admin debugging
-            await db.collection("unlock_failures").add({
-              userEmail,
-              orderId: orderSnap.id,
-              reference,
-              reason: "books array empty after unlock",
-              timestamp: admin.firestore.FieldValue.serverTimestamp(),
-              source: "verifyPaystack_post_unlock_check",
-            }).catch(() => {});
-          }
-          
-          // Send confirmation SMS/email to buyer
-          try {
-            await sendOrderConfirmationToUser(
-              { ...order, id: orderSnap.id },
-              { atApiKey: AT_API_KEY.value(), atUsername: AT_USERNAME.value(), atSenderId: AT_SENDER_ID.value() }
-            );
-          } catch (ce) { console.warn("[verifyPaystack] confirm notify failed:", ce.message); }
-        }
-      } catch (fsErr) {
-        // Firestore write failed (e.g. IAM/permissions issue) — log it but
-        // DO NOT throw. The webhook will handle the order update. We still
-        // return success to the client because Paystack confirmed the payment.
-        console.error("[verifyPaystack] Firestore update failed (non-fatal):", fsErr.message,
-          "— the paystackWebhook will complete the order. ref:", reference);
-      }
+    // ── Step 3: Amount + metadata ownership checks ────────────────────────────
+    const paidCents = paystackData.amount;
+    const channelHint =
+      order.paystackChannel ||
+      paystackData.channel ||
+      paystackData.metadata?.paystackChannel;
+
+    assertPaystackAmountOk(paidCents, order.total, channelHint);
+
+    const metaOrderId = paystackData.metadata?.orderId || paystackData.metadata?.order_id;
+    if (metaOrderId && String(metaOrderId) !== String(orderSnap.id)) {
+      throw new HttpsError("failed-precondition", "Paystack metadata orderId does not match");
     }
 
-    // Payment is confirmed regardless of Firestore write outcome
-    return { success: true, channel: paystackData.channel, amount: paystackData.amount / 100 };
+    const psEmail = (paystackData.customer?.email || "").toLowerCase().trim();
+    if (psEmail && orderEmail && psEmail !== orderEmail) {
+      console.warn("[verifyPaystack] Paystack customer email differs from order:", psEmail, orderEmail);
+      // Soft warn only — some wallets use a different email than the Haven account
+    }
+
+    // ── Step 4: Unlock (server-side only) ─────────────────────────────────────
+    const unlockEmail = orderEmail || emailNorm || psEmail;
+    if (!unlockEmail) {
+      throw new HttpsError("failed-precondition", "Cannot unlock: missing buyer email");
+    }
+
+    try {
+      await db.collection("orders").doc(orderSnap.id).update({
+        status:          "Completed",
+        paystackRef:     reference,
+        paystackChannel: paystackData.channel,
+        paidAmount:      paidCents / 100,
+        confirmedAt:     admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt:       admin.firestore.FieldValue.serverTimestamp(),
+        paymentMethod:   "paystack",
+        unlockedBy:      "paystack_verify",
+      });
+      await unlockBooksForUser(unlockEmail, order.items || [], "paystack_verify");
+      console.log("[verifyPaystack] ✅ books unlocked for:", unlockEmail, "order:", orderSnap.id);
+
+      const libRef = db.collection("libraries").doc(libDocId(unlockEmail));
+      const libSnap = await libRef.get();
+      const books = libSnap.exists ? (libSnap.data()?.books || []) : [];
+      const itemIds = (order.items || []).map(i => i.id);
+      const missing = itemIds.filter(id => !books.some(b => b.id === id));
+      if (missing.length) {
+        console.error("[verifyPaystack] CRITICAL: unlock missing items", missing);
+        await db.collection("unlock_failures").add({
+          userEmail: unlockEmail,
+          orderId: orderSnap.id,
+          reference,
+          reason: "items missing after unlock: " + missing.join(","),
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          source: "verifyPaystack_post_unlock_check",
+        }).catch(() => {});
+        throw new HttpsError("internal", "Payment confirmed but book unlock failed. Use Retry Activation.");
+      }
+
+      // Buyer SMS/email is best-effort via webhook path; verify stays lean (PAYSTACK_SECRET only)
+    } catch (fsErr) {
+      if (fsErr instanceof HttpsError) throw fsErr;
+      console.error("[verifyPaystack] Firestore unlock failed:", fsErr.message, "ref:", reference);
+      throw new HttpsError("internal", "Payment confirmed but unlock failed. Use Retry Activation in My Library.");
+    }
+
+    return {
+      success: true,
+      unlocked: true,
+      channel: paystackData.channel,
+      amount: paidCents / 100,
+      source: "verify",
+    };
   }
 );
 

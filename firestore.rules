@@ -45,24 +45,27 @@ service cloud.firestore {
     }
 
     // ── User libraries ────────────────────────────────────────────────────────
-    // Each user has their own library document (keyed by userEmail)
-    // Users can unlock books and track progress
-    // NOTE: Currently allows any user to read/write any library (app enforces access)
+    // Each user has their own library document (keyed by userEmail).
+    // PAYMENT UNLOCKS must go through Cloud Functions (Admin SDK) after Paystack/
+    // M-Pesa/PayPal verification — never trust the client alone for granting books.
+    // NOTE: Without Firebase Auth, rules cannot enforce per-user ownership yet.
+    // isLoggedIn()/isAdmin() are placeholders until Auth migration.
     match /libraries/{docId} {
-      allow read:   if isLoggedIn();  // Logged-in users only (app enforces ownership)
-      allow create: if isLoggedIn();  // Logged-in users can create
-      allow update: if isLoggedIn();  // Logged-in users can update their own
-      allow delete: if false;         // No deletes — books removed by Cloud Functions
+      allow read:   if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn();
+      allow delete: if false;
     }
 
     // ── Orders ────────────────────────────────────────────────────────────────
-    // Users create orders, Cloud Functions update status via authenticated triggers
-    // NO CLIENT-SIDE UPDATES after creation (critical for payment security)
+    // Clients create orders and may attach paystackRef before checkout.
+    // Status → Completed / paid unlocks: Cloud Functions only (Admin SDK).
+    // allow update is open for admin UI + paystackRef writes until Firebase Auth.
     match /orders/{orderId} {
-      allow read:   if isLoggedIn();  // Logged-in users only (app enforces viewing own orders)
-      allow create: if isLoggedIn();  // Logged-in users can create orders
-      allow update: if false;         // ⚠️ CRITICAL: No client-side updates (only Cloud Functions)
-      allow delete: if false;         // No deletes
+      allow read:   if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn();
+      allow delete: if false;
     }
 
     // ── Users / profiles ──────────────────────────────────────────────────────

@@ -176,25 +176,60 @@ async function notifyAdminPaymentIssue(order, reason, paystackRef) {
   } catch {}
 }
 
-// ── VerifyingScreen — listens to Firestore in real-time, completes instantly ──
-// Uses onSnapshot instead of polling so as soon as the webhook marks the
-// order Completed, the user sees success with zero lag.
-function VerifyingScreen({ orderId, onDone }) {
+// ── VerifyingScreen — listens to Firestore + retries server verify ───────────
+// Unlock happens only in Cloud Functions (verifyPaystackPayment / webhook).
+function VerifyingScreen({ orderId, paystackRef, userEmail, onDone, onGiveUp }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     if (!orderId) return;
-    // Real-time listener — fires the instant Firestore changes
+    let stopped = false;
+
     const unsub = onSnapshot(doc(db, 'orders', orderId), (snap) => {
-      if (!snap.exists()) return;
+      if (!snap.exists() || stopped) return;
       if (snap.data().status === 'Completed') {
+        stopped = true;
         onDone();
       }
     });
-    // Tick a counter so user sees something is happening
+
     const timer = setInterval(() => setElapsed(s => s + 1), 1000);
-    return () => { unsub(); clearInterval(timer); };
-  }, [orderId, onDone]); // eslint-disable-line
+
+    // Periodically re-call verify so Haven unlocks even when the hub webhook
+    // (ellines.co.ke) is the only Paystack webhook URL.
+    let verifyAttempts = 0;
+    const verifyTimer = setInterval(async () => {
+      if (stopped || !paystackRef || !userEmail) return;
+      verifyAttempts += 1;
+      if (verifyAttempts > 12) return; // ~60s of retries
+      try {
+        await callVerifyPaystack({
+          reference: paystackRef,
+          orderId,
+          userEmail,
+        });
+        // Success → onSnapshot will flip to Completed; also finish here
+        if (!stopped) {
+          stopped = true;
+          onDone();
+        }
+      } catch {
+        /* pending / network — keep waiting */
+      }
+    }, 5000);
+
+    const giveUp = setTimeout(() => {
+      if (!stopped && onGiveUp) onGiveUp();
+    }, 90_000);
+
+    return () => {
+      stopped = true;
+      unsub();
+      clearInterval(timer);
+      clearInterval(verifyTimer);
+      clearTimeout(giveUp);
+    };
+  }, [orderId, paystackRef, userEmail, onDone, onGiveUp]);
 
   const dots = '.'.repeat((elapsed % 3) + 1);
 
@@ -210,7 +245,7 @@ function VerifyingScreen({ orderId, onDone }) {
           {elapsed < 10 ? 'Waiting for confirmation…' :
            elapsed < 20 ? 'Still waiting — M-Pesa is processing…' :
            elapsed < 35 ? 'Almost there — confirming with Paystack…' :
-           'This is taking a bit longer than usual. Your books will unlock automatically.'}
+           'This is taking a bit longer than usual. Your books will unlock automatically — you can also retry from My Library → Orders.'}
         </p>
       </div>
     </main>
@@ -235,6 +270,7 @@ export default function Cart() {
   const [busy,             setBusy]            = useState(false);
   const [stkError,         setStkError]        = useState('');
   const [placedOrder,      setPlacedOrder]     = useState(null);
+  const [verifyRef,        setVerifyRef]       = useState(null); // paystack ref while verifying
   const [cancelledNotice,  setCancelledNotice] = useState('');
   const [refundAcked,      setRefundAcked]     = useState(false); // no-refund acknowledgement
   const navigate = useNavigate();
@@ -342,11 +378,20 @@ export default function Cart() {
           return;
         }
 
-        // Otherwise call verify function
+        if (!orderId) {
+          setStkError('Could not find your order for this payment. Contact support with ref: ' + reference);
+          setStep('pay');
+          return;
+        }
+
+        setPlacedOrder({ id: orderId, ...orderData });
+        setVerifyRef(reference);
+
+        // Otherwise call verify function (server unlocks)
         try {
           await callVerifyPaystack({
             reference,
-            orderId:   orderId || '',
+            orderId,
             userEmail: user.email,
           });
           clearCart();
@@ -355,25 +400,23 @@ export default function Cart() {
           // Verify failed — poll Firestore for up to 15 s in case the webhook
           // fires while we're waiting (race condition on mobile redirect flow)
           let confirmed = false;
-          if (orderId) {
-            const { getDoc, doc: fsDoc } = await import('firebase/firestore');
-            for (let i = 0; i < 10; i++) {
-              await new Promise(r => setTimeout(r, 1500));
-              try {
-                const snap2 = await getDoc(fsDoc(db, 'orders', orderId));
-                if (snap2.exists() && snap2.data().status === 'Completed') {
-                  confirmed = true;
-                  break;
-                }
-              } catch { /* keep polling */ }
-            }
+          const { getDoc, doc: fsDoc } = await import('firebase/firestore');
+          for (let i = 0; i < 10; i++) {
+            await new Promise(r => setTimeout(r, 1500));
+            try {
+              const snap2 = await getDoc(fsDoc(db, 'orders', orderId));
+              if (snap2.exists() && snap2.data().status === 'Completed') {
+                confirmed = true;
+                break;
+              }
+            } catch { /* keep polling */ }
           }
           if (confirmed) {
             clearCart();
             setStep('done');
           } else {
-            setStkError('Payment may have succeeded. If books are not in your library in a few minutes, contact support with ref: ' + reference);
-            setStep('pay');
+            // Stay on verifying so VerifyingScreen keeps retrying
+            setStep('verifying');
           }
         }
       } catch {
@@ -416,8 +459,6 @@ export default function Cart() {
     setStkError('');
     setBusy(true);
     try {
-      const order = await placeOrder([...cart], 'paystack', '', '', promoApplied);
-      setPlacedOrder(order);
       await loadPaystack();
 
       // Calculate gross amount so customer bears the Paystack fee
@@ -425,19 +466,29 @@ export default function Cart() {
       const grossKes = paystackAmountCents / 100;
       const feeKes   = +(grossKes - effectiveTotal).toFixed(2);
 
-      // Generate a unique Paystack reference and save it to Firestore BEFORE
-      // opening the popup. This ensures the webhook can find the order the
-      // moment Paystack fires charge.success — eliminating the race condition
-      // where the webhook fires before paystackRef is written to Firestore.
-      const paystackRef = order.id + '_' + Date.now();
+      // Create order WITH paystackRef already set so webhook/verify can find it
+      // even if a later updateDoc is blocked by rules.
+      const orderId = 'ORD-' + Date.now();
+      const paystackRef = orderId + '_' + Date.now();
+      const order = await placeOrder([...cart], 'paystack', '', '', promoApplied, {
+        id: orderId,
+        paystackRef,
+        paystackChannel,
+        expectedGrossKes: grossKes,
+      });
+      setPlacedOrder(order);
+      setVerifyRef(paystackRef);
+
+      // Best-effort refresh of ref fields (create already has them)
       try {
         await updateDoc(doc(db, 'orders', order.id), {
           paystackRef,
           paystackChannel,
+          expectedGrossKes: grossKes,
           updatedAt: serverTimestamp(),
         });
       } catch (refErr) {
-        console.warn('[Cart] paystackRef save failed — proceeding anyway:', refErr.message);
+        console.warn('[Cart] paystackRef update skipped:', refErr.message);
       }
 
       await new Promise((resolve) => {
@@ -465,95 +516,39 @@ export default function Cart() {
             discountAmount:   discountAmount || 0,
           },
           callback: (response) => {
-            // Payment successful — verify + unlock
+            // Payment popup reported success — only Cloud Functions unlock books
             paymentSucceeded = true;
+            setVerifyRef(response.reference);
             setStep('verifying');
 
             const doVerify = async () => {
-              // ── Frontend unlock — writes directly to Firestore client-side ──
-              // This is the guaranteed path. The Cloud Function is only used to
-              // confirm payment status with Paystack's API, not to write Firestore.
-              const doFrontendUnlock = async (orderId, userEmailLow, items) => {
-                const libDocIdLocal = (e) => (e || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
-                const { getDoc: fsGet, setDoc: fsSet, updateDoc: fsUpd, doc: fsDoc, serverTimestamp: fsSvTs } = await import('firebase/firestore');
-                const libRef = fsDoc(db, 'libraries', libDocIdLocal(userEmailLow));
-                const snap   = await fsGet(libRef);
-                const existing = snap.exists() ? (snap.data().books || []) : [];
-                const map = new Map(existing.map(b => [b.id, b]));
-                items.forEach(item => {
-                  const prev = map.get(item.id) || {};
-                  map.set(item.id, {
-                    ...prev,
-                    id:               item.id,
-                    title:            item.title || prev.title || '',
-                    price:            item.price || prev.price || 0,
-                    downloadUnlocked: true,
-                    unlockedAt:       new Date().toISOString(),
-                    unlockedBy:       'paystack_frontend',
-                    ...(item.isChapter ? {
-                      isChapter:  true,
-                      bookId:     item.bookId || null,
-                      chapterNum: item.chapterNum || null,
-                    } : {}),
-                  });
-                });
-                await fsSet(libRef, { email: userEmailLow, books: Array.from(map.values()) }, { merge: true });
-                await fsUpd(fsDoc(db, 'orders', orderId), {
-                  status:        'Completed',
-                  confirmedAt:   fsSvTs(),
-                  paymentMethod: 'paystack',
-                  activatedBy:   'frontend_verify',
-                  updatedAt:     fsSvTs(),
-                });
-              };
-
-              // ── Step 1: check if webhook already completed it ──────────────
+              // ── Step 1: check if webhook / prior verify already completed ──
               try {
                 const { getDoc: fsGet, doc: fsDoc } = await import('firebase/firestore');
                 const snap = await fsGet(fsDoc(db, 'orders', order.id));
                 if (snap.exists() && snap.data().status === 'Completed') {
+                  try {
+                    const { notifyBooksUnlocked } = await import('../utils/userNotifier');
+                    await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
+                  } catch {}
                   clearCart();
                   setStep('done');
                   return;
                 }
               } catch { /* continue */ }
 
-              // ── Step 2: try verify function (confirms with Paystack API) ───
-              let verifyConfirmed = false;
-              let verifyErrMsg = '';
+              // ── Step 2: server verify + unlock ────────────────────────────
               try {
                 await callVerifyPaystack({
                   reference: response.reference,
                   orderId:   order.id,
                   userEmail: user.email,
                 });
-                verifyConfirmed = true;
-              } catch (verifyErr) {
-                verifyErrMsg = String(verifyErr?.message || verifyErr?.details || '');
-                console.warn('[Cart] verify threw:', verifyErrMsg);
-              }
 
-              // Unlock when verify succeeded, or when Paystack is still pending
-              // (common for M-Pesa). Do NOT unlock on definitive failures.
-              const pendingRace = /pending|timeout|network|unavailable|deadline/i.test(verifyErrMsg);
-              const hardFail = /failed|abandoned|reversed|declined|invalid/i.test(verifyErrMsg);
-              if (!verifyConfirmed && hardFail && !pendingRace) {
-                setStkError(
-                  'Payment was not confirmed. If money was deducted, go to My Library → Orders and tap Retry Activation. Ref: ' +
-                  response.reference
-                );
-                setStep('pay');
-                return;
-              }
-
-              try {
-                await doFrontendUnlock(order.id, user.email.toLowerCase(), order.items || []);
-                // Notify user in their own feed
                 try {
                   const { notifyBooksUnlocked } = await import('../utils/userNotifier');
                   await notifyBooksUnlocked(user.email.toLowerCase(), order.items || [], order.id);
                 } catch {}
-                // Track purchase in activity feed
                 try {
                   const { trackActivity, NOTIFICATION_CATEGORIES } = await import('../utils/adminActivityTracker');
                   const titles = (order.items || []).map(i => i.title).join(', ');
@@ -567,14 +562,35 @@ export default function Cart() {
                     priority: 'high',
                   }).catch(() => {});
                 } catch {}
+
                 clearCart();
                 setStep('done');
-              } catch (unlockErr) {
-                console.error('[Cart] frontend unlock failed:', unlockErr.message);
-                // Unlock failed — show message, leave order Pending for retry
+              } catch (verifyErr) {
+                const verifyErrMsg = String(verifyErr?.message || verifyErr?.details || '');
+                console.warn('[Cart] verify threw:', verifyErrMsg);
+
+                const hardFail = /failed|abandoned|reversed|declined|invalid|too low|does not match|permission/i.test(verifyErrMsg);
+                const pendingRace = /pending|timeout|network|unavailable|deadline|unlock failed|Retry Activation/i.test(verifyErrMsg);
+
+                if (hardFail && !/pending/i.test(verifyErrMsg)) {
+                  setStkError(
+                    'Payment was not confirmed. If money was deducted, go to My Library → Orders and tap Retry Activation. Ref: ' +
+                    response.reference
+                  );
+                  setStep('pay');
+                  return;
+                }
+
+                // Pending / unlock race — stay on verifying; screen retries + listens
+                if (pendingRace || !hardFail) {
+                  setVerifyRef(response.reference);
+                  setStep('verifying');
+                  return;
+                }
+
                 setStkError(
-                  'Payment confirmed but book unlock failed. Go to My Library → Orders and tap Retry Activation. ' +
-                  'Ref: ' + response.reference
+                  'Payment confirmation timed out. Go to My Library → Orders and tap Retry Activation. Ref: ' +
+                  response.reference
                 );
                 setStep('pay');
               }
@@ -764,7 +780,19 @@ export default function Cart() {
 
   // ── Verifying screen ──────────────────────────────────────────────────────
   if (step === 'verifying') return (
-    <VerifyingScreen orderId={placedOrder?.id} onDone={() => { clearCart(); setStep('done'); }} />
+    <VerifyingScreen
+      orderId={placedOrder?.id}
+      paystackRef={verifyRef || placedOrder?.paystackRef}
+      userEmail={user?.email}
+      onDone={() => { clearCart(); setStep('done'); }}
+      onGiveUp={() => {
+        setStkError(
+          'Confirmation is taking longer than usual. Check My Library → Orders and tap Retry Activation if needed.' +
+          (verifyRef ? ' Ref: ' + verifyRef : '')
+        );
+        setStep('pay');
+      }}
+    />
   );
 
   // ── Done screen ───────────────────────────────────────────────────────────
