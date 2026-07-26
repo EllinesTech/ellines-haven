@@ -9,7 +9,6 @@ import OrderReceiptModal from '../components/OrderReceiptModal';
 import { readPath } from '../utils/slugify';
 import { listOfflineBooks, removeOfflineBook, getOfflineBook } from '../hooks/useOfflineBook';
 import { downloadEhbookPack } from '../utils/ehbookPack';
-import EhbookImportZone from '../components/EhbookImportZone';
 import { verifyPassword, storePasswordValue } from '../utils/passwordSecurity';
 import { findUserInFirestore } from './Login';
 import './UserProfile.css';
@@ -652,21 +651,14 @@ export default function UserProfile() {
                 <h2>📥 Offline Books</h2>
                 <span>{offlineBooks.length} book{offlineBooks.length!==1?'s':''} on this device</span>
               </div>
-              <div style={{ marginBottom: 16 }}>
-                <EhbookImportZone
-                  userEmail={user.email}
-                  onImported={async () => {
-                    const books = await listOfflineBooks(user.email);
-                    setOfflineBooks(books);
-                  }}
-                />
-              </div>
               {offlineBooks.length === 0 ? (
                 <div className="up-empty">
                   <div className="up-empty__icon">📱</div>
                   <h3>No books on this device yet</h3>
-                  <p>While reading, tap <strong>Save offline</strong> or <strong>Keep forever</strong> for a <code>.ehbook</code> file that survives clearing browser data.</p>
-                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>Import a pack above anytime while signed in to the same account.</p>
+                  <p>While reading, tap <strong>Save offline</strong> or <strong>Keep forever</strong>.</p>
+                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>
+                    To restore a <code>.ehbook</code> after clearing browser data, use <Link to="/my-library" style={{ color:'var(--gold)' }}>My Library → Downloaded</Link>.
+                  </p>
                   <Link to="/library" className="btn btn-primary">Browse & Read Books →</Link>
                 </div>
               ) : (
@@ -712,7 +704,7 @@ export default function UserProfile() {
                     ))}
                   </div>
                   <div style={{padding:'14px 16px',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',fontSize:'0.78rem',color:'var(--muted)'}}>
-                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Quick saves live in this browser. <strong style={{color:'#6eb6ff'}}>Keep forever</strong> downloads a locked <code>.ehbook</code> that survives clearing site data. The unlock key stays on our servers — if someone else gets the file, it will not open.
+                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Quick saves live in this browser. <strong style={{color:'#6eb6ff'}}>Keep forever</strong> downloads a locked personal <code>.ehbook</code>. Import packs only from <Link to="/my-library" style={{ color:'var(--gold)' }}>My Library → Downloaded</Link> — shared files will not open.
                   </div>
                 </div>
               )}

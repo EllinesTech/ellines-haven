@@ -32,7 +32,6 @@ import { getFallbackChapters } from '../data/bookChapters';
 
 import AudioPlayer from '../components/AudioPlayer';
 import { ErrorBoundary } from '../components/ErrorDisplay';
-import EhbookImportZone from '../components/EhbookImportZone';
 
 import {
   READING_FONTS,
@@ -1547,36 +1546,12 @@ export default function Reader() {
 
           <span>
             You’re offline and this book isn’t on this device.
-            If you have a <strong>.ehbook</strong> file, go to My Library → Downloaded and import it.
-            Otherwise reconnect and tap <strong>Keep forever</strong>.
+            Reconnect and open <strong>My Library → Downloaded</strong> to import your <strong>.ehbook</strong> pack,
+            or tap <strong>Keep forever</strong> while reading online.
           </span>
 
         </div>
 
-      )}
-
-      {!isOffline && (siteControls?.offlineEnabled !== false) && user?.email && (
-        <div className="reader__ehbook-bar">
-          <EhbookImportZone
-            userEmail={user.email}
-            compact
-            onImported={async (pack) => {
-              if (String(pack.bookId) === String(book.id)) {
-                setOfflineSaved(true);
-                setOfflineChapters(pack.chapters);
-                setOfflineMeta({
-                  bookId: pack.bookId,
-                  title: pack.title,
-                  chapterCount: pack.chapterCount,
-                  savedAt: Date.now(),
-                });
-                setOfflineMsgTone('ok');
-                setOfflineSaveMsg(`Imported “${pack.title}” — ready offline`);
-                setTimeout(() => setOfflineSaveMsg(''), 5000);
-              }
-            }}
-          />
-        </div>
       )}
 
 
