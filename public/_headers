@@ -1,12 +1,18 @@
 # ── Security + Cache headers for Cloudflare Pages ───────────────────────────
-# IMPORTANT: Only ONE block per path pattern. Later blocks override earlier ones.
-# Always set CDN-Cache-Control on specific routes — /* bleeds otherwise.
+# IMPORTANT: Cloudflare Pages COMBINES matching header blocks (they do not
+# fully override). Avoid putting CDN-Cache-Control on /* — it stacks onto
+# /assets/* and can force asset MISS/0 TTL or poison 404 responses.
 #
 # HTML must be cacheable for Google indexing (public) but always revalidate so
 # browsers never keep a stale index.html that points at old hashed JS chunks.
 # NEVER use no-store on HTML — it blocks Google from indexing the site.
+#
+# Do NOT set CDN-Cache-Control: immutable on /assets/*. Pages already edge-
+# caches successful assets and purges on deploy. Custom long CDN TTLs also
+# attach to missing-asset 404s (via /assets/* → 404.html) and can sticky-
+# cache "not found" at the edge after a deploy race.
 
-# Default — HTML + unhashed files: revalidate every time (browser + CDN)
+# Default — HTML + unhashed files: revalidate every time (browser).
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
@@ -15,12 +21,20 @@
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cache-Control: public, max-age=0, must-revalidate
-  CDN-Cache-Control: public, max-age=0, must-revalidate
 
-# Hashed JS/CSS bundles — safe to cache forever (Vite content-hashes filenames)
+# Explicit document shell — never long-cached at the edge
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+  CDN-Cache-Control: no-cache
+
+# Custom 404 body — never cache (also used for missing /assets/* hashes)
+/404.html
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store
+
+# Hashed JS/CSS — long browser cache only. Let Pages manage edge TTL/purge.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
-  CDN-Cache-Control: public, max-age=31536000, immutable
 
 # Service Worker — never cache (kill-switch must reach clients immediately)
 /sw.js
@@ -68,29 +82,22 @@
 # Images
 /*.png
   Cache-Control: public, max-age=86400, must-revalidate
-  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.jpg
   Cache-Control: public, max-age=86400, must-revalidate
-  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.jpeg
   Cache-Control: public, max-age=86400, must-revalidate
-  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.webp
   Cache-Control: public, max-age=86400, must-revalidate
-  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 /*.svg
   Cache-Control: public, max-age=86400, must-revalidate
-  CDN-Cache-Control: public, max-age=86400, must-revalidate
 
 # Fonts
 /*.woff2
   Cache-Control: public, max-age=31536000, immutable
-  CDN-Cache-Control: public, max-age=31536000, immutable
 
 /*.woff
   Cache-Control: public, max-age=31536000, immutable
-  CDN-Cache-Control: public, max-age=31536000, immutable

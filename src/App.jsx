@@ -39,64 +39,17 @@ import EllineaAI from './components/EllineaAI';
 import EditToolbar from './components/EditToolbar';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { initializeActivityLogger } from './utils/reliableActivityLogger';
+import {
+  hardReload,
+  isChunkLoadError,
+  lazyRetry,
+  tryRecoverFromChunkError,
+} from './utils/chunkRecovery';
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 import './App.css';
-
-/* ── Reliable reload helper — bust caches and force a fresh HTML fetch ───────
-   location.reload() is NOT enough after a deploy: browsers/CDN can keep serving
-   the same stale index.html that points at deleted /assets/* chunk hashes.
-   We navigate to a cache-busted URL and clear the build stamp so the head guard
-   can reconcile against freshly fetched HTML.
-────────────────────────────────────────────────────────────────────────── */
-function hardReload() {
-  if (typeof window === 'undefined' || window.__EH_RELOADING__) return;
-  window.__EH_RELOADING__ = true;
-
-  try {
-    localStorage.removeItem('eh_chunk_reload');
-    localStorage.removeItem('eh_chunk_reload_global');
-    // Keep eh_build_v — clearing it fought the stamp guard and could loop after deploys
-  } catch { /* ignore */ }
-
-  const bust = () => {
-    window.location.replace(window.location.pathname + '?_eh=' + Date.now() + (window.location.hash || ''));
-  };
-
-  // Drop any leftover service workers + caches, then navigate once.
-  // Do NOT re-register a kill-switch SW — that triggered claim/reload races.
-  const cleanup = Promise.all([
-    'serviceWorker' in navigator
-      ? navigator.serviceWorker.getRegistrations().then((regs) =>
-          Promise.all(regs.map((r) => r.unregister()))
-        )
-      : Promise.resolve(),
-    'caches' in window
-      ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
-      : Promise.resolve(),
-  ]);
-
-  const clearTimer = setTimeout(bust, 600);
-  cleanup.then(() => { clearTimeout(clearTimer); bust(); }).catch(() => { clearTimeout(clearTimer); bust(); });
-}
-
-function isChunkLoadError(err) {
-  const msg = String(err?.message || err || '');
-  return (
-    err?.name === 'ChunkLoadError' ||
-    msg.includes('Failed to fetch dynamically imported module') ||
-    msg.includes('Importing a module script failed') ||
-    msg.includes('error loading dynamically imported module') ||
-    msg.includes('Loading chunk') ||
-    msg.includes('Loading CSS chunk') ||
-    msg.includes('Unable to preload CSS') ||
-    msg.includes('error loading CSS') ||
-    /MIME type .* text\/html/i.test(msg) ||
-    /Unexpected token '<'/.test(msg)
-  );
-}
 
 /* ── Chunk error boundary — auto-reloads on stale deploy cache ──────────────
    Only triggers full-page fallback for true chunk/module-load errors.
@@ -110,59 +63,44 @@ class ChunkErrorBoundary extends Component {
   }
   static getDerivedStateFromError(err) {
     if (isChunkLoadError(err)) {
-      const reloadKey = 'eh_chunk_reload';
-      const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
-      const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
-      if (!isReading && Date.now() - last > 60_000) {
-        localStorage.setItem(reloadKey, String(Date.now()));
-        // Use setTimeout so the state update finishes before reload fires
-        setTimeout(() => hardReload(), 0);
-        return { hasError: false, isChunkError: false };
-      }
+      // Must keep hasError:true so React does not rethrow into RootErrorBoundary.
       return { hasError: true, isChunkError: true };
     }
-
-    // Non-chunk React errors — let PageErrorBoundary (nested) handle them.
-    // Only set hasError if this is a top-level catch (no child boundary caught it).
     return { hasError: true, isChunkError: false };
+  }
+  componentDidCatch(err) {
+    if (isChunkLoadError(err)) {
+      tryRecoverFromChunkError();
+    }
   }
   render() {
     if (this.state.hasError && this.state.isChunkError) {
-      // True chunk/network error — show a minimal non-blocking update banner
+      // Do NOT re-render failed children — that rethrows into RootErrorBoundary.
       return (
-        <>
-          {/* Still render children (may be partially working) */}
-          {this.props.children}
-          {/* Floating update banner — doesn't block the page */}
-          <div style={{
-            position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-            zIndex: 99999, background: '#1a1a2e', border: '1px solid rgba(201,168,76,0.4)',
-            borderRadius: 10, padding: '14px 24px', display: 'flex',
-            alignItems: 'center', gap: 14, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-            maxWidth: 420, width: 'calc(100% - 32px)',
-          }}>
-            <span style={{ fontSize: '1.4rem', flexShrink: 0 }}>⚡</span>
-            <div style={{ flex: 1 }}>
-              <strong style={{ color: '#c9a84c', fontSize: '0.9rem', display: 'block' }}>Update available</strong>
-              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.78rem' }}>Refresh to get the latest version</span>
-            </div>
-            <button
-              style={{
-                padding: '7px 16px', background: '#c9a84c', color: '#000',
-                border: 'none', borderRadius: 6, cursor: 'pointer',
-                fontWeight: 700, fontSize: '0.82rem', flexShrink: 0,
-                minHeight: 44, minWidth: 80, // accessible touch target
-              }}
-              onClick={hardReload}
-            >
-              Refresh
-            </button>
-          </div>
-        </>
+        <div style={{
+          minHeight: '60vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 14,
+          padding: 40, textAlign: 'center',
+        }}>
+          <h2 style={{ color: '#c9a84c', margin: 0, fontSize: '1.1rem' }}>Update available</h2>
+          <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 360, margin: 0, fontSize: '0.85rem' }}>
+            This tab is on an older version. Refreshing to load the latest pages…
+          </p>
+          <button
+            type="button"
+            style={{
+              marginTop: 8, padding: '9px 24px', background: '#c9a84c',
+              color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer',
+              fontWeight: 700, fontSize: '0.87rem', minHeight: 44,
+            }}
+            onClick={hardReload}
+          >
+            Refresh now
+          </button>
+        </div>
       );
     }
     if (this.state.hasError) {
-      // Non-chunk error fell through — show minimal page-level error
       return (
         <div style={{
           minHeight: '60vh', display: 'flex', flexDirection: 'column',
@@ -175,6 +113,7 @@ class ChunkErrorBoundary extends Component {
             A site update may be loading. Refresh to fetch the latest version.
           </p>
           <button
+            type="button"
             style={{
               marginTop: 8, padding: '9px 24px', background: '#c9a84c',
               color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer',
@@ -196,29 +135,46 @@ class ChunkErrorBoundary extends Component {
 class PageErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, recovering: false };
   }
   static getDerivedStateFromError(err) {
-    // Stale deploy / missing CSS chunk — recover with one hard reload instead of
-    // trapping the user on "Home failed to load".
     if (isChunkLoadError(err)) {
-      try {
-        const reloadKey = 'eh_page_chunk_reload';
-        const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
-        const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
-        if (!isReading && Date.now() - last > 60_000) {
-          localStorage.setItem(reloadKey, String(Date.now()));
-          setTimeout(() => hardReload(), 0);
-          return { hasError: false, error: null };
-        }
-      } catch { /* ignore */ }
+      return { hasError: true, error: err, recovering: true };
     }
-    return { hasError: true, error: err };
+    return { hasError: true, error: err, recovering: false };
   }
   componentDidCatch(err, info) {
+    if (isChunkLoadError(err)) {
+      tryRecoverFromChunkError();
+      return;
+    }
     console.error('[PageErrorBoundary]', err, info?.componentStack);
   }
   render() {
+    if (this.state.recovering) {
+      return (
+        <div style={{
+          minHeight: '40vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 12,
+          padding: 40, textAlign: 'center',
+        }}>
+          <h2 style={{ color: '#c9a84c', margin: 0, fontSize: '1.05rem' }}>Updating…</h2>
+          <p style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340, margin: 0, fontSize: '0.83rem' }}>
+            Loading the latest version of this page.
+          </p>
+          <button
+            type="button"
+            style={{
+              marginTop: 8, padding: '9px 22px', background: '#c9a84c', color: '#000',
+              border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem',
+            }}
+            onClick={hardReload}
+          >
+            Refresh
+          </button>
+        </div>
+      );
+    }
     if (this.state.hasError) {
       return (
         <div style={{
@@ -235,16 +191,18 @@ class PageErrorBoundary extends Component {
           </p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 8 }}>
             <button
+              type="button"
               style={{
                 padding: '9px 22px', background: 'rgba(201,168,76,0.12)',
                 color: '#c9a84c', border: '1px solid rgba(201,168,76,0.3)',
                 borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem',
               }}
-              onClick={() => this.setState({ hasError: false, error: null })}
+              onClick={() => this.setState({ hasError: false, error: null, recovering: false })}
             >
               Try Again
             </button>
             <button
+              type="button"
               style={{
                 padding: '9px 22px', background: '#c9a84c', color: '#000',
                 border: 'none', borderRadius: 6, cursor: 'pointer',
@@ -288,30 +246,30 @@ function PageLoader() {
   );
 }
 
-/* ── Lazy page imports ── */
-const Home         = lazy(() => import('./pages/Home'));
-const Library      = lazy(() => import('./pages/Library'));
-const Trending     = lazy(() => import('./pages/Trending'));
-const BookDetail   = lazy(() => import('./pages/BookDetail'));
-const Cart         = lazy(() => import('./pages/Cart'));
-const Login        = lazy(() => import('./pages/Login'));
-const Register     = lazy(() => import('./pages/Register'));
-const MyLibrary    = lazy(() => import('./pages/MyLibrary'));
-const Reader       = lazy(() => import('./pages/Reader'));
-const About        = lazy(() => import('./pages/About'));
-const Contact      = lazy(() => import('./pages/Contact'));
-const Admin        = lazy(() => import('./pages/Admin'));
-const Founder      = lazy(() => import('./pages/Founder'));
-const UserProfile  = lazy(() => import('./pages/UserProfile'));
-const AdminProfile = lazy(() => import('./pages/AdminProfile'));
-const FAQ          = lazy(() => import('./pages/FAQ'));
-const Terms        = lazy(() => import('./pages/Terms'));
-const Privacy      = lazy(() => import('./pages/Privacy'));
-const Wishlist        = lazy(() => import('./pages/Wishlist'));
-const ChangePassword  = lazy(() => import('./pages/ChangePassword'));
-const ReaderProfile   = lazy(() => import('./pages/ReaderProfile'));
-const Recommendations = lazy(() => import('./pages/Recommendations'));
-const Challenges      = lazy(() => import('./pages/Challenges'));
+/* ── Lazy page imports (retry + soft-reload on stale hashed chunks) ── */
+const Home            = lazy(lazyRetry(() => import('./pages/Home')));
+const Library         = lazy(lazyRetry(() => import('./pages/Library')));
+const Trending        = lazy(lazyRetry(() => import('./pages/Trending')));
+const BookDetail      = lazy(lazyRetry(() => import('./pages/BookDetail')));
+const Cart            = lazy(lazyRetry(() => import('./pages/Cart')));
+const Login           = lazy(lazyRetry(() => import('./pages/Login')));
+const Register        = lazy(lazyRetry(() => import('./pages/Register')));
+const MyLibrary       = lazy(lazyRetry(() => import('./pages/MyLibrary')));
+const Reader          = lazy(lazyRetry(() => import('./pages/Reader')));
+const About           = lazy(lazyRetry(() => import('./pages/About')));
+const Contact         = lazy(lazyRetry(() => import('./pages/Contact')));
+const Admin           = lazy(lazyRetry(() => import('./pages/Admin')));
+const Founder         = lazy(lazyRetry(() => import('./pages/Founder')));
+const UserProfile     = lazy(lazyRetry(() => import('./pages/UserProfile')));
+const AdminProfile    = lazy(lazyRetry(() => import('./pages/AdminProfile')));
+const FAQ             = lazy(lazyRetry(() => import('./pages/FAQ')));
+const Terms           = lazy(lazyRetry(() => import('./pages/Terms')));
+const Privacy         = lazy(lazyRetry(() => import('./pages/Privacy')));
+const Wishlist        = lazy(lazyRetry(() => import('./pages/Wishlist')));
+const ChangePassword  = lazy(lazyRetry(() => import('./pages/ChangePassword')));
+const ReaderProfile   = lazy(lazyRetry(() => import('./pages/ReaderProfile')));
+const Recommendations = lazy(lazyRetry(() => import('./pages/Recommendations')));
+const Challenges      = lazy(lazyRetry(() => import('./pages/Challenges')));
 
 /* ── Scroll to top on route change ── */
 function ScrollToTop() {
@@ -901,11 +859,11 @@ export default function App() {
                           <Route path="/admin-profile" element={<PageErrorBoundary label="Admin Profile failed to load"><AdminProfile /></PageErrorBoundary>} />
                           <Route path="/recommendations" element={<PageErrorBoundary label="Recommendations failed to load"><Recommendations /></PageErrorBoundary>} />
                           <Route path="/challenges"    element={<PageErrorBoundary label="Challenges failed to load"><Challenges /></PageErrorBoundary>} />
-                          <Route path="/faq"           element={<FAQ />} />
-                          <Route path="/terms"         element={<Terms />} />
-                          <Route path="/privacy"       element={<Privacy />} />
-                          <Route path="/wishlist"         element={<Wishlist />} />
-                          <Route path="/change-password" element={<ChangePassword />} />
+                          <Route path="/faq"             element={<PageErrorBoundary label="FAQ failed to load"><FAQ /></PageErrorBoundary>} />
+                          <Route path="/terms"           element={<PageErrorBoundary label="Terms failed to load"><Terms /></PageErrorBoundary>} />
+                          <Route path="/privacy"         element={<PageErrorBoundary label="Privacy failed to load"><Privacy /></PageErrorBoundary>} />
+                          <Route path="/wishlist"        element={<PageErrorBoundary label="Wishlist failed to load"><Wishlist /></PageErrorBoundary>} />
+                          <Route path="/change-password" element={<PageErrorBoundary label="Change Password failed to load"><ChangePassword /></PageErrorBoundary>} />
                           {/* Catch-all: try custom pages first, then 404 */}
                           <Route path="*" element={<CustomPageRenderer />} />
                         </Routes>
