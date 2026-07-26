@@ -83,6 +83,10 @@ export default defineConfig(({ command, mode }) => {
       sourcemap: false,
       chunkSizeWarningLimit: 600,
       minify: true,
+      // Keep CSS in one file linked from index.html. Async CSS chunks for lazy
+      // routes break after deploys when a stale JS chunk preloads a deleted hash
+      // (Cloudflare SPA fallback used to return HTML → "Unable to preload CSS").
+      cssCodeSplit: false,
       rollupOptions: {
         output: {
           manualChunks(id) {

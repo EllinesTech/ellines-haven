@@ -199,6 +199,20 @@ class PageErrorBoundary extends Component {
     this.state = { hasError: false, error: null };
   }
   static getDerivedStateFromError(err) {
+    // Stale deploy / missing CSS chunk — recover with one hard reload instead of
+    // trapping the user on "Home failed to load".
+    if (isChunkLoadError(err)) {
+      try {
+        const reloadKey = 'eh_page_chunk_reload';
+        const last = parseInt(localStorage.getItem(reloadKey) || '0', 10);
+        const isReading = typeof window !== 'undefined' && window.location.pathname.startsWith('/read');
+        if (!isReading && Date.now() - last > 60_000) {
+          localStorage.setItem(reloadKey, String(Date.now()));
+          setTimeout(() => hardReload(), 0);
+          return { hasError: false, error: null };
+        }
+      } catch { /* ignore */ }
+    }
     return { hasError: true, error: err };
   }
   componentDidCatch(err, info) {

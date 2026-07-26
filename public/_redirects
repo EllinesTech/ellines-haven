@@ -1,6 +1,7 @@
-# SPA fallback — ALL routes serve index.html EXCEPT /assets/
-# If an /assets/ file is missing (stale browser/CDN HTML pointing to an old hash),
-# return a proper 404 instead of serving index.html with text/html MIME type.
-# Serving index.html for a .js/.css request causes MIME errors and a crash loop.
-/assets/* /assets/:splat 404
-/* /index.html 200
+# Missing hashed assets must NOT fall through to the SPA shell.
+# Serving index.html for .js/.css causes "Unable to preload CSS" / MIME crashes.
+# Existing files under /assets/ are still served normally by Cloudflare Pages.
+/assets/*  /404.html  404
+
+# All other routes → SPA shell
+/*    /index.html   200
