@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { calculateRecommendations, getCachedRecommendations, saveRecommendations, getTrendingBooks } from '../utils/recommendationEngine';
-import { BOOKS } from '../data/books';
 import { Link } from 'react-router-dom';
 import { bookPath } from '../utils/slugify';
 import { BookCover } from './BookCard';
@@ -11,7 +10,7 @@ import './RecommendationWidget.css';
 const PICK_LABELS = ['Top Pick', 'For You', 'New'];
 
 export default function RecommendationWidget({ limit = 8, title = "Recommended For You", showViewMore = true }) {
-  const { user } = useApp();
+  const { user, books } = useApp();
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,33 +20,33 @@ export default function RecommendationWidget({ limit = 8, title = "Recommended F
       try {
         setLoading(true);
         if (!user) {
-          const trending = getTrendingBooks(limit);
+          const trending = getTrendingBooks(limit, books);
           if (isMounted) setRecommendations(trending);
           return;
         }
         let recs = await getCachedRecommendations(user.email);
         if (!recs || recs.length === 0) {
-          recs = await calculateRecommendations(user.email, limit);
+          recs = await calculateRecommendations(user.email, limit, books);
           if (recs.length > 0) await saveRecommendations(user.email, recs);
         }
         if (isMounted) {
-          const books = recs.slice(0, limit)
+          const resolved = recs.slice(0, limit)
             .map(rec => {
-              const b = BOOKS.find(b => b.id === rec.bookId || b.id === rec.id);
+              const b = books.find(b => b.id === rec.bookId || b.id === rec.id);
               return b ? { ...b, reason: rec.reason, score: rec.score } : null;
             })
             .filter(Boolean);
-          setRecommendations(books);
+          setRecommendations(resolved.length ? resolved : getTrendingBooks(limit, books));
         }
       } catch {
-        if (isMounted) setRecommendations(getTrendingBooks(limit));
+        if (isMounted) setRecommendations(getTrendingBooks(limit, books));
       } finally {
         if (isMounted) setLoading(false);
       }
     }
     load();
     return () => { isMounted = false; };
-  }, [user, limit]);
+  }, [user, limit, books]);
 
   const subtitle = user ? 'Based on your reading history' : 'Popular books you might enjoy';
 

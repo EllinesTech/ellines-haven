@@ -183,14 +183,14 @@ export async function getOfflineStorageStats(userEmail) {
     const totalSize = books.reduce((sum, b) => sum + (b.fileSize || 0), 0);
     
     return {
-      books: books.length,
+      count: books.length,
       totalSize,
       estimatedMB: (totalSize / 1024 / 1024).toFixed(2),
       books: books.map(b => ({
         id: b.bookId,
         title: b.title,
-        size: (b.fileSize / 1024 / 1024).toFixed(2),
-        savedAt: new Date(b.savedAt).toLocaleDateString(),
+        size: ((b.fileSize || 0) / 1024 / 1024).toFixed(2),
+        savedAt: b.savedAt ? new Date(b.savedAt).toLocaleDateString() : '',
       })),
     };
   } catch (err) {

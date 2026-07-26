@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import { getTrendingBooks } from '../utils/recommendationEngine';
 import { bookPath } from '../utils/slugify';
 import { BookCover } from './BookCard';
@@ -7,19 +8,20 @@ import './BookCard.css';
 import './TrendingWidget.css';
 
 export default function TrendingWidget({ limit = 6, title = "Trending Now" }) {
-  const [books, setBooks] = useState([]);
+  const { books } = useApp();
+  const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
       setLoading(true);
-      setBooks(getTrendingBooks(limit));
+      setList(getTrendingBooks(limit, books));
     } catch (e) {
       console.error('TrendingWidget:', e);
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [limit, books]);
 
   return (
     <div className="tw">
@@ -40,7 +42,7 @@ export default function TrendingWidget({ limit = 6, title = "Trending Now" }) {
                 <div className="tw__skeleton-line tw__skeleton-line--short" />
               </div>
             ))
-          : books.map((book, i) => (
+          : list.map((book, i) => (
               <Link key={book.id} to={bookPath(book)} className="tw__card">
                 <div className="tw__cover-wrap">
                   <BookCover book={book} />

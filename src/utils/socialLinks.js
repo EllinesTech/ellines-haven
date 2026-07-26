@@ -22,20 +22,23 @@ export function getSocialLink(platform, handle) {
       if (!cleanHandle.startsWith('/')) return `https://facebook.com/${cleanHandle}`;
       return `https://facebook.com${cleanHandle}`;
     
-    case 'instagram':
+    case 'instagram': {
       if (cleanHandle.startsWith('http')) return cleanHandle;
       const igHandle = cleanHandle.startsWith('@') ? cleanHandle.slice(1) : cleanHandle;
       return `https://instagram.com/${igHandle}`;
+    }
     
-    case 'twitter':
+    case 'twitter': {
       if (cleanHandle.startsWith('http')) return cleanHandle;
       const twitterHandle = cleanHandle.startsWith('@') ? cleanHandle.slice(1) : cleanHandle;
       return `https://x.com/${twitterHandle}`;
+    }
     
-    case 'tiktok':
+    case 'tiktok': {
       if (cleanHandle.startsWith('http')) return cleanHandle;
       const ttHandle = cleanHandle.startsWith('@') ? cleanHandle.slice(1) : cleanHandle;
       return `https://tiktok.com/@${ttHandle}`;
+    }
     
     case 'youtube':
       if (cleanHandle.startsWith('http')) return cleanHandle;
@@ -48,22 +51,25 @@ export function getSocialLink(platform, handle) {
       if (cleanHandle.startsWith('/')) return `https://linkedin.com${cleanHandle}`;
       return `https://linkedin.com/company/${cleanHandle}`;
     
-    case 'telegram':
+    case 'telegram': {
       if (cleanHandle.startsWith('http')) return cleanHandle;
       const tgHandle = cleanHandle.startsWith('@') ? cleanHandle.slice(1) : cleanHandle;
       return `https://t.me/${tgHandle}`;
+    }
     
     case 'discord':
       return cleanHandle; // Should already be full link
     
-    case 'snapchat':
+    case 'snapchat': {
       const scHandle = cleanHandle.startsWith('@') ? cleanHandle.slice(1) : cleanHandle;
       return `https://snapchat.com/add/${scHandle}`;
+    }
     
-    case 'pinterest':
+    case 'pinterest': {
       if (cleanHandle.startsWith('http')) return cleanHandle;
       const pHandle = cleanHandle.startsWith('/') ? cleanHandle.slice(1) : cleanHandle;
       return `https://pinterest.com/${pHandle}`;
+    }
     
     case 'reddit':
       if (cleanHandle.startsWith('http')) return cleanHandle;

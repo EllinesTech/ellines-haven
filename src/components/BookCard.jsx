@@ -111,22 +111,38 @@ export function BookBadges({ book, style = {}, cardMode = false, maxExtras = car
 
 // Derive WebP path from a PNG cover path (e.g. /cover-pain.png → /cover-pain.webp)
 function webpSrc(src) {
-  if (!src) return null;
-  return src.replace(/\.png$/i, '.webp');
+  if (!src || typeof src !== 'string') return null;
+  if (src.startsWith('data:') || !/\.png(\?|$)/i.test(src)) return null;
+  return src.replace(/\.png(\?[^#]*)?/i, '.webp$1');
+}
+
+function hasImageCover(book) {
+  const src = book?.cover;
+  if (!src || typeof src !== 'string') return false;
+  if (book.coverType === 'photo') return true;
+  // Use the assigned image even if coverType was left as "styled" in CMS
+  if (src.startsWith('data:image')) return true;
+  return /\.(png|jpe?g|webp|gif|svg)(\?|#|$)/i.test(src);
 }
 
 /** Shared cover used by BookCard, RecommendationWidget, TrendingWidget, etc. */
 export function BookCover({ book, priority = false }) {
-  if (book.coverType === 'photo' && book.cover) {
+  if (hasImageCover(book)) {
+    const webp = webpSrc(book.cover);
     return (
       <picture>
-        <source srcSet={webpSrc(book.cover)} type="image/webp" />
+        {webp && <source srcSet={webp} type="image/webp" />}
         <img
           src={book.cover}
           alt={book.title}
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
           className="bcard__cover-photo"
+          onLoad={(e) => {
+            // Wrap-around jackets are landscape; pin crop to the front (right) panel
+            const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+            if (w > h) e.currentTarget.style.objectPosition = 'right center';
+          }}
         />
       </picture>
     );

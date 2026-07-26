@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import { findSimilarBooks } from '../utils/recommendationEngine';
 import './SimilarBooksSlider.css';
 
 export default function SimilarBooksSlider({ bookId, title = "📖 Readers Also Liked" }) {
+  const { books } = useApp();
   const [similarBooks, setSimilarBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,9 +18,9 @@ export default function SimilarBooksSlider({ bookId, title = "📖 Readers Also 
       try {
         setLoading(true);
         setError(null);
-        const books = await findSimilarBooks(bookId, 8);
+        const similar = await findSimilarBooks(bookId, 8, books);
         if (isMounted) {
-          setSimilarBooks(books);
+          setSimilarBooks(similar);
         }
       } catch (err) {
         console.error('Error loading similar books:', err);
@@ -37,7 +39,7 @@ export default function SimilarBooksSlider({ bookId, title = "📖 Readers Also 
     return () => {
       isMounted = false;
     };
-  }, [bookId]);
+  }, [bookId, books]);
 
   const scroll = (direction) => {
     if (scrollContainerRef.current) {

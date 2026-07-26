@@ -1427,6 +1427,7 @@ exports.enrichVisitorOnCreate = onDocumentCreated(
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 const OTP_TTL_MS = 15 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 
 function authOtpDocId(email, purpose) {
   return `${libDocId(email)}_${purpose || "login"}`;
@@ -1439,15 +1440,32 @@ function hashOtpCode(otp, email, purpose) {
     .digest("hex");
 }
 
+async function assertOtpSendAllowed(emailKey, purpose) {
+  const docId = authOtpDocId(emailKey, purpose);
+  const snap = await db.collection("auth_otps").doc(docId).get();
+  if (!snap.exists) return;
+  const createdAtMs = snap.data()?.createdAtMs || 0;
+  const elapsed = Date.now() - createdAtMs;
+  if (createdAtMs && elapsed < OTP_RESEND_COOLDOWN_MS) {
+    const waitSec = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsed) / 1000);
+    throw new HttpsError(
+      "resource-exhausted",
+      `Please wait ${waitSec}s before requesting another code.`
+    );
+  }
+}
+
 async function storeAuthOtp(email, purpose, otpCode) {
   const emailKey = String(email).toLowerCase().trim();
   const docId = authOtpDocId(emailKey, purpose);
+  const now = Date.now();
   await db.collection("auth_otps").doc(docId).set({
     email: emailKey,
     purpose,
     hash: hashOtpCode(otpCode, emailKey, purpose),
     attempts: 0,
-    expiresAtMs: Date.now() + OTP_TTL_MS,
+    createdAtMs: now,
+    expiresAtMs: now + OTP_TTL_MS,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
   return docId;
@@ -1615,6 +1633,11 @@ async function deliverOtpMessage({ email, phone, name, otpCode, purpose }) {
 async function issueAndDeliverOtp({ email, phone, name, purpose }) {
   const emailKey = String(email || "").toLowerCase().trim();
   if (!emailKey) throw new HttpsError("invalid-argument", "email is required");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailKey)) {
+    throw new HttpsError("invalid-argument", "A valid email address is required");
+  }
+
+  await assertOtpSendAllowed(emailKey, purpose);
 
   const otpCode = String(crypto.randomInt(100000, 1000000));
   await storeAuthOtp(emailKey, purpose, otpCode);

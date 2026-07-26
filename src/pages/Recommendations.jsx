@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { calculateRecommendations, getTrendingBooks } from '../utils/recommendationEngine';
-import { BOOKS } from '../data/books';
 import { Link } from 'react-router-dom';
 import BookCard from '../components/BookCard';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -13,7 +12,7 @@ export default function Recommendations() {
     description: 'Discover books recommended based on your reading history and preferences.',
   });
 
-  const { user } = useApp();
+  const { user, books } = useApp();
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,17 +28,17 @@ export default function Recommendations() {
 
         let recs = [];
         if (user) {
-          recs = await calculateRecommendations(user.email, 30);
+          recs = await calculateRecommendations(user.email, 30, books);
         } else {
-          recs = getTrendingBooks(30);
+          recs = getTrendingBooks(30, books);
         }
 
         if (isMounted) {
-          // Map recommendations to full book objects
+          // Resolve against the live catalogue so covers stay current
           const recBooks = recs
             .map(rec => {
-              const bookData = BOOKS.find(b => b.id === rec.bookId || b.id === rec.id);
-              return bookData ? { ...bookData, reason: rec.reason, score: rec.score } : null;
+              const bookData = books.find(b => b.id === rec.bookId || b.id === rec.id) || rec;
+              return bookData?.id ? { ...bookData, reason: rec.reason, score: rec.score } : null;
             })
             .filter(Boolean);
 
@@ -62,7 +61,7 @@ export default function Recommendations() {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, books]);
 
   const sortedRecommendations = [...recommendations].sort((a, b) => {
     switch (sortBy) {

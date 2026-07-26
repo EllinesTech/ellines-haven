@@ -27,9 +27,9 @@ export default function Trending() {
     let results = [];
 
     if (selectedGenre === 'All') {
-      results = getTrendingBooks(50);
+      results = getTrendingBooks(50, books);
     } else {
-      results = getTrendingByCategory(selectedGenre, 50);
+      results = getTrendingByCategory(selectedGenre, 50, books);
     }
 
     // Sort by selected criteria
@@ -45,7 +45,7 @@ export default function Trending() {
 
     setTrending(results);
     setLoading(false);
-  }, [selectedGenre, sortBy]);
+  }, [selectedGenre, sortBy, books]);
 
   const handleGenreChange = (genre) => {
     setSearchParams({ genre: genre === 'All' ? '' : genre, sort: sortBy }, { replace: true });

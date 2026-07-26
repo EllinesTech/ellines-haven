@@ -123,7 +123,7 @@ export async function testAudioPlayback() {
       const synth = window.speechSynthesis;
       if (!synth) return resolve(false);
       
-      const utterance = new SpeechUtterance('Audio test');
+      const utterance = new SpeechSynthesisUtterance('Audio test');
       utterance.volume = 0.1; // Low volume for test
       utterance.rate = 2.0;   // Fast for quick test
       

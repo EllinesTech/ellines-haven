@@ -208,7 +208,9 @@ function CoverLightbox({ book, onClose }) {
         >
           {book.cover
             ? <picture>
-                <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
+                {/\.png(\?|#|$)/i.test(book.cover) && (
+                  <source srcSet={book.cover.replace(/\.png(\?[^#]*)?/i, '.webp$1')} type="image/webp" />
+                )}
                 <img src={book.cover} alt={book.title} className="lb-img" draggable="false" decoding="async" />
               </picture>
             : <div className="lb-styled-cover"
@@ -1097,7 +1099,9 @@ export default function BookDetail() {
             <div className="bd-left">
               {book.cover
                 ? <picture>
-                    <source srcSet={book.cover.replace(/\.png$/i, '.webp')} type="image/webp" />
+                    {/\.png(\?|#|$)/i.test(book.cover) && (
+                      <source srcSet={book.cover.replace(/\.png(\?[^#]*)?/i, '.webp$1')} type="image/webp" />
+                    )}
                     <img
                       src={book.cover}
                       alt={book.title}

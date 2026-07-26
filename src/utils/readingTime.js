@@ -170,7 +170,7 @@ export function getReadingStats(book, chapters = null) {
 export function isValidReadingTimeFormat(readTime) {
   if (!readTime || typeof readTime !== 'string') return false;
   // Match patterns: "45 mins", "8–10 hrs", "2 hrs", etc.
-  return /^\d+(\–\d+)?\s(min|hr)s?$/.test(readTime.trim());
+  return /^\d+(–\d+)?\s(min|hr)s?$/.test(readTime.trim());
 }
 
 /**

@@ -21,7 +21,7 @@ export const ValidationRules = {
   },
   phone: {
     required: false,
-    pattern: /^[\+]?[\d\s\-\(\)]{10,}$/,
+    pattern: /^[+]?[\d\s\-()]{10,}$/,
     message: 'Please enter a valid phone number'
   }
 };

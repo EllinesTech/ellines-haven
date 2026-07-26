@@ -1000,6 +1000,17 @@ function mergeWithFirestore(local, fsBooks) {
         merged[k] = defaults[k];
       }
     });
+    // Keep public cover files in sync with seed (cache-bust + front-crop paths)
+    if (
+      typeof defaults.cover === 'string' &&
+      defaults.cover.startsWith('/cover-') &&
+      typeof merged.cover === 'string' &&
+      merged.cover.startsWith('/cover-') &&
+      merged.cover.split('?')[0] === defaults.cover.split('?')[0]
+    ) {
+      merged.cover = defaults.cover;
+      if (defaults.coverType) merged.coverType = defaults.coverType;
+    }
     return merged;
   });
 

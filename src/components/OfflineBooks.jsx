@@ -102,7 +102,7 @@ export default function OfflineBooks() {
         {stats && (
           <div className="ob-stats">
             <span className="stat">
-              📚 {stats.books.length} book{stats.books.length !== 1 ? 's' : ''}
+              📚 {(stats.count ?? stats.books?.length ?? 0)} book{(stats.count ?? stats.books?.length ?? 0) !== 1 ? 's' : ''}
             </span>
             <span className="stat">
               💾 {stats.estimatedMB} MB
