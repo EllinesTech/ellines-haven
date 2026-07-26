@@ -5,11 +5,15 @@ import { collection, query, where, onSnapshot, doc, getDoc, getDocFromCache, set
 import { db, callVerifyPaystack } from '../firebase';
 import { getAllReadingStats, hydrateReadingStats } from '../hooks/useReadingProgress';
 import {
+  isBookSavedOffline,
   saveBookOffline,
   removeOfflineBook,
   listOfflineBooks,
+  getOfflineBook,
   formatOfflineSize,
 } from '../hooks/useOfflineBook';
+import { downloadEhbookPack } from '../utils/ehbookPack';
+import EhbookImportZone from '../components/EhbookImportZone';
 import { bookPath, readPath } from '../utils/slugify';
 import { getFallbackChapters } from '../data/bookChapters';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -535,7 +539,17 @@ function OfflineBooks({ user, catalog, onCountChange }) {
   const [offlineBooks, setOfflineBooks] = useState([]);
   const [loadingOffline, setLoadingOffline] = useState(true);
   const [removingBook, setRemovingBook] = useState(null);
+  const [packBusyId, setPackBusyId] = useState(null);
+  const [packMsg, setPackMsg] = useState('');
   const [loadError, setLoadError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+
+  const reloadList = async () => {
+    const list = await listOfflineBooks(user.email);
+    setOfflineBooks(list);
+    onCountChange?.(list.length);
+    return list;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -559,7 +573,7 @@ function OfflineBooks({ user, catalog, onCountChange }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [user.email]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user.email, reloadTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRemove = async (bookId) => {
     await removeOfflineBook(user.email, bookId);
@@ -571,59 +585,107 @@ function OfflineBooks({ user, catalog, onCountChange }) {
     setRemovingBook(null);
   };
 
+  const handleDownloadPack = async (bookMeta) => {
+    setPackBusyId(bookMeta.bookId);
+    setPackMsg('');
+    try {
+      const full = await getOfflineBook(user.email, bookMeta.bookId);
+      if (!full?.chapters?.length) throw new Error('No chapters saved for this title yet.');
+      const result = await downloadEhbookPack(user.email, {
+        id: full.bookId,
+        title: full.title,
+        author: full.author,
+        cover: full.cover,
+        slug: full.slug,
+      }, full.chapters);
+      setPackMsg(`Downloaded ${result.filename} — keep this file; it survives clearing browser data.`);
+    } catch (e) {
+      setPackMsg(e?.message || 'Could not create pack.');
+    } finally {
+      setPackBusyId(null);
+      setTimeout(() => setPackMsg(''), 6000);
+    }
+  };
+
   const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('en-KE', {
       day: 'numeric', month: 'short', year: 'numeric',
     });
   };
 
+  const importPanel = (
+    <div className="mylib-ehbook-panel" style={{ marginBottom: offlineBooks.length ? 22 : 0 }}>
+      <EhbookImportZone
+        userEmail={user.email}
+        onImported={async () => {
+          await reloadList();
+          setReloadTick((t) => t + 1);
+        }}
+      />
+    </div>
+  );
+
   if (loadingOffline) return (
-    <div className="mylib-empty">
-      <div className="mylib-empty-icon">⏳</div>
-      <h3>Loading offline books…</h3>
-      <p>Checking books saved on this device.</p>
+    <div>
+      {importPanel}
+      <div className="mylib-empty">
+        <div className="mylib-empty-icon">⏳</div>
+        <h3>Loading offline books…</h3>
+        <p>Checking books saved on this device.</p>
+      </div>
     </div>
   );
 
   if (loadError) return (
-    <div className="mylib-empty">
-      <div className="mylib-empty-icon">⚠️</div>
-      <h3>Couldn’t read offline storage</h3>
-      <p>
-        Your browser blocked access to saved books. Try another browser, or turn off private browsing,
-        then open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> again.
-      </p>
-      <Link to="/my-library" className="btn btn-primary" onClick={(e) => { e.preventDefault(); window.location.reload(); }}>
-        Retry
-      </Link>
+    <div>
+      {importPanel}
+      <div className="mylib-empty">
+        <div className="mylib-empty-icon">⚠️</div>
+        <h3>Couldn’t read offline storage</h3>
+        <p>
+          Your browser blocked quick offline storage. Import a <strong>.ehbook</strong> keep-forever pack above,
+          or try another browser / turn off private browsing.
+        </p>
+        <button type="button" className="btn btn-primary" onClick={() => setReloadTick((t) => t + 1)}>
+          Retry
+        </button>
+      </div>
     </div>
   );
 
   if (offlineBooks.length === 0) return (
-    <div className="mylib-empty">
-      <div className="mylib-empty-icon">📥</div>
-      <h3>No books on this device yet</h3>
-      <p>
-        Open a book you own and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong>.
-        Saves stay on this device after refresh — even without internet.
-      </p>
-      <Link to="/library" className="btn btn-primary">Browse Books</Link>
+    <div>
+      {importPanel}
+      <div className="mylib-empty">
+        <div className="mylib-empty-icon">📥</div>
+        <h3>No books on this device yet</h3>
+        <p>
+          Open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> for quick reading,
+          or <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> to download a <code>.ehbook</code> file
+          that survives clearing browser data — then import it here anytime.
+        </p>
+        <Link to="/library" className="btn btn-primary">Browse Books</Link>
+      </div>
     </div>
   );
 
   return (
     <div>
+      {importPanel}
+      {packMsg && (
+        <p className="mylib-ehbook-toast" role="status">{packMsg}</p>
+      )}
       {/* Header row */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
         <div>
           <h2 style={{ fontSize:'1.1rem', margin:0 }}>
-            Downloaded Books
+            On this device
             <span style={{ marginLeft:10, background:'rgba(201,168,76,0.15)', color:'var(--gold)', padding:'2px 10px', borderRadius:20, fontSize:'0.78rem', fontWeight:700 }}>
               {offlineBooks.length}
             </span>
           </h2>
           <p style={{ fontSize:'0.8rem', color:'var(--muted)', margin:'4px 0 0' }}>
-            Stored on this device — survives refresh. Remove a title anytime to free space.
+            Quick cache survives refresh. Use <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> for a file that survives browser cleans.
           </p>
         </div>
       </div>
@@ -698,21 +760,30 @@ function OfflineBooks({ user, catalog, onCountChange }) {
               </div>
 
               {/* Action buttons */}
-              <div style={{ padding:'8px 14px 14px', display:'flex', gap:8, marginTop:'auto' }}>
+              <div style={{ padding:'8px 14px 14px', display:'flex', gap:8, marginTop:'auto', flexWrap:'wrap' }}>
                 <Link
                   to={catalogBook
                     ? readPath(catalogBook)
                     : (book.slug ? `/read/${book.slug}` : `/read/${book.bookId}`)}
                   className="btn btn-primary btn-sm"
-                  style={{ flex:1, textAlign:'center', fontWeight:700 }}
+                  style={{ flex:1, textAlign:'center', fontWeight:700, minWidth:120 }}
                 >
                   Continue reading
                 </Link>
                 <button
                   className="btn btn-ghost btn-sm"
+                  onClick={() => handleDownloadPack(book)}
+                  disabled={packBusyId === book.bookId}
+                  style={{ color:'#6eb6ff', borderColor:'rgba(74,158,255,0.35)' }}
+                  title="Download .ehbook keep-forever pack to your Files/Downloads"
+                >
+                  {packBusyId === book.bookId ? 'Packing…' : 'Keep forever'}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
                   onClick={() => setRemovingBook(book.bookId)}
                   style={{ color:'#e74c3c', borderColor:'rgba(231,76,60,0.3)' }}
-                  title="Remove offline copy"
+                  title="Remove offline copy from this browser"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>

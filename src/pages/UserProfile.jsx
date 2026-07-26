@@ -7,7 +7,9 @@ import UserMessages from '../components/UserMessages';
 import { UserNotificationsPanel } from '../components/UserNotifications';
 import OrderReceiptModal from '../components/OrderReceiptModal';
 import { readPath } from '../utils/slugify';
-import { listOfflineBooks, removeOfflineBook } from '../hooks/useOfflineBook';
+import { listOfflineBooks, removeOfflineBook, getOfflineBook } from '../hooks/useOfflineBook';
+import { downloadEhbookPack } from '../utils/ehbookPack';
+import EhbookImportZone from '../components/EhbookImportZone';
 import { verifyPassword, storePasswordValue } from '../utils/passwordSecurity';
 import { findUserInFirestore } from './Login';
 import './UserProfile.css';
@@ -359,6 +361,26 @@ export default function UserProfile() {
     setRemovingOffline(null);
   };
 
+  const handleDownloadOfflinePack = async (bookId) => {
+    try {
+      const full = await getOfflineBook(user.email, bookId);
+      if (!full?.chapters?.length) {
+        showToast('No chapters saved for this title yet', 'err');
+        return;
+      }
+      const result = await downloadEhbookPack(user.email, {
+        id: full.bookId,
+        title: full.title,
+        author: full.author,
+        cover: full.cover,
+        slug: full.slug,
+      }, full.chapters);
+      showToast(`Downloaded ${result.filename}`);
+    } catch (e) {
+      showToast(e?.message || 'Download failed', 'err');
+    }
+  };
+
   /* SVG icons — stroke-based, inherit currentColor */
   const NAV_ICONS = {
     account: (
@@ -628,14 +650,23 @@ export default function UserProfile() {
             <div className="up-panel">
               <div className="up-panel__head">
                 <h2>📥 Offline Books</h2>
-                <span>{offlineBooks.length} book{offlineBooks.length!==1?'s':''} saved for offline reading</span>
+                <span>{offlineBooks.length} book{offlineBooks.length!==1?'s':''} on this device</span>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <EhbookImportZone
+                  userEmail={user.email}
+                  onImported={async () => {
+                    const books = await listOfflineBooks(user.email);
+                    setOfflineBooks(books);
+                  }}
+                />
               </div>
               {offlineBooks.length === 0 ? (
                 <div className="up-empty">
                   <div className="up-empty__icon">📱</div>
                   <h3>No books on this device yet</h3>
-                  <p>While reading, tap <strong>Save offline</strong> to keep chapters on this device.</p>
-                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>They stay available after refresh — and work without internet on this browser.</p>
+                  <p>While reading, tap <strong>Save offline</strong> or <strong>Keep forever</strong> for a <code>.ehbook</code> file that survives clearing browser data.</p>
+                  <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>Import a pack above anytime while signed in to the same account.</p>
                   <Link to="/library" className="btn btn-primary">Browse & Read Books →</Link>
                 </div>
               ) : (
@@ -654,13 +685,24 @@ export default function UserProfile() {
                           <span style={{fontSize:'0.75rem',fontWeight:600,color:'var(--text)',marginBottom:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',title:b.title}}>{b.title}</span>
                           <span style={{fontSize:'0.65rem',color:'var(--muted)',marginBottom:3}}>{b.chapters} ch</span>
                           <span style={{fontSize:'0.6rem',color:'var(--muted)',marginBottom:6,flex:1}}>📅 {new Date(b.savedAt).toLocaleDateString('en-KE')}</span>
-                          <div style={{display:'flex',gap:4,marginTop:'auto'}}>
-                            <Link to={`/read/${b.bookId}`} className="btn btn-primary btn-sm" style={{flex:1,fontSize:'0.65rem',padding:'3px 4px',textAlign:'center'}}>Read</Link>
-                            <button 
-                              className="btn btn-ghost btn-sm" 
+                          <div style={{display:'flex',gap:4,marginTop:'auto',flexWrap:'wrap'}}>
+                            <Link
+                              to={b.slug ? `/read/${b.slug}` : `/read/${b.bookId}`}
+                              className="btn btn-primary btn-sm"
+                              style={{flex:1,fontSize:'0.65rem',padding:'3px 4px',textAlign:'center'}}
+                            >Read</Link>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{fontSize:'0.65rem',padding:'3px 6px',color:'#6eb6ff'}}
+                              title="Download keep-forever .ehbook"
+                              onClick={() => handleDownloadOfflinePack(b.bookId)}
+                            >Pack</button>
+                            <button
+                              className="btn btn-ghost btn-sm"
                               style={{fontSize:'0.7rem',padding:'4px 6px',color:'#e74c3c'}}
                               onClick={() => handleRemoveOffline(b.bookId)}
                               disabled={removingOffline === b.bookId}
+                              title="Remove from this browser"
                             >
                               {removingOffline === b.bookId ? '...' : '🗑'}
                             </button>
@@ -670,7 +712,7 @@ export default function UserProfile() {
                     ))}
                   </div>
                   <div style={{padding:'14px 16px',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',fontSize:'0.78rem',color:'var(--muted)'}}>
-                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Chapters are saved in this browser (IndexedDB). They survive refresh and closing the tab. They stay on this device only — clear a title anytime to free space.
+                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Quick saves live in this browser. <strong style={{color:'#6eb6ff'}}>Keep forever</strong> downloads an encrypted <code>.ehbook</code> to your Files/Downloads — that file survives clearing site data. Import it back while signed in to the same account.
                   </div>
                 </div>
               )}

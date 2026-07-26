@@ -26,10 +26,13 @@ import {
 
 } from '../hooks/useOfflineBook';
 
+import { downloadEhbookPack, ehbookSupported } from '../utils/ehbookPack';
+
 import { getFallbackChapters } from '../data/bookChapters';
 
 import AudioPlayer from '../components/AudioPlayer';
 import { ErrorBoundary } from '../components/ErrorDisplay';
+import EhbookImportZone from '../components/EhbookImportZone';
 
 import {
   READING_FONTS,
@@ -175,6 +178,8 @@ export default function Reader() {
   const [offlineSaved,    setOfflineSaved]     = useState(false);
 
   const [offlineSaving,   setOfflineSaving]    = useState(false);
+
+  const [ehbookBusy,      setEhbookBusy]       = useState(false);
 
   const [offlineSaveMsg,  setOfflineSaveMsg]   = useState('');
 
@@ -879,6 +884,41 @@ export default function Reader() {
 
   };
 
+  /** Download encrypted .ehbook to device Files/Downloads — survives browser data clear */
+  const handleDownloadEhbook = async () => {
+    if (!user?.email || !book?.id) return;
+    if (!ehbookSupported()) {
+      setOfflineMsgTone('err');
+      setOfflineSaveMsg('This browser can’t create keep-forever packs');
+      setTimeout(() => setOfflineSaveMsg(''), 4000);
+      return;
+    }
+    if (!chapters?.length) {
+      setOfflineMsgTone('err');
+      setOfflineSaveMsg('Wait for chapters to load, then try again');
+      setTimeout(() => setOfflineSaveMsg(''), 4000);
+      return;
+    }
+    setEhbookBusy(true);
+    try {
+      // Also refresh the quick offline cache
+      await saveBookOffline(user.email, book.id, book, chapters);
+      setOfflineSaved(true);
+      setOfflineChapters(chapters);
+      const result = await downloadEhbookPack(user.email, book, chapters);
+      setOfflineMsgTone('ok');
+      setOfflineSaveMsg(
+        `Downloaded ${result.filename} · keep this file; import it anytime after a browser clean`
+      );
+    } catch (e) {
+      setOfflineMsgTone('err');
+      setOfflineSaveMsg(e?.message || 'Could not download pack');
+    } finally {
+      setEhbookBusy(false);
+      setTimeout(() => setOfflineSaveMsg(''), 7000);
+    }
+  };
+
 
 
   // Download URL — uses Google Drive's export endpoint for direct PDF download
@@ -1258,7 +1298,8 @@ export default function Reader() {
 
               {(siteControls?.offlineEnabled !== false) && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
 
-                offlineSaved ? (
+                <>
+                {offlineSaved ? (
 
                   <button
 
@@ -1288,7 +1329,17 @@ export default function Reader() {
 
                   >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
-                )
+                )}
+                {!isOffline && chapters?.length > 0 && (
+                  <button
+                    className="reader__offline-btn reader__offline-btn--pack"
+                    title="Download an encrypted .ehbook file to your device — survives clearing browser data"
+                    onClick={handleDownloadEhbook}
+                    disabled={ehbookBusy}
+                    aria-busy={ehbookBusy}
+                  >{ehbookBusy ? 'Packing…' : 'Keep forever'}</button>
+                )}
+                </>
 
               )}
 
@@ -1374,7 +1425,8 @@ export default function Reader() {
 
               {(siteControls?.offlineEnabled !== false) && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
 
-                offlineSaved ? (
+                <>
+                {offlineSaved ? (
 
                   <button
 
@@ -1404,7 +1456,17 @@ export default function Reader() {
 
                   >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
-                )
+                )}
+                {!isOffline && chapters?.length > 0 && (
+                  <button
+                    className="reader__offline-btn reader__offline-btn--pack"
+                    title="Download an encrypted .ehbook file to your device — survives clearing browser data"
+                    onClick={handleDownloadEhbook}
+                    disabled={ehbookBusy}
+                    aria-busy={ehbookBusy}
+                  >{ehbookBusy ? 'Packing…' : 'Keep forever'}</button>
+                )}
+                </>
 
               )}
 
@@ -1483,10 +1545,38 @@ export default function Reader() {
 
           <span aria-hidden="true">!</span>
 
-          <span>You’re offline and this book isn’t saved on this device. Reconnect, open the book, then tap <strong>Save offline</strong>.</span>
+          <span>
+            You’re offline and this book isn’t on this device.
+            If you have a <strong>.ehbook</strong> file, go to My Library → Downloaded and import it.
+            Otherwise reconnect and tap <strong>Keep forever</strong>.
+          </span>
 
         </div>
 
+      )}
+
+      {!isOffline && (siteControls?.offlineEnabled !== false) && user?.email && (
+        <div className="reader__ehbook-bar">
+          <EhbookImportZone
+            userEmail={user.email}
+            compact
+            onImported={async (pack) => {
+              if (String(pack.bookId) === String(book.id)) {
+                setOfflineSaved(true);
+                setOfflineChapters(pack.chapters);
+                setOfflineMeta({
+                  bookId: pack.bookId,
+                  title: pack.title,
+                  chapterCount: pack.chapterCount,
+                  savedAt: Date.now(),
+                });
+                setOfflineMsgTone('ok');
+                setOfflineSaveMsg(`Imported “${pack.title}” — ready offline`);
+                setTimeout(() => setOfflineSaveMsg(''), 5000);
+              }
+            }}
+          />
+        </div>
       )}
 
 
