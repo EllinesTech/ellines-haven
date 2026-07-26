@@ -34,10 +34,10 @@
   border-color: rgba(201, 168, 76, 0.45);
 }
 
-/* ── Horizontal scroll strip ── */
+/* ── Horizontal scroll strip (many books) ── */
 .rw__strip {
   display: flex;
-  gap: 18px;
+  gap: 14px;
   overflow-x: auto;
   padding: 4px 2px 14px;
   -webkit-overflow-scrolling: touch;
@@ -51,10 +51,25 @@
   border-radius: 2px;
 }
 
+/* Few books: even columns across the full row (no empty void on the right) */
+.rw__strip--fill {
+  display: grid;
+  grid-template-columns: repeat(var(--rw-cols, 3), minmax(0, 1fr));
+  gap: 14px;
+  overflow: visible;
+  padding-bottom: 4px;
+  justify-items: stretch;
+}
+.rw__strip--fill .rw__card {
+  width: 100%;
+  max-width: 186px; /* fills the shelf, stays modest */
+  justify-self: center;
+}
+
 /* ── Book card ── */
 .rw__card {
   flex-shrink: 0;
-  width: 148px;
+  width: 152px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -284,7 +299,12 @@
 @media (max-width: 768px) {
   .rw__title { font-size: 1.12rem; }
   .rw__strip { gap: 12px; }
-  .rw__card { width: 128px; border-radius: 12px; }
+  .rw__strip--fill {
+    grid-template-columns: repeat(var(--rw-cols, 2), minmax(0, 1fr));
+    gap: 12px;
+  }
+  .rw__strip--fill .rw__card { max-width: 156px; }
+  .rw__card { width: 132px; border-radius: 12px; }
   .rw__info { padding: 9px 10px 11px; }
   .rw__book-title { font-size: 0.8rem; min-height: 2.3em; }
 }

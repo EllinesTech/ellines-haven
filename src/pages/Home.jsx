@@ -870,10 +870,10 @@ export default function Home() {
         <div className="container">
           <div className="rec-trending-grid">
             <div className="rec-trending-grid__main">
-              <RecommendationWidget limit={10} />
+              <RecommendationWidget limit={8} />
             </div>
             <div className="rec-trending-grid__side">
-              <TrendingWidget limit={6} />
+              <TrendingWidget limit={5} />
             </div>
           </div>
         </div>

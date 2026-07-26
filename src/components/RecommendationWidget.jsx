@@ -8,6 +8,8 @@ import './BookCard.css';
 import './RecommendationWidget.css';
 
 const PICK_LABELS = ['Top Pick', 'For You', 'New'];
+/** Fill the row evenly when few titles; scroll strip when the shelf is full. */
+const FILL_MAX = 4;
 
 export default function RecommendationWidget({ limit = 8, title = "Recommended For You", showViewMore = true }) {
   const { user, books } = useApp();
@@ -49,6 +51,8 @@ export default function RecommendationWidget({ limit = 8, title = "Recommended F
   }, [user, limit, books]);
 
   const subtitle = user ? 'Based on your reading history' : 'Popular books you might enjoy';
+  const count = loading ? Math.min(limit, FILL_MAX) : recommendations.length;
+  const fillRow = count > 0 && count <= FILL_MAX;
 
   return (
     <div className="rw">
@@ -62,9 +66,12 @@ export default function RecommendationWidget({ limit = 8, title = "Recommended F
         )}
       </div>
 
-      <div className="rw__strip">
+      <div
+        className={`rw__strip${fillRow ? ' rw__strip--fill' : ''}`}
+        style={fillRow ? { '--rw-cols': count } : undefined}
+      >
         {loading
-          ? Array.from({ length: 6 }).map((_, i) => (
+          ? Array.from({ length: count }).map((_, i) => (
               <div key={i} className="rw__card rw__card--skeleton">
                 <div className="rw__skeleton-cover" />
                 <div className="rw__skeleton-line" />
