@@ -1272,6 +1272,8 @@ exports.trackVisitorHttp = onRequest(
       const userEmail = (body.userEmail || "").slice(0, 200);
       const userName  = (body.userName  || "").slice(0, 100);
       const existingDocId = body._docId || null; // doc already created by client
+      // Optional: admin re-enrich of a stored visitor IP (never trust for auth — geo only)
+      const requestedIp   = typeof body.ip === "string" ? body.ip.trim() : "";
 
       // Extract real IP from request headers
       const xForwardedFor = req.get("x-forwarded-for") || "";
@@ -1287,9 +1289,13 @@ exports.trackVisitorHttp = onRequest(
         req.socket?.remoteAddress ||
         "";
 
-      const clientIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
+      const headerIp = rawIp.replace(/^::ffff:/, "").trim() || "unknown";
+      // Prefer explicit IP only when looking up a past visitor; else use the requester's IP
+      const clientIp = (/^\d{1,3}(\.\d{1,3}){3}$/.test(requestedIp) || requestedIp.includes(":"))
+        ? requestedIp.replace(/^::ffff:/, "")
+        : headerIp;
 
-      console.log("[trackVisitorHttp] 🌐 IP:", clientIp, "| docId:", existingDocId);
+      console.log("[trackVisitorHttp] 🌐 IP:", clientIp, "| headerIp:", headerIp, "| docId:", existingDocId);
 
       // Geolocate
       let geo = {};

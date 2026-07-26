@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc, writeBatch, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const fmtDate = ts => {
@@ -23,25 +23,29 @@ const fmtRelative = ts => {
 };
 
 const FLAG_BASE = 'https://flagcdn.com/16x12/';
+const GEO_ENRICH_URL = 'https://us-central1-ellines-haven-web.cloudfunctions.net/trackVisitorHttp';
 
-/** Fetch geo info for an IP using ip-api.com (free, no key needed) */
-async function fetchGeoForIp(ip) {
-  if (!ip || ip === 'unknown' || ip === '' || ip.startsWith('127.') || ip.startsWith('::1')) return null;
+/**
+ * Enrich a visitor doc via Cloud Function (server calls ip-api over HTTP).
+ * Never call ip-api.com from the browser — HTTPS free tier returns 403 and
+ * Chrome still logs the failed request even inside try/catch.
+ */
+async function enrichVisitorDoc(docId, ip) {
+  if (!docId) return false;
   try {
-    const res = await fetch(`https://ip-api.com/json/${ip}?fields=status,country,countryCode,regionName,city,lat,lon,isp,org,timezone,query`);
-    const data = await res.json();
-    if (data.status === 'success') return data;
-  } catch {}
-  return null;
-}
-
-/** Get the visitor's real IP using ipify */
-async function getMyIp() {
-  try {
-    const res = await fetch('https://api.ipify.org?format=json');
-    const data = await res.json();
-    return data.ip || null;
-  } catch { return null; }
+    const res = await fetch(GEO_ENRICH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        _docId: docId,
+        ...(ip ? { ip } : {}),
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export default function VisitorsPanel({ showToast }) {
@@ -72,40 +76,16 @@ export default function VisitorsPanel({ showToast }) {
     return () => unsub();
   }, []);
 
-  // ── Auto-enrich visitors that are missing geo data ───────────────────────────
+  // ── Auto-enrich visitors that are missing geo data (server-side only) ────────
   useEffect(() => {
     if (loading || visitors.length === 0) return;
     const needsGeo = visitors.filter(v => v._needsGeo && !geoCache[v.id]);
     if (needsGeo.length === 0) return;
 
-    // Process up to 5 at a time to avoid rate limiting ip-api (45 req/min free)
     const batch = needsGeo.slice(0, 5);
     batch.forEach(async (v) => {
-      // Get IP: try the stored rawIp first, then the stored ip field
-      const ip = v.rawIp || v.ip || null;
-      if (!ip) return;
-      const geo = await fetchGeoForIp(ip);
-      if (!geo) return;
-
-      // Update Firestore doc with geo data
-      try {
-        await updateDoc(doc(db, 'site_visitors', v.id), {
-          ip:          geo.query || ip,
-          city:        geo.city || '',
-          region:      geo.regionName || '',
-          country:     geo.country || '',
-          countryCode: geo.countryCode || '',
-          lat:         geo.lat || null,
-          lon:         geo.lon || null,
-          isp:         geo.isp || geo.org || '',
-          org:         geo.org || '',
-          timezone:    geo.timezone || '',
-          _needsGeo:   false,
-        });
-      } catch {}
-
-      // Cache locally too
-      setGeoCache(prev => ({ ...prev, [v.id]: geo }));
+      setGeoCache(prev => ({ ...prev, [v.id]: true })); // mark attempted so we don't loop
+      await enrichVisitorDoc(v.id, v.rawIp || v.ip || undefined);
     });
   }, [visitors, loading]);
 
@@ -156,29 +136,15 @@ export default function VisitorsPanel({ showToast }) {
     setClearing(false);
   };
 
-  // ── Manually enrich all missing IPs ──────────────────────────────────────────
+  // ── Manually enrich all missing IPs (server-side geo) ────────────────────────
   const enrichAll = async () => {
     setEnriching(true);
     showToast?.('🔍 Looking up IP addresses... this may take a moment');
-    const missing = visitors.filter(v => !v.country && (v.rawIp || v.ip));
+    const missing = visitors.filter(v => v._needsGeo || (!v.country && (v.rawIp || v.ip || v.id)));
     let done = 0;
-    for (const v of missing.slice(0, 30)) {  // max 30 to respect rate limits
-      const ip = v.rawIp || v.ip;
-      const geo = await fetchGeoForIp(ip);
-      if (geo) {
-        try {
-          await updateDoc(doc(db, 'site_visitors', v.id), {
-            ip: geo.query || ip, city: geo.city || '', region: geo.regionName || '',
-            country: geo.country || '', countryCode: geo.countryCode || '',
-            lat: geo.lat || null, lon: geo.lon || null,
-            isp: geo.isp || geo.org || '', org: geo.org || '', timezone: geo.timezone || '',
-            _needsGeo: false,
-          });
-          done++;
-        } catch {}
-      }
-      // Small delay to avoid rate limit (45 req/min = ~1.3 req/sec)
-      await new Promise(r => setTimeout(r, 800));
+    for (const v of missing.slice(0, 30)) {
+      if (await enrichVisitorDoc(v.id, v.rawIp || v.ip || undefined)) done++;
+      await new Promise(r => setTimeout(r, 400));
     }
     showToast?.(`✅ Enriched ${done} visitor records with IP data`);
     setEnriching(false);
@@ -187,30 +153,22 @@ export default function VisitorsPanel({ showToast }) {
   // ── Test visit ────────────────────────────────────────────────────────────────
   const simulateVisit = async () => {
     try {
-      const ip = await getMyIp();
       const { addDoc, serverTimestamp } = await import('firebase/firestore');
-      const geo = ip ? await fetchGeoForIp(ip) : null;
-      await addDoc(collection(db, 'site_visitors'), {
-        ip:          geo?.query || ip || '0.0.0.0',
-        city:        geo?.city || 'Test City',
-        region:      geo?.regionName || '',
-        country:     geo?.country || 'Kenya',
-        countryCode: geo?.countryCode || 'ke',
-        lat:         geo?.lat || -1.2864, lon: geo?.lon || 36.8172,
-        isp:         geo?.isp || 'Test ISP',
-        org:         geo?.org || '',
-        timezone:    geo?.timezone || 'Africa/Nairobi',
-        page:        '/library',
-        referrer:    'admin-test',
-        userAgent:   navigator.userAgent.slice(0, 200),
-        device:      'Desktop',
-        rawIp:       ip || '0.0.0.0',
-        visitedAt:   serverTimestamp(),
+      const ref = await addDoc(collection(db, 'site_visitors'), {
+        ip: '', rawIp: '', city: '', region: '', country: '', countryCode: '',
+        lat: null, lon: null, isp: '', org: '',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Nairobi',
+        page: '/library',
+        referrer: 'admin-test',
+        userAgent: navigator.userAgent.slice(0, 200),
+        device: 'Desktop',
+        visitedAt: serverTimestamp(),
         visitedAtMs: Date.now(),
-        _needsGeo:   false,
-        _isTest:     true,
+        _needsGeo: true,
+        _isTest: true,
       });
-      showToast?.('✅ Test visit recorded with real IP data');
+      await enrichVisitorDoc(ref.id);
+      showToast?.('✅ Test visit recorded (geo via Cloud Function)');
     } catch (e) {
       showToast?.('❌ Test failed: ' + e.message);
     }
@@ -488,22 +446,11 @@ export default function VisitorsPanel({ showToast }) {
                                   🗺️ View on Map
                                 </a>
                               )}
-                              {(v.ip || v.rawIp) && !v.country && (
+                              {!v.country && (
                                 <button className="btn btn-ghost btn-sm" style={{ fontSize:'0.75rem', color:'#2ecc71' }}
                                   onClick={async () => {
-                                    const geo = await fetchGeoForIp(v.ip || v.rawIp);
-                                    if (geo) {
-                                      await updateDoc(doc(db, 'site_visitors', v.id), {
-                                        ip: geo.query || v.ip, city: geo.city || '', region: geo.regionName || '',
-                                        country: geo.country || '', countryCode: geo.countryCode || '',
-                                        lat: geo.lat || null, lon: geo.lon || null,
-                                        isp: geo.isp || '', org: geo.org || '', timezone: geo.timezone || '',
-                                        _needsGeo: false,
-                                      });
-                                      showToast?.('✅ IP enriched: ' + geo.city + ', ' + geo.country);
-                                    } else {
-                                      showToast?.('❌ Could not lookup IP: ' + (v.ip || v.rawIp));
-                                    }
+                                    const ok = await enrichVisitorDoc(v.id, v.ip || v.rawIp || undefined);
+                                    showToast?.(ok ? '✅ IP enrichment requested' : '❌ Could not enrich this visitor');
                                   }}>
                                   🔍 Lookup IP
                                 </button>
