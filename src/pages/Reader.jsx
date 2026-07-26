@@ -1743,9 +1743,14 @@ export default function Reader() {
             {/* Floating listen dock — isolated so a player bug never blanks the chapter */}
             <ErrorBoundary
               fallback={(
-                <div className="audio-player audio-float audio-float--normal" style={{ position: 'fixed', right: 16, bottom: 96, zIndex: 12000, padding: 16 }}>
-                  <p style={{ margin: 0, color: '#e8e0f0' }}>Listen player failed to load in this browser.</p>
-                  <button type="button" className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setMode('text')}>Back to Read</button>
+                <div className="listen-dock listen-dock--normal" style={{ right: 16, bottom: 96, left: 'auto', top: 'auto' }}>
+                  <div className="listen-dock__chrome">
+                    <span className="listen-dock__brand">Listen</span>
+                  </div>
+                  <p className="listen-dock__unsupported">Listen player failed to load in this browser.</p>
+                  <div style={{ padding: '0 16px 14px' }}>
+                    <button type="button" className="btn btn-primary" onClick={() => setMode('text')}>Back to Read</button>
+                  </div>
                 </div>
               )}
             >
