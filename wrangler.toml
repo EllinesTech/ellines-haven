@@ -7,6 +7,9 @@ pages_build_output_dir = "dist"
 # Frontend is a static Vite SPA. Auth, Firestore, Storage, and transactional
 # email (Resend / SMTP / Africa's Talking) run on Firebase — not Pages Functions.
 #
+# Asset-404 cache middleware lives in pages-functions/ and is copied to
+# .cf-deploy/functions during GitHub Actions deploy (repo ./functions is Firebase).
+#
 # Cloudflare Pages → Settings → Environment variables (build / runtime):
 #   VITE_PAYSTACK_PUBLIC_KEY   Paystack public key (safe for the browser)
 #   VITE_ENV_MODE              production | development

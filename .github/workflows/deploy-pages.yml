@@ -10,6 +10,10 @@
 # to avoid double deploys.
 #   dash.cloudflare.com → Workers & Pages → ellines-haven → Settings → Builds
 #   → Connect to Git → branch main, build `npm run build`, output `dist`
+#
+# Zone cache tip (custom domain haven.ellines.co.ke):
+#   Caching → Configuration → Browser Cache TTL = "Respect Existing Headers"
+#   Avoid zone Cache Rules that set long TTLs on /* or /assets/* 404s.
 
 name: Deploy Cloudflare Pages
 
@@ -24,8 +28,10 @@ on:
   workflow_dispatch:
 
 concurrency:
+  # Never cancel an in-flight Pages upload — partial deploys cause hashed
+  # chunk 404s while index.html already references the new build.
   group: pages-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -51,13 +57,31 @@ jobs:
           VITE_PAYSTACK_PUBLIC_KEY: ${{ secrets.VITE_PAYSTACK_PUBLIC_KEY }}
           VITE_ENV_MODE: production
 
+      - name: Verify hashed assets exist
+        run: |
+          set -e
+          test -f dist/index.html
+          test -f dist/_headers
+          test -f dist/_redirects
+          test -f dist/version.json
+          count=$(find dist/assets -type f -name '*.js' | wc -l)
+          echo "JS assets in dist/assets: $count"
+          test "$count" -ge 10
+          # Entry script referenced by index must exist on disk
+          entry=$(grep -oE '/assets/index-[^"]+\.js' dist/index.html | head -1)
+          test -n "$entry"
+          test -f "dist${entry}"
+          echo "Entry OK: $entry"
+
       # ./functions is Firebase Cloud Functions. Wrangler treats ./functions as
       # Pages Functions and fails — stage a clean dist-only tree first.
+      # pages-functions/ holds the asset-404 cache middleware (not Firebase).
       - name: Stage clean dist for Pages
         run: |
           rm -rf .cf-deploy
           mkdir -p .cf-deploy
           cp -R dist .cf-deploy/dist
+          cp -R pages-functions .cf-deploy/functions
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
@@ -67,3 +91,21 @@ jobs:
           # Run from .cf-deploy so Wrangler does not scan repo ./functions
           workingDirectory: .cf-deploy
           command: pages deploy dist --project-name=ellines-haven --commit-dirty=true --branch=main
+
+      - name: Smoke-check production assets
+        run: |
+          set -e
+          sleep 8
+          entry=$(grep -oE '/assets/index-[^"]+\.js' dist/index.html | head -1)
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "https://haven.ellines.co.ke${entry}")
+          echo "GET ${entry} → ${code}"
+          test "$code" = "200"
+          html_cc=$(curl -sSI "https://haven.ellines.co.ke/" | tr -d '\r' | grep -i '^cache-control:' | head -1)
+          echo "index Cache-Control: $html_cc"
+          echo "$html_cc" | grep -qi 'max-age=0\|must-revalidate\|no-cache'
+          miss_cc=$(curl -sSI "https://haven.ellines.co.ke/assets/__eh_missing_chunk__.js" | tr -d '\r' | grep -iE '^(cache-control|cdn-cache-control):' || true)
+          echo "missing asset headers:"$'\n'"$miss_cc"
+          # Must not advertise year-long / immutable caching on a 404
+          if echo "$miss_cc" | grep -qi 'immutable\|max-age=31536000'; then
+            echo "::warning::Missing asset still advertises long cache — check zone Cache Rules"
+          fi

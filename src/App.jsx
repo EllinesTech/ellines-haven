@@ -717,7 +717,9 @@ function SWUpdateBanner() {
     };
 
     checkVersion();
-    const timer = setInterval(checkVersion, 5 * 60 * 1000);
+    // Poll often enough that open tabs pick up a deploy before users navigate
+    // into a lazy route that 404s on deleted chunk hashes.
+    const timer = setInterval(checkVersion, 60 * 1000);
     const onVisible = () => { if (document.visibilityState === 'visible') checkVersion(); };
     document.addEventListener('visibilitychange', onVisible);
 
