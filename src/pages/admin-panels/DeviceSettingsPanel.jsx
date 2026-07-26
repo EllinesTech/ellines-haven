@@ -51,7 +51,7 @@ const DEFAULTS = {
   desktopAccessEnabled: true,
   restrictedDeviceMsg: 'Access to Ellines Haven is restricted on this device type.',
 
-  /* Offline / caching */
+  /* Offline / Keep forever (also mirrored to siteControls on save) */
   offlineEnabled: true,
   maxOfflineBooks: 10,
   cacheVersionBust: false,
@@ -156,6 +156,20 @@ export default function DeviceSettingsPanel({ showToast, isSuper }) {
         updatedAt: serverTimestamp(),
         updatedBy: 'admin',
       }, { merge: true });
+      // Mirror Keep forever knobs into siteControls so Content Protection + Reader stay in sync
+      try {
+        const permsRef = doc(db, 'site_data', 'user_permissions');
+        const permsSnap = await getDoc(permsRef);
+        const prev = permsSnap.exists() ? (permsSnap.data().siteControls || {}) : {};
+        await setDoc(permsRef, {
+          siteControls: {
+            ...prev,
+            offlineEnabled: settings.offlineEnabled !== false,
+            maxOfflineBooks: Number(settings.maxOfflineBooks) || 10,
+          },
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch { /* non-fatal — device_settings still saved */ }
       showToast?.('✅ Device settings saved');
       setDirty(false);
     } catch (e) {
@@ -306,12 +320,25 @@ export default function DeviceSettingsPanel({ showToast, isSuper }) {
         </SettingRow>
       </SectionCard>
 
-      {/* ── Offline / Caching ── */}
-      <SectionCard title="Offline &amp; Caching" icon="💾">
-        <SettingRow icon="📥" label="Allow Offline Saving" desc="Users can save books to their browser for offline reading.">
+      {/* ── Keep forever / Owned forever ── */}
+      <SectionCard title="Keep forever &amp; Caching" icon="💾">
+        {!isSuper && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--muted)', padding: '8px 10px', margin: 0 }}>
+            Super Admin can also manage these under Content Protection.
+          </p>
+        )}
+        <SettingRow
+          icon="📥"
+          label="Allow Keep Forever"
+          desc="Readers can mark books Owned forever on this device (survives refresh; works offline). Anti-sharing watermarks still apply while reading."
+        >
           <Toggle value={settings.offlineEnabled} onChange={v => set('offlineEnabled', v)} />
         </SettingRow>
-        <SettingRow icon="📚" label="Max Offline Books per User" desc="Maximum number of books a user can save offline at one time.">
+        <SettingRow
+          icon="📚"
+          label="Max Owned Forever Books"
+          desc="Maximum titles a reader can keep on one browser. Mirrored to Content Protection on save."
+        >
           <select
             className="field"
             style={{ maxWidth: 90, fontSize: '0.82rem' }}

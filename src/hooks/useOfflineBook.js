@@ -294,11 +294,21 @@ export async function findOfflineBook(email, slugOrId) {
 /**
  * Save chapters for offline reading.
  * Returns { ok, reason?, count?, approxBytes? }
+ * options.maxBooks — admin limit (skip count check when updating an already-kept book)
  */
-export async function saveBookOffline(email, bookId, bookMeta, chapters) {
+export async function saveBookOffline(email, bookId, bookMeta, chapters, options = {}) {
   if (!email || !bookId) return { ok: false, reason: 'missing' };
   const normalized = normalizeChapters(chapters);
   if (!normalized.length) return { ok: false, reason: 'empty' };
+
+  const maxBooks = Number(options.maxBooks);
+  if (Number.isFinite(maxBooks) && maxBooks > 0) {
+    const already = await isBookSavedOffline(email, bookId);
+    if (!already) {
+      const n = await countOfflineBooks(email);
+      if (n >= maxBooks) return { ok: false, reason: 'limit', max: maxBooks };
+    }
+  }
 
   const payload = buildPayload(email, bookId, bookMeta, normalized);
 

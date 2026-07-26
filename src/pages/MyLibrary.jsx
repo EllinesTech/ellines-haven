@@ -532,7 +532,7 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
 }
 
 // -- Offline Books Panel -----------------------------------------------
-function OfflineBooks({ user, catalog, onCountChange }) {
+function OfflineBooks({ user, catalog, library = [], onCountChange }) {
   const [offlineBooks, setOfflineBooks] = useState([]);
   const [loadingOffline, setLoadingOffline] = useState(true);
   const [removingBook, setRemovingBook] = useState(null);
@@ -601,7 +601,12 @@ function OfflineBooks({ user, catalog, onCountChange }) {
     </div>
   );
 
-  if (offlineBooks.length === 0) return (
+  const keptIds = new Set(offlineBooks.map((b) => String(b.bookId)));
+  const notKeptYet = (library || []).filter(
+    (b) => b?.id && !b._parentBook && !keptIds.has(String(b.id)) && b.active !== false && !b.readDeactivated,
+  );
+
+  if (offlineBooks.length === 0 && notKeptYet.length === 0) return (
     <div className="mylib-empty">
       <div className="mylib-empty-icon">📥</div>
       <h3>No books on this device yet</h3>
@@ -625,12 +630,40 @@ function OfflineBooks({ user, catalog, onCountChange }) {
             </span>
           </h2>
           <p style={{ fontSize:'0.8rem', color:'var(--muted)', margin:'4px 0 0' }}>
-            Kept in this browser — available after refresh. Remove a title anytime to free space.
+            Kept in this browser — works online, after refresh, and offline. Licensed to your account only.
           </p>
         </div>
       </div>
 
-      {/* Cards grid */}
+      {/* Reminder: owned books the user has not kept yet */}
+      {notKeptYet.length > 0 && (
+        <div className="mylib-notkept-banner" role="status">
+          <div>
+            <strong>{notKeptYet.length} book{notKeptYet.length !== 1 ? 's' : ''} not kept on this device</strong>
+            <p>
+              You can still read them online anytime. Tap <strong>Keep forever</strong> on a title
+              (or while reading) so it stays after refresh without internet.
+            </p>
+          </div>
+          <ul className="mylib-notkept-list">
+            {notKeptYet.slice(0, 8).map((b) => (
+              <li key={b.id}>
+                <span className="mylib-offline-badge mylib-offline-badge--warn">Not kept yet</span>
+                <span className="mylib-notkept-title">{b.title}</span>
+                <Link to={readPath(b)} className="btn btn-outline btn-sm">Open → Keep forever</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {offlineBooks.length === 0 ? (
+        <div className="mylib-empty" style={{ padding: '32px 16px' }}>
+          <h3>None marked Owned forever yet</h3>
+          <p>Use the links above — or open any book and tap Keep forever.</p>
+        </div>
+      ) : (
+      /* Cards grid */
       <div style={{
         display:'grid',
         gridTemplateColumns:'repeat(auto-fill, minmax(280px, 1fr))',
@@ -638,7 +671,6 @@ function OfflineBooks({ user, catalog, onCountChange }) {
       }}>
         {offlineBooks.map(book => {
           const catalogBook = catalog.find(b => b.id === book.bookId);
-          const accent      = catalogBook?.coverAccent || '#c9a84c';
           return (
             <div key={book.bookId} className="card" style={{ position:'relative', padding:0, overflow:'hidden', display:'flex', flexDirection:'column' }}>
 
@@ -657,14 +689,14 @@ function OfflineBooks({ user, catalog, onCountChange }) {
                   background:'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.65) 100%)',
                 }} />
 
-                {/* Offline badge */}
+                {/* Status badge */}
                 <span style={{
                   position:'absolute', top:10, right:10,
                   background:'rgba(46,204,113,0.9)', color:'#fff',
                   fontSize:'0.65rem', fontWeight:800, padding:'3px 8px',
                   borderRadius:12, letterSpacing:0.5, backdropFilter:'blur(4px)',
                 }}>
-                  ✓ OFFLINE
+                  ✓ Owned forever
                 </span>
 
                 {/* Book title over cover */}
@@ -695,9 +727,13 @@ function OfflineBooks({ user, catalog, onCountChange }) {
                 </span>
                 <span style={{ fontSize:'0.75rem', color:'var(--muted)', display:'flex', alignItems:'center', gap:4 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ opacity:0.6 }}><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.5z"/></svg>
-                  Saved {formatDate(book.savedAt)}
+                  Kept {formatDate(book.savedAt)}
                 </span>
               </div>
+
+              <p className="mylib-license-note" style={{ margin:'0 14px 4px', fontSize:'0.7rem' }}>
+                Status: Owned forever · Licensed to {user.name || user.email} only — not for sharing
+              </p>
 
               {/* Action buttons */}
               <div style={{ padding:'8px 14px 14px', display:'flex', gap:8, marginTop:'auto', flexWrap:'wrap' }}>
@@ -714,7 +750,7 @@ function OfflineBooks({ user, catalog, onCountChange }) {
                   className="btn btn-ghost btn-sm"
                   onClick={() => setRemovingBook(book.bookId)}
                   style={{ color:'#e74c3c', borderColor:'rgba(231,76,60,0.3)' }}
-                  title="Remove offline copy from this browser"
+                  title="Remove kept copy from this browser"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                 </button>
@@ -730,10 +766,10 @@ function OfflineBooks({ user, catalog, onCountChange }) {
                   gap:12, zIndex:10, borderRadius:'var(--r)',
                 }}>
                   <p style={{ color:'#fff', fontWeight:600, fontSize:'0.9rem', margin:0 }}>
-                    Remove offline copy?
+                    Remove Owned forever copy?
                   </p>
                   <p style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.78rem', margin:0, textAlign:'center', maxWidth:200 }}>
-                    You can re-save it from the reader anytime.
+                    You can Keep forever again from the reader anytime.
                   </p>
                   <div style={{ display:'flex', gap:10 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setRemovingBook(null)}>
@@ -753,11 +789,13 @@ function OfflineBooks({ user, catalog, onCountChange }) {
           );
         })}
       </div>
+      )}
 
       {/* Help note */}
       <p style={{ fontSize:'0.75rem', color:'var(--muted)', marginTop:20, textAlign:'center' }}>
-        Downloads are stored in your browser. Clearing browser data will remove them.
-        Re-open any book in the reader to save it again.
+        Kept copies stay in this browser for online, refresh, and offline reading.
+        Clearing site data removes them — tap Keep forever again after that.
+        Anti-sharing: watermarks and account licence stay active while you read.
       </p>
     </div>
   );
@@ -915,7 +953,10 @@ function ReadingLeaderboard({ user, catalog }) {
 
 // -- Main MyLibrary Page -----------------------------------------------------
 export default function MyLibrary() {
-  const { user, library, books: catalog, myPerms, removeFromMyLibrary, siteControls, wishlist } = useApp();
+  const {
+    user, library, books: catalog, myPerms, removeFromMyLibrary, siteControls, wishlist,
+    offlineKeepEnabled, maxOfflineBooks,
+  } = useApp();
   
   usePageMeta({
     title: 'My Library',
@@ -1273,8 +1314,8 @@ export default function MyLibrary() {
                           )}
                         </div>
 
-                        {/* -- Offline save row -- */}
-                        {siteControls?.offlineEnabled !== false && !anyOff && (
+                        {/* -- Keep forever status (always visible so users don't forget) -- */}
+                        {offlineKeepEnabled && !anyOff && (
                           <div className="mylib-offline-row">
                             {offlineState[b.id] === 'saved' ? (
                               <>
@@ -1289,10 +1330,13 @@ export default function MyLibrary() {
                                     setOfflineCount(c => Math.max(0, c - 1));
                                   }}
                                 >Remove</button>
-                                <p className="mylib-offline-hint">Keeps working after refresh — even without internet.</p>
+                                <p className="mylib-offline-hint">
+                                  Works online, after refresh, and offline. Licensed to you only.
+                                </p>
                               </>
                             ) : (
                               <>
+                                <span className="mylib-offline-badge mylib-offline-badge--warn">Not kept yet</span>
                                 <button
                                   className={`mylib-offline-btn${offlineState[b.id] === 'error' ? ' mylib-offline-btn--err' : ''}`}
                                   disabled={offlineState[b.id] === 'saving'}
@@ -1314,8 +1358,11 @@ export default function MyLibrary() {
                                       const result = await saveBookOffline(user.email, b.id, {
                                         ...b,
                                         slug: b.slug || undefined,
-                                      }, chapters);
-                                      setOfflineState(s => ({ ...s, [b.id]: result?.ok ? 'saved' : 'error' }));
+                                      }, chapters, { maxBooks: maxOfflineBooks });
+                                      setOfflineState(s => ({
+                                        ...s,
+                                        [b.id]: result?.ok ? 'saved' : (result?.reason === 'limit' ? 'limit' : 'error'),
+                                      }));
                                       if (result?.ok) setOfflineCount(c => c + (offlineState[b.id] === 'saved' ? 0 : 1));
                                     } catch {
                                       setOfflineState(s => ({ ...s, [b.id]: 'error' }));
@@ -1324,15 +1371,17 @@ export default function MyLibrary() {
                                 >
                                   {offlineState[b.id] === 'saving'
                                     ? 'Keeping…'
-                                    : offlineState[b.id] === 'error'
+                                    : offlineState[b.id] === 'error' || offlineState[b.id] === 'limit'
                                       ? 'Retry'
                                       : 'Keep forever'}
                                 </button>
                                 {offlineState[b.id] !== 'saving' && (
                                   <p className="mylib-offline-hint">
-                                    {offlineState[b.id] === 'error'
-                                      ? 'Couldn’t keep — storage may be full. Remove another book and retry.'
-                                      : 'Keep chapters here so you can read after refresh offline.'}
+                                    {offlineState[b.id] === 'limit'
+                                      ? `Limit reached (${maxOfflineBooks}). Remove one under Owned forever, then retry.`
+                                      : offlineState[b.id] === 'error'
+                                        ? 'Couldn’t keep — storage may be full. Remove another book and retry.'
+                                        : 'Still readable online — Keep forever so it survives refresh offline.'}
                                   </p>
                                 )}
                               </>
@@ -1340,9 +1389,7 @@ export default function MyLibrary() {
                           </div>
                         )}
 
-                        {b.downloadUnlocked && (
-                          <p className="mylib-license-note">Licensed to {user.name} only</p>
-                        )}
+                        <p className="mylib-license-note">Licensed to {user.name || user.email} only — sharing prohibited</p>
                       </div>
                     </div>
                   );
@@ -1448,7 +1495,7 @@ export default function MyLibrary() {
 
         {/* -- OFFLINE BOOKS TAB -- */}
         {activeTab === 'offline' && (
-          <OfflineBooks user={user} catalog={catalog} onCountChange={setOfflineCount} />
+          <OfflineBooks user={user} catalog={catalog} library={library} onCountChange={setOfflineCount} />
         )}
 
         {/* -- REFERRAL TAB -- */}

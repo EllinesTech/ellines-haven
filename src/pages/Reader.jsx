@@ -114,7 +114,10 @@ export default function Reader() {
 
   const location = useLocation();
 
-  const { books, user, isOwned, isChapterOwned, library, myPerms, libLoaded, siteControls } = useApp();
+  const {
+    books, user, isOwned, isChapterOwned, library, myPerms, libLoaded, siteControls,
+    offlineKeepEnabled, maxOfflineBooks,
+  } = useApp();
 
   const catalogBook = findBookBySlugOrId(books, id);
 
@@ -815,7 +818,9 @@ export default function Reader() {
 
     setOfflineSaveMsg('');
 
-    const result = await saveBookOffline(user.email, book.id, book, chapters);
+    const result = await saveBookOffline(user.email, book.id, book, chapters, {
+      maxBooks: maxOfflineBooks,
+    });
 
     setOfflineSaving(false);
 
@@ -846,9 +851,11 @@ export default function Reader() {
       setOfflineMsgTone('err');
 
       setOfflineSaveMsg(
-        result?.reason === 'quota'
-          ? 'Storage full — remove a kept book in My Library, then try again'
-          : 'Could not keep this book. Please try again.'
+        result?.reason === 'limit'
+          ? `Keep forever limit reached (${result.max || maxOfflineBooks}). Remove one in My Library → Owned forever.`
+          : result?.reason === 'quota'
+            ? 'Storage full — remove a kept book in My Library, then try again'
+            : 'Could not keep this book. Please try again.'
       );
 
     }
@@ -1254,7 +1261,7 @@ export default function Reader() {
 
               {/* Offline save — keep status visible after refresh; allow remove while offline */}
 
-              {(siteControls?.offlineEnabled !== false) && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
+              {offlineKeepEnabled && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
 
                 <>
                 {offlineSaved ? (
@@ -1372,7 +1379,7 @@ export default function Reader() {
 
               )}
 
-              {(siteControls?.offlineEnabled !== false) && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
+              {offlineKeepEnabled && (offlineSaved || (!isOffline && chapters?.length > 0)) && (
 
                 <>
                 {offlineSaved ? (
@@ -1552,7 +1559,7 @@ export default function Reader() {
 
       {/* -- Watermark strip -- */}
 
-      {user && (<div className="reader__watermark">
+      {user && (siteControls?.watermarkForce !== false) && (<div className="reader__watermark">
         &bull;<strong>{user?.name || "Guest"}</strong> &bull; {user?.email || ""} &mdash; Personal use only. Sharing or redistribution is prohibited.
       </div>)}
 
@@ -1592,6 +1599,7 @@ export default function Reader() {
 
             {/* Ghost watermark tiled in background */}
 
+            {(siteControls?.watermarkForce !== false) && (
             <div className="reader__ghost-wm" aria-hidden="true">
 
               {Array.from({ length: 24 }).map((_, i) => (
@@ -1601,6 +1609,7 @@ export default function Reader() {
               ))}
 
             </div>
+            )}
 
 
 
@@ -1682,11 +1691,13 @@ export default function Reader() {
 
             {/* Inline licence watermark */}
 
+            {(siteControls?.watermarkForce !== false) && (
             <p className="reader__inline-mark" aria-hidden="true">
 
               &bull; <strong>{user?.name || "Guest"}</strong> &bull; {user?.email || ""}
 
             </p>
+            )}
 
 
 
@@ -1796,6 +1807,7 @@ export default function Reader() {
 
             {/* Ghost watermark */}
 
+            {(siteControls?.watermarkForce !== false) && (
             <div className="reader__ghost-wm" aria-hidden="true">
 
               {Array.from({ length: 24 }).map((_, i) => (
@@ -1805,6 +1817,7 @@ export default function Reader() {
               ))}
 
             </div>
+            )}
 
 
 

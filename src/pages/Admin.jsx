@@ -5719,7 +5719,7 @@ export default function Admin() {
         {/* -- CONTENT PROTECTION (DRM) -- */}
         {tab === 'contentprotect' && (
           <Suspense fallback={<PanelLoader />}>
-            <ContentProtectionPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} />
+            <ContentProtectionPanel showToast={showToast} siteControls={siteControls} saveSiteControls={saveSiteControls} isSuper={isSuper} />
           </Suspense>
         )}
 

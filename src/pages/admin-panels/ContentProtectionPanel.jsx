@@ -1,19 +1,8 @@
 /**
- * ContentProtectionPanel — Admin control for DRM / copy-protection settings.
+ * ContentProtectionPanel — Admin / Super-admin DRM + Keep forever settings.
  *
- * All toggles are stored in siteControls (Firestore site_data/perms → siteControls)
- * and read in real-time by the Reader and SiteControls components on every page.
- *
- * Toggles:
- *  disableRightClick      — block contextmenu on reader
- *  disableCopy            — block copy / cut / drag on reader
- *  disableSelect          — CSS user-select:none on reader (already default, but toggleable)
- *  disableKeyboardShortcuts — block Ctrl+C/A/S/P/U, F12, Ctrl+Shift+I/J
- *  disablePrint           — intercept beforeprint, show DRM block screen
- *  disableInspect         — block F12 and devtools shortcuts
- *  watermarkForce         — enforce watermark even if site-wide watermark is off
- *  screenshotOverlay      — adds a semi-transparent CSS overlay that degrades screenshots
- *  offlineEnabled         — allow users to save books for offline reading (default: true)
+ * Stored in siteControls (Firestore site_data/perms → siteControls)
+ * and read in real-time by Reader, My Library, and App.jsx SiteControls.
  */
 
 import { useState } from 'react';
@@ -58,61 +47,61 @@ function Toggle({ label, desc, checked, onChange }) {
 const DRM_TOGGLES = [
   {
     key: 'disableRightClick',
-    label: '🖱️ Disable Right-Click',
-    desc: 'Blocks the browser context menu on the reader page. Prevents "Save image", "View page source", etc.',
+    label: 'Disable Right-Click',
+    desc: 'Blocks the browser context menu on the reader page.',
     def: true,
   },
   {
     key: 'disableCopy',
-    label: '📋 Disable Copy & Paste',
-    desc: 'Blocks Ctrl+C, cut, and drag-to-copy on book content. Text cannot be copied out of the reader.',
+    label: 'Disable Copy & Paste',
+    desc: 'Blocks Ctrl+C, cut, and drag-to-copy on book content.',
     def: true,
   },
   {
     key: 'disableSelect',
-    label: '🖊️ Disable Text Selection',
-    desc: 'CSS user-select:none on the reader — text cannot be highlighted or selected by mouse or keyboard.',
+    label: 'Disable Text Selection',
+    desc: 'CSS user-select:none on the reader — text cannot be highlighted.',
     def: true,
   },
   {
     key: 'disableKeyboardShortcuts',
-    label: '⌨️ Block Copy Keyboard Shortcuts',
+    label: 'Block Copy Keyboard Shortcuts',
     desc: 'Blocks Ctrl+C, Ctrl+A, Ctrl+S, Ctrl+P, Ctrl+U, and F12 while reading.',
     def: true,
   },
   {
     key: 'disablePrint',
-    label: '🖨️ Disable Printing',
-    desc: 'Intercepts Ctrl+P and the print dialog. Replaces the page with a DRM notice when printing is attempted.',
+    label: 'Disable Printing',
+    desc: 'Intercepts print and shows a DRM notice instead of the book.',
     def: true,
   },
   {
     key: 'disableInspect',
-    label: '🛠️ Block DevTools (F12)',
-    desc: 'Blocks F12 and Ctrl+Shift+I / Ctrl+Shift+J to prevent inspecting the page source.',
+    label: 'Block DevTools (F12)',
+    desc: 'Blocks F12 and Ctrl+Shift+I / Ctrl+Shift+J.',
     def: true,
   },
   {
     key: 'watermarkForce',
-    label: '💧 Force Watermark on Reader',
-    desc: 'Always show the user identity watermark on the reader page, regardless of site-wide watermark settings.',
+    label: 'Force Identity Watermark',
+    desc: 'Always show the reader’s name & email watermark (anti-sharing). Default ON.',
     def: true,
   },
   {
     key: 'screenshotOverlay',
-    label: '📸 Screenshot Deterrent Overlay',
-    desc: 'Adds a subtle CSS overlay pattern over book content. Does not fully prevent screenshots but adds a visible watermark layer that degrades the quality of any screenshot.',
+    label: 'Screenshot Deterrent Overlay',
+    desc: 'Subtle overlay pattern so screenshots include identity watermarks.',
     def: false,
   },
   {
     key: 'offlineEnabled',
-    label: '📥 Allow Offline Reading',
-    desc: 'Lets users save book chapter text to their browser for offline reading. The data stays on their device only — it cannot be shared or exported as a file.',
+    label: 'Allow Keep Forever',
+    desc: 'Lets readers keep chapters on their device (Owned forever). Stays after refresh; works offline. Not a shareable file export.',
     def: true,
   },
 ];
 
-export default function ContentProtectionPanel({ showToast, siteControls, saveSiteControls }) {
+export default function ContentProtectionPanel({ showToast, siteControls, saveSiteControls, isSuper }) {
   const c = siteControls || {};
   const [saving, setSaving] = useState(false);
 
@@ -120,6 +109,8 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
     if (key in c) return !!c[key];
     return def;
   };
+
+  const maxBooks = Math.max(1, Number(c.maxOfflineBooks) || 10);
 
   const toggle = async (key, def) => {
     const current = get(key, def);
@@ -133,7 +124,17 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
     setSaving(false);
   };
 
-  // Compute a simple score
+  const setMaxBooks = async (n) => {
+    setSaving(true);
+    try {
+      await saveSiteControls({ ...c, maxOfflineBooks: n });
+      showToast?.(`✅ Max Keep forever books set to ${n}`);
+    } catch (e) {
+      showToast?.('❌ ' + e.message);
+    }
+    setSaving(false);
+  };
+
   const score = DRM_TOGGLES.filter(t => get(t.key, t.def) && t.key !== 'offlineEnabled').length;
   const maxScore = DRM_TOGGLES.filter(t => t.key !== 'offlineEnabled').length;
   const pct = Math.round((score / maxScore) * 100);
@@ -142,21 +143,25 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
   return (
     <div className="adm-page">
 
-      {/* Header */}
       <div className="adm-page-head" style={{ marginBottom: 24 }}>
         <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          🛡️ Content Protection
+          Content Protection
+          {isSuper && (
+            <span style={{
+              fontSize: '0.68rem', background: 'linear-gradient(135deg,#c9a84c,#e8c96d)',
+              color: '#000', padding: '2px 8px', borderRadius: 10, fontWeight: 700, letterSpacing: 1,
+            }}>SUPER ADMIN</span>
+          )}
           {saving && (
             <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontWeight: 400 }}>Saving…</span>
           )}
         </h2>
         <p style={{ color: 'var(--muted)', fontSize: '0.84rem', marginTop: 4 }}>
-          Control how the reader protects book content from copying, screenshots, and unauthorised sharing.
-          Changes take effect instantly for all users.
+          Anti-sharing (watermarks, copy blocks) and Keep forever / Owned forever device storage.
+          Changes apply instantly for all readers.
         </p>
       </div>
 
-      {/* Protection score */}
       <div className="card" style={{ padding: '16px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 20 }}>
         <div style={{
           width: 56, height: 56, borderRadius: '50%',
@@ -167,7 +172,7 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
           {pct}%
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Protection Score</div>
+          <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Anti-sharing score</div>
           <div style={{ color: 'var(--muted)', fontSize: '0.78rem', marginTop: 3 }}>
             {score} of {maxScore} protection layers active.
             {pct < 80 && ' Enable more layers for stronger protection.'}
@@ -176,23 +181,20 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
         </div>
       </div>
 
-      {/* Important note */}
       <div style={{
         background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)',
         borderRadius: 'var(--r)', padding: '12px 16px', marginBottom: 24,
         fontSize: '0.8rem', color: 'var(--muted)', lineHeight: 1.6,
       }}>
-        <strong style={{ color: 'var(--gold)' }}>ℹ️ Important:</strong> These controls are a strong deterrent, but no web-based DRM is
-        100% unbreakable. Determined users with technical knowledge can always bypass browser-level
-        protections. The best protection is the combination of watermarks (user identity embedded in
-        content), legal terms, and community trust. Use these controls together with your watermark
-        and legal policy.
+        <strong style={{ color: 'var(--gold)' }}>Anti-sharing:</strong> Identity watermarks, licence notes,
+        and copy/print blocks stay active while reading — online or from a kept copy.
+        Keep forever stores chapters only in the reader’s browser (not a shareable file).
+        No web DRM is 100% unbreakable; watermarks + legal terms are the durable layer.
       </div>
 
-      {/* Toggle cards by group */}
       <div className="card" style={{ padding: '4px 20px 16px', marginBottom: 20 }}>
         <h3 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 1, padding: '16px 0 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 0 }}>
-          🔒 Copy & Access Controls
+          Copy &amp; Access Controls
         </h3>
         {DRM_TOGGLES.filter(t => !['screenshotOverlay', 'offlineEnabled', 'watermarkForce'].includes(t.key)).map(t => (
           <Toggle
@@ -207,7 +209,7 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
 
       <div className="card" style={{ padding: '4px 20px 16px', marginBottom: 20 }}>
         <h3 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 1, padding: '16px 0 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 0 }}>
-          🎨 Visual Protection
+          Visual / Anti-sharing
         </h3>
         {DRM_TOGGLES.filter(t => ['watermarkForce', 'screenshotOverlay'].includes(t.key)).map(t => (
           <Toggle
@@ -222,7 +224,7 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
 
       <div className="card" style={{ padding: '4px 20px 16px', marginBottom: 20 }}>
         <h3 style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: 1, padding: '16px 0 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: 0 }}>
-          📥 Offline Access
+          Keep forever / Owned forever
         </h3>
         {DRM_TOGGLES.filter(t => t.key === 'offlineEnabled').map(t => (
           <Toggle
@@ -233,22 +235,42 @@ export default function ContentProtectionPanel({ showToast, siteControls, saveSi
             onChange={() => toggle(t.key, t.def)}
           />
         ))}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', gap: 16,
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>Max books per device</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>
+              How many titles a reader can mark Owned forever on one browser.
+              Also configurable under Device &amp; Phone (both apply; Content Protection wins if set).
+            </div>
+          </div>
+          <select
+            className="field"
+            style={{ maxWidth: 100, fontSize: '0.82rem' }}
+            value={maxBooks}
+            onChange={(e) => setMaxBooks(parseInt(e.target.value, 10))}
+            disabled={saving}
+          >
+            {[1, 3, 5, 10, 20, 50].map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </div>
         <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
-          When offline reading is enabled, users see a "Save Offline" button in the reader. Chapter text is
-          stored only in their own browser storage — it cannot be exported, shared, or accessed from another device.
-          Disabling this removes the button and prevents new offline saves. Existing cached data stays until the
-          user clears their browser storage.
+          Readers who skip Keep forever can still read online after refresh (account library).
+          Without Keep forever they cannot read that title offline. Disabling this hides new Keep forever
+          actions; existing device copies remain until the user removes them or clears site data.
         </p>
       </div>
 
-      {/* Screenshot tips */}
       <div className="card" style={{ padding: '16px 20px' }}>
-        <h3 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: 10 }}>📸 About Screenshot Protection</h3>
+        <h3 style={{ fontSize: '0.88rem', fontWeight: 700, marginBottom: 10 }}>Screenshot protection</h3>
         <ul style={{ fontSize: '0.8rem', color: 'var(--muted)', lineHeight: 1.8, paddingLeft: 20 }}>
-          <li>The <strong>Screenshot Deterrent Overlay</strong> adds a repeating watermark grid over the reader content, making any screenshot include the user's identity information.</li>
-          <li>The reader already embeds the user's name and email in the page content as ghost watermarks.</li>
-          <li>True screenshot blocking is not possible on the web — operating systems handle screenshots at a level browsers cannot access.</li>
-          <li>The user's name and email are burned into the ghost watermark tiles. If a screenshot is shared, the watermark identifies the source.</li>
+          <li>Identity watermarks (name + email) appear on the reader when Force Identity Watermark is on.</li>
+          <li>Screenshot Deterrent Overlay adds a repeating pattern so captures still show the licence.</li>
+          <li>True OS-level screenshot blocking is not possible in browsers.</li>
         </ul>
       </div>
     </div>

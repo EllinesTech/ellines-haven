@@ -40,6 +40,13 @@ const COVERS_DOC  = () => doc(db, 'site_data', 'book_covers_map');
 const CHAPTER_DOC = (bookId) => doc(db, 'book_chapters', String(bookId));
 const PERMS_DOC   = () => doc(db, 'site_data', 'user_permissions');
 const USERS_DOC   = () => doc(db, 'site_data', 'registered_users');
+const DEVICE_DOC  = () => doc(db, 'site_data', 'device_settings');
+
+const DEFAULT_DEVICE_SETTINGS = {
+  offlineEnabled: true,
+  maxOfflineBooks: 10,
+  disableScreenshotMobile: false,
+};
 
 // ── Strip large fields before Firestore write ────────────────────────────────
 function stripLargeFields(books) {
@@ -138,6 +145,13 @@ export function AppProvider({ children }) {
   const [siteControls, setSiteControlsState] = useState(() => {
     try { return JSON.parse(localStorage.getItem('eh_site_controls') || '{}'); } catch { return {}; }
   });
+  const [deviceSettings, setDeviceSettings] = useState(() => {
+    try {
+      return { ...DEFAULT_DEVICE_SETTINGS, ...(JSON.parse(localStorage.getItem('eh_device_settings') || '{}') || {}) };
+    } catch {
+      return { ...DEFAULT_DEVICE_SETTINGS };
+    }
+  });
 
   // Real-time listener for permissions + suspension + site controls + registered users
   useEffect(() => {
@@ -154,6 +168,17 @@ export function AppProvider({ children }) {
       // Also keep legacy key in sync so Login.jsx picks it up
       localStorage.setItem('eh_suspended_users', JSON.stringify(suspended));
       localStorage.setItem('eh_site_controls', JSON.stringify(controls));
+    }, () => {});
+    return () => unsub();
+  }, []); // eslint-disable-line
+
+  // Device / Keep forever settings (super-admin Device & Phone panel)
+  useEffect(() => {
+    const unsub = onSnapshot(DEVICE_DOC(), (snap) => {
+      const data = snap.exists() ? snap.data() : {};
+      const next = { ...DEFAULT_DEVICE_SETTINGS, ...data };
+      setDeviceSettings(next);
+      try { localStorage.setItem('eh_device_settings', JSON.stringify(next)); } catch { /* ignore */ }
     }, () => {});
     return () => unsub();
   }, []); // eslint-disable-line
@@ -265,6 +290,15 @@ export function AppProvider({ children }) {
       await setDoc(PERMS_DOC(), { siteControls: controls, updatedAt: serverTimestamp() }, { merge: true });
     } catch (e) { console.warn('[SiteControls] write failed:', e.message); }
   };
+
+  /** Keep forever / offline is on unless Content Protection or Device Settings turns it off */
+  const offlineKeepEnabled =
+    siteControls?.offlineEnabled !== false && deviceSettings?.offlineEnabled !== false;
+
+  const maxOfflineBooks = Math.max(
+    1,
+    Number(siteControls?.maxOfflineBooks ?? deviceSettings?.maxOfflineBooks ?? 10) || 10,
+  );
 
   const setPermField = async (email, field, val) => {
     const key     = email.toLowerCase();
@@ -982,8 +1016,9 @@ export function AppProvider({ children }) {
       userPerms, getUserPerms, setPermField, saveUserPerms, myPerms,
       // Suspension (Firestore-backed, real-time)
       suspendedList, isUserSuspended, setSuspended,
-      // Site controls
+      // Site controls + device / Keep forever settings
       siteControls, saveSiteControls,
+      deviceSettings, offlineKeepEnabled, maxOfflineBooks,
       // Wishlist
       wishlist, toggleWishlist, isWishlisted,
       // Referral system

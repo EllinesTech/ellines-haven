@@ -1055,6 +1055,51 @@
   white-space: nowrap;
   flex-shrink: 0;
 }
+.mylib-offline-badge--warn {
+  color: #e8b84a;
+  background: rgba(232, 184, 74, 0.12);
+  border-color: rgba(232, 184, 74, 0.35);
+}
+
+.mylib-notkept-banner {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: var(--r, 12px);
+  border: 1px solid rgba(232, 184, 74, 0.28);
+  background: rgba(232, 184, 74, 0.06);
+}
+.mylib-notkept-banner strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.mylib-notkept-banner > div > p {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.mylib-notkept-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mylib-notkept-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.mylib-notkept-title {
+  flex: 1;
+  min-width: 120px;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
 
 .mylib-offline-btn {
   font-size: 0.75rem;
