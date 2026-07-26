@@ -152,9 +152,9 @@ const DEFAULT = {
   worksHeading: 'The Ellines Group',
   worksSub: 'Three ventures, one vision — built from the ground up in Kenya.',
   works: [
-    { icon: '⚡', tag: 'Technology',    title: 'Ellines Tech',            story: 'Kenyan businesses were being left behind by technology — not because they lacked ambition, but because accessible, world-class tech solutions didn\'t exist for them. Elijah founded Ellines Tech to change that. Today it is a trusted IT partner delivering software, AI, cybersecurity, and managed services to businesses across East Africa.', link: 'https://ellinestech.co.ke', linkLabel: 'ellinestech.co.ke' },
+    { icon: '⚡', tag: 'Technology',    title: 'Ellines Tech',            story: 'Kenyan businesses were being left behind by technology — not because they lacked ambition, but because accessible, world-class tech solutions didn\'t exist for them. Elijah founded Ellines Tech to change that. Today it is a trusted IT partner delivering software, AI, cybersecurity, and managed services to businesses across East Africa.', link: 'https://tech.ellines.co.ke/', linkLabel: 'tech.ellines.co.ke' },
     { icon: '📚', tag: 'Literature',   title: 'Ellines Haven',           story: 'Books saved Elijah. But the African stories he needed — honest, local, deeply human — were hard to find and rarely celebrated. So he built Ellines Haven: a dedicated digital home for original African literature. Every novel is written by him, drawn from real life and real people. Not just a bookstore — a literary sanctuary built by a writer who refused to wait.', link: '/', linkLabel: 'Explore Ellines Haven' },
-    { icon: '🪑', tag: 'Furniture',    title: 'Ellines Rattan Furniture', story: 'Not every Ellines chapter happens on a screen. Ellines Rattan Furniture brings premium handcrafted rattan and cane pieces to Kenyan homes and offices at honest prices. The same philosophy: build something real, build it well, and make sure the people around you can afford to benefit from it.', link: 'https://ellinestech.co.ke', linkLabel: 'Contact for orders' },
+    { icon: '🪑', tag: 'Furniture',    title: 'Ellines Rattan Furniture', story: 'Not every Ellines chapter happens on a screen. Ellines Rattan Furniture brings premium handcrafted rattan and cane pieces to Kenyan homes and offices at honest prices. The same philosophy: build something real, build it well, and make sure the people around you can afford to benefit from it.', link: 'https://tech.ellines.co.ke/', linkLabel: 'Contact for orders' },
   ],
   ctaHeading: 'Work with Elijah',
   ctaSub: 'Whether you need a custom software solution, AI integration, IT infrastructure, or just want to collaborate — reach out and let\'s build something great.',
@@ -335,7 +335,7 @@ export default function Founder() {
               ))}
             </div>
             <div className="founder-cta-row">
-              <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+              <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
                 <IconGlobe size={15} /> Visit Ellines Tech
               </a>
               <Link to="/contact" className="btn btn-outline">Get in Touch</Link>
@@ -343,7 +343,7 @@ export default function Founder() {
             <div className="founder-contact-strip">
               <a href="tel:+254748255466" className="founder-contact-item"><IconPhone /> 0748 255 466</a>
               <a href="mailto:haven@ellines.co.ke" className="founder-contact-item"><IconMail /> haven@ellines.co.ke</a>
-              <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-contact-item"><IconGlobe /> ellinestech.co.ke</a>
+              <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="founder-contact-item"><IconGlobe /> tech.ellines.co.ke</a>
             </div>
           </div>
         </div>
@@ -599,10 +599,10 @@ export default function Founder() {
           <div className="founder-cta-contact">
             <a href="tel:+254748255466" className="founder-cta-chip"><IconPhone /> 0748 255 466</a>
             <a href="mailto:haven@ellines.co.ke" className="founder-cta-chip"><IconMail /> haven@ellines.co.ke</a>
-            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="founder-cta-chip"><IconGlobe /> ellinestech.co.ke</a>
+            <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="founder-cta-chip"><IconGlobe /> tech.ellines.co.ke</a>
           </div>
           <div className="founder-cta-buttons">
-            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+            <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
               <IconGlobe size={15} /> Ellines Tech
             </a>
             <Link to="/contact" className="btn btn-outline">Contact Us</Link>

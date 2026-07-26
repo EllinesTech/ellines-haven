@@ -15,7 +15,7 @@ import { db } from '../../firebase';
 
 const DEFAULTS = {
   authorBio: 'IT entrepreneur, software engineer, AI developer, and author based in Kenya.',
-  authorWeb: 'https://ellinestech.co.ke',
+  authorWeb: 'https://tech.ellines.co.ke/',
   authorTwitter: '',
   authorInstagram: '',
 };

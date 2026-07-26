@@ -138,7 +138,7 @@ export default function Footer() {
             <Link to="/faq" className="footer__link">FAQ / Help</Link>
             <a href={`mailto:${INFO_EMAIL}`} className="footer__link">Info</a>
             <a href={`mailto:${HAVEN_EMAIL}`} className="footer__link">Orders</a>
-            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
+            <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
               Ellines Tech ↗
             </a>
           </div>
@@ -184,7 +184,7 @@ export default function Footer() {
           </div>
           <p className="footer__devby">
             Designed &amp; developed by{' '}
-            <a href="https://ellinestech.co.ke" target="_blank" rel="noopener noreferrer">Ellines Tech</a>
+            <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer">Ellines Tech</a>
           </p>
         </div>
       </div>

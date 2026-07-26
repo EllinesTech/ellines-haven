@@ -283,10 +283,9 @@ export default function EmailPanel({ showToast, isSuper }) {
             <h3 style={{ fontSize:'0.92rem', marginBottom:14, color:'var(--gold)' }}>📧 Recommended Email Addresses</h3>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { addr:'noreply@haven.ellines.co.ke',  use:'System emails (orders, resets)' },
-                { addr:'hello@haven.ellines.co.ke',    use:'General contact' },
-                { addr:'support@haven.ellines.co.ke',  use:'Customer support' },
-                { addr:'admin@haven.ellines.co.ke',    use:'Admin notifications' },
+                { addr:'haven@ellines.co.ke', use:'Orders, leads, invoices, project requests' },
+                { addr:'info@ellines.co.ke',  use:'General, group, careers' },
+                { addr:'noreply@haven.ellines.co.ke', use:'System emails (orders, resets) — optional' },
               ].map(e => (
                 <div key={e.addr} style={{ padding:'10px 14px', background:'var(--bg)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)' }}>
                   <code style={{ fontSize:'0.82rem', color:'var(--gold)' }}>{e.addr}</code>

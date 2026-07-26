@@ -88,7 +88,7 @@ const DEFAULT_SETTINGS = {
   email:'haven@ellines.co.ke', phone:'0748 255 466', location:'Nairobi, Kenya',
   authorName:'Elijah Mwangi M',
   authorBio:'IT entrepreneur, software engineer, AI developer, and author based in Kenya.',
-  authorWeb:'https://ellinestech.co.ke', authorTwitter:'',
+  authorWeb:'https://tech.ellines.co.ke/', authorTwitter:'',
   mpesaPhone:'0748255466', mpesaTill:'', mpesaName:'Ellines Haven',
   airtelNum:'', stripeEnabled:false, stripeKey:'', currency:'KES',
   payMethods:['mpesa','airtel','card'],
