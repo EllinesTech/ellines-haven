@@ -247,7 +247,7 @@ export function initializeActivityLogger() {
     if (result.flushed > 0) {
       console.log(`[initializeActivityLogger] Flushed ${result.flushed} queued activities`);
     }
-  });
+  }).catch(() => {});
 
   // Also try to flush before page unload
   window.addEventListener('beforeunload', () => {

@@ -106,11 +106,27 @@ if (typeof window !== 'undefined') {
     forceFreshNavigation();
   });
 
-  // Promise rejection handler for dynamic imports
+  // Promise rejection handler — recover from stale chunks; quiet benign Firebase noise
   window.addEventListener('unhandledrejection', (e) => {
     if (window.__EH_RELOADING__) return;
     const reason = e.reason;
     const msg = reason?.message || String(reason || '');
+    const code = String(reason?.code || reason?.name || '');
+
+    // Benign backend noise (often logged as "Uncaught (in promise) Object")
+    if (
+      code.includes('permission-denied') ||
+      code.includes('functions/') ||
+      code.includes('unauthenticated') ||
+      msg.includes('permission-denied') ||
+      msg.includes('Missing or insufficient permissions') ||
+      (reason && typeof reason === 'object' && !reason.stack && (reason.code || reason.details))
+    ) {
+      console.warn('[UnhandledRejection] suppressed:', code || msg || reason);
+      e.preventDefault();
+      return;
+    }
+
     if (!isStaleChunkMessage(msg, reason)) return;
 
     console.warn('[Promise Rejection Handler] Detected chunk error:', msg);

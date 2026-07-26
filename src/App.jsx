@@ -493,15 +493,16 @@ function PresenceTracker() {
         unsub = onSnapshot(doc(fsDb, 'user_presence', presenceId), snap => {
           if (snap.exists() && snap.data()?.forceLogout) {
             // Clear the flag then logout
-            import('firebase/firestore').then(({ doc: d2, setDoc: set2, serverTimestamp: svTs }) =>
+            import('firebase/firestore').then(({ doc: d2, setDoc: set2 }) =>
               import('./firebase').then(({ db: db2 }) =>
                 set2(d2(db2, 'user_presence', presenceId), { forceLogout: false }, { merge: true })
-              )
-            );
+                  .catch(() => {})
+              ).catch(() => {})
+            ).catch(() => {});
             localStorage.removeItem('eh_user');
             window.location.href = '/login';
           }
-        });
+        }, () => { /* permission errors — ignore */ });
       } catch {}
     })();
     return () => { if (unsub) unsub(); };
@@ -516,7 +517,9 @@ function ActivityTracker() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    // Track key user interactions that indicate engagement
+    // Don't fire tracking callables from admin — noisy + often permission-denied
+    if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
+
     const trackActivity = async (activity, details = {}) => {
       try {
         const { callTrackVisitor } = await import('./firebase');
@@ -532,7 +535,7 @@ function ActivityTracker() {
           ...details
         });
       } catch (error) {
-        console.warn(`[ActivityTracker] Failed to track ${activity}:`, error.message);
+        console.warn(`[ActivityTracker] Failed to track ${activity}:`, error?.message || error);
       }
     };
 

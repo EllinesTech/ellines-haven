@@ -1,7 +1,7 @@
 # Missing hashed assets must NOT fall through to the SPA shell.
 # Serving index.html for .js/.css causes "Unable to preload CSS" / MIME crashes.
-# Existing files under /assets/ are still served normally by Cloudflare Pages.
 /assets/*  /404.html  404
 
-# All other routes → SPA shell
+# SPA fallback for client routes. Cloudflare Pages still serves real files first
+# (e.g. /library/index.html from prerender) before this rewrite applies.
 /*    /index.html   200

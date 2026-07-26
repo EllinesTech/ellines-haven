@@ -104,8 +104,8 @@ function AutoRefreshBar({ onRefresh, lastRefresh }) {
           ...next,
           updatedAt: serverTimestamp(),
         }, { merge: true }).catch(() => {});
-      });
-    });
+      }).catch(() => {});
+    }).catch(() => {});
   };
 
   // Load Firestore copy on mount (overrides localStorage if newer)
@@ -120,8 +120,8 @@ function AutoRefreshBar({ onRefresh, lastRefresh }) {
             saveArSettings(merged);
           }
         }).catch(() => {});
-      });
-    });
+      }).catch(() => {});
+    }).catch(() => {});
   }, []);
 
   // Main auto-refresh timer

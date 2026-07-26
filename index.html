@@ -21,11 +21,13 @@
         } catch(e) {}
       })();
     </script>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="512x512" href="/pwa-icon-512.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/pwa-icon-192.png" />
     <link rel="icon" type="image/png" sizes="32x32"   href="/logo-icon.png" />
     <link rel="icon" type="image/png" sizes="16x16"   href="/logo-icon.png" />
-    <link rel="shortcut icon" href="/pwa-icon-192.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="512x512" href="/pwa-icon-512.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/pwa-icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -326,7 +328,19 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Fallback crawlable content (prerender.js replaces this per route at build time) -->
+      <main>
+        <h1>Ellines Haven</h1>
+        <p>Home For The Story Soul — Kenya's premier digital bookstore for original novels and short stories by Elijah Mwangi M.</p>
+        <nav>
+          <a href="/library">Library</a> ·
+          <a href="/about">About</a> ·
+          <a href="/founder">Founder</a> ·
+          <a href="/contact">Contact</a>
+        </nav>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <!-- Kill-switch SW is registered in <head> at stable /sw.js (never caches /assets/). -->
   </body>
