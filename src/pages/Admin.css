@@ -2093,8 +2093,8 @@
 
   /* Overlay panel — full screen */
   .adm-bookform {
-    width: 100vw !important;
-    max-width: 100vw !important;
+    width: 100% !important;
+    max-width: 100% !important;
     border-radius: 0 !important;
     max-height: 100vh !important;
     height: 100vh !important;

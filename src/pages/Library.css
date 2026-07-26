@@ -535,7 +535,7 @@
     position: fixed;
     top: 0;
     right: -100%;
-    width: min(300px, calc(100vw - 40px));
+    width: min(300px, calc(100% - 40px));
     height: 100dvh;
     max-height: 100dvh;
     border-radius: 0;

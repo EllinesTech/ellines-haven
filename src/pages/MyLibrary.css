@@ -662,6 +662,24 @@
   .mylib-hero { padding: 28px 0 24px; }
   .mylib-hero--gate { padding: 64px 0 40px; }
 }
+@media (max-width: 380px) {
+  .mylib-card {
+    flex-direction: column;
+  }
+  .mylib-card__cover-wrap {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    aspect-ratio: 2 / 3;
+    max-height: 220px;
+  }
+  .mylib-card__actions {
+    flex-wrap: wrap;
+  }
+  .mylib-card__actions .btn-sm {
+    flex: 1 1 auto;
+  }
+}
 
 /* ─────────────────────────────────────────────
    Reading Stats Tab

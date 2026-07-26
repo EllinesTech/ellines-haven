@@ -795,7 +795,7 @@
   color: #1da1f2;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .cart-hero { padding: 96px 0 48px; }
   .cart-layout, .pay-layout { grid-template-columns: 1fr; }
   .cart-sum, .pay-summary { position: static; }

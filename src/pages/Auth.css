@@ -773,6 +773,10 @@
     gap: 10px;
   }
   .auth-page::after { background-size: 36px 36px; }
+  .auth-otp-input {
+    letter-spacing: 0.18em;
+    font-size: 1.1rem;
+  }
 }
 
 @media (max-height: 700px) {

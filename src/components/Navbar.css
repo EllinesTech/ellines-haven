@@ -6,7 +6,7 @@
   padding: 6px 0;
   /* Critical: prevent the nav itself from being wider than the viewport */
   width: 100%;
-  max-width: 100vw;
+  max-width: 100%;
   overflow: visible;
   transition: background .3s, padding .3s, border-color .3s;
 }
@@ -316,7 +316,7 @@
 /* ── Ensure nav never causes horizontal scroll ── */
 .nav__inner,
 .nav__mobile {
-  max-width: 100vw;
+  max-width: 100%;
   box-sizing: border-box;
 }
 

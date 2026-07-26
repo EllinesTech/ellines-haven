@@ -164,7 +164,7 @@
   flex-wrap: wrap;
   align-items: center;
 }
-@media (max-width:768px) {
+@media (max-width:900px) {
   .bd-grid { grid-template-columns:1fr; gap:28px; }
   .bd-left { position:static; max-width:280px; margin:0 auto; }
   .bd-meta { gap: 16px; flex-wrap: wrap; }
