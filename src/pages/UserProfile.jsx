@@ -7,8 +7,7 @@ import UserMessages from '../components/UserMessages';
 import { UserNotificationsPanel } from '../components/UserNotifications';
 import OrderReceiptModal from '../components/OrderReceiptModal';
 import { readPath } from '../utils/slugify';
-import { listOfflineBooks, removeOfflineBook, getOfflineBook } from '../hooks/useOfflineBook';
-import { downloadEhbookPack } from '../utils/ehbookPack';
+import { listOfflineBooks, removeOfflineBook } from '../hooks/useOfflineBook';
 import { verifyPassword, storePasswordValue } from '../utils/passwordSecurity';
 import { findUserInFirestore } from './Login';
 import './UserProfile.css';
@@ -360,26 +359,6 @@ export default function UserProfile() {
     setRemovingOffline(null);
   };
 
-  const handleDownloadOfflinePack = async (bookId) => {
-    try {
-      const full = await getOfflineBook(user.email, bookId);
-      if (!full?.chapters?.length) {
-        showToast('No chapters saved for this title yet', 'err');
-        return;
-      }
-      const result = await downloadEhbookPack(user.email, {
-        id: full.bookId,
-        title: full.title,
-        author: full.author,
-        cover: full.cover,
-        slug: full.slug,
-      }, full.chapters, user.name || '');
-      showToast(`Downloaded ${result.filename} (personal — not shareable)`);
-    } catch (e) {
-      showToast(e?.message || 'Download failed', 'err');
-    }
-  };
-
   /* SVG icons — stroke-based, inherit currentColor */
   const NAV_ICONS = {
     account: (
@@ -655,9 +634,9 @@ export default function UserProfile() {
                 <div className="up-empty">
                   <div className="up-empty__icon">📱</div>
                   <h3>No books on this device yet</h3>
-                  <p>While reading, tap <strong>Save offline</strong> or <strong>Keep forever</strong>.</p>
+                  <p>While reading, tap <strong>Save offline</strong> to keep chapters on this device.</p>
                   <p style={{fontSize:'0.85rem',color:'var(--muted)',marginTop:12}}>
-                    To restore a <code>.ehbook</code> after clearing browser data, use <Link to="/my-library" style={{ color:'var(--gold)' }}>My Library → Downloaded</Link>.
+                    Saves stay after refresh in this browser. Clearing site data removes them.
                   </p>
                   <Link to="/library" className="btn btn-primary">Browse & Read Books →</Link>
                 </div>
@@ -685,12 +664,6 @@ export default function UserProfile() {
                             >Read</Link>
                             <button
                               className="btn btn-ghost btn-sm"
-                              style={{fontSize:'0.65rem',padding:'3px 6px',color:'#6eb6ff'}}
-                              title="Download keep-forever .ehbook"
-                              onClick={() => handleDownloadOfflinePack(b.bookId)}
-                            >Pack</button>
-                            <button
-                              className="btn btn-ghost btn-sm"
                               style={{fontSize:'0.7rem',padding:'4px 6px',color:'#e74c3c'}}
                               onClick={() => handleRemoveOffline(b.bookId)}
                               disabled={removingOffline === b.bookId}
@@ -704,7 +677,7 @@ export default function UserProfile() {
                     ))}
                   </div>
                   <div style={{padding:'14px 16px',background:'rgba(201,168,76,0.08)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'var(--r-sm)',fontSize:'0.78rem',color:'var(--muted)'}}>
-                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Quick saves live in this browser. <strong style={{color:'#6eb6ff'}}>Keep forever</strong> downloads a locked personal <code>.ehbook</code>. Import packs only from <Link to="/my-library" style={{ color:'var(--gold)' }}>My Library → Downloaded</Link> — shared files will not open.
+                    <strong style={{color:'var(--gold)'}}>How it works:</strong> Offline books are stored in this browser. They survive refresh and closing the tab. Clearing site data removes them — save again from the reader anytime.
                   </div>
                 </div>
               )}

@@ -2997,15 +2997,6 @@
   border-color: rgba(231, 76, 60, 0.35);
   color: #e74c3c;
 }
-.reader__offline-btn--pack {
-  background: rgba(74, 158, 255, 0.1);
-  border-color: rgba(74, 158, 255, 0.35);
-  color: #6eb6ff;
-}
-.reader__offline-btn--pack:hover:not(:disabled) {
-  background: rgba(74, 158, 255, 0.18);
-  border-color: rgba(74, 158, 255, 0.55);
-}
 .reader__offline-btn[aria-busy="true"] {
   min-width: 7.5rem;
 }

@@ -9,11 +9,8 @@ import {
   saveBookOffline,
   removeOfflineBook,
   listOfflineBooks,
-  getOfflineBook,
   formatOfflineSize,
 } from '../hooks/useOfflineBook';
-import { downloadEhbookPack } from '../utils/ehbookPack';
-import EhbookImportZone from '../components/EhbookImportZone';
 import { bookPath, readPath } from '../utils/slugify';
 import { getFallbackChapters } from '../data/bookChapters';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -539,17 +536,8 @@ function OfflineBooks({ user, catalog, onCountChange }) {
   const [offlineBooks, setOfflineBooks] = useState([]);
   const [loadingOffline, setLoadingOffline] = useState(true);
   const [removingBook, setRemovingBook] = useState(null);
-  const [packBusyId, setPackBusyId] = useState(null);
-  const [packMsg, setPackMsg] = useState('');
   const [loadError, setLoadError] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
-
-  const reloadList = async () => {
-    const list = await listOfflineBooks(user.email);
-    setOfflineBooks(list);
-    onCountChange?.(list.length);
-    return list;
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -585,96 +573,48 @@ function OfflineBooks({ user, catalog, onCountChange }) {
     setRemovingBook(null);
   };
 
-  const handleDownloadPack = async (bookMeta) => {
-    setPackBusyId(bookMeta.bookId);
-    setPackMsg('');
-    try {
-      const full = await getOfflineBook(user.email, bookMeta.bookId);
-      if (!full?.chapters?.length) throw new Error('No chapters saved for this title yet.');
-      const result = await downloadEhbookPack(user.email, {
-        id: full.bookId,
-        title: full.title,
-        author: full.author,
-        cover: full.cover,
-        slug: full.slug,
-      }, full.chapters, user.name || '');
-      setPackMsg(`Downloaded ${result.filename} — personal license; it won’t open for other accounts.`);
-    } catch (e) {
-      setPackMsg(e?.message || 'Could not create pack.');
-    } finally {
-      setPackBusyId(null);
-      setTimeout(() => setPackMsg(''), 6000);
-    }
-  };
-
   const formatDate = (timestamp) => {
     return new Date(timestamp).toLocaleDateString('en-KE', {
       day: 'numeric', month: 'short', year: 'numeric',
     });
   };
 
-  const importPanel = (
-    <div className="mylib-ehbook-panel" style={{ marginBottom: offlineBooks.length ? 22 : 0 }}>
-      <EhbookImportZone
-        userEmail={user.email}
-        onImported={async () => {
-          await reloadList();
-          setReloadTick((t) => t + 1);
-        }}
-      />
-    </div>
-  );
-
   if (loadingOffline) return (
-    <div>
-      {importPanel}
-      <div className="mylib-empty">
-        <div className="mylib-empty-icon">⏳</div>
-        <h3>Loading offline books…</h3>
-        <p>Checking books saved on this device.</p>
-      </div>
+    <div className="mylib-empty">
+      <div className="mylib-empty-icon">⏳</div>
+      <h3>Loading offline books…</h3>
+      <p>Checking books saved on this device.</p>
     </div>
   );
 
   if (loadError) return (
-    <div>
-      {importPanel}
-      <div className="mylib-empty">
-        <div className="mylib-empty-icon">⚠️</div>
-        <h3>Couldn’t read offline storage</h3>
-        <p>
-          Your browser blocked quick offline storage. Import a <strong>.ehbook</strong> keep-forever pack above,
-          or try another browser / turn off private browsing.
-        </p>
-        <button type="button" className="btn btn-primary" onClick={() => setReloadTick((t) => t + 1)}>
-          Retry
-        </button>
-      </div>
+    <div className="mylib-empty">
+      <div className="mylib-empty-icon">⚠️</div>
+      <h3>Couldn’t read offline storage</h3>
+      <p>
+        Your browser blocked offline storage. Try another browser, or turn off private browsing,
+        then open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> again.
+      </p>
+      <button type="button" className="btn btn-primary" onClick={() => setReloadTick((t) => t + 1)}>
+        Retry
+      </button>
     </div>
   );
 
   if (offlineBooks.length === 0) return (
-    <div>
-      {importPanel}
-      <div className="mylib-empty">
-        <div className="mylib-empty-icon">📥</div>
-        <h3>No books on this device yet</h3>
-        <p>
-          Open a book and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong> for quick reading,
-          or <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> for a locked <code>.ehbook</code> file
-          that survives browser cleans — and <strong>will not open if shared</strong> with anyone else.
-        </p>
-        <Link to="/library" className="btn btn-primary">Browse Books</Link>
-      </div>
+    <div className="mylib-empty">
+      <div className="mylib-empty-icon">📥</div>
+      <h3>No books on this device yet</h3>
+      <p>
+        Open a book you own and tap <strong style={{ color:'var(--gold)' }}>Save offline</strong>.
+        It stays on this device after refresh — even without internet.
+      </p>
+      <Link to="/library" className="btn btn-primary">Browse Books</Link>
     </div>
   );
 
   return (
     <div>
-      {importPanel}
-      {packMsg && (
-        <p className="mylib-ehbook-toast" role="status">{packMsg}</p>
-      )}
       {/* Header row */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
         <div>
@@ -685,7 +625,7 @@ function OfflineBooks({ user, catalog, onCountChange }) {
             </span>
           </h2>
           <p style={{ fontSize:'0.8rem', color:'var(--muted)', margin:'4px 0 0' }}>
-            Quick cache survives refresh. <strong style={{ color:'#6eb6ff' }}>Keep forever</strong> packs are personal — locked to your account, not shareable.
+            Saved in this browser — available after refresh. Remove a title anytime to free space.
           </p>
         </div>
       </div>
@@ -770,15 +710,6 @@ function OfflineBooks({ user, catalog, onCountChange }) {
                 >
                   Continue reading
                 </Link>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => handleDownloadPack(book)}
-                  disabled={packBusyId === book.bookId}
-                  style={{ color:'#6eb6ff', borderColor:'rgba(74,158,255,0.35)' }}
-                  title="Download .ehbook keep-forever pack to your Files/Downloads"
-                >
-                  {packBusyId === book.bookId ? 'Packing…' : 'Keep forever'}
-                </button>
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => setRemovingBook(book.bookId)}

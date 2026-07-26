@@ -26,8 +26,6 @@ import {
 
 } from '../hooks/useOfflineBook';
 
-import { downloadEhbookPack, ehbookSupported } from '../utils/ehbookPack';
-
 import { getFallbackChapters } from '../data/bookChapters';
 
 import AudioPlayer from '../components/AudioPlayer';
@@ -177,8 +175,6 @@ export default function Reader() {
   const [offlineSaved,    setOfflineSaved]     = useState(false);
 
   const [offlineSaving,   setOfflineSaving]    = useState(false);
-
-  const [ehbookBusy,      setEhbookBusy]       = useState(false);
 
   const [offlineSaveMsg,  setOfflineSaveMsg]   = useState('');
 
@@ -883,43 +879,6 @@ export default function Reader() {
 
   };
 
-  /** Download encrypted .ehbook to device Files/Downloads — survives browser data clear */
-  const handleDownloadEhbook = async () => {
-    if (!user?.email || !book?.id) return;
-    if (!ehbookSupported()) {
-      setOfflineMsgTone('err');
-      setOfflineSaveMsg('This browser can’t create keep-forever packs');
-      setTimeout(() => setOfflineSaveMsg(''), 4000);
-      return;
-    }
-    if (!chapters?.length) {
-      setOfflineMsgTone('err');
-      setOfflineSaveMsg('Wait for chapters to load, then try again');
-      setTimeout(() => setOfflineSaveMsg(''), 4000);
-      return;
-    }
-    setEhbookBusy(true);
-    try {
-      // Also refresh the quick offline cache
-      await saveBookOffline(user.email, book.id, book, chapters);
-      setOfflineSaved(true);
-      setOfflineChapters(chapters);
-      const result = await downloadEhbookPack(user.email, book, chapters, user.name || '');
-      setOfflineMsgTone('ok');
-      setOfflineSaveMsg(
-        `Downloaded ${result.filename} · personal license only — won’t open if shared`
-      );
-    } catch (e) {
-      setOfflineMsgTone('err');
-      setOfflineSaveMsg(e?.message || 'Could not download pack');
-    } finally {
-      setEhbookBusy(false);
-      setTimeout(() => setOfflineSaveMsg(''), 7000);
-    }
-  };
-
-
-
   // Download URL — uses Google Drive's export endpoint for direct PDF download
 
   const downloadUrl = rawUrl ? (() => {
@@ -1329,15 +1288,6 @@ export default function Reader() {
                   >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
                 )}
-                {!isOffline && chapters?.length > 0 && (
-                  <button
-                    className="reader__offline-btn reader__offline-btn--pack"
-                    title="Download an encrypted .ehbook file to your device — survives clearing browser data"
-                    onClick={handleDownloadEhbook}
-                    disabled={ehbookBusy}
-                    aria-busy={ehbookBusy}
-                  >{ehbookBusy ? 'Packing…' : 'Keep forever'}</button>
-                )}
                 </>
 
               )}
@@ -1456,15 +1406,6 @@ export default function Reader() {
                   >{offlineSaving ? 'Saving…' : 'Save offline'}</button>
 
                 )}
-                {!isOffline && chapters?.length > 0 && (
-                  <button
-                    className="reader__offline-btn reader__offline-btn--pack"
-                    title="Download an encrypted .ehbook file to your device — survives clearing browser data"
-                    onClick={handleDownloadEhbook}
-                    disabled={ehbookBusy}
-                    aria-busy={ehbookBusy}
-                  >{ehbookBusy ? 'Packing…' : 'Keep forever'}</button>
-                )}
                 </>
 
               )}
@@ -1545,9 +1486,8 @@ export default function Reader() {
           <span aria-hidden="true">!</span>
 
           <span>
-            You’re offline and this book isn’t on this device.
-            Reconnect and open <strong>My Library → Downloaded</strong> to import your <strong>.ehbook</strong> pack,
-            or tap <strong>Keep forever</strong> while reading online.
+            You’re offline and this book isn’t saved on this device.
+            Reconnect, open the book, then tap <strong>Save offline</strong>.
           </span>
 
         </div>
