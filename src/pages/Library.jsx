@@ -30,13 +30,13 @@ function useLibContent() {
 }
 
 const STATUS_FILTERS = [
-  { value:'',             label:'All',          icon:'📚' },
-  { value:'complete',     label:'Complete',     icon:'✅' },
-  { value:'ongoing',      label:'Ongoing',      icon:'📖' },
-  { value:'premium',      label:'Premium',      icon:'⭐' },
-  { value:'free-preview', label:'Free Preview', icon:'👀' },
-  { value:'coming-soon',  label:'Coming Soon',  icon:'🔜' },
-  { value:'limited',      label:'Limited',      icon:'⏳' },
+  { value:'',             label:'All' },
+  { value:'complete',     label:'Complete' },
+  { value:'ongoing',      label:'Ongoing' },
+  { value:'premium',      label:'Premium' },
+  { value:'free-preview', label:'Free Preview' },
+  { value:'coming-soon',  label:'Coming Soon' },
+  { value:'limited',      label:'Limited' },
 ];
 
 const TYPE_TABS = [
@@ -51,20 +51,6 @@ const SORT_OPTIONS = [
   { value: 'price-asc',  label: 'Price ↑' },
   { value: 'price-desc', label: 'Price ↓' },
 ];
-
-const GENRE_ICONS = {
-  // Primary
-  Romance: '💕', Mystery: '🔍', Fantasy: '🌙', 'Sci-Fi': '🚀',
-  Historical: '📜', 'Short Stories': '✍️', Drama: '🎭', Adventure: '⚔️',
-  // Sub-genres
-  'Contemporary Fiction': '🏙️', 'Relationship Drama': '💔', 'Literary Fiction': '📖', 'African Fiction': '🌍',
-  'Emotional Drama': '🫀', 'Psychological Fiction': '🧠', 'Urban Fiction': '🌆',
-  'Historical Fiction': '🏛️', 'African Literature': '✊', 'Family Saga': '👨‍👩‍👧‍👦',
-  'Short Story Collection': '📝', 'East African Fiction': '🦁',
-  'Thriller': '⚡', 'African Crime Fiction': '🕵️',
-  'Epic Fantasy': '🐉', 'East African Mythology': '⚡',
-  'Epistolary Fiction': '✉️',
-};
 
 const PRIMARY_GENRES = ['Romance','Mystery','Fantasy','Sci-Fi','Historical','Short Stories','Drama','Adventure'];
 
@@ -250,7 +236,7 @@ export default function Library() {
               className={`lib-genre-chip${genre === g ? ' lib-genre-chip--on' : ''}${!PRIMARY_GENRES.includes(g) ? ' lib-genre-chip--sub' : ''}`}
               onClick={() => setGenre(g)}
             >
-              <span>{GENRE_ICONS[g] || '📚'}</span> {g}
+              {g}
             </button>
           ))}
         </div>
@@ -268,14 +254,14 @@ export default function Library() {
 
           <div className="lib-sidebar__section">
             <h4 className="lib-sidebar__heading">Status</h4>
-            {STATUS_FILTERS.map(({ value, label, icon }) => (
+            {STATUS_FILTERS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
                 className={`lib-filt-btn${status === value ? ' lib-filt-btn--on' : ''}`}
                 onClick={() => { setStatus(value); setSidebarOpen(false); }}
               >
-                <span>{icon}</span> {label}
+                {label}
               </button>
             ))}
           </div>
@@ -294,7 +280,7 @@ export default function Library() {
                 className={`lib-filt-btn${genre === g ? ' lib-filt-btn--on' : ''}`}
                 onClick={() => { setGenre(g); setSidebarOpen(false); }}
               >
-                <span>{GENRE_ICONS[g] || '📚'}</span> {g}
+                {g}
               </button>
             ))}
           </div>
@@ -319,8 +305,8 @@ export default function Library() {
           {/* Active filter chips */}
           {hasFilters && (
             <div className="lib-active-filters">
-              {genre && <span className="lib-chip">{GENRE_ICONS[genre]} {genre} <button type="button" onClick={() => setGenre('')}>×</button></span>}
-              {status && activeStatusMeta && <span className="lib-chip">{activeStatusMeta.icon} {activeStatusMeta.label} <button type="button" onClick={() => setStatus('')}>×</button></span>}
+              {genre && <span className="lib-chip">{genre} <button type="button" onClick={() => setGenre('')}>×</button></span>}
+              {status && activeStatusMeta && <span className="lib-chip">{activeStatusMeta.label} <button type="button" onClick={() => setStatus('')}>×</button></span>}
               {search && <span className="lib-chip">"{search}" <button type="button" onClick={() => setSearch('')}>×</button></span>}
             </div>
           )}

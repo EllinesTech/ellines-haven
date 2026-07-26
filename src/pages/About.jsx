@@ -24,10 +24,10 @@ const DEFAULT_CONTENT = {
   whyHeading: 'Why Africa Needs This',
   whySub: 'The African literary space is vast — but the platforms that celebrate it are few. Ellines Haven was built to close that gap.',
   whyPoints: [
-    { icon: '📖', title: 'Stories Locked Away', desc: 'Brilliant African writers exist across every village, city, and campus on this continent — but their stories rarely reach the people they were written for. We change that.' },
-    { icon: '💸', title: 'Priced Out of Books', desc: 'Imported books are expensive. Shipping is unreliable. Ellines Haven delivers world-class stories at honest, locally-calibrated prices — instantly, anywhere.' },
-    { icon: '🌍', title: 'Representation Matters', desc: 'African readers deserve to see themselves in fiction. Not as spectacle, not as tragedy — but as full, complex human beings navigating the same beautiful, messy life everyone else does.' },
-    { icon: '🛠️', title: 'Built by an African', desc: 'This platform was not donated, commissioned, or approved by a foreign publisher. It was conceived, engineered, and launched by a Kenyan — for Kenya and the continent.' },
+    { title: 'Stories Locked Away', desc: 'Brilliant African writers exist across every village, city, and campus on this continent — but their stories rarely reach the people they were written for. We change that.' },
+    { title: 'Priced Out of Books', desc: 'Imported books are expensive. Shipping is unreliable. Ellines Haven delivers world-class stories at honest, locally-calibrated prices — instantly, anywhere.' },
+    { title: 'Representation Matters', desc: 'African readers deserve to see themselves in fiction. Not as spectacle, not as tragedy — but as full, complex human beings navigating the same beautiful, messy life everyone else does.' },
+    { title: 'Built by an African', desc: 'This platform was not donated, commissioned, or approved by a foreign publisher. It was conceived, engineered, and launched by a Kenyan — for Kenya and the continent.' },
   ],
 
   /* Mission & Vision */
@@ -39,12 +39,12 @@ const DEFAULT_CONTENT = {
   /* Values */
   valuesHeading: 'What We Stand For',
   values: [
-    { icon: '✦', title: 'Authenticity', desc: 'Every story is grounded in real life — real people, real places, real emotions. No borrowed narratives, no distant voices.' },
-    { icon: '🌍', title: 'African Pride', desc: 'We celebrate the richness of East African culture, history, and humanity without apology and without explanation.' },
-    { icon: '📖', title: 'Accessibility', desc: 'Great literature should not be locked behind geography or high prices. Every story on Ellines Haven is priced for the people it was written about.' },
-    { icon: '🛡️', title: 'Quality', desc: 'Every work published here meets a standard of craft and honesty. Stories that are worth your time, every time.' },
-    { icon: '💡', title: 'Innovation', desc: 'Built by a software engineer and author, Ellines Haven blends the best of technology with the soul of literature.' },
-    { icon: '🤝', title: 'Community', desc: 'We exist for readers and writers alike — building a community that uplifts African voices and creates space for new stories to emerge.' },
+    { title: 'Authenticity', desc: 'Every story is grounded in real life — real people, real places, real emotions. No borrowed narratives, no distant voices.' },
+    { title: 'African Pride', desc: 'We celebrate the richness of East African culture, history, and humanity without apology and without explanation.' },
+    { title: 'Accessibility', desc: 'Great literature should not be locked behind geography or high prices. Every story on Ellines Haven is priced for the people it was written about.' },
+    { title: 'Quality', desc: 'Every work published here meets a standard of craft and honesty. Stories that are worth your time, every time.' },
+    { title: 'Innovation', desc: 'Built by a software engineer and author, Ellines Haven blends the best of technology with the soul of literature.' },
+    { title: 'Community', desc: 'We exist for readers and writers alike — building a community that uplifts African voices and creates space for new stories to emerge.' },
   ],
 
   /* What We Offer */
@@ -62,10 +62,10 @@ const DEFAULT_CONTENT = {
   experienceHeading: 'The Ellines Haven Experience',
   experienceSub: 'More than a store — a complete literary journey from discovery to the last page.',
   experiences: [
-    { step: '01', icon: '🔍', title: 'Discover', desc: 'Browse our curated library by genre, theme, or mood. Every book comes with a full synopsis, excerpt, and reader reviews.' },
-    { step: '02', icon: '💳', title: 'Purchase', desc: 'Pay instantly with M-Pesa, Airtel Money, or card. No hidden fees. Your book is unlocked the moment payment clears.' },
-    { step: '03', icon: '📱', title: 'Read', desc: 'Open in our beautiful built-in reader — works on any device, no app needed. Or download your PDF for offline reading.' },
-    { step: '04', icon: '♾️', title: 'Own Forever', desc: 'No subscriptions. No expiry. Once you buy a book, it lives in your library permanently. Yours to return to whenever you want.' },
+    { step: '01', title: 'Discover', desc: 'Browse our curated library by genre, theme, or mood. Every book comes with a full synopsis, excerpt, and reader reviews.' },
+    { step: '02', title: 'Purchase', desc: 'Pay instantly with M-Pesa, Airtel Money, or card. No hidden fees. Your book is unlocked the moment payment clears.' },
+    { step: '03', title: 'Read', desc: 'Open in our beautiful built-in reader — works on any device, no app needed. Or download your PDF for offline reading.' },
+    { step: '04', title: 'Own Forever', desc: 'No subscriptions. No expiry. Once you buy a book, it lives in your library permanently. Yours to return to whenever you want.' },
   ],
 
   /* Ellines Group */
@@ -73,7 +73,6 @@ const DEFAULT_CONTENT = {
   groupIntro: 'Ellines Haven is the literary heart of the Ellines Group — a family of businesses founded by Elijah Mwangi M, all built on one shared belief: that Kenya deserves world-class everything. The Ellines name carries a promise of quality, purpose, and pride in every venture it covers.',
   groupCompanies: [
     {
-      icon: '📚',
       name: 'Ellines Haven',
       tag: 'Literature · You Are Here',
       desc: 'A dedicated digital home for original African literature. Every novel and story is written by Elijah Mwangi M — honest, local, and deeply human. A place where authentic East African stories find a beautiful home and reach the readers who deserve them.',
@@ -82,7 +81,6 @@ const DEFAULT_CONTENT = {
       highlight: true,
     },
     {
-      icon: '⚡',
       name: 'Ellines Tech',
       tag: 'Technology',
       desc: 'A full-service IT company delivering software development, AI integrations, cybersecurity, web and mobile applications, and managed IT support to businesses across Kenya and East Africa. The digital infrastructure that African business deserves.',
@@ -91,7 +89,6 @@ const DEFAULT_CONTENT = {
       highlight: false,
     },
     {
-      icon: '🪑',
       name: 'Ellines Rattan Furniture',
       tag: 'Craft & Living',
       desc: 'Premium quality rattan and cane furniture, handcrafted with care and traditional weaving techniques for Kenyan homes and offices. Beautiful living spaces at honest prices.',
@@ -141,8 +138,8 @@ const IconPhone = () => (
     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
   </svg>
 );
-const IconGlobe = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+const IconGlobe = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
   </svg>
 );
@@ -156,6 +153,65 @@ const IconCheck = () => (
     <polyline points="20 6 9 17 4 12"/>
   </svg>
 );
+const IconBook = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+const IconLock = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+);
+const IconTag = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+  </svg>
+);
+const IconUsers = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
+const IconWrench = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+  </svg>
+);
+const IconShield = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  </svg>
+);
+const IconSpark = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6L12 2z"/>
+  </svg>
+);
+const IconHeart = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+  </svg>
+);
+const IconBolt = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+);
+const IconChair = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6 11h12v3a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-3z"/><path d="M8 11V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4"/><path d="M8 16v3M16 16v3M5 22h14"/>
+  </svg>
+);
+const IconArrow = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+  </svg>
+);
+
+const WHY_ICONS = [IconLock, IconTag, IconUsers, IconWrench];
+const VALUE_ICONS = [IconSpark, IconGlobe, IconBook, IconShield, IconBolt, IconHeart];
+const GROUP_ICONS = [IconBook, IconBolt, IconChair];
 
 /* ── Inline editor ── */
 function EditableText({ value, onSave, tag: Tag = 'p', className, style, multiline = false }) {
@@ -193,9 +249,8 @@ function AboutPoster() {
     <div className="about-poster-card">
       <div className="apc-orb apc-orb1" aria-hidden="true" />
       <div className="apc-orb apc-orb2" aria-hidden="true" />
-      <div className="apc-orb apc-orb3" aria-hidden="true" />
       <div className="apc-logo-wrap">
-        <img src="/logo-icon.png" alt="Ellines Haven logo mark" className="apc-logo-img" />
+        <img src="/logo-icon.png" alt="" className="apc-logo-img" />
         <div className="apc-logo-glow" aria-hidden="true" />
       </div>
       <div className="apc-brand">
@@ -204,11 +259,7 @@ function AboutPoster() {
       </div>
       <p className="apc-tagline">Stories That Resonate</p>
       <div className="apc-divider" aria-hidden="true" />
-      <div className="apc-pillars">
-        {['Original Stories', 'African Voices', 'Digital Library'].map(p => (
-          <span key={p} className="apc-pill">{p}</span>
-        ))}
-      </div>
+      <p className="apc-pillars">Original African Literature</p>
       <span className="apc-watermark">haven.ellines.co.ke</span>
     </div>
   );
@@ -271,6 +322,10 @@ export default function About() {
           <p className="about-hero__brand">Ellines Haven</p>
           <h1>About <span className="gold-text">Our Haven</span></h1>
           {EA('heroTagline', 'p', 'about-hero__sub', undefined, false)}
+          <div className="about-hero__ctas">
+            <Link to="/library" className="btn btn-primary">Browse the Library</Link>
+            <Link to="/founder" className="btn btn-outline">Meet the Founder</Link>
+          </div>
         </div>
       </header>
 
@@ -285,7 +340,10 @@ export default function About() {
             {EA('storyPara1', 'p', undefined, undefined, true)}
             {EA('storyPara2', 'p', undefined, undefined, true)}
             {EA('storyPara3', 'p', 'about-story-pull', undefined, true)}
-            <Link to="/library" className="btn btn-primary about-cta">Browse Our Books →</Link>
+            <div className="about-story-actions">
+              <Link to="/library" className="btn btn-primary about-cta">Browse Our Books</Link>
+              <Link to="/contact" className="btn btn-outline about-cta">Get in Touch</Link>
+            </div>
           </div>
         </div>
       </section>
@@ -318,21 +376,24 @@ export default function About() {
             {EA('whySub', 'p', 'about-section-sub', undefined, true)}
           </div>
           <div className="about-why-grid">
-            {content.whyPoints.map((p, i) => (
-              <div key={i} className="about-why-item">
-                <div className="about-mark" aria-hidden="true">{p.icon}</div>
-                <div>
-                  {isSA
-                    ? <EditableText value={p.title} onSave={v => patchArray('whyPoints', i, 'title', v)} tag="h4" />
-                    : <h4>{p.title}</h4>
-                  }
-                  {isSA
-                    ? <EditableText value={p.desc} onSave={v => patchArray('whyPoints', i, 'desc', v)} tag="p" multiline />
-                    : <p>{p.desc}</p>
-                  }
+            {content.whyPoints.map((p, i) => {
+              const WhyIcon = WHY_ICONS[i % WHY_ICONS.length];
+              return (
+                <div key={i} className="about-why-item">
+                  <div className="about-mark" aria-hidden="true"><WhyIcon /></div>
+                  <div>
+                    {isSA
+                      ? <EditableText value={p.title} onSave={v => patchArray('whyPoints', i, 'title', v)} tag="h4" />
+                      : <h4>{p.title}</h4>
+                    }
+                    {isSA
+                      ? <EditableText value={p.desc} onSave={v => patchArray('whyPoints', i, 'desc', v)} tag="p" multiline />
+                      : <p>{p.desc}</p>
+                    }
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -362,21 +423,24 @@ export default function About() {
             <h2>{EA('valuesHeading', 'span', 'gold-text')}</h2>
           </div>
           <div className="about-values-grid">
-            {content.values.map((v, i) => (
-              <div key={i} className="about-value-item">
-                <div className="about-mark about-mark--sm" aria-hidden="true">{v.icon}</div>
-                <div>
-                  {isSA
-                    ? <EditableText value={v.title} onSave={val => patchArray('values', i, 'title', val)} tag="h4" />
-                    : <h4>{v.title}</h4>
-                  }
-                  {isSA
-                    ? <EditableText value={v.desc} onSave={val => patchArray('values', i, 'desc', val)} tag="p" multiline />
-                    : <p>{v.desc}</p>
-                  }
+            {content.values.map((v, i) => {
+              const ValIcon = VALUE_ICONS[i % VALUE_ICONS.length];
+              return (
+                <div key={i} className="about-value-item">
+                  <div className="about-mark about-mark--sm" aria-hidden="true"><ValIcon /></div>
+                  <div>
+                    {isSA
+                      ? <EditableText value={v.title} onSave={val => patchArray('values', i, 'title', val)} tag="h4" />
+                      : <h4>{v.title}</h4>
+                    }
+                    {isSA
+                      ? <EditableText value={v.desc} onSave={val => patchArray('values', i, 'desc', val)} tag="p" multiline />
+                      : <p>{v.desc}</p>
+                    }
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -422,28 +486,29 @@ export default function About() {
                 </li>
               ))}
             </ul>
-            <Link to="/library" className="btn btn-primary about-cta">Start Reading →</Link>
+            <Link to="/library" className="btn btn-primary about-cta">Start Reading</Link>
           </div>
           <div className="about-offer-aside">
-            <div className="about-offer-card">
-              <h4>Get in Touch</h4>
-              <div className="about-contact-row">
-                <span className="about-contact-icon"><IconMail /></span>
-                <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>
-              </div>
-              <div className="about-contact-row">
-                <span className="about-contact-icon"><IconPhone /></span>
-                <a href="tel:+254748255466">0748 255 466</a>
-              </div>
-              <div className="about-contact-row">
-                <span className="about-contact-icon"><IconGlobe /></span>
-                <a href="https://haven.ellines.co.ke" target="_blank" rel="noopener noreferrer">haven.ellines.co.ke</a>
-              </div>
-              <div className="about-contact-row">
-                <span className="about-contact-icon"><IconMap /></span>
-                <span>Nairobi, Kenya</span>
-              </div>
+            <h4 className="about-offer-aside__title">Get in Touch</h4>
+            <div className="about-contact-row">
+              <span className="about-contact-icon"><IconMail /></span>
+              <a href="mailto:ellines.haven@gmail.com">ellines.haven@gmail.com</a>
             </div>
+            <div className="about-contact-row">
+              <span className="about-contact-icon"><IconPhone /></span>
+              <a href="tel:+254748255466">0748 255 466</a>
+            </div>
+            <div className="about-contact-row">
+              <span className="about-contact-icon"><IconGlobe /></span>
+              <a href="https://haven.ellines.co.ke" target="_blank" rel="noopener noreferrer">haven.ellines.co.ke</a>
+            </div>
+            <div className="about-contact-row">
+              <span className="about-contact-icon"><IconMap /></span>
+              <span>Nairobi, Kenya</span>
+            </div>
+            <Link to="/contact" className="about-offer-aside__link">
+              Contact form <IconArrow />
+            </Link>
           </div>
         </div>
       </section>
@@ -456,27 +521,30 @@ export default function About() {
             {EA('groupIntro', 'p', 'about-section-sub', undefined, true)}
           </div>
           <div className="about-group-grid">
-            {content.groupCompanies.map((co, i) => (
-              <div key={i} className={`about-group-card${co.highlight ? ' highlight' : ''}`}>
-                <div className="about-mark" aria-hidden="true">{co.icon}</div>
-                <div className="about-group-body">
-                  <span className="about-group-tag">{co.tag}</span>
-                  {isSA
-                    ? <EditableText value={co.name} onSave={v => patchArray('groupCompanies', i, 'name', v)} tag="h3" />
-                    : <h3>{co.name}</h3>
-                  }
-                  {isSA
-                    ? <EditableText value={co.desc} onSave={v => patchArray('groupCompanies', i, 'desc', v)} tag="p" multiline />
-                    : <p>{co.desc}</p>
-                  }
-                  {co.link.startsWith('/') ? (
-                    <Link to={co.link} className="about-group-link">{co.linkLabel} <span>→</span></Link>
-                  ) : (
-                    <a href={co.link} target="_blank" rel="noopener noreferrer" className="about-group-link">{co.linkLabel} <span>→</span></a>
-                  )}
+            {content.groupCompanies.map((co, i) => {
+              const GroupIcon = GROUP_ICONS[i % GROUP_ICONS.length];
+              return (
+                <div key={i} className={`about-group-card${co.highlight ? ' highlight' : ''}`}>
+                  <div className="about-mark" aria-hidden="true"><GroupIcon /></div>
+                  <div className="about-group-body">
+                    <span className="about-group-tag">{co.tag}</span>
+                    {isSA
+                      ? <EditableText value={co.name} onSave={v => patchArray('groupCompanies', i, 'name', v)} tag="h3" />
+                      : <h3>{co.name}</h3>
+                    }
+                    {isSA
+                      ? <EditableText value={co.desc} onSave={v => patchArray('groupCompanies', i, 'desc', v)} tag="p" multiline />
+                      : <p>{co.desc}</p>
+                    }
+                    {co.link.startsWith('/') ? (
+                      <Link to={co.link} className="about-group-link">{co.linkLabel} <IconArrow /></Link>
+                    ) : (
+                      <a href={co.link} target="_blank" rel="noopener noreferrer" className="about-group-link">{co.linkLabel} <IconArrow /></a>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -534,8 +602,27 @@ export default function About() {
               <h2>Elijah <span className="gold-text">Mwangi M</span></h2>
               {EA('founderTeaser', 'p', undefined, undefined, true)}
               <Link to="/founder" className="btn btn-primary about-cta about-cta--sm">
-                Meet the Founder →
+                Meet the Founder
               </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Closing CTA ── */}
+      <section className="section about-close-section">
+        <div className="container">
+          <div className="about-close about-rise">
+            <div className="about-close__glow" aria-hidden="true" />
+            <p className="about-close__brand">Ellines Haven</p>
+            <h2>Ready to find your next story?</h2>
+            <p className="about-close__sub">
+              Browse the library, meet the founder, or reach the team in Nairobi — we are here for African literature.
+            </p>
+            <div className="about-close__actions">
+              <Link to="/library" className="btn btn-primary">Explore the Library</Link>
+              <Link to="/founder" className="btn btn-outline">Meet the Founder</Link>
+              <Link to="/contact" className="about-close__ghost">Contact Us</Link>
             </div>
           </div>
         </div>
