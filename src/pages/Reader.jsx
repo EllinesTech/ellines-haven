@@ -29,6 +29,7 @@ import {
 import { getFallbackChapters } from '../data/bookChapters';
 
 import AudioPlayer from '../components/AudioPlayer';
+import { ErrorBoundary } from '../components/ErrorDisplay';
 
 import {
   READING_FONTS,
@@ -1739,15 +1740,24 @@ export default function Reader() {
 
 
 
-            {/* Floating listen dock (portal) — does not push chapter text */}
-            <AudioPlayer
-              chapters={chapters}
-              currentChapter={chapter}
-              canAccessChapter={canAccessChapter}
-              onChapterBlocked={() => setChapterGate(true)}
-              onChapterChange={ch => { setChapter(ch); window.scrollTo(0, 0); }}
-              onClose={() => setMode('text')}
-            />
+            {/* Floating listen dock — isolated so a player bug never blanks the chapter */}
+            <ErrorBoundary
+              fallback={(
+                <div className="audio-player audio-float audio-float--normal" style={{ position: 'fixed', right: 16, bottom: 96, zIndex: 12000, padding: 16 }}>
+                  <p style={{ margin: 0, color: '#e8e0f0' }}>Listen player failed to load in this browser.</p>
+                  <button type="button" className="btn btn-primary" style={{ marginTop: 10 }} onClick={() => setMode('text')}>Back to Read</button>
+                </div>
+              )}
+            >
+              <AudioPlayer
+                chapters={chapters}
+                currentChapter={chapter}
+                canAccessChapter={canAccessChapter}
+                onChapterBlocked={() => setChapterGate(true)}
+                onChapterChange={ch => { setChapter(ch); window.scrollTo(0, 0); }}
+                onClose={() => setMode('text')}
+              />
+            </ErrorBoundary>
 
 
 

@@ -153,7 +153,7 @@ function pickBestVoice(voiceList) {
   return sortVoicesNeuralFirst(pool)[0] || pool[0];
 }
 
-function defaultPanelPos(size = 'normal') {
+function defaultDockPos(size = 'normal') {
   if (typeof window === 'undefined') return { x: 24, y: 24 };
   const w = size === 'min' ? 300 : size === 'max' ? Math.min(440, window.innerWidth - 24) : 360;
   const h = size === 'min' ? 64 : size === 'max' ? 420 : 200;
@@ -218,6 +218,7 @@ export default function AudioPlayer({
   const [langScope, setLangScope] = useState('en');
   const [voiceDdOpen, setVoiceDdOpen] = useState(false);
   const [selectedName, setSelectedName] = useState(() => saved.voiceName || '');
+  const [portalReady, setPortalReady] = useState(false);
 
   const uttRef = useRef(null);
   const charRef = useRef(0);
@@ -239,6 +240,7 @@ export default function AudioPlayer({
 
   useEffect(() => { posRef.current = pos; }, [pos]);
   useEffect(() => { panelSizeRef.current = panelSize; }, [panelSize]);
+  useEffect(() => { setPortalReady(true); }, []);
 
   // Place dock once on mount if no saved position
   useEffect(() => {
@@ -276,33 +278,69 @@ export default function AudioPlayer({
     });
   }
 
-  function onDragPointerDown(e) {
-    if (e.button != null && e.button !== 0) return;
+  function clientPoint(e) {
+    if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (e.changedTouches && e.changedTouches[0]) {
+      return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function onDragStart(e) {
+    if (e.type === 'mousedown' && e.button !== 0) return;
     if (e.target.closest?.('button, a, input, select, textarea, [role="listbox"], [role="option"]')) return;
+    const pt = clientPoint(e);
     const current = posRef.current || defaultDockPos(panelSizeRef.current);
-    dragOffset.current = { x: e.clientX - current.x, y: e.clientY - current.y };
+    dragOffset.current = { x: pt.x - current.x, y: pt.y - current.y };
     draggingRef.current = true;
     setDragging(true);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    // Prevent text selection / scroll while dragging (Safari/Firefox/mobile)
+    if (e.cancelable) e.preventDefault();
   }
 
-  function onDragPointerMove(e) {
-    if (!draggingRef.current) return;
-    const next = clampPos({
-      x: e.clientX - dragOffset.current.x,
-      y: e.clientY - dragOffset.current.y,
-    }, panelSizeRef.current);
-    posRef.current = next;
-    setPos(next);
-  }
+  // Window-level move/up so drag works across Chrome, Edge, Firefox, Safari, Brave
+  useEffect(() => {
+    if (!dragging) return undefined;
 
-  function onDragPointerUp(e) {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    setDragging(false);
-    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* ignore */ }
-    persistPanel(panelSizeRef.current, posRef.current);
-  }
+    const onMove = (e) => {
+      if (!draggingRef.current) return;
+      const pt = clientPoint(e);
+      const next = clampPos({
+        x: pt.x - dragOffset.current.x,
+        y: pt.y - dragOffset.current.y,
+      }, panelSizeRef.current);
+      posRef.current = next;
+      setPos(next);
+      if (e.cancelable && e.type.startsWith('touch')) e.preventDefault();
+    };
+
+    const onUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      setDragging(false);
+      persistPanel(panelSizeRef.current, posRef.current);
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('mousemove', onMove, { passive: false });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onUp);
+
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchend', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('blur', onUp);
+    };
+  }, [dragging]);
 
   function handleClose() {
     if (synth) synth.cancel();
@@ -503,7 +541,9 @@ export default function AudioPlayer({
     const text = chapterText.slice(fromChar);
     if (!text.trim()) return;
 
-    const utt = new SpeechSynthesisUtterance(text);
+    const Ctor = window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance;
+    if (!Ctor) return;
+    const utt = new Ctor(text);
     const selectedVoice = getSelectedVoice();
     if (selectedVoice) {
       utt.voice = selectedVoice;
@@ -655,7 +695,10 @@ export default function AudioPlayer({
     if (playing) speak(charRef.current);
   };
 
-  const available = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  const UtteranceCtor = typeof window !== 'undefined'
+    ? (window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance)
+    : null;
+  const available = !!(typeof window !== 'undefined' && window.speechSynthesis && UtteranceCtor);
   const dispVoices = filteredVoices();
   const activeVoice = getSelectedVoice();
   const englishCount = voices.filter(isEnglishVoice).length;
@@ -731,7 +774,7 @@ export default function AudioPlayer({
         {windowControls}
       </div>
       <p className="audio-float__unsupported-msg">
-        Text-to-speech is not supported in this browser. Try Chrome, Edge, or Safari.
+        Text-to-speech is not available in this browser. Try Chrome, Edge, Firefox, Safari, or Brave — then tap Play after the page loads.
       </p>
     </div>
   ) : (
@@ -751,10 +794,9 @@ export default function AudioPlayer({
     >
       <div
         className="audio-float__chrome"
-        onPointerDown={onDragPointerDown}
-        onPointerMove={onDragPointerMove}
-        onPointerUp={onDragPointerUp}
-        onPointerCancel={onDragPointerUp}
+        onPointerDown={onDragStart}
+        onMouseDown={onDragStart}
+        onTouchStart={onDragStart}
       >
         <div className="audio-float__drag">
           <span className="audio-float__grip" aria-hidden="true">⋮⋮</span>
@@ -988,6 +1030,6 @@ export default function AudioPlayer({
     </div>
   );
 
-  if (typeof document === 'undefined') return null;
+  if (!portalReady || typeof document === 'undefined' || !document.body) return null;
   return createPortal(panel, document.body);
 }

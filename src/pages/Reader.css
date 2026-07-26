@@ -1096,7 +1096,13 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   touch-action: none;
+  -webkit-user-select: none;
   user-select: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .audio-player.audio-float {
+    background: #161222;
+  }
 }
 .audio-float--max {
   width: min(420px, calc(100vw - 16px));
