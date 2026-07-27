@@ -90,7 +90,7 @@ const DEFAULT_SETTINGS = {
   authorBio:'IT entrepreneur, software engineer, AI developer, and author based in Kenya.',
   authorWeb:'https://tech.ellines.co.ke/', authorTwitter:'',
   mpesaPhone:'0748255466', mpesaTill:'', mpesaName:'Ellines Haven',
-  airtelNum:'', stripeEnabled:false, stripeKey:'', currency:'KES',
+  airtelNum:'', stripeEnabled:false, stripePubKey:'', currency:'KES',
   payMethods:['mpesa','airtel','card'],
   paypalClientId:'', paypalEnabled:false,
   flutterwaveKey:'', flutterwaveEnabled:false,

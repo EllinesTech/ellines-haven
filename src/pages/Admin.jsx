@@ -5123,8 +5123,9 @@ export default function Admin() {
                     </div>
                     <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Stripe card payments (requires Stripe setup).</p>
                     <div className="adm-field-group">
-                      <label>Stripe Secret Key</label>
-                      <input className="field" type="password" value={sForm.stripeKey || ''} onChange={e => setSetting('stripeKey', e.target.value)} placeholder="sk_live_..." />
+                      <label>Stripe Publishable Key</label>
+                      <input className="field" type="text" value={sForm.stripePubKey || ''} onChange={e => setSetting('stripePubKey', e.target.value)} placeholder="pk_live_..." />
+                      <small style={{color:'var(--muted)',marginTop:4,display:'block'}}>Secret keys must be stored in Cloud Functions environment variables, never here.</small>
                     </div>
                     <div className="adm-field-group">
                       <label>Currency</label>

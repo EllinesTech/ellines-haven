@@ -43,7 +43,6 @@ const AVAILABLE = [
     badge: 'International',
     fields: [
       { k: 'pubKey',  l: 'Publishable Key', ph: 'pk_live_…', type: 'text'     },
-      { k: 'secKey',  l: 'Secret Key',       ph: 'sk_live_…', type: 'password' },
     ],
   },
   {

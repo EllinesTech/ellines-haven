@@ -287,6 +287,9 @@ function VisitorTracker() {
     // Skip admin and reader pages — don't track admin browsing as site visitors
     if (pathname.startsWith('/admin') || pathname.startsWith('/read')) return;
 
+    // Respect cookie consent — skip analytics if declined
+    if (localStorage.getItem('eh_cookie_consent') === 'declined') return;
+
     // Track page visits with per-page cooldown (60 seconds per page per session)
     const sessionKey = 'eh_visitor_' + pathname + '_' + (user?.email || 'anon');
     const lastTracked = sessionStorage.getItem(sessionKey);

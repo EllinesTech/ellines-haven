@@ -70,6 +70,10 @@ export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
+    test: {
+      environment: 'jsdom',
+      globals: true,
+    },
     plugins: [react(), stampServiceWorker(), stampPublicAssets()],
     define: {
       '__PAYSTACK_KEY__': JSON.stringify(env.VITE_PAYSTACK_PUBLIC_KEY || ''),

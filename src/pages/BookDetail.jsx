@@ -372,12 +372,27 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
     }
     const loadGrants = async () => {
       try {
-        // Automatically grant first chapter if enabled
         const chapters = book.freeFirstChapter ? [0] : [];
+        // Query user_chapter_grants for individually granted chapters
+        const cached = localStorage.getItem('eh_chapter_grants');
+        if (cached) {
+          const allGrants = JSON.parse(cached);
+          const bookGrant = (allGrants.grants || []).find(g => g.bookId === book.id);
+          if (bookGrant) {
+            if (bookGrant.chapters === 'all') {
+              setGrantedChapters('all');
+              return;
+            }
+            if (Array.isArray(bookGrant.chapters)) {
+              const merged = [...new Set([...chapters, ...bookGrant.chapters])];
+              setGrantedChapters(merged);
+              return;
+            }
+          }
+        }
         setGrantedChapters(chapters);
-        // TODO: Could query user_chapter_grants collection here if needed
       } catch {
-        /* grants are optional — ignore load failures */
+        setGrantedChapters(book.freeFirstChapter ? [0] : []);
       }
     };
     loadGrants();

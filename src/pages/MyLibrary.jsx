@@ -1198,7 +1198,7 @@ export default function MyLibrary() {
                     <div key={b.id} className={'mylib-card card' + (anyOff ? ' mylib-card--restricted' : '') + (isReading ? ' mylib-card--reading' : '')}>
                       <div className="mylib-card__cover-wrap">
                         {b.cover
-                          ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
+                          ? <img src={b.cover} alt={b.title} className="mylib-card__cover" loading="lazy" decoding="async" />
                           : <div className="mylib-card__cover mylib-card__cover--styled"
                               style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
                               <span style={{ fontSize:'1.6rem', opacity:0.35 }}>&#128218;</span>
@@ -1429,7 +1429,7 @@ export default function MyLibrary() {
                     <div key={b.id} className={'mylib-card card' + (owned ? ' mylib-card--owned' : '')}>
                       <div className="mylib-card__cover-wrap">
                         {b.cover
-                          ? <img src={b.cover} alt={b.title} className="mylib-card__cover" />
+                          ? <img src={b.cover} alt={b.title} className="mylib-card__cover" loading="lazy" decoding="async" />
                           : <div className="mylib-card__cover mylib-card__cover--styled"
                               style={{ background: b.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }}>
                               <span style={{ fontSize:'1.6rem', opacity:0.35 }}>&#128218;</span>

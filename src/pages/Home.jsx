@@ -243,7 +243,7 @@ function PersonalisedSection({ user, library, books }) {
             <Link to={readPath(resumeBook)} className="home-resume">
               <div className="home-resume__cover">
                 {resumeBook.cover
-                  ? <img src={resumeBook.cover} alt="" />
+                  ? <img src={resumeBook.cover} alt="" loading="lazy" decoding="async" />
                   : <div className="home-resume__cover-fallback" style={{ background: resumeBook.coverColor || 'linear-gradient(145deg,#0f0f22,#1a1a3a)' }} />
                 }
               </div>
