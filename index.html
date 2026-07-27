@@ -92,6 +92,10 @@
     <!-- ALLOW GOOGLE INDEXING ON PRODUCTION (do not add no-store meta — blocks indexing) -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <!-- Google Search Console — HTML-tag verification (preferred if Pretty URLs still 308 the .html file).
+         After deploy of pages-functions middleware, HTML-file method should also work.
+         To use meta tag: GSC → URL-prefix property → HTML tag → paste content= value below, then deploy. -->
+    <!-- <meta name="google-site-verification" content="PASTE_GSC_TOKEN_HERE" /> -->
     <title>Ellines Haven | Home For The Story Soul</title>
     <meta name="description" content="Discover original novels and short stories by Elijah Mwangi M — all inspired by true stories from East Africa. Buy once, read forever. Kenya's premier literary platform." />
     <meta name="keywords" content="Ellines Haven, Elijah Mwangi, Kenyan novels, African literature, East Africa books, online bookstore Kenya" />
@@ -194,7 +198,6 @@
       "email": "haven@ellines.co.ke",
       "address": {
         "@type": "PostalAddress",
-        "streetAddress": "Nairobi",
         "addressLocality": "Nairobi",
         "addressCountry": "KE"
       },
@@ -204,7 +207,13 @@
           "telephone": "+254748255466",
           "contactType": "customer support",
           "availableLanguage": "English",
-          "areaServed": "KE"
+          "areaServed": "KE",
+          "hoursAvailable": {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+            "opens": "08:00",
+            "closes": "20:00"
+          }
         },
         {
           "@type": "ContactPoint",
@@ -221,15 +230,14 @@
       "currenciesAccepted": "KES, USD",
       "openingHoursSpecification": {
         "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
-        "opens": "00:00",
-        "closes": "23:59"
+        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+        "opens": "08:00",
+        "closes": "20:00"
       },
       "sameAs": [
         "https://tech.ellines.co.ke/",
         "https://haven.ellines.co.ke"
       ],
-      "hasMap": "https://maps.google.com/?q=Nairobi,Kenya",
       "foundingDate": "2024",
       "founder": {
         "@type": "Person",
@@ -311,34 +319,13 @@
         {
           "@type": "ListItem",
           "position": 4,
-          "name": "My Library",
-          "description": "Access your purchased books — read online or download PDF",
-          "url": "https://haven.ellines.co.ke/my-library"
-        },
-        {
-          "@type": "ListItem",
-          "position": 5,
           "name": "Contact Us",
           "description": "Get in touch with Ellines Haven support",
           "url": "https://haven.ellines.co.ke/contact"
         },
         {
           "@type": "ListItem",
-          "position": 6,
-          "name": "Sign In",
-          "description": "Sign in to your Ellines Haven account",
-          "url": "https://haven.ellines.co.ke/login"
-        },
-        {
-          "@type": "ListItem",
-          "position": 7,
-          "name": "Create Account",
-          "description": "Join Ellines Haven and start reading original African stories",
-          "url": "https://haven.ellines.co.ke/register"
-        },
-        {
-          "@type": "ListItem",
-          "position": 8,
+          "position": 5,
           "name": "FAQ",
           "description": "Frequently asked questions about Ellines Haven",
           "url": "https://haven.ellines.co.ke/faq"

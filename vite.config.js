@@ -89,6 +89,12 @@ export default defineConfig(({ command, mode }) => {
       cssCodeSplit: false,
       rollupOptions: {
         output: {
+          // Embed build stamp in filenames so every deploy gets new /assets/*
+          // URLs. Content-only hashes can reuse names across deploys; browsers
+          // that cached an immutable 404 for that name stay broken forever.
+          entryFileNames: `assets/[name]-${BUILD_STAMP}-[hash].js`,
+          chunkFileNames: `assets/[name]-${BUILD_STAMP}-[hash].js`,
+          assetFileNames: `assets/[name]-${BUILD_STAMP}-[hash][extname]`,
           manualChunks(id) {
             if (id.includes('firebase/auth') || id.includes('@firebase/auth'))
               return 'vendor-firebase-auth';

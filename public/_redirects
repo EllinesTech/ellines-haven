@@ -2,9 +2,11 @@
 # Serving index.html for .js/.css causes "Unable to preload CSS" / MIME crashes.
 /assets/*  /404.html  404
 
-# Keep Google Search Console HTML verification on the exact .html URL
-# (Cloudflare "pretty URLs" otherwise 308-strips the extension).
+# Keep Google Search Console HTML verification on the exact .html URL.
+# Note: Cloudflare Pages "Pretty URLs" may still 308 before _redirects apply.
+# Authoritative fix lives in pages-functions/_middleware.js (serves 200 body).
 /google17caeb8194dadb8a.html  /google17caeb8194dadb8a.html  200!
+/google17caeb8194dadb8a       /google17caeb8194dadb8a.html  200!
 
 # Explicit SPA app routes — ensure 200 + index.html (not custom 404.html).
 # Cloudflare can serve /404.html for unmatched paths when only a bare /* rewrite exists.

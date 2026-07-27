@@ -122,31 +122,35 @@ jobs:
           fi
           echo "Deployment URL: $DEPLOY_URL"
           test -n "$DEPLOY_URL"
-          for ref in "${refs[@]}"; do
-            ok=0
-            for attempt in 1 2 3 4 5; do
-              code=$(curl -sS -o /dev/null -w '%{http_code}' "${DEPLOY_URL%/}${ref}" || echo 000)
-              echo "ORIGIN GET ${ref} → ${code} (try ${attempt})"
-              if [ "$code" = "200" ]; then
-                ok=1
-                break
+          # Status 200 alone is not enough — SPA/404.html fallback is text/html and
+          # breaks CSS ("MIME type text/html") while looking like a soft miss.
+          check_asset() {
+            local base="$1" ref="$2" label="$3"
+            local want='javascript'
+            [[ "$ref" == *.css ]] && want='text/css'
+            local ok=0
+            for attempt in 1 2 3 4 5 6 7 8; do
+              headers=$(curl -sSI "${base%/}${ref}" | tr -d '\r' || true)
+              code=$(printf '%s\n' "$headers" | awk 'NR==1{print $2}')
+              ctype=$(printf '%s\n' "$headers" | awk -F': ' 'tolower($1)=="content-type"{print $2; exit}')
+              echo "${label} GET ${ref} → ${code} ctype=${ctype} (try ${attempt})"
+              if [ "$code" = "200" ] && printf '%s' "$ctype" | grep -qi "$want"; then
+                if printf '%s' "$ctype" | grep -qi 'text/html'; then
+                  echo "rejecting HTML fallback for ${ref}"
+                else
+                  ok=1
+                  break
+                fi
               fi
-              sleep 4
+              sleep 5
             done
             test "$ok" = "1"
+          }
+          for ref in "${refs[@]}"; do
+            check_asset "$DEPLOY_URL" "$ref" ORIGIN
           done
           for ref in "${refs[@]}"; do
-            ok=0
-            for attempt in 1 2 3 4 5; do
-              code=$(curl -sS -o /dev/null -w '%{http_code}' "https://haven.ellines.co.ke${ref}" || echo 000)
-              echo "LIVE GET ${ref} → ${code} (try ${attempt})"
-              if [ "$code" = "200" ]; then
-                ok=1
-                break
-              fi
-              sleep 4
-            done
-            test "$ok" = "1"
+            check_asset "https://haven.ellines.co.ke" "$ref" LIVE
           done
           html_cc=$(curl -sSI "https://haven.ellines.co.ke/" | tr -d '\r' | grep -i '^cache-control:' | head -1)
           echo "index Cache-Control: $html_cc"
