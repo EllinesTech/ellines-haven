@@ -100,6 +100,7 @@ jobs:
           cp -R pages-functions .cf-deploy/functions
 
       - name: Deploy to Cloudflare Pages
+        id: pages_deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -113,11 +114,32 @@ jobs:
           set -e
           sleep 8
           mapfile -t refs < <(grep -oE '(src|href)="/assets/[^"]+\.(js|css)"' dist/index.html | grep -oE '/assets/[^"]+\.(js|css)' | sort -u)
+          # Verify on the Pages deployment origin first — custom-domain CDN can
+          # still return HIT 200 for deleted hashes while HTML already moved on.
+          DEPLOY_URL="${{ steps.pages_deploy.outputs.deployment-url }}"
+          if [ -z "$DEPLOY_URL" ]; then
+            DEPLOY_URL=$(npx wrangler pages deployment list --project-name=ellines-haven --json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const j=JSON.parse(d);console.log((j[0]&&j[0].url)||'');});")
+          fi
+          echo "Deployment URL: $DEPLOY_URL"
+          test -n "$DEPLOY_URL"
+          for ref in "${refs[@]}"; do
+            ok=0
+            for attempt in 1 2 3 4 5; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' "${DEPLOY_URL%/}${ref}" || echo 000)
+              echo "ORIGIN GET ${ref} → ${code} (try ${attempt})"
+              if [ "$code" = "200" ]; then
+                ok=1
+                break
+              fi
+              sleep 4
+            done
+            test "$ok" = "1"
+          done
           for ref in "${refs[@]}"; do
             ok=0
             for attempt in 1 2 3 4 5; do
               code=$(curl -sS -o /dev/null -w '%{http_code}' "https://haven.ellines.co.ke${ref}" || echo 000)
-              echo "GET ${ref} → ${code} (try ${attempt})"
+              echo "LIVE GET ${ref} → ${code} (try ${attempt})"
               if [ "$code" = "200" ]; then
                 ok=1
                 break

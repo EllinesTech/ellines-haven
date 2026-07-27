@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:pages": "wrangler pages dev dist --port 5174 --ip 127.0.0.1 --show-interactive-dev-session=false",
-    "deploy:pages": "npm run build && wrangler pages deploy dist --project-name=ellines-haven",
+    "deploy:pages": "npm run build && node scripts/deploy-pages.mjs",
     "cf-build": "npm install && vite build && node scripts/prerender.js",
     "submit-indexing": "node scripts/submit-indexing.mjs"
   },
