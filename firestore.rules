@@ -133,6 +133,77 @@ service cloud.firestore {
       }
     }
 
+    // ── Ellines Rattan Furniture (namespaced; shared project) ───────────────
+    // Rattan portal uses Firebase Auth (synced on app login). Haven admin does
+    // NOT — keep Haven paths above gated only by app UI, not request.auth.
+    // site_data docs (including rattan_*) stay on Haven's write:if true above.
+
+    function rattanSignedIn() {
+      return request.auth != null;
+    }
+
+    function rattanValidEmail(value) {
+      return value is string && value.size() > 3 && value.size() < 320;
+    }
+
+    // Portal users for rattanfurniture.ellines.co.ke — separate from Haven `users`.
+    match /rattan_users/{userId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if rattanSignedIn();
+    }
+
+    // Quote / budget requests from the Rattan shop.
+    match /quote_requests/{requestId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAny(['customer', 'items'])
+        && request.resource.data.customer is map;
+      allow update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_orders/{orderId} {
+      allow read: if true;
+      allow create, update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_media/{mediaId} {
+      allow read: if true;
+      allow create, update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_subscriptions/{subId} {
+      allow read: if rattanSignedIn();
+      allow create: if request.resource.data.email is string
+        && rattanValidEmail(request.resource.data.email);
+      allow update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_testimonials/{id} {
+      allow read: if true;
+      allow create, update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_posts/{id} {
+      allow read: if true;
+      allow create, update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_visit_bookings/{id} {
+      allow read: if rattanSignedIn();
+      allow create: if request.resource.data.keys().hasAny(['name', 'phone'])
+        && request.resource.data.name is string
+        && request.resource.data.phone is string;
+      allow update, delete: if rattanSignedIn();
+    }
+
+    match /rattan_trade_enquiries/{id} {
+      allow read: if rattanSignedIn();
+      allow create: if request.resource.data.keys().hasAny(['name', 'phone'])
+        && request.resource.data.name is string
+        && request.resource.data.phone is string;
+      allow update, delete: if rattanSignedIn();
+    }
+
     // ── Newsletter ──────────────────────────────────────────────────────────
     match /newsletter_signups/{d} {
       allow read:  if true;

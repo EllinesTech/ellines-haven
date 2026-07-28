@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Ellines Haven (custom auth — no request.auth on client) ─────────────
+    match /site-images/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /local/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ── Ellines Rattan Furniture (Firebase Auth on privileged writes) ───────
+    // Prefix used by Rattan CMS / media utils: rattan-media/...
+    match /rattan-media/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.size < 15 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+        );
+      allow delete: if request.auth != null;
+    }
+  }
+}
