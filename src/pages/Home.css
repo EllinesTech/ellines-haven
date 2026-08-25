@@ -1319,3 +1319,140 @@
   .hero__poster-frame { max-width: 200px; }
 }
 
+
+/* ════════════════════════════════════════
+   DEAL STRIP — bundle offer bar
+════════════════════════════════════════ */
+.deal-strip {
+  background: linear-gradient(90deg, rgba(201,168,76,0.12) 0%, rgba(201,168,76,0.06) 100%);
+  border-top: 1px solid rgba(201,168,76,0.3);
+  border-bottom: 1px solid rgba(201,168,76,0.18);
+  padding: 14px 0;
+}
+.deal-strip__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.deal-strip__left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.deal-strip__tag {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  color: var(--gold, #c9a84c);
+  text-transform: uppercase;
+}
+.deal-strip__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text, #f0ece2);
+}
+.deal-strip__books {
+  font-size: 0.72rem;
+  color: var(--muted, rgba(240,236,226,0.55));
+}
+.deal-strip__right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-shrink: 0;
+}
+.deal-strip__pricing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.deal-strip__old {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.deal-strip__new {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--gold, #c9a84c);
+  line-height: 1;
+}
+.deal-strip__save {
+  font-size: 0.65rem;
+  color: #2ecc71;
+  font-weight: 700;
+}
+.deal-strip__btn {
+  padding: 10px 20px !important;
+  font-size: 0.82rem !important;
+  white-space: nowrap;
+}
+
+/* ════════════════════════════════════════
+   WHATSAPP QUICK BUY BAR
+════════════════════════════════════════ */
+.wa-quick-buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 20px;
+  background: rgba(37,211,102,0.07);
+  border-top: 1px solid rgba(37,211,102,0.18);
+  border-bottom: 1px solid rgba(37,211,102,0.18);
+  color: #25d366;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.wa-quick-buy:hover {
+  background: rgba(37,211,102,0.13);
+  color: #25d366;
+}
+.wa-quick-buy__arrow {
+  margin-left: 4px;
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .deal-strip__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .deal-strip__right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .deal-strip__pricing {
+    align-items: flex-start;
+  }
+}
+
+/* ════════════════════════════════════════
+   CTA BOX — enhanced proof + fine print
+════════════════════════════════════════ */
+.cta-box__proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0 20px;
+  font-size: 0.78rem;
+  color: var(--muted, rgba(240,236,226,0.6));
+}
+.cta-box__proof-sep {
+  opacity: 0.4;
+}
+.cta-box__fine {
+  margin-top: 12px;
+  font-size: 0.68rem;
+  color: var(--muted, rgba(240,236,226,0.4));
+  text-align: center;
+}

@@ -441,7 +441,13 @@ export default function BookCard({ book }) {
       <div className="bcard__img-wrap">
         <BookCover book={book} />
         <div className="bcard__overlay">
-          <Link to={bookPath(book)} className="btn btn-primary btn-sm">View Book</Link>
+          {owned ? (
+            <Link to={readPath(book)} className="btn btn-primary btn-sm">Read Now →</Link>
+          ) : hasFreeSampleChapter(book) ? (
+            <Link to={readPath(book)} className="btn btn-primary btn-sm" style={{ color: '#d4b5ff', background: 'rgba(168,85,247,0.25)', borderColor: 'rgba(168,85,247,0.6)' }}>Read Free Chapter</Link>
+          ) : (
+            <Link to={bookPath(book)} className="btn btn-primary btn-sm">View Book</Link>
+          )}
         </div>
         <div className="bcard__wishlist-btn" onClick={e => e.stopPropagation()}>
           <WishlistButton book={book} size="sm" />
@@ -497,6 +503,15 @@ export default function BookCard({ book }) {
         <p className="bcard__excerpt">{book.excerpt}</p>
         {book.inspired && book.inspiredNote && (
           <p className="bcard__inspired-note">✦ {book.inspiredNote}</p>
+        )}
+        {!owned && hasFreeSampleChapter(book) && !NO_PURCHASE_STATUSES.has(book.status) && (
+          <Link
+            to={readPath(book)}
+            className="bcard__free-teaser"
+            title="Read the first chapter free before buying"
+          >
+            👀 Free first chapter — read before you buy
+          </Link>
         )}
 
         <div className="bcard__meta">

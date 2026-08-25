@@ -484,3 +484,19 @@
   .bcard:hover .bcard__cover-photo,
   .bcard:hover .bcard__cover-styled { transform: none; }
 }
+
+/* ── Free Chapter Teaser link ── */
+.bcard__free-teaser {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #a855f7;
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.bcard__free-teaser:hover {
+  opacity: 1;
+  text-decoration: underline;
+}

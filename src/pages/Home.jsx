@@ -459,6 +459,82 @@ function TestimonialsCarousel({ sub }) {
   );
 }
 
+/* ── Deal Strip — high-visibility bundle offer above the fold ── */
+function DealStrip({ books }) {
+  const { addToCart, cart } = useApp();
+  // Pick the 3 best complete, priced books for a bundle deal
+  const eligible = books.filter(b =>
+    b.active !== false &&
+    b.status !== 'coming-soon' &&
+    b.status !== 'draft' &&
+    b.price > 0
+  );
+  const bundle = eligible.slice(0, 3);
+  if (bundle.length < 2) return null;
+  const fullPrice = bundle.reduce((s, b) => s + b.price, 0);
+  const dealPrice = Math.round(fullPrice * 0.72 / 10) * 10; // 28% off, rounded
+  const saving = fullPrice - dealPrice;
+  const allInCart = bundle.every(b => cart.some(c => c.id === b.id));
+
+  const handleBundle = () => {
+    bundle.forEach(b => {
+      if (!cart.some(c => c.id === b.id)) addToCart(b);
+    });
+  };
+
+  return (
+    <div className="deal-strip">
+      <div className="container deal-strip__inner">
+        <div className="deal-strip__left">
+          <span className="deal-strip__tag">🔥 LIMITED OFFER</span>
+          <strong className="deal-strip__title">Starter Bundle — {bundle.length} Books</strong>
+          <span className="deal-strip__books">{bundle.map(b => b.title).join(' · ')}</span>
+        </div>
+        <div className="deal-strip__right">
+          <div className="deal-strip__pricing">
+            <span className="deal-strip__old">KSh {fullPrice.toLocaleString()}</span>
+            <span className="deal-strip__new">KSh {dealPrice.toLocaleString()}</span>
+            <span className="deal-strip__save">Save KSh {saving.toLocaleString()}</span>
+          </div>
+          {allInCart ? (
+            <Link to="/cart" className="btn btn-primary deal-strip__btn">Go to Cart →</Link>
+          ) : (
+            <button className="btn btn-primary deal-strip__btn" onClick={handleBundle}>
+              Get Bundle →
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── WhatsApp Quick Buy bar — for M-Pesa buyers who skip the cart ── */
+function WAQuickBuy({ books }) {
+  const topBook = books.find(b =>
+    b.active !== false && b.status !== 'coming-soon' && b.status !== 'draft' && b.price > 0 && b.featured
+  );
+  if (!topBook) return null;
+  const msg = encodeURIComponent(
+    `Hi! I want to buy "${topBook.title}" (KSh ${topBook.price}) via M-Pesa. Please send me the payment details.`
+  );
+  return (
+    <a
+      href={`https://wa.me/254748255466?text=${msg}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="wa-quick-buy"
+      aria-label="Buy via WhatsApp and M-Pesa"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+      <span>Prefer M-Pesa? Order via WhatsApp in 30 seconds</span>
+      <span className="wa-quick-buy__arrow">→</span>
+    </a>
+  );
+}
+
 export default function Home() {
   const { books, user, library } = useApp();
   usePageMeta({
@@ -550,26 +626,25 @@ export default function Home() {
             </p>
 
             <div className="hero__btns">
-              <Link to="/library" className="btn btn-primary hero__cta-primary">
-                <EditableField field="hero_btn_primary">{c.hero_btn_primary}</EditableField>
-              </Link>
               {sampleBook ? (
-                <Link to={readPath(sampleBook)} className="btn btn-outline hero__cta-secondary">
-                  Read a Free Chapter
+                <Link to={readPath(sampleBook)} className="btn btn-primary hero__cta-primary">
+                  Read Free Chapter →
                 </Link>
               ) : (
-                <Link to="/founder" className="btn btn-outline hero__cta-secondary">
-                  <EditableField field="hero_btn_secondary">{c.hero_btn_secondary}</EditableField>
+                <Link to="/library" className="btn btn-primary hero__cta-primary">
+                  <EditableField field="hero_btn_primary">{c.hero_btn_primary}</EditableField>
                 </Link>
               )}
+              <Link to="/library" className="btn btn-outline hero__cta-secondary">
+                Browse All Books
+              </Link>
             </div>
 
             <ul className="hero__promises">
-              <li>Buy once · own forever</li>
+              <li>Books from KSh 120</li>
               <li>M-Pesa ready</li>
-              <li>Read on any phone</li>
-            </ul>
-          </div>
+              <li>Own forever — no subscription</li>
+            </ul>          </div>
 
           <div className="hero__visual">
             <div className="hero__shelf">
@@ -635,6 +710,11 @@ export default function Home() {
       </div>
 
       {/* ══════════════════════════════════════
+          DEAL STRIP — bundle offer
+      ══════════════════════════════════════ */}
+      <DealStrip books={activeBooks} />
+
+      {/* ══════════════════════════════════════
           STORY HOOK — get them into a chapter
       ══════════════════════════════════════ */}
       <div id="home-hook">
@@ -662,6 +742,11 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* ══════════════════════════════════════
+          WHATSAPP QUICK BUY — M-Pesa shortcut
+      ══════════════════════════════════════ */}
+      <WAQuickBuy books={activeBooks} />
 
       {/* ══════════════════════════════════════
           PERSONALISED FEED — logged-in users only
@@ -894,16 +979,30 @@ export default function Home() {
           <div className="cta-box">
             <div className="cta-box__glow" />
             <p className="cta-box__brand">Ellines Haven</p>
-            <h2><EditableField field="cta_heading">{c.cta_heading}</EditableField></h2>
-            <p><EditableField field="cta_sub" multiline>{c.cta_sub}</EditableField></p>
+            <h2>Your next story is <span className="gold-text">KSh 120 away</span></h2>
+            <p>Join thousands of Kenyan readers. Create your free account, pick any book, and start reading in under 2 minutes — on any phone, no app needed.</p>
+            <div className="cta-box__proof">
+              <span>⭐ 4.8 average rating</span>
+              <span className="cta-box__proof-sep">·</span>
+              <span>📚 {activeBooks.filter(b => b.price > 0 && b.status !== 'coming-soon').length}+ books available now</span>
+              <span className="cta-box__proof-sep">·</span>
+              <span>✅ Buy once, own forever</span>
+            </div>
             <div className="cta-box__btns">
               <Link to="/register" className="btn btn-primary">
-                <EditableField field="cta_btn_primary">{c.cta_btn_primary}</EditableField>
+                Create Free Account →
               </Link>
-              <Link to="/library" className="btn btn-ghost">
-                <EditableField field="cta_btn_secondary">{c.cta_btn_secondary}</EditableField>
-              </Link>
+              {sampleBook ? (
+                <Link to={readPath(sampleBook)} className="btn btn-ghost">
+                  Read a Free Chapter First
+                </Link>
+              ) : (
+                <Link to="/library" className="btn btn-ghost">
+                  Browse the Library
+                </Link>
+              )}
             </div>
+            <p className="cta-box__fine">No subscription · No credit card needed to register · M-Pesa accepted</p>
           </div>
         </div>
       </section>

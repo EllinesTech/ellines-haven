@@ -48,7 +48,7 @@ const TYPE_TABS = [
 const SORT_OPTIONS = [
   { value: 'newest',     label: 'Newest First' },
   { value: 'rating',     label: 'Top Rated' },
-  { value: 'price-asc',  label: 'Price ↑' },
+  { value: 'price-asc',  label: 'Best Value (Price ↑)' },
   { value: 'price-desc', label: 'Price ↓' },
 ];
 
@@ -308,6 +308,16 @@ export default function Library() {
               {genre && <span className="lib-chip">{genre} <button type="button" onClick={() => setGenre('')}>×</button></span>}
               {status && activeStatusMeta && <span className="lib-chip">{activeStatusMeta.label} <button type="button" onClick={() => setStatus('')}>×</button></span>}
               {search && <span className="lib-chip">"{search}" <button type="button" onClick={() => setSearch('')}>×</button></span>}
+            </div>
+          )}
+
+          {/* Value nudge — only when browsing unfiltered */}
+          {!hasFilters && sort === 'newest' && (
+            <div className="lib-value-nudge">
+              <span>📚 Starting from <strong>KSh 120</strong> · Buy once, read forever ·</span>
+              <button type="button" className="lib-value-nudge__btn" onClick={() => setSort('price-asc')}>
+                Show cheapest first →
+              </button>
             </div>
           )}
 

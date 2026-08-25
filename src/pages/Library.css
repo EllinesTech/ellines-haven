@@ -621,3 +621,36 @@
     animation: none !important;
   }
 }
+
+/* ── Library value nudge ── */
+.lib-value-nudge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: rgba(201,168,76,0.07);
+  border: 1px solid rgba(201,168,76,0.2);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--muted, rgba(240,236,226,0.6));
+}
+.lib-value-nudge strong {
+  color: var(--gold, #c9a84c);
+}
+.lib-value-nudge__btn {
+  background: none;
+  border: none;
+  color: var(--gold, #c9a84c);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.lib-value-nudge__btn:hover {
+  opacity: 0.8;
+}

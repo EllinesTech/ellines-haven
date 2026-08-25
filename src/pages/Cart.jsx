@@ -250,7 +250,7 @@ function VerifyingScreen({ orderId, paystackRef, userEmail, onDone, onGiveUp }) 
 
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
-  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount } = useApp();
+  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount, addToCart, books: allBooks } = useApp();
   
   usePageMeta({
     title: 'Cart',
@@ -1272,6 +1272,57 @@ export default function Cart() {
                   </div>
                 ))}
               </div>
+
+              {/* ── Upsell: add another book ── */}
+              {cart.length === 1 && !cart[0].isChapter && (() => {
+                const inCart = cart[0];
+                const suggestion = allBooks.find(b =>
+                  b.active !== false &&
+                  b.id !== inCart.id &&
+                  b.status !== 'coming-soon' &&
+                  b.status !== 'draft' &&
+                  b.price > 0 &&
+                  b.genre === inCart.genre
+                ) || allBooks.find(b =>
+                  b.active !== false &&
+                  b.id !== inCart.id &&
+                  b.status !== 'coming-soon' &&
+                  b.status !== 'draft' &&
+                  b.price > 0
+                );
+                if (!suggestion) return null;
+                const alreadyIn = cart.some(c => c.id === suggestion.id);
+                return (
+                  <div className="cart-upsell card">
+                    <p className="cart-upsell__label">📚 Readers who bought <strong>{inCart.title}</strong> also loved:</p>
+                    <div className="cart-upsell__row">
+                      <img
+                        src={suggestion.cover || '/logo-icon.png'}
+                        alt={suggestion.title}
+                        className="cart-upsell__cover"
+                        onError={e => { e.target.src = '/logo-icon.png'; }}
+                      />
+                      <div className="cart-upsell__info">
+                        <strong>{suggestion.title}</strong>
+                        <span>{suggestion.genre} · KSh {suggestion.price}</span>
+                        {suggestion.freeFirstChapter && (
+                          <span className="cart-upsell__free">Free first chapter available</span>
+                        )}
+                      </div>
+                      {alreadyIn ? (
+                        <span className="cart-upsell__added">✓ Added</span>
+                      ) : (
+                        <button
+                          className="btn btn-primary btn-sm cart-upsell__btn"
+                          onClick={() => addToCart(suggestion)}
+                        >
+                          + Add
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ── Right: order summary ── */}
               <div className="cart-sum card">
