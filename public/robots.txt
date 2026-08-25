@@ -16,11 +16,13 @@ Disallow: /admin
 Disallow: /my-library
 Disallow: /cart
 Disallow: /wishlist
-Disallow: /reader-profile
+Disallow: /profile
+Disallow: /reader/
 Disallow: /admin-profile
 Disallow: /change-password
 Disallow: /challenges
 Disallow: /login
 Disallow: /register
+Disallow: /read/
 
 Sitemap: https://haven.ellines.co.ke/sitemap.xml

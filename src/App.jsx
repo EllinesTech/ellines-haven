@@ -28,7 +28,7 @@
  */
 
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useEffect, useState, useRef, lazy, Suspense, Component } from 'react';
+import { useEffect, useState, lazy, Suspense, Component } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { EditModeProvider, useEditMode } from './context/EditModeContext';
