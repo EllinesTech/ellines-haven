@@ -317,6 +317,21 @@ export default function Register() {
             <h2><EditableField field="heading">{cv.heading}</EditableField></h2>
             <p><EditableField field="sub">{cv.sub}</EditableField></p>
           </div>
+
+          {/* What you unlock */}
+          <div className="auth-perks">
+            {[
+              { icon: '📚', text: 'Access the full library — 10+ books' },
+              { icon: '📖', text: 'Read free first chapters instantly' },
+              { icon: '💳', text: 'Buy with M-Pesa, card or PayPal' },
+              { icon: '✅', text: 'Own your books forever — no subscription' },
+            ].map(p => (
+              <div key={p.text} className="auth-perk">
+                <span className="auth-perk__icon">{p.icon}</span>
+                <span>{p.text}</span>
+              </div>
+            ))}
+          </div>
           <form onSubmit={submit}>
             {err && (
               <div className="form-error auth-alert" role="alert" style={{ marginBottom:'16px' }}>

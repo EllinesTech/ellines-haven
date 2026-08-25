@@ -802,3 +802,29 @@
     transform: none;
   }
 }
+
+/* ── Register unlock perks ── */
+.auth-perks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 4px 0 20px;
+  padding: 12px 14px;
+  background: rgba(201,168,76,0.06);
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 8px;
+}
+.auth-perk {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.74rem;
+  color: var(--muted, rgba(240,236,226,0.65));
+}
+.auth-perk__icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+@media (max-width: 400px) {
+  .auth-perks { grid-template-columns: 1fr; }
+}

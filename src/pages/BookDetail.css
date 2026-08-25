@@ -961,3 +961,74 @@
   cursor: pointer;
 }
 .bd-toc-editor-cancel:hover { color: var(--text); }
+
+/* ── Sticky buy bar ── */
+.bd-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  background: rgba(13,13,26,0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(201,168,76,0.25);
+  padding: 10px 0;
+  animation: bd-sticky-in 0.2s ease;
+}
+@keyframes bd-sticky-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.bd-sticky-bar__inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.bd-sticky-bar__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bd-sticky-bar__title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+.bd-sticky-bar__price {
+  font-size: 0.78rem;
+  color: var(--gold, #c9a84c);
+  font-weight: 700;
+}
+.bd-sticky-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.bd-sticky-bar__btn {
+  padding: 10px 20px !important;
+  font-size: 0.84rem !important;
+  white-space: nowrap;
+}
+.bd-sticky-bar__wa {
+  padding: 10px 14px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem !important;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .bd-sticky-bar__title { max-width: 130px; font-size: 0.78rem; }
+  .bd-sticky-bar__wa span { display: none; }
+}
