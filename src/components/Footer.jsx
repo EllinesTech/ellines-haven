@@ -138,11 +138,16 @@ export default function Footer() {
             <Link to="/faq" className="footer__link">FAQ / Help</Link>
             <a href={`mailto:${INFO_EMAIL}`} className="footer__link">Info</a>
             <a href={`mailto:${HAVEN_EMAIL}`} className="footer__link">Orders</a>
-            <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
+            <div className="footer__group-divider" />
+            <span className="footer__group-label">Ellines Group</span>
+            <a href="https://haven.ellines.co.ke/" className="footer__link footer__link--group">
+              Ellines Haven
+            </a>
+            <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--group footer__link--ext">
               Ellines Tech ↗
             </a>
-            <a href="https://ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
-              Ellines Group ↗
+            <a href="https://rattanfurniture.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--group footer__link--ext">
+              Ellines Rattan Furniture ↗
             </a>
           </div>
 
