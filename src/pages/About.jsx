@@ -615,15 +615,19 @@ export default function About() {
           <div className="about-close about-rise">
             <div className="about-close__glow" aria-hidden="true" />
             <p className="about-close__brand">Ellines Haven</p>
-            <h2>Ready to find your next story?</h2>
+            <h2>Your next story starts at <span className="gold-text">KSh 120</span></h2>
             <p className="about-close__sub">
-              Browse the library, meet the founder, or reach the team in Nairobi — we are here for African literature.
+              Browse 10+ original novels and short stories. Read a free first chapter before you buy.
+              M-Pesa accepted — own your books forever, no subscription.
             </p>
             <div className="about-close__actions">
-              <Link to="/library" className="btn btn-primary">Explore the Library</Link>
-              <Link to="/founder" className="btn btn-outline">Meet the Founder</Link>
-              <Link to="/contact" className="about-close__ghost">Contact Us</Link>
+              <Link to="/library" className="btn btn-primary">Browse the Library →</Link>
+              <Link to="/register" className="btn btn-outline">Create Free Account</Link>
+              <Link to="/founder" className="about-close__ghost">Meet the Founder</Link>
             </div>
+            <p style={{ marginTop: 12, fontSize: '0.72rem', color: 'var(--muted)', textAlign: 'center' }}>
+              Free to register · No credit card needed · M-Pesa &amp; card accepted
+            </p>
           </div>
         </div>
       </section>

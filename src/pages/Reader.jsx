@@ -1777,6 +1777,61 @@ export default function Reader() {
 
               )}
 
+              {/* End-of-free-chapter buy prompt */}
+              {chapter === 0 && !canAccessChapter(1) && book?.price > 0 && (
+                <div style={{
+                  marginTop: 24, padding: '18px 20px',
+                  background: 'rgba(201,168,76,0.08)',
+                  border: '1px solid rgba(201,168,76,0.25)',
+                  borderRadius: 10, textAlign: 'center',
+                }}>
+                  <p style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
+                    Enjoyed Chapter 1?
+                  </p>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.82rem', color: 'var(--muted)' }}>
+                    Get the full book — {book.chapterCount || 'all'} chapters · Buy once, read forever
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Link to={bookPath(book)} className="btn btn-primary" style={{ fontSize: '0.88rem' }}>
+                      Get Full Book — KSh {book.price}
+                    </Link>
+                    <a
+                      href={`https://wa.me/254748255466?text=${encodeURIComponent(`Hi! I'd like to buy "${book.title}" (KSh ${book.price}) via M-Pesa.`)}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="btn btn-wa"
+                      style={{ fontSize: '0.88rem' }}
+                    >
+                      Order via WhatsApp
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* End-of-book panel for completed readers */}
+              {chapter === chapters.length - 1 && ownedBook && (
+                <div style={{
+                  marginTop: 24, padding: '18px 20px',
+                  background: 'rgba(46,204,113,0.06)',
+                  border: '1px solid rgba(46,204,113,0.2)',
+                  borderRadius: 10, textAlign: 'center',
+                }}>
+                  <p style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 700, color: '#2ecc71' }}>
+                    🎉 You finished the book!
+                  </p>
+                  <p style={{ margin: '0 0 14px', fontSize: '0.82rem', color: 'var(--muted)' }}>
+                    Loved it? Leave a review or discover your next read.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Link to={bookPath(book)} className="btn btn-outline" style={{ fontSize: '0.82rem' }}>
+                      Leave a Review
+                    </Link>
+                    <Link to="/library" className="btn btn-primary" style={{ fontSize: '0.82rem' }}>
+                      Browse More Books →
+                    </Link>
+                  </div>
+                </div>
+              )}
+
             </div>
 
           </div>
