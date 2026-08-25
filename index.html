@@ -434,21 +434,18 @@
         });
       })();
     </script>
-    <!-- Keep crawlable SEO text invisible so reload never flashes plain HTML before React mounts -->
+    <!-- Page chrome: dark background + min-height so #root never flashes white -->
     <style id="eh-seo-hide">
       html,body{background:#05050e;color:#f0ece2;margin:0;}
       #root{min-height:100vh;}
-      #eh-seo-crawl,[data-eh-seo]{
-        position:absolute!important;width:1px!important;height:1px!important;
-        padding:0!important;margin:-1px!important;overflow:hidden!important;
-        clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;
-        clip-path:inset(50%)!important;
-      }
     </style>
   </head>
   <body>
-    <!-- Crawlable copy for Google (prerender fills this). Kept outside #root = no FOUC flash. -->
-    <div id="eh-seo-crawl" data-eh-seo="1">
+    <!-- Crawlable copy for Google (prerender fills this). Kept outside #root = no FOUC flash.
+         Hidden from users via inline style — inline style survives the prerender strip.
+         Google can read text inside visually-hidden elements; aria-hidden is NOT set so
+         screen readers and crawlers both see the content. -->
+    <div id="eh-seo-crawl" data-eh-seo="1" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;clip-path:inset(50%)">
       <h1>Ellines Haven</h1>
       <p>Home For The Story Soul — Kenya's premier digital bookstore for original novels and short stories by Elijah Mwangi M.</p>
       <nav>
