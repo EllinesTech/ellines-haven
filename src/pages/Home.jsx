@@ -756,6 +756,23 @@ export default function Home() {
       )}
 
       {/* ══════════════════════════════════════
+          REFERRAL NUDGE — logged-in, has books
+      ══════════════════════════════════════ */}
+      {user && library.length > 0 && (
+        <div className="referral-nudge">
+          <div className="container referral-nudge__inner">
+            <div className="referral-nudge__copy">
+              <strong>Enjoying Ellines Haven?</strong>
+              <span>Share your referral link — when a friend buys, you both get a discount on your next book.</span>
+            </div>
+            <Link to="/profile" className="btn btn-outline btn-sm referral-nudge__btn">
+              Get My Referral Link →
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════
           FEATURED BOOKS — available stories first
       ══════════════════════════════════════ */}
       <section className="section home-featured-sec">

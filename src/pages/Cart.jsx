@@ -906,6 +906,68 @@ export default function Cart() {
             </div>
           </div>
 
+          {/* ── What to read next ── */}
+          {(() => {
+            const boughtIds = new Set((placedOrder?.items || []).map(i => i.bookId || i.id));
+            const boughtGenres = new Set(
+              (placedOrder?.items || [])
+                .map(i => allBooks.find(b => b.id === (i.bookId || i.id))?.genre)
+                .filter(Boolean)
+            );
+            const next = allBooks.find(b =>
+              b.active !== false &&
+              !boughtIds.has(b.id) &&
+              b.status !== 'coming-soon' &&
+              b.status !== 'draft' &&
+              b.price > 0 &&
+              boughtGenres.has(b.genre)
+            ) || allBooks.find(b =>
+              b.active !== false &&
+              !boughtIds.has(b.id) &&
+              b.status !== 'coming-soon' &&
+              b.status !== 'draft' &&
+              b.price > 0 &&
+              b.featured
+            );
+            if (!next) return null;
+            return (
+              <div style={{
+                margin: '20px 0 4px',
+                padding: '14px 16px',
+                background: 'rgba(74,158,255,0.06)',
+                border: '1px solid rgba(74,158,255,0.2)',
+                borderRadius: 'var(--r-sm)',
+                textAlign: 'left',
+              }}>
+                <p style={{ fontSize: '0.72rem', color: 'var(--muted)', margin: '0 0 10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                  📖 What to read next
+                </p>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <img
+                    src={next.cover || '/logo-icon.png'}
+                    alt={next.title}
+                    style={{ width: 44, height: 60, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
+                    onError={e => { e.target.src = '/logo-icon.png'; }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text)', marginBottom: 2 }}>{next.title}</strong>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>{next.genre} · KSh {next.price}</span>
+                    {next.freeFirstChapter && (
+                      <span style={{ display: 'block', fontSize: '0.68rem', color: '#a855f7', fontWeight: 600, marginTop: 2 }}>Free first chapter available</span>
+                    )}
+                  </div>
+                  <Link
+                    to={`/book/${next.id}`}
+                    className="btn btn-primary btn-sm"
+                    style={{ flexShrink: 0, fontSize: '0.78rem' }}
+                  >
+                    View →
+                  </Link>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="done-box__actions">
             <Link to="/my-library" className="btn btn-primary">Go to My Library</Link>
             <Link to="/library" className="btn btn-outline">Browse More</Link>

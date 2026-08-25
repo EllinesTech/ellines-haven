@@ -1456,3 +1456,45 @@
   color: var(--muted, rgba(240,236,226,0.4));
   text-align: center;
 }
+
+/* ════════════════════════════════════════
+   REFERRAL NUDGE STRIP
+════════════════════════════════════════ */
+.referral-nudge {
+  background: rgba(168,85,247,0.06);
+  border-top: 1px solid rgba(168,85,247,0.15);
+  border-bottom: 1px solid rgba(168,85,247,0.15);
+  padding: 12px 0;
+}
+.referral-nudge__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.referral-nudge__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.referral-nudge__copy strong {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.referral-nudge__copy span {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.referral-nudge__btn {
+  flex-shrink: 0;
+  border-color: rgba(168,85,247,0.5) !important;
+  color: #d4b5ff !important;
+  white-space: nowrap;
+}
+.referral-nudge__btn:hover {
+  background: rgba(168,85,247,0.1) !important;
+}
+@media (max-width: 600px) {
+  .referral-nudge__inner { flex-direction: column; align-items: flex-start; }
+}
