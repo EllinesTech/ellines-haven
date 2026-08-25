@@ -141,6 +141,9 @@ export default function Footer() {
             <a href="https://tech.ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
               Ellines Tech ↗
             </a>
+            <a href="https://ellines.co.ke/" target="_blank" rel="noopener noreferrer" className="footer__link footer__link--ext">
+              Ellines Group ↗
+            </a>
           </div>
 
         </div>

@@ -36,8 +36,8 @@ const firebaseConfig = {
   projectId:         "ellines-haven-web",
   storageBucket:     "ellines-haven-web.firebasestorage.app",
   messagingSenderId: "733742563669",
-  appId:             "1:733742563669:web:3f5f627161d021c99aefdc",
-  measurementId:     "G-NS37C57X64",
+  appId:             "1:733742563669:web:08df2b624292b7c49aefdc",
+  measurementId:     "G-0ECS70RX32",
 };
 
 const app = initializeApp(firebaseConfig);

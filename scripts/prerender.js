@@ -413,6 +413,13 @@ function patchHtml(template, route) {
 
   let html = template;
 
+  // Remove the #eh-seo-hide style block so the prerendered SEO content is
+  // visible in static HTML (not hidden with clip-path/position:absolute).
+  // Google treats visually-hidden content with less weight and may flag it
+  // as cloaking. The SEO crawl div must be legible in the static response.
+  // React will replace #root on mount; #eh-seo-crawl sits outside #root.
+  html = html.replace(/<style id="eh-seo-hide">[\s\S]*?<\/style>/m, '');
+
   // 1. Page title
   html = html.replace(
     /<title>[^<]*<\/title>/,
@@ -473,10 +480,15 @@ function patchHtml(template, route) {
     );
   }
 
-  // 7. Crawlable body OUTSIDE #root — Google indexes it; users never see a flash
-  //    (visually hidden via #eh-seo-hide in index.html)
+  // 7. Crawlable body OUTSIDE #root — visible in static HTML for Googlebot.
+  //    The #eh-seo-hide style is stripped above, so this block renders normally
+  //    in the prerendered file. React mounts into #root (a sibling), so React
+  //    never touches or re-renders #eh-seo-crawl.
   const seoBody = buildSeoBody(route);
-  const seoBlock = `<div id="eh-seo-crawl" data-eh-seo="1" aria-hidden="true">${seoBody}</div>`;
+  // No aria-hidden — screen readers and Google should see this content in the
+  // static prerendered HTML. React mounts into #root (a sibling element), so
+  // this block stays visible in the initial HTML but React does not re-render it.
+  const seoBlock = `<div id="eh-seo-crawl" data-eh-seo="1">${seoBody}</div>`;
   if (/<div id="eh-seo-crawl"[^>]*>[\s\S]*?<\/div>\s*<div id="root"/i.test(html)) {
     html = html.replace(
       /<div id="eh-seo-crawl"[^>]*>[\s\S]*?<\/div>(\s*<div id="root")/i,
