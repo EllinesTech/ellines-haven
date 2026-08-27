@@ -359,42 +359,79 @@ function buildSeoBody(route) {
         const name = escapeHtml(b.bookTitle || b.schema.name);
         const href = escapeHtml(b.path);
         const blurb = escapeHtml(b.description.slice(0, 140));
-        return `<li><a href="${href}"><strong>${name}</strong></a> — ${blurb}</li>`;
+        const price = b.bookPrice ? ` — KES ${b.bookPrice}` : '';
+        return `<li><a href="${href}"><strong>${name}</strong></a>${price} — ${blurb}</li>`;
       })
       .join('\n');
+
     return `
 <main data-eh-seo="1">
-  <h1>Ellines Haven</h1>
-  <p>Home For The Story Soul — Kenya's premier digital bookstore for original novels and short stories by Elijah Mwangi M, inspired by true East African stories. Buy once, read forever.</p>
+  <header>
+    <h1>Ellines Haven — Kenya's Digital Bookstore</h1>
+    <p>Home For The Story Soul. Original novels and short stories by Elijah Mwangi M, inspired by true East African stories. Buy once, read forever. Based in Nairobi, Kenya.</p>
+  </header>
   ${nav}
-  <h2>Featured books</h2>
-  <ul>${list}</ul>
-  <p>Not a hotel or vacation rental — Ellines Haven is an online bookstore based in Kenya.</p>
+  <section>
+    <h2>About Ellines Haven</h2>
+    <p>Ellines Haven is Kenya's premier digital bookstore featuring original fiction by Elijah Mwangi M — a Kenyan author, software engineer and AI developer based in Nairobi. Every novel and short story is drawn from real East African life: real relationships, real places, real heartbreak, real hope.</p>
+    <p>Books are available for purchase with M-Pesa, Airtel Money, Paystack, Visa, Mastercard and PayPal. Buy once and own your book forever — no subscription, no expiry. Read on any phone, tablet or desktop using our built-in reader. No app needed.</p>
+    <p>Ellines Haven is part of the <a href="https://ellines.co.ke">Ellines Group</a> — a Kenyan group of companies founded by Elijah Mwangi M.</p>
+  </section>
+  <section>
+    <h2>Available Books — Starting from KES 120</h2>
+    <ul>${list}</ul>
+    <p><a href="/library">Browse the full library →</a></p>
+  </section>
+  <section>
+    <h2>Why Ellines Haven?</h2>
+    <ul>
+      <li>Authentic Kenyan stories drawn from real life — not generic fiction</li>
+      <li>Affordable prices starting from KES 120</li>
+      <li>Pay with M-Pesa in seconds</li>
+      <li>Buy once, own forever — no subscription or expiry</li>
+      <li>Read on any phone — no app needed</li>
+      <li>Support an independent Kenyan author directly</li>
+    </ul>
+  </section>
+  <section>
+    <h2>About the Author</h2>
+    <p>Elijah Mwangi M is a Kenyan author, software engineer and AI developer. He is the founder of Ellines Haven and the Ellines Group. His novels and short stories are set across Kenya — Nairobi, Mombasa, the Rift Valley, the Savanna — and are inspired by real people and real events. <a href="/founder">Learn more about Elijah Mwangi M →</a></p>
+  </section>
+  <section>
+    <h2>Contact Ellines Haven</h2>
+    <p>Email: haven@ellines.co.ke · Phone: +254 748 255 466 · WhatsApp: +254 748 255 466 · Location: Nairobi, Kenya</p>
+    <p><a href="/contact">Contact us →</a> · <a href="/faq">FAQ →</a> · <a href="/about">About Us →</a></p>
+  </section>
 </main>`;
   }
 
   if (route.path === '/library') {
     const list = books.map(b => {
       const name = escapeHtml(b.bookTitle || b.schema?.name || b.title.split(' by ')[0]);
-      return `<li><a href="${escapeHtml(b.path)}">${name}</a></li>`;
+      const price = b.bookPrice ? ` (KES ${b.bookPrice})` : '';
+      const genre = b.schema?.genre ? ` — ${escapeHtml(b.schema.genre)}` : '';
+      return `<li><a href="${escapeHtml(b.path)}">${name}</a>${price}${genre}</li>`;
     }).join('\n');
     return `
 <main data-eh-seo="1">
-  <p><a href="/">Ellines Haven</a></p>
+  <p><a href="/">Ellines Haven</a> — Kenya's Digital Bookstore</p>
   ${nav}
-  <h1>The Library</h1>
+  <h1>The Library — All Books by Elijah Mwangi M</h1>
   <p>${escapeHtml(route.description)}</p>
+  <p>Browse all original novels and short stories available on Ellines Haven. Pay with M-Pesa or card. Buy once, own forever.</p>
   <ul>${list}</ul>
+  <p>All books written by <a href="/founder">Elijah Mwangi M</a>, a Kenyan author based in Nairobi, Kenya.</p>
 </main>`;
   }
 
   return `
 <main data-eh-seo="1">
-  <p><a href="/">Ellines Haven</a> — Home For The Story Soul</p>
+  <p><a href="/">Ellines Haven</a> — Kenya's Digital Bookstore — <a href="https://ellines.co.ke">Ellines Group</a></p>
   ${nav}
   <h1>${escapeHtml(route.title.replace(` — ${SITE}`, '').replace(` | ${SITE}`, ''))}</h1>
   <p>${escapeHtml(route.description)}</p>
-  <p>Ellines Haven is Kenya's digital bookstore for original African literature by Elijah Mwangi M.</p>
+  <p>Ellines Haven is Kenya's digital bookstore for original African literature by <a href="/founder">Elijah Mwangi M</a>. Books from KES 120. Pay with M-Pesa. Based in Nairobi, Kenya.</p>
+  <p><a href="/library">Browse all books →</a> · <a href="/register">Create free account →</a> · <a href="/contact">Contact us →</a></p>
 </main>`;
 }
 
