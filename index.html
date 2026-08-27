@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -97,8 +97,8 @@
          To use meta tag: GSC → URL-prefix property → HTML tag → paste content= value below, then deploy. -->
     <!-- <meta name="google-site-verification" content="PASTE_GSC_TOKEN_HERE" /> -->
     <title>Ellines Haven | Home For The Story Soul</title>
-    <meta name="description" content="Discover original novels and short stories by Elijah Mwangi M — all inspired by true stories from East Africa. Buy once, read forever. Kenya's premier literary platform." />
-    <meta name="keywords" content="Ellines Haven, Elijah Mwangi, Kenyan novels, African literature, East Africa books, online bookstore Kenya" />
+    <meta name="description" content="Ellines Haven — part of Ellines Group. Discover original novels and short stories by Elijah Mwangi M, inspired by true stories from East Africa. Kenya's premier digital bookstore. Buy once, read forever." />
+    <meta name="keywords" content="Ellines Haven, Ellines Group, Elijah Mwangi, Kenyan novels, African literature, East Africa books, online bookstore Kenya, ellines.co.ke" />
     <meta name="author" content="Elijah Mwangi M" />
 
     <!-- Google Fonts — non-blocking preload -->
@@ -155,7 +155,7 @@
     <link rel="dns-prefetch" href="https://www.paypal.com" />
     <!-- Structured Data — WebSite + SitelinksSearchBox -->
     <script type="application/ld+json">
-    {
+{
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Ellines Haven",
@@ -164,176 +164,221 @@
       "description": "Kenya's premier digital bookstore — original novels and short stories by Elijah Mwangi M, inspired by true East African stories.",
       "inLanguage": "en-KE",
       "potentialAction": {
-        "@type": "SearchAction",
-        "target": {
-          "@type": "EntryPoint",
-          "urlTemplate": "https://haven.ellines.co.ke/library?q={search_term_string}"
-        },
-        "query-input": "required name=search_term_string"
+            "@type": "SearchAction",
+            "target": {
+                  "@type": "EntryPoint",
+                  "urlTemplate": "https://haven.ellines.co.ke/library?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
       }
-    }
+}
     </script>
     <!-- Structured Data — Organization / BookStore (IMPROVED) -->
     <script type="application/ld+json">
-    {
+{
       "@context": "https://schema.org",
-      "@type": ["Organization", "BookStore", "LocalBusiness"],
+      "@type": [
+            "Organization",
+            "BookStore",
+            "LocalBusiness"
+      ],
       "name": "Ellines Haven",
       "url": "https://haven.ellines.co.ke",
       "logo": {
-        "@type": "ImageObject",
-        "url": "https://haven.ellines.co.ke/pwa-icon-512.png",
-        "width": 512,
-        "height": 512
+            "@type": "ImageObject",
+            "url": "https://haven.ellines.co.ke/pwa-icon-512.png",
+            "width": 512,
+            "height": 512
       },
       "image": {
-        "@type": "ImageObject",
-        "url": "https://haven.ellines.co.ke/og-image.png",
-        "width": 1200,
-        "height": 630
+            "@type": "ImageObject",
+            "url": "https://haven.ellines.co.ke/og-image.png",
+            "width": 1200,
+            "height": 630
       },
       "description": "Kenya's premier digital bookstore. Original novels and short stories by Elijah Mwangi M — all inspired by true East African stories. Buy once, read forever.",
       "disambiguatingDescription": "An online bookstore featuring original African literature and books from emerging East African authors",
       "telephone": "+254748255466",
       "email": "haven@ellines.co.ke",
       "address": {
-        "@type": "PostalAddress",
-        "addressLocality": "Nairobi",
-        "addressCountry": "KE"
+            "@type": "PostalAddress",
+            "addressLocality": "Nairobi",
+            "addressCountry": "KE"
       },
       "contactPoint": [
-        {
-          "@type": "ContactPoint",
-          "telephone": "+254748255466",
-          "contactType": "customer support",
-          "availableLanguage": "English",
-          "areaServed": "KE",
-          "hoursAvailable": {
-            "@type": "OpeningHoursSpecification",
-            "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
-            "opens": "08:00",
-            "closes": "20:00"
-          }
-        },
-        {
-          "@type": "ContactPoint",
-          "contactType": "sales",
-          "email": "haven@ellines.co.ke"
-        }
+            {
+                  "@type": "ContactPoint",
+                  "telephone": "+254748255466",
+                  "contactType": "customer support",
+                  "availableLanguage": "English",
+                  "areaServed": "KE",
+                  "hoursAvailable": {
+                        "@type": "OpeningHoursSpecification",
+                        "dayOfWeek": [
+                              "Monday",
+                              "Tuesday",
+                              "Wednesday",
+                              "Thursday",
+                              "Friday",
+                              "Saturday"
+                        ],
+                        "opens": "08:00",
+                        "closes": "20:00"
+                  }
+            },
+            {
+                  "@type": "ContactPoint",
+                  "contactType": "sales",
+                  "email": "haven@ellines.co.ke"
+            }
       ],
       "areaServed": {
-        "@type": "Country",
-        "name": "Kenya"
+            "@type": "Country",
+            "name": "Kenya"
       },
-      "paymentAccepted": ["M-Pesa", "Airtel Money", "Paystack", "PayPal", "Visa", "Mastercard"],
+      "paymentAccepted": [
+            "M-Pesa",
+            "Airtel Money",
+            "Paystack",
+            "PayPal",
+            "Visa",
+            "Mastercard"
+      ],
       "priceRange": "KES 120 - 500",
       "currenciesAccepted": "KES, USD",
       "openingHoursSpecification": {
-        "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
-        "opens": "08:00",
-        "closes": "20:00"
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": [
+                  "Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday"
+            ],
+            "opens": "08:00",
+            "closes": "20:00"
       },
       "sameAs": [
-        "https://tech.ellines.co.ke/",
-        "https://haven.ellines.co.ke",
-        "https://rattanfurniture.ellines.co.ke/"
+            "https://ellines.co.ke",
+            "https://tech.ellines.co.ke/",
+            "https://haven.ellines.co.ke",
+            "https://rattanfurniture.ellines.co.ke/"
       ],
       "foundingDate": "2024",
       "founder": {
-        "@type": "Person",
-        "name": "Elijah Mwangi M",
-        "url": "https://haven.ellines.co.ke/founder"
+            "@type": "Person",
+            "name": "Elijah Mwangi M",
+            "url": "https://haven.ellines.co.ke/founder"
       },
       "numberOfEmployees": 1,
-      "knowsAbout": ["African Literature", "East African Culture", "Digital Publishing"],
+      "knowsAbout": [
+            "African Literature",
+            "East African Culture",
+            "Digital Publishing"
+      ],
       "mainEntity": {
-        "@type": "CreativeWork",
-        "name": "Ellines Haven Literary Platform"
+            "@type": "CreativeWork",
+            "name": "Ellines Haven Literary Platform"
+      },
+      "parentOrganization": {
+            "@type": "Organization",
+            "name": "Ellines Group",
+            "url": "https://ellines.co.ke"
       }
-    }
+}
     </script>
     <!-- Structured Data — Author / Person -->
     <script type="application/ld+json">
-    {
+{
       "@context": "https://schema.org",
       "@type": "Person",
       "name": "Elijah Mwangi M",
       "url": "https://haven.ellines.co.ke/founder",
       "image": "https://haven.ellines.co.ke/mwangi.png",
-      "jobTitle": ["Author", "Software Engineer", "AI Developer"],
+      "jobTitle": [
+            "Author",
+            "Software Engineer",
+            "AI Developer"
+      ],
       "worksFor": {
-        "@type": "Organization",
-        "name": "Ellines Group",
-        "url": "https://tech.ellines.co.ke/"
+            "@type": "Organization",
+            "name": "Ellines Group",
+            "url": "https://ellines.co.ke"
       },
       "nationality": {
-        "@type": "Country",
-        "name": "Kenya"
+            "@type": "Country",
+            "name": "Kenya"
       },
       "description": "Kenyan author, software engineer and AI developer. Founder of the Ellines Group. Author of original novels and short stories inspired by real East African life.",
-      "knowsAbout": ["African Literature", "Software Engineering", "Artificial Intelligence", "Kenyan Culture"],
+      "knowsAbout": [
+            "African Literature",
+            "Software Engineering",
+            "Artificial Intelligence",
+            "Kenyan Culture"
+      ],
       "sameAs": [
-        "https://haven.ellines.co.ke/founder",
-        "https://tech.ellines.co.ke/",
-        "https://rattanfurniture.ellines.co.ke/"
+            "https://ellines.co.ke",
+            "https://haven.ellines.co.ke/founder",
+            "https://tech.ellines.co.ke/",
+            "https://rattanfurniture.ellines.co.ke/"
       ]
-    }
+}
     </script>
     <!-- Structured Data — Site navigation / key pages (helps Google show sitelinks) -->
     <script type="application/ld+json">
-    {
+{
       "@context": "https://schema.org",
       "@type": "ItemList",
       "name": "Ellines Haven — Key Pages",
       "description": "Main sections of Ellines Haven — Kenya's premier digital bookstore",
       "itemListElement": [
-        {
-          "@type": "SiteLinksSearchBox",
-          "url": "https://haven.ellines.co.ke",
-          "potentialAction": {
-            "@type": "SearchAction",
-            "target": "https://haven.ellines.co.ke/library?q={search_term_string}",
-            "query-input": "required name=search_term_string"
-          }
-        },
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Book Library",
-          "description": "Browse all original novels and short stories by Elijah Mwangi M",
-          "url": "https://haven.ellines.co.ke/library"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Meet the Founder",
-          "description": "Learn about Elijah Mwangi M — Kenyan author, engineer and AI developer",
-          "url": "https://haven.ellines.co.ke/founder"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "About Ellines Haven",
-          "description": "Our story, mission and vision for African literature",
-          "url": "https://haven.ellines.co.ke/about"
-        },
-        {
-          "@type": "ListItem",
-          "position": 4,
-          "name": "Contact Us",
-          "description": "Get in touch with Ellines Haven support",
-          "url": "https://haven.ellines.co.ke/contact"
-        },
-        {
-          "@type": "ListItem",
-          "position": 5,
-          "name": "FAQ",
-          "description": "Frequently asked questions about Ellines Haven",
-          "url": "https://haven.ellines.co.ke/faq"
-        }
+            {
+                  "@type": "SiteLinksSearchBox",
+                  "url": "https://haven.ellines.co.ke",
+                  "potentialAction": {
+                        "@type": "SearchAction",
+                        "target": "https://haven.ellines.co.ke/library?q={search_term_string}",
+                        "query-input": "required name=search_term_string"
+                  }
+            },
+            {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Book Library",
+                  "description": "Browse all original novels and short stories by Elijah Mwangi M",
+                  "url": "https://haven.ellines.co.ke/library"
+            },
+            {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Meet the Founder",
+                  "description": "Learn about Elijah Mwangi M — Kenyan author, engineer and AI developer",
+                  "url": "https://haven.ellines.co.ke/founder"
+            },
+            {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "About Ellines Haven",
+                  "description": "Our story, mission and vision for African literature",
+                  "url": "https://haven.ellines.co.ke/about"
+            },
+            {
+                  "@type": "ListItem",
+                  "position": 4,
+                  "name": "Contact Us",
+                  "description": "Get in touch with Ellines Haven support",
+                  "url": "https://haven.ellines.co.ke/contact"
+            },
+            {
+                  "@type": "ListItem",
+                  "position": 5,
+                  "name": "FAQ",
+                  "description": "Frequently asked questions about Ellines Haven",
+                  "url": "https://haven.ellines.co.ke/faq"
+            }
       ]
-    }
+}
     </script>
     <!-- Block crawlers on non-production domains (e.g. pages.dev preview URLs) -->
     <!-- Production domain (haven.ellines.co.ke) is NOT blocked - it's allowed to be indexed -->
@@ -461,3 +506,5 @@
     <!-- Kill-switch SW is registered in <head> at stable /sw.js (never caches /assets/). -->
   </body>
 </html>
+
+
