@@ -25,4 +25,7 @@ Disallow: /login
 Disallow: /register
 Disallow: /read/
 
+# Sitemaps
 Sitemap: https://haven.ellines.co.ke/sitemap.xml
+# Cross-site discovery: Ellines Group parent site.
+Sitemap: https://ellines.co.ke/sitemap.xml
