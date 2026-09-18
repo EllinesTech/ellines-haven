@@ -116,7 +116,15 @@ export default function AdminOrdersPanel({ showToast, isSuper }) {
       if (editData.status === 'Completed' && editingOrder.status !== 'Completed' && editData.userEmail) {
         const bookIds = (editingOrder.items || []).map(item => item.id).filter(Boolean);
         if (bookIds.length) {
-          await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: editData.userEmail, bookIds }).catch(() => {});
+          try {
+            await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: editData.userEmail, bookIds });
+          } catch (unlockErr) {
+            // Don't swallow — tell admin the unlock failed so they can retry manually
+            showToast?.('⚠️ Order saved but book unlock failed: ' + (unlockErr?.message || 'unknown error') + '. Use the manual unlock tool.');
+            setSaving(false);
+            setEditingOrder(null);
+            return;
+          }
         }
       }
       showToast?.('✅ Order updated');
@@ -339,7 +347,41 @@ export default function AdminOrdersPanel({ showToast, isSuper }) {
                         </td>
                         <td style={{ fontSize: '0.72rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{fmtDate(o.createdAt || o._createdMs)}</td>
                         <td>
-                          <div style={{ display: 'flex', gap: 4 }}>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {o.status === 'Pending' && (
+                              <>
+                                <button
+                                  className="adm-act-btn adm-act-confirm"
+                                  title="Approve & unlock books"
+                                  onClick={async e => {
+                                    e.stopPropagation();
+                                    try {
+                                      const bookIds = (o.items || []).map(i => i.id).filter(Boolean);
+                                      if (bookIds.length && o.userEmail) {
+                                        await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: o.userEmail, bookIds });
+                                      }
+                                      await updateDoc(doc(db, 'orders', o.id), { status: 'Completed', confirmedAt: serverTimestamp() });
+                                      showToast?.('✅ Order approved — books unlocked for ' + (o.userName || o.userEmail));
+                                    } catch (err) {
+                                      showToast?.('❌ Approval failed: ' + (err?.message || 'unknown error'));
+                                    }
+                                  }}
+                                >✅</button>
+                                <button
+                                  className="adm-act-btn adm-act-del"
+                                  title="Reject order"
+                                  onClick={async e => {
+                                    e.stopPropagation();
+                                    try {
+                                      await updateDoc(doc(db, 'orders', o.id), { status: 'Rejected', rejectedAt: serverTimestamp() });
+                                      showToast?.('✕ Order rejected');
+                                    } catch (err) {
+                                      showToast?.('❌ Reject failed: ' + (err?.message || 'unknown error'));
+                                    }
+                                  }}
+                                >✕</button>
+                              </>
+                            )}
                             <button className="adm-act-btn adm-act-edit" onClick={e => { e.stopPropagation(); openEdit(o); }}>✏️ Edit</button>
                             <button className="adm-act-btn" style={{ color: '#4a9eff', border: '1px solid rgba(74,158,255,0.25)' }}
                               onClick={e => { e.stopPropagation(); printReceipt(o); }}>🖨</button>

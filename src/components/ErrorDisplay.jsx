@@ -1,4 +1,5 @@
 // ── Error Display Component for Ellines Haven ─────────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components -- exports ErrorTypes alongside components
 // Consistent error messaging and user feedback across the application
 
 import React, { useState, useEffect } from 'react';

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react';
 import { BOOKS as INITIAL_BOOKS } from '../data/books';
 import { resolveCoverFields } from '../utils/bookCovers';
@@ -6,7 +7,7 @@ import {
   doc, getDoc, setDoc, updateDoc,
   collection, onSnapshot, serverTimestamp, getDocs, query, where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, callAdminManualUnlock } from '../firebase';
 
 const Ctx = createContext(null);
 
@@ -910,7 +911,7 @@ export function AppProvider({ children }) {
     } catch (e) { console.error('unlockBooksForBuyer failed:', e); throw e; }
   };
 
-  const confirmOrder = async (orderId) => {
+  const confirmOrder = async (orderId, callerEmail) => {
     // Read directly from Firestore — don't rely on possibly-stale `orders` state
     let order = orders.find(o => o.id === orderId);
     if (!order) {
@@ -921,8 +922,14 @@ export function AppProvider({ children }) {
     }
     if (!order || order.status !== 'Pending') return;
     if (!order.userEmail) { console.error('confirmOrder: order has no userEmail'); return; }
-    const resolved = (order.items || []).map(item => ({ ...(books.find(b => b.id === item.id) || item), downloadUnlocked: true }));
-    await unlockBooksForBuyer(order.userEmail, resolved);
+
+    // ── Unlock books via Cloud Function (client writes to /libraries are blocked by Firestore rules) ──
+    const bookIds = (order.items || []).map(item => item.id).filter(Boolean);
+    if (bookIds.length) {
+      const adminEmail = callerEmail || user?.email || 'admin';
+      await callAdminManualUnlock({ adminEmail, targetEmail: order.userEmail, bookIds });
+    }
+
     try { await updateDoc(doc(db,'orders',orderId), { status:'Completed', confirmedAt: serverTimestamp() }); }
     catch (e) { console.error('confirmOrder failed:', e); }
 

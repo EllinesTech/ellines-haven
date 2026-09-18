@@ -1057,23 +1057,57 @@ exports.verifyPaystackPayment = onCall(
       const itemIds = (order.items || []).map(i => i.id);
       const missing = itemIds.filter(id => !books.some(b => b.id === id));
       if (missing.length) {
-        console.error("[verifyPaystack] CRITICAL: unlock missing items", missing);
-        await db.collection("unlock_failures").add({
-          userEmail: unlockEmail,
-          orderId: orderSnap.id,
-          reference,
-          reason: "items missing after unlock: " + missing.join(","),
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-          source: "verifyPaystack_post_unlock_check",
-        }).catch(() => {});
-        throw new HttpsError("internal", "Payment confirmed but book unlock failed. Use Retry Activation.");
+        console.error("[verifyPaystack] CRITICAL: unlock missing items", missing, "— retrying once");
+        // Retry the unlock once before giving up
+        try {
+          await unlockBooksForUser(unlockEmail, order.items || [], "paystack_verify_retry");
+          const libSnap2 = await libRef.get();
+          const books2 = libSnap2.exists ? (libSnap2.data()?.books || []) : [];
+          const stillMissing = itemIds.filter(id => !books2.some(b => b.id === id));
+          if (stillMissing.length) {
+            console.error("[verifyPaystack] Still missing after retry:", stillMissing);
+            await db.collection("unlock_failures").add({
+              userEmail: unlockEmail,
+              orderId: orderSnap.id,
+              reference,
+              reason: "items missing after unlock retry: " + stillMissing.join(","),
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+              source: "verifyPaystack_post_unlock_check",
+            }).catch(() => {});
+            // Return success=true because order IS completed — client will re-read library
+            // Do NOT throw here; throwing causes the frontend to show an error and go back
+            // to the payment form. The order is confirmed, the books will appear in the library.
+            console.warn("[verifyPaystack] Returning success despite missing items — client will retry library read");
+          }
+        } catch (retryErr) {
+          console.error("[verifyPaystack] Retry unlock threw:", retryErr.message);
+          await db.collection("unlock_failures").add({
+            userEmail: unlockEmail,
+            orderId: orderSnap.id,
+            reference,
+            reason: "unlock retry threw: " + retryErr.message,
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            source: "verifyPaystack_retry_error",
+          }).catch(() => {});
+        }
       }
 
       // Buyer SMS/email is best-effort via webhook path; verify stays lean (PAYSTACK_SECRET only)
     } catch (fsErr) {
       if (fsErr instanceof HttpsError) throw fsErr;
       console.error("[verifyPaystack] Firestore unlock failed:", fsErr.message, "ref:", reference);
-      throw new HttpsError("internal", "Payment confirmed but unlock failed. Use Retry Activation in My Library.");
+      // Order is already marked Completed above — return success so client moves to 'done'
+      // and the library onSnapshot will deliver the books when Firestore replicates.
+      // Throwing here sends the user back to the payment form even though they paid.
+      console.warn("[verifyPaystack] Unlock write failed but order is Completed — returning success for client retry");
+      return {
+        success: true,
+        unlocked: false,
+        channel: "unknown",
+        amount: 0,
+        source: "verify_unlock_write_failed",
+        retryLibrary: true,
+      };
     }
 
     return {

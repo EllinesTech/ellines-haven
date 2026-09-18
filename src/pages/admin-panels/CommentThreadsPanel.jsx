@@ -19,23 +19,13 @@ export default function CommentThreadsPanel({ showToast, books, isSuper }) {
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, flagged: 0 });
   const [actionInProgress, setActionInProgress] = useState(null);
 
-  useEffect(() => {
-    loadComments();
-  }, [filter]);
-
   const loadComments = async () => {
     setLoading(true);
     try {
-      // Fetch ALL comments without composite index requirement
-      // (orderBy alone doesn't need an index, only orderBy + where does)
       const q = query(collection(db, 'book_comments'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
       const allComments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Filter on client side to avoid composite index requirement
-      const filtered = filter === 'all' 
-        ? allComments 
-        : allComments.filter(c => c.status === filter);
+      const filtered = filter === 'all' ? allComments : allComments.filter(c => c.status === filter);
       
       setComments(filtered);
 
@@ -51,6 +41,9 @@ export default function CommentThreadsPanel({ showToast, books, isSuper }) {
     }
     setLoading(false);
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadComments(); }, [filter]);
 
   const updateStats = async () => {
     try {

@@ -27,14 +27,9 @@ export default function ReaderProfile() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadProfile();
-  }, [email]);
-
   const loadProfile = async () => {
     setLoading(true);
     try {
-      // Get user profile
       const userSnap = await getDoc(doc(db, 'site_data', 'registered_users'));
       const users = userSnap.data()?.users || {};
       const profileData = users[email.replace(/[^a-z0-9]/g, '_')];
@@ -46,17 +41,14 @@ export default function ReaderProfile() {
 
       setProfile(profileData);
 
-      // Get user's library (books read)
       const libSnap = await getDoc(doc(db, 'libraries', email.toLowerCase()));
       const booksRead = libSnap.exists() ? libSnap.data().books?.length || 0 : 0;
 
-      // Get user's reviews
       const reviewsSnap = await getDocs(
         query(collection(db, 'book_reviews'), where('reviewerEmail', '==', email.toLowerCase()))
       );
       setReviews(reviewsSnap.docs.map(d => d.data()));
 
-      // Calculate stats
       const avgRating = reviews.length > 0
         ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
         : 0;
@@ -69,7 +61,6 @@ export default function ReaderProfile() {
         favoriteGenres: profileData.favoriteGenres || [],
       });
 
-      // Check if current user follows this reader
       if (currentUser) {
         const followSnap = await getDoc(
           doc(db, 'user_followers', currentUser.email.toLowerCase(), 'following', email.toLowerCase())
@@ -82,6 +73,9 @@ export default function ReaderProfile() {
     }
     setLoading(false);
   };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadProfile(); }, [email]);
 
   const toggleFollow = async () => {
     if (!currentUser) {

@@ -51,6 +51,18 @@ function hexToRgb(hex) {
   return isNaN(r)?'201,168,76':`${r},${g},${b}`;
 }
 
+// Hoisted outside DesignStudioPanel to avoid "cannot create components during render"
+function DesignToggle({ label, desc, field, value, onToggle }) {
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
+      <div><div style={{fontSize:'0.85rem',fontWeight:600}}>{label}</div>{desc&&<div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:2}}>{desc}</div>}</div>
+      <button onClick={()=>onToggle(field,!value)} style={{width:40,height:22,borderRadius:11,border:'none',cursor:'pointer',position:'relative',background:value?'var(--gold)':'rgba(255,255,255,0.15)',transition:'background 0.2s',flexShrink:0}}>
+        <span style={{position:'absolute',top:2,left:value?20:2,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
+      </button>
+    </div>
+  );
+}
+
 export default function DesignStudioPanel({ showToast }) {
   const fileRef = useRef(null);
   const [s, setS] = useState(()=>{ try{return JSON.parse(localStorage.getItem('eh_design')||'null')||{...DEFAULTS};}catch{return{...DEFAULTS};} });
@@ -87,15 +99,7 @@ export default function DesignStudioPanel({ showToast }) {
   const applyCustomCss = () => { applyTheme(s); showToast?.('🎨 CSS applied'); };
 
   const sampleCard = { background:s['--card'], border:`1px solid ${s['--gold']}30`, borderRadius:(s['--r']||'12')+'px', padding:'14px 16px', color:s['--text'] };
-
-  const Toggle = ({label, desc, field}) => (
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-      <div><div style={{fontSize:'0.85rem',fontWeight:600}}>{label}</div>{desc&&<div style={{fontSize:'0.72rem',color:'var(--muted)',marginTop:2}}>{desc}</div>}</div>
-      <button onClick={()=>upd(field,!s[field])} style={{width:40,height:22,borderRadius:11,border:'none',cursor:'pointer',position:'relative',background:s[field]?'var(--gold)':'rgba(255,255,255,0.15)',transition:'background 0.2s',flexShrink:0}}>
-        <span style={{position:'absolute',top:2,left:s[field]?20:2,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'left 0.2s'}}/>
-      </button>
-    </div>
-  );
+  const Toggle = ({label, desc, field}) => <DesignToggle label={label} desc={desc} field={field} value={s[field]} onToggle={upd} />;
 
   return (
     <div className="adm-page">

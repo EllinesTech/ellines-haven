@@ -24,8 +24,7 @@ export default function Trending() {
   useEffect(() => {
     setLoading(true);
 
-    let results = [];
-
+    let results;
     if (selectedGenre === 'All') {
       results = getTrendingBooks(50, books);
     } else {

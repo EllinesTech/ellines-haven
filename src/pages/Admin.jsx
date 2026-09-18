@@ -3519,17 +3519,21 @@ export default function Admin() {
   };
 
   // Confirm order  immediately refresh via tick
-  const handleConfirmOrder = (orderId, customerName) => {
-    confirmOrder(orderId);
-    setTimeout(() => {
-      try {
-        const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
-        setLiveOrders(stored);
-      } catch {}
-      syncOrders();
-      setTick(t => t + 1);
-    }, 80);
-    showToast('Payment confirmed - books unlocked for ' + customerName);
+  const handleConfirmOrder = async (orderId, customerName) => {
+    try {
+      await confirmOrder(orderId, user?.email);
+      setTimeout(() => {
+        try {
+          const stored = JSON.parse(localStorage.getItem('eh_orders') || '[]');
+          setLiveOrders(stored);
+        } catch {}
+        syncOrders();
+        setTick(t => t + 1);
+      }, 80);
+      showToast('Payment confirmed - books unlocked for ' + customerName);
+    } catch (e) {
+      showToast('❌ Approval failed: ' + (e?.message || 'unknown error'));
+    }
   };
 
   // Reject order  immediately refresh via tick
