@@ -8,7 +8,7 @@ import BookComments from '../components/BookComments';
 import SocialShare from '../components/SocialShare';
 import SimilarBooksSlider from '../components/SimilarBooksSlider';
 import WishlistButton from '../components/WishlistButton';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
 import { getReadingTimeDisplay, countWordsFromChapters, formatWordCount, calculateReadingTime } from '../utils/readingTime';
@@ -344,8 +344,8 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
   const totalPlanned = book.totalChapters > 0 ? book.totalChapters
     : book.chapterCount > 0 ? book.chapterCount : releasedCount;
 
-  // Only render this component if ongoing & more than 2 chapters out
-  if (book.status !== 'ongoing' || releasedCount <= 2) return null;
+  // Render for any ongoing book with at least 1 released chapter
+  if (book.status !== 'ongoing' || releasedCount < 1) return null;
 
   const wholeBookInCart = cart.some(b => b.id === book.id && !b.isChapter);
   const siteReadOnly = siteControls?.readOnlyMode;
@@ -409,7 +409,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
   const addWholeBook = () => {
     if (requireLogin()) return;
     addToCart(book);
-    flashMsg('📚 All chapters added to cart!');
+    flashMsg('📖 Book added to cart!');
   };
 
   const addChapter = (idx) => {
@@ -485,7 +485,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
             borderBottom: mode === 'all' ? '2px solid #4a9eff' : '2px solid transparent',
           }}
         >
-          📦 Buy All ({releasedCount} Chapters)
+          📖 Buy This Book ({releasedCount} Chapters)
         </button>
         {book.allowIndividualPurchase !== false && (
           <button
@@ -519,14 +519,14 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>Full access price</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginBottom: 2 }}>Book price</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)' }}>
                   <small style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--muted)', marginRight: 2 }}>KSh</small>
                   {book.price}
                 </div>
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--muted)', flex: 1 }}>
-                Includes all {releasedCount} chapters now + every new chapter as it releases. Best value.
+                Get all {releasedCount} chapters now + every new chapter as it releases. Best value.
               </div>
             </div>
             {siteReadOnly ? (
@@ -544,7 +544,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                       style={{ background: '#4a9eff', color: '#000' }}
                       onClick={addWholeBook}
                     >
-                      {user ? `Add All Chapters — KSh ${book.price}` : '🔒 Sign In to Buy'}
+                      {user ? `Buy This Book — KSh ${book.price}` : '🔒 Sign In to Buy'}
                     </button>
                 }
               <a
@@ -571,7 +571,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
             <div style={{ marginBottom: 12, fontSize: '0.8rem', color: 'var(--muted)' }}>
               Each chapter: <strong style={{ color: 'var(--gold)' }}>KSh {chapterPrice}</strong>
               {' '}· {releasedCount} available now
-              {' '}· <span style={{ color: '#4a9eff' }}>Buying all individually costs KSh {chapterPrice * releasedCount} — save KSh {chapterPrice * releasedCount - book.price} with the full bundle</span>
+              {' '}· <span style={{ color: '#4a9eff' }}>Buying individually costs KSh {chapterPrice * releasedCount} — save KSh {chapterPrice * releasedCount - book.price} buying the full book</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
               {realToc.slice(0, releasedCount).map((tocItem, idx) => {
@@ -647,7 +647,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
                   View Cart ({cart.filter(b => b.isChapter && b.bookId === book.id).length} ch)
                 </Link>
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                  Or switch to "Buy All" for the best deal
+                  Or switch to "Buy This Book" for the best deal
                 </span>
               </div>
             )}
@@ -826,6 +826,118 @@ function TocSection({ book, owned, libLoaded, user }) {
   );
 }
 
+/* ── Bundle Offer — shown on every purchasable book page ── */
+function BundleOffer({ currentBook }) {
+  const { addToCart, cart, books, isOwned, siteControls } = useApp();
+
+  // Admin-configurable bundle settings (same source as DealStrip)
+  const bundleCfg     = siteControls?.bundle || {};
+  const bundleEnabled = bundleCfg.enabled !== false;
+  const discountPct   = Number(bundleCfg.discountPct) || 28;
+  const bundleBookIds = Array.isArray(bundleCfg.bookIds) && bundleCfg.bookIds.length >= 2
+    ? bundleCfg.bookIds
+    : null;
+
+  if (!bundleEnabled) return null;
+
+  // Same eligibility rules as the Home DealStrip
+  const eligible = books.filter(b =>
+    b.active !== false &&
+    b.status !== 'coming-soon' &&
+    b.status !== 'draft' &&
+    b.price > 0
+  );
+  const bundle = bundleBookIds
+    ? bundleBookIds.map(id => eligible.find(b => b.id === id)).filter(Boolean)
+    : eligible.slice(0, 3);
+
+  // Need at least 2 books for a bundle to make sense
+  if (bundle.length < 2) return null;
+
+  // Don't show if the current book isn't part of the bundle
+  const inBundle = bundle.some(b => b.id === currentBook.id);
+  if (!inBundle) return null;
+
+  const fullPrice  = bundle.reduce((s, b) => s + b.price, 0);
+  const multiplier = (100 - discountPct) / 100;
+  const dealPrice  = Math.round(fullPrice * multiplier / 10) * 10;
+  const saving     = fullPrice - dealPrice;
+
+  const allOwned  = bundle.every(b => isOwned(b.id));
+  const allInCart = bundle.every(b => cart.some(c => c.id === b.id));
+  if (allOwned) return null; // user already has everything
+
+  const otherBooks = bundle.filter(b => b.id !== currentBook.id);
+
+  const handleBundle = () => {
+    bundle.forEach(b => {
+      if (!cart.some(c => c.id === b.id) && !isOwned(b.id)) addToCart(b);
+    });
+  };
+
+  return (
+    <div style={{
+      marginTop: 16,
+      padding: '14px 16px',
+      borderRadius: 'var(--r)',
+      background: 'linear-gradient(135deg, rgba(201,168,76,0.10) 0%, rgba(201,168,76,0.04) 100%)',
+      border: '1px solid rgba(201,168,76,0.35)',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: '1.1rem' }}>🔥</span>
+        <div>
+          <strong style={{ color: 'var(--gold)', fontSize: '0.88rem', display: 'block', lineHeight: 1.2 }}>
+            Bundle Deal — Save {Math.round((saving / fullPrice) * 100)}%
+          </strong>
+          <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>
+            Get this book + {otherBooks.map(b => b.title).join(' + ')}
+          </span>
+        </div>
+        <span style={{
+          marginLeft: 'auto', background: 'rgba(201,168,76,0.2)', border: '1px solid rgba(201,168,76,0.5)',
+          borderRadius: 20, padding: '2px 10px', fontSize: '0.68rem', fontWeight: 800,
+          color: 'var(--gold)', whiteSpace: 'nowrap',
+        }}>
+          LIMITED OFFER
+        </span>
+      </div>
+
+      {/* Pricing + CTA */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--muted)', textDecoration: 'line-through' }}>
+            KSh {fullPrice.toLocaleString()}
+          </span>
+          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--gold)' }}>
+            KSh {dealPrice.toLocaleString()}
+          </span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--ok)', fontWeight: 700 }}>
+            Save KSh {saving.toLocaleString()}
+          </span>
+        </div>
+        {allInCart ? (
+          <Link to="/cart" className="btn btn-primary" style={{ background: 'rgba(201,168,76,0.25)', borderColor: 'rgba(201,168,76,0.6)', color: 'var(--gold)', marginLeft: 'auto' }}>
+            Go to Cart →
+          </Link>
+        ) : (
+          <button
+            className="btn btn-primary"
+            style={{ background: 'rgba(201,168,76,0.25)', borderColor: 'rgba(201,168,76,0.6)', color: 'var(--gold)', marginLeft: 'auto' }}
+            onClick={handleBundle}
+          >
+            🛒 Buy Bundle — KSh {dealPrice.toLocaleString()}
+          </button>
+        )}
+      </div>
+
+      <p style={{ margin: '8px 0 0', fontSize: '0.72rem', color: 'var(--muted)' }}>
+        {bundle.length} books · Buy once, read forever · Instant access after payment
+      </p>
+    </div>
+  );
+}
+
 export default function BookDetail() {
   const { id } = useParams();
   const { addToCart, cart, books, user, isOwned, myPerms, siteControls, libLoaded } = useApp();
@@ -846,49 +958,63 @@ export default function BookDetail() {
 
   const book = findBookBySlugOrId(books, id);
 
-  // ── Live word count from Firestore chapters ────────────────────────────────
-  const [liveWordCount, setLiveWordCount] = useState(null); // null = not loaded yet
+  // ── Live word count + chapter count from Firestore (real-time) ──────────────
+  const [liveWordCount, setLiveWordCount]       = useState(null);
+  const [liveChapterCount, setLiveChapterCount] = useState(null);
 
   useEffect(() => {
     if (!book?.id) return;
-    let cancelled = false;
 
-    const computeFromChapters = (chapters) => {
+    const computeStats = (chapters) => {
       if (!chapters?.length) return null;
       const wc = countWordsFromChapters(chapters);
-      return wc > 0 ? wc : null;
+      // Filter out part-divider entries to get real chapter count
+      const realChapters = chapters.filter(
+        ch => ch.text && ch.text.trim().length > 0
+      );
+      return { wc: wc > 0 ? wc : null, count: realChapters.length || null };
     };
 
-    (async () => {
-      try {
-        // Try Firestore first (admin-uploaded full text)
-        const snap = await getDoc(doc(db, 'book_chapters', String(book.id)));
-        if (!cancelled) {
+    // Real-time listener — updates whenever admin adds/edits chapters in Firestore
+    const { onSnapshot: fsOnSnapshot, doc: fsDoc } = { onSnapshot: null, doc: null };
+    import('firebase/firestore').then(({ onSnapshot, doc: fsDocFn }) => {
+      const ref = fsDocFn(db, 'book_chapters', String(book.id));
+      const unsub = onSnapshot(ref,
+        (snap) => {
           if (snap.exists() && snap.data().chapters?.length > 0) {
-            const wc = computeFromChapters(snap.data().chapters);
-            setLiveWordCount(wc);
+            const stats = computeStats(snap.data().chapters);
+            setLiveWordCount(stats?.wc ?? null);
+            setLiveChapterCount(stats?.count ?? null);
           } else {
-            // Fall back to static chapter content
+            // No Firestore data — fall back to static fallback chapters
             const fallback = getFallbackChapters(book);
-            setLiveWordCount(computeFromChapters(fallback));
+            const stats = computeStats(fallback);
+            setLiveWordCount(stats?.wc ?? null);
+            setLiveChapterCount(stats?.count ?? null);
           }
-        }
-      } catch {
-        if (!cancelled) {
-          // Offline or error — use fallback content
+        },
+        () => {
+          // Offline/error — use fallback
           const fallback = getFallbackChapters(book);
-          setLiveWordCount(computeFromChapters(fallback));
+          const stats = computeStats(fallback);
+          setLiveWordCount(stats?.wc ?? null);
+          setLiveChapterCount(stats?.count ?? null);
         }
-      }
-    })();
+      );
+      return unsub;
+    }).catch(() => {});
 
-    return () => { cancelled = true; };
   }, [book?.id]); // eslint-disable-line
 
   // Resolved word count: live (from Firestore) > static (from books.js) > pages estimate
   const resolvedWordCount = liveWordCount
     || (book?.wordCount > 0 ? book.wordCount : null)
     || (book?.pages > 0 ? book.pages * 250 : null);
+
+  // Resolved chapter count: live (from Firestore) > chapterCount > tableOfContents length
+  const resolvedChapterCount = liveChapterCount
+    || (book?.chapterCount > 0 ? book.chapterCount : null)
+    || (book?.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(t)).length || null);
 
   const resolvedReadTime = resolvedWordCount
     ? calculateReadingTime(resolvedWordCount)
@@ -1221,8 +1347,8 @@ export default function BookDetail() {
                         <strong style={{ color:'#4a9eff' }}>
                           {book.chaptersReleased > 0
                             ? book.chaptersReleased
-                            : book.chapterCount > 0
-                              ? book.chapterCount
+                            : resolvedChapterCount
+                              ? resolvedChapterCount
                               : (book.tableOfContents?.length || book.chapters?.length || '—')}
                         </strong>
                       </div>
@@ -1251,10 +1377,10 @@ export default function BookDetail() {
                         </div>
                       )}
                       <div><small>Read Time</small><strong>{resolvedReadTime}</strong></div>
-                      {(book.chapterCount > 0 || book.tableOfContents?.length > 0) && (
+                      {(resolvedChapterCount > 0 || book.tableOfContents?.length > 0) && (
                         <div>
                           <small>Chapters</small>
-                          <strong>{book.chapterCount > 0 ? book.chapterCount : book.tableOfContents.length}</strong>
+                          <strong>{resolvedChapterCount || book.tableOfContents.length}</strong>
                         </div>
                       )}
                       <div><small>Released</small><strong>{new Date(book.date).toLocaleDateString('en-KE',{year:'numeric',month:'short'})}</strong></div>
@@ -1310,7 +1436,7 @@ export default function BookDetail() {
                   ? book.chaptersReleased
                   : realToc.length > 0 ? realToc.length
                   : book.chapterCount > 0 ? book.chapterCount : 0;
-                const isOngoingSeries = book.status === 'ongoing' && releasedCount > 2;
+                const isOngoingSeries = book.status === 'ongoing' && releasedCount >= 1;
 
                 if (isOngoingSeries) {
                   return (
@@ -1330,6 +1456,7 @@ export default function BookDetail() {
                       {(!owned || !libLoaded) && (
                         <OngoingSeriesPurchase book={book} owned={owned} libLoaded={libLoaded} />
                       )}
+                      {!owned && <BundleOffer currentBook={book} />}
                     </div>
                   );
                 }
@@ -1388,7 +1515,7 @@ export default function BookDetail() {
                                         </Link>
                                       )}
                                       {book.status === 'ongoing'
-                                        ? <Link to={readPath(book)} className="btn btn-primary">Buy Chapters — KSh {book.price}</Link>
+                                        ? <button className="btn btn-primary" onClick={() => addToCart(book)}>Buy This Book — KSh {book.price}</button>
                                         : <button className="btn btn-primary" onClick={() => addToCart(book)}>Add to Cart — KSh {book.price}</button>
                                       }
                                       <a href={waOrderLink(book.title, book.price)} target="_blank" rel="noopener noreferrer" className="btn btn-wa">
@@ -1398,6 +1525,7 @@ export default function BookDetail() {
                                     </div>
                       }
                     </div>
+                    {!owned && <BundleOffer currentBook={book} />}
                   </div>
                 );
               })()}
