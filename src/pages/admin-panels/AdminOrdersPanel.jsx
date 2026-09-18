@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, updateDoc, setDoc, getDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db, callAdminManualUnlock } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
 const fmtDate = ts => {
@@ -20,7 +20,7 @@ const STATUS_COLORS = {
 };
 
 export default function AdminOrdersPanel({ showToast, isSuper }) {
-  const { books, confirmOrder, rejectOrder, unlockBooksForBuyer } = useApp();
+  const { books, confirmOrder, rejectOrder, user } = useApp();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -112,13 +112,12 @@ export default function AdminOrdersPanel({ showToast, isSuper }) {
         updatedAt: serverTimestamp(),
       };
       await updateDoc(doc(db, 'orders', editingOrder.id), patch);
-      // If status changed to Completed, also unlock books
+      // If status changed to Completed, also unlock books via Cloud Function
       if (editData.status === 'Completed' && editingOrder.status !== 'Completed' && editData.userEmail) {
-        const resolved = (editingOrder.items || []).map(item => ({
-          ...(books?.find(b => b.id === item.id) || item),
-          downloadUnlocked: true,
-        }));
-        await unlockBooksForBuyer(editData.userEmail, resolved).catch(() => {});
+        const bookIds = (editingOrder.items || []).map(item => item.id).filter(Boolean);
+        if (bookIds.length) {
+          await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: editData.userEmail, bookIds }).catch(() => {});
+        }
       }
       showToast?.('✅ Order updated');
       setEditingOrder(null);
