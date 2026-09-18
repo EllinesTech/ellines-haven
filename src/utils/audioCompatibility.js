@@ -10,7 +10,7 @@
  */
 export function checkSpeechSynthesisSupport() {
   const synth = window.speechSynthesis;
-  const SpeechUtterance = window.SpeechUtterance || window.webkitSpeechUtterance;
+  const SpeechUtterance = window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance;
   
   return {
     supported: !!(synth && SpeechUtterance),

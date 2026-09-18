@@ -8,6 +8,7 @@
  */
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { getRecommendedVoiceForDevice, getNormalizedAudioSettings } from '../utils/audioCompatibility';
 
 const AUDIO_PREFS_KEY = 'eh_audio_prefs';
 /** Persisted marker: branded Ellinea alias (resolved to a real system voice). */
@@ -402,6 +403,8 @@ export default function AudioPlayer({
   const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
   const saved = loadAudioPrefs();
   const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/i.test(navigator.userAgent);
+  // Device-aware settings from the compatibility utility
+  const deviceSettings = typeof window !== 'undefined' ? getNormalizedAudioSettings() : {};
 
   const tryAdvanceChapter = (next) => {
     if (typeof canAccessChapter === 'function' && !canAccessChapter(next)) {
@@ -438,6 +441,7 @@ export default function AudioPlayer({
   const [portalReady, setPortalReady] = useState(false);
   const [ellineaMappedName, setEllineaMappedName] = useState('');
   const [narratorMappedName, setNarratorMappedName] = useState('');
+  const [ttsError, setTtsError] = useState('');
 
   const uttRef = useRef(null);
   const charRef = useRef(0);
@@ -656,18 +660,20 @@ export default function AudioPlayer({
 
   useEffect(() => {
     if (!synth) return undefined;
-    if (playing && !isIOS) {
+    // keepAliveInterval is null on iOS — the pause/resume trick corrupts iOS audio
+    const keepAliveMs = deviceSettings.keepAliveInterval ?? 10000;
+    if (playing && !isIOS && keepAliveMs) {
       keepAliveRef.current = setInterval(() => {
         if (synth.speaking && !synth.paused) {
           synth.pause();
           synth.resume();
         }
-      }, 10000);
+      }, keepAliveMs);
     } else {
       clearInterval(keepAliveRef.current);
     }
     return () => clearInterval(keepAliveRef.current);
-  }, [playing, isIOS, synth]);
+  }, [playing, isIOS, synth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     stopSpeech();
@@ -701,17 +707,24 @@ export default function AudioPlayer({
     const live = synth?.getVoices?.() || voices;
     const pool = live.length ? live : voices;
     if (selectedNameRef.current === ELLINEA_PREF) {
-      return pickEllineaVoice(pool) || pool.find(v => isEnglishVoice(v) && !isRoboticDesktop(v)) || null;
+      return pickEllineaVoice(pool)
+        || pool.find(v => isEnglishVoice(v) && !isRoboticDesktop(v))
+        || getRecommendedVoiceForDevice(pool)
+        || null;
     }
     if (selectedNameRef.current === NARRATOR_PREF) {
-      return pickNarratorVoice(pool) || pickBestVoiceByGender(pool, 'male') || pickEllineaVoice(pool);
+      return pickNarratorVoice(pool)
+        || pickBestVoiceByGender(pool, 'male')
+        || pickEllineaVoice(pool)
+        || getRecommendedVoiceForDevice(pool)
+        || null;
     }
     if (selectedNameRef.current) {
       const byName = pool.find(v => v.name === selectedNameRef.current)
         || voices.find(v => v.name === selectedNameRef.current);
       if (byName && !isRoboticDesktop(byName)) return byName;
     }
-    return pickEllineaVoice(pool);
+    return pickEllineaVoice(pool) || getRecommendedVoiceForDevice(pool);
   }
 
   function startElapsedTimer() {
@@ -736,7 +749,12 @@ export default function AudioPlayer({
 
   function speak(fromChar = 0) {
     if (!synth) return;
-    synth.cancel();
+
+    // Pre-resolve voice synchronously before cancel/speak so we stay within
+    // the user-gesture window on mobile (async state updates after cancel can
+    // invalidate the gesture, causing a not-allowed error).
+    const selectedVoice = resolveSelectedVoice();
+
     clearInterval(timerRef.current);
 
     const text = chapterText.slice(fromChar);
@@ -745,7 +763,6 @@ export default function AudioPlayer({
     const Ctor = window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance;
     if (!Ctor) return;
     const utt = new Ctor(text);
-    const selectedVoice = resolveSelectedVoice();
     if (selectedVoice) {
       utt.voice = selectedVoice;
       utt.lang = selectedVoice.lang || 'en-US';
@@ -781,14 +798,42 @@ export default function AudioPlayer({
     };
 
     utt.onerror = (e) => {
+      // 'interrupted' / 'canceled' are expected when we call synth.cancel() ourselves
       if (e.error === 'interrupted' || e.error === 'canceled') return;
       clearInterval(timerRef.current);
       setPlaying(false);
       playingRef.current = false;
+      // Surface a user-visible error so they know why playback stopped
+      if (e.error === 'not-allowed') {
+        setTtsError('Voice blocked by browser. Tap Play again — a direct tap is required to start audio on mobile.');
+      } else if (e.error === 'synthesis-failed' || e.error === 'synthesis-unavailable') {
+        setTtsError('Voice synthesis failed. Try a different voice or reload the page.');
+      } else if (e.error === 'audio-busy') {
+        setTtsError('Audio is busy. Pause other audio on this device, then tap Play again.');
+      } else if (e.error === 'network') {
+        setTtsError('Could not load cloud voice. Switch to a local voice in settings, or check your connection.');
+      } else {
+        setTtsError(`Voice error: ${e.error || 'unknown'}. Try tapping Play again.`);
+      }
     };
 
     uttRef.current = utt;
-    synth.speak(utt);
+
+    // iOS: cancel() is asynchronous — calling speak() immediately after
+    // cancel() causes the utterance to be silently dropped. Use a short
+    // requestAnimationFrame delay so the cancel fully drains before we speak.
+    const doSpeak = () => {
+      synth.cancel();
+      if (isIOS) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => synth.speak(utt));
+        });
+      } else {
+        synth.cancel();
+        synth.speak(utt);
+      }
+    };
+    doSpeak();
     setPlaying(true);
     playingRef.current = true;
     startedAt.current = Date.now() - pausedAt.current * 1000;
@@ -797,7 +842,11 @@ export default function AudioPlayer({
 
   const handlePlay = () => {
     if (!synth) return;
+    setTtsError(''); // clear any previous error on each new attempt
 
+    // Resolve voices synchronously here — inside the gesture callback — so
+    // applyVoices() state updates don't push synth.speak() outside the
+    // browser's user-gesture window on Android/iOS.
     const currentVoices = synth.getVoices();
     if (currentVoices.length > 0 && !voicesReady) {
       applyVoices(currentVoices);
@@ -1140,6 +1189,28 @@ export default function AudioPlayer({
           </div>
 
           {progressBlock}
+
+          {ttsError && (
+            <div
+              role="alert"
+              style={{
+                margin: '6px 0 2px',
+                padding: '7px 10px',
+                background: 'rgba(220,53,69,0.15)',
+                border: '1px solid rgba(220,53,69,0.45)',
+                borderRadius: 6,
+                color: '#ff8a8a',
+                fontSize: '0.82rem',
+                lineHeight: 1.4,
+                display: 'flex',
+                gap: 6,
+                alignItems: 'flex-start',
+              }}
+            >
+              <span aria-hidden="true" style={{ flexShrink: 0 }}>⚠️</span>
+              <span>{ttsError}</span>
+            </div>
+          )}
 
           <div className="listen-dock__gender" role="group" aria-label="Voice presets">
             <button
