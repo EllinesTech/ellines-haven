@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { getAccounts, SUPER_ADMIN_EMAIL } from './Login';
 import { collection, query, where, orderBy, onSnapshot, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref as sRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db, storage, callAdminManualUnlock, callAdminPatchLibrary } from '../firebase';
 import { GENRES } from '../data/books';
 import { lazyRetry } from '../utils/chunkRecovery';
 
@@ -1423,6 +1423,7 @@ function BookForm({ initial, onSave, onCancel }) {
 
 // ── UserLibrariesTab ─────────────────────────────────────────────────────────
 function UserLibrariesTab({ users, books, showToast }) {
+  const { user: currentUser } = useApp();
   const [libs,        setLibs]        = useState({});
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState('');
@@ -1458,18 +1459,14 @@ function UserLibrariesTab({ users, books, showToast }) {
     const busyKey = key + '_' + bookId;
     setBusy(b => ({ ...b, [busyKey]: true }));
     try {
-      const ref  = doc(db, 'libraries', libDocId(userEmail));
-      const snap = await getDoc(ref);
-      if (!snap.exists()) { showToast('No library for ' + userEmail); return; }
-      const existing = snap.data().books || [];
-      const updated  = existing.map(b => {
+      await callAdminPatchLibrary({ adminEmail: currentUser?.email, targetEmail: userEmail, patch: { op: 'update', bookId, mode, reason: deactReason } });
+      const updated = (libs[key] || []).map(b => {
         if (b.id !== bookId) return b;
-        if (mode === 'full')     return { ...b, active: false, readDeactivated: true, downloadDeactivated: true, deactivationReason: deactReason || 'Access restricted by administrator.' };
-        if (mode === 'read')     return { ...b, readDeactivated: true,     deactivationReason: deactReason || 'Online reading restricted by administrator.' };
+        if (mode === 'full')     return { ...b, active: false, readDeactivated: true,  downloadDeactivated: true,  deactivationReason: deactReason || 'Access restricted by administrator.' };
+        if (mode === 'read')     return { ...b, readDeactivated: true,  deactivationReason: deactReason || 'Online reading restricted by administrator.' };
         if (mode === 'download') return { ...b, downloadDeactivated: true, deactivationReason: deactReason || 'Downloads restricted by administrator.' };
         return b;
       });
-      await setDoc(ref, { books: updated }, { merge: true });
       setLibs(prev => ({ ...prev, [key]: updated }));
       showToast('✅ Book access updated for ' + userEmail.split('@')[0]);
       setDeactModal(null); setDeactReason('');
@@ -1483,15 +1480,11 @@ function UserLibrariesTab({ users, books, showToast }) {
     const busyKey = key + '_' + bookId;
     setBusy(b => ({ ...b, [busyKey]: true }));
     try {
-      const ref  = doc(db, 'libraries', libDocId(userEmail));
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const existing = snap.data().books || [];
-      const updated  = existing.map(b => b.id === bookId
+      await callAdminPatchLibrary({ adminEmail: currentUser?.email, targetEmail: userEmail, patch: { op: 'update', bookId, active: true } });
+      const updated = (libs[key] || []).map(b => b.id === bookId
         ? { ...b, active: true, readDeactivated: false, downloadDeactivated: false, deactivationReason: '' }
         : b
       );
-      await setDoc(ref, { books: updated }, { merge: true });
       setLibs(prev => ({ ...prev, [key]: updated }));
       showToast('✅ Full access restored for ' + userEmail.split('@')[0]);
     } catch (e) { showToast('Error: ' + e.message); }
@@ -1503,27 +1496,19 @@ function UserLibrariesTab({ users, books, showToast }) {
     if (!window.confirm('Remove this book from ' + userEmail.split('@')[0] + "'s library? They will lose access permanently.")) return;
     const key = userEmail.toLowerCase();
     try {
-      const ref  = doc(db, 'libraries', libDocId(userEmail));
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const updated = (snap.data().books || []).filter(b => b.id !== bookId);
-      await setDoc(ref, { books: updated }, { merge: true });
-      setLibs(prev => ({ ...prev, [key]: updated }));
+      await callAdminPatchLibrary({ adminEmail: currentUser?.email, targetEmail: userEmail, patch: { op: 'remove', bookId } });
+      setLibs(prev => ({ ...prev, [key]: (libs[key] || []).filter(b => b.id !== bookId) }));
       showToast('📕 Book removed from ' + userEmail.split('@')[0] + "'s library");
     } catch (e) { showToast('Error: ' + e.message); }
   };
 
-  // Add book back to user library
+  // Add book to user library via Cloud Function (client writes to /libraries are blocked by rules)
   const addBook = async (userEmail, bookToAdd) => {
     const key = userEmail.toLowerCase();
     try {
-      const ref  = doc(db, 'libraries', libDocId(userEmail));
-      const snap = await getDoc(ref);
-      const existing = snap.exists() ? (snap.data().books || []) : [];
-      if (existing.find(b => b.id === bookToAdd.id)) { showToast('User already has this book'); return; }
-      const updated = [...existing, { ...bookToAdd, downloadUnlocked: true, active: true }];
-      await setDoc(ref, { books: updated }, { merge: true });
-      setLibs(prev => ({ ...prev, [key]: updated }));
+      const result = await callAdminPatchLibrary({ adminEmail: currentUser?.email, targetEmail: userEmail, patch: { op: 'add', bookData: { ...bookToAdd, downloadUnlocked: true, active: true } } });
+      if (result?.data?.note === 'already_owned') { showToast('User already has this book'); return; }
+      setLibs(prev => ({ ...prev, [key]: [...(libs[key] || []), { ...bookToAdd, downloadUnlocked: true, active: true }] }));
       showToast('✅ "' + bookToAdd.title + '" added to ' + userEmail.split('@')[0] + "'s library");
       setAddModal(null);
     } catch (e) { showToast('Error: ' + e.message); }
@@ -1720,8 +1705,220 @@ function UserLibrariesTab({ users, books, showToast }) {
 }
 
 
+// ── BundleConfig — sub-component of SiteControlsPanel ───────────────────────
+function BundleConfig({ sc, saveSiteControls, showToast, books }) {
+  const bundle    = sc.bundle || {};
+  const enabled   = bundle.enabled !== false;
+  const discount  = Number(bundle.discountPct) || 28;
+  const bookIds   = Array.isArray(bundle.bookIds) ? bundle.bookIds : [];
+
+  const [localDiscount, setLocalDiscount] = useState(discount);
+  const [saving, setSaving]               = useState(false);
+
+  // Eligible books (same filter as DealStrip/BundleOffer)
+  const eligible = (books || []).filter(b =>
+    b.active !== false && b.status !== 'coming-soon' && b.status !== 'draft' && b.price > 0
+  );
+
+  const save = async (patch) => {
+    setSaving(true);
+    const updated = { ...sc, bundle: { ...bundle, ...patch } };
+    await saveSiteControls(updated);
+    showToast('✅ Bundle deal settings saved');
+    setSaving(false);
+  };
+
+  const toggleEnabled = () => save({ enabled: !enabled });
+
+  const toggleBook = (id) => {
+    const next = bookIds.includes(id) ? bookIds.filter(x => x !== id) : [...bookIds, id];
+    save({ bookIds: next });
+  };
+
+  const applyDiscount = () => {
+    const v = Math.min(90, Math.max(1, localDiscount));
+    save({ discountPct: v });
+  };
+
+  // Preview pricing
+  const selectedBooks = bookIds.length >= 2
+    ? bookIds.map(id => eligible.find(b => b.id === id)).filter(Boolean)
+    : eligible.slice(0, 3);
+  const fullPrice  = selectedBooks.reduce((s, b) => s + b.price, 0);
+  const dealPrice  = fullPrice > 0
+    ? Math.round(fullPrice * ((100 - (localDiscount || 28)) / 100) / 10) * 10
+    : 0;
+  const saving_    = fullPrice - dealPrice;
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>
+        Bundle Deal
+      </div>
+
+      {/* Enable / Disable */}
+      <div className="card" style={{
+        display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', marginBottom: 12,
+        border: enabled ? '1px solid rgba(201,168,76,0.35)' : '1px solid var(--dim)',
+        background: enabled ? 'rgba(201,168,76,0.05)' : 'rgba(255,255,255,0.02)',
+      }}>
+        <span style={{ fontSize: '1.8rem', flexShrink: 0 }}>🎁</span>
+        <div style={{ flex: 1 }}>
+          <strong style={{ fontSize: '0.92rem', display: 'block', marginBottom: 3 }}>Bundle Deal Strip</strong>
+          <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+            Show a discounted multi-book offer on the home page and every book detail page.
+          </span>
+          {enabled && selectedBooks.length >= 2 && (
+            <span style={{ display: 'block', marginTop: 4, fontSize: '0.72rem', color: 'var(--gold)' }}>
+              🟢 Active — {selectedBooks.length} books · KSh {dealPrice.toLocaleString()} (save KSh {saving_.toLocaleString()})
+            </span>
+          )}
+        </div>
+        <button
+          onClick={toggleEnabled}
+          disabled={saving}
+          style={{
+            flexShrink: 0, minWidth: 64, padding: '8px 16px', borderRadius: 'var(--r-sm)',
+            border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.82rem', transition: 'all 0.2s',
+            background: enabled ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.06)',
+            color: enabled ? 'var(--gold)' : 'var(--muted)',
+          }}
+        >
+          {enabled ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      {enabled && (
+        <div className="card" style={{ padding: '18px 20px', border: '1px solid rgba(201,168,76,0.2)', background: 'rgba(201,168,76,0.03)' }}>
+
+          {/* Discount slider */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 700, display: 'block', marginBottom: 8 }}>
+              Discount — <span style={{ color: 'var(--gold)' }}>{localDiscount}% off</span>
+            </label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input
+                type="range" min={5} max={70} step={5}
+                value={localDiscount}
+                onChange={e => setLocalDiscount(Number(e.target.value))}
+                style={{ flex: 1, accentColor: 'var(--gold)' }}
+              />
+              <input
+                type="number" min={1} max={90} step={1}
+                value={localDiscount}
+                onChange={e => setLocalDiscount(Number(e.target.value))}
+                style={{ width: 64, textAlign: 'center' }}
+                className="field"
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={applyDiscount}
+                disabled={saving}
+                style={{ flexShrink: 0 }}
+              >
+                Apply
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {[10, 15, 20, 25, 28, 30, 40, 50].map(v => (
+                <button
+                  key={v}
+                  onClick={() => { setLocalDiscount(v); save({ discountPct: v }); }}
+                  disabled={saving}
+                  style={{
+                    padding: '3px 12px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700,
+                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                    background: discount === v ? 'var(--gold)' : 'rgba(255,255,255,0.07)',
+                    color: discount === v ? '#000' : 'var(--muted)',
+                  }}
+                >{v}%</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Book picker */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 700, display: 'block', marginBottom: 4 }}>
+              Books in Bundle
+              <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: 8, fontSize: '0.74rem' }}>
+                Select 2+ books. Leave all unchecked to auto-pick first 3 eligible.
+              </span>
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto', padding: '4px 0' }}>
+              {eligible.map(b => {
+                const checked = bookIds.includes(b.id);
+                return (
+                  <label
+                    key={b.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                      borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                      background: checked ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.02)',
+                      border: checked ? '1px solid rgba(201,168,76,0.35)' : '1px solid var(--dim)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleBook(b.id)}
+                      style={{ accentColor: 'var(--gold)', width: 16, height: 16, flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: checked ? 700 : 400, color: checked ? 'var(--gold)' : 'var(--text)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {b.title}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                        {b.genre} · KSh {b.price} · {b.status}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>
+                      KSh {b.price}
+                    </span>
+                  </label>
+                );
+              })}
+              {eligible.length === 0 && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--muted)', padding: '8px 0' }}>No eligible books found.</p>
+              )}
+            </div>
+            {bookIds.length > 0 && bookIds.length < 2 && (
+              <p style={{ fontSize: '0.74rem', color: '#e74c3c', marginTop: 6 }}>
+                ⚠ Select at least 2 books, or clear all to auto-pick.
+              </p>
+            )}
+          </div>
+
+          {/* Live preview */}
+          {selectedBooks.length >= 2 && (
+            <div style={{ padding: '12px 16px', borderRadius: 'var(--r-sm)', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)', marginBottom: 8 }}>
+                📦 Bundle Preview
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginBottom: 6 }}>
+                {selectedBooks.map(b => b.title).join(' · ')}
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--muted)', textDecoration: 'line-through' }}>
+                  KSh {fullPrice.toLocaleString()}
+                </span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--gold)' }}>
+                  KSh {dealPrice.toLocaleString()}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--ok)', fontWeight: 700 }}>
+                  Saves KSh {saving_.toLocaleString()} ({localDiscount}% off)
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SiteControlsPanel ────────────────────────────────────────────────────────
-function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper }) {
+function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper, books }) {
   const sc = siteControls || {};
   const toggle = async (key) => {
     const updated = { ...sc, [key]: !sc[key] };
@@ -1854,6 +2051,9 @@ function SiteControlsPanel({ siteControls, saveSiteControls, showToast, isSuper 
       {sc.disablePrint && (
         <style>{`@media print { body { display: none !important; } }`}</style>
       )}
+
+      {/* ── Bundle Deal Configuration ── */}
+      <BundleConfig sc={sc} saveSiteControls={saveSiteControls} showToast={showToast} books={books} />
     </div>
   );
 }
@@ -2641,15 +2841,15 @@ function OrdersPanel({
         <p style={{ fontSize:'0.82rem', color:'var(--muted)', marginBottom:16 }}>Use this when a customer paid but books weren't unlocked automatically.</p>
         <ManualUnlockForm books={books} showToast={showToast} onUnlock={async (email, bookIds) => {
           const emailLow = email.trim().toLowerCase();
-          const booksToUnlock = bookIds.map(bid => books.find(b => b.id === bid)).filter(Boolean).map(b => ({ ...b, downloadUnlocked:true }));
+          const booksToUnlock = bookIds.map(bid => books.find(b => b.id === bid)).filter(Boolean);
           if (!booksToUnlock.length) { showToast('No valid books selected'); return; }
           try {
-            await unlockBooksForBuyer(emailLow, booksToUnlock);
+            await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: emailLow, bookIds: booksToUnlock.map(b => b.id) });
             const mo = { id:'ORD-MANUAL-'+Date.now(), userId:null, userName:emailLow.split('@')[0], userEmail:emailLow, items:booksToUnlock.map(b=>({id:b.id,title:b.title,price:b.price})), total:booksToUnlock.reduce((s,b)=>s+(b.price||0),0), method:'manual', ref:'MANUAL-UNLOCK', status:'Completed', date:new Date().toISOString().slice(0,10), createdAt:serverTimestamp() };
             await setDoc(doc(db,'orders',mo.id), mo);
             showToast('✅ Unlocked ' + booksToUnlock.length + ' book(s) for ' + emailLow);
             setTick(t => t+1);
-          } catch (err) { showToast('❌ Unlock failed: ' + err.message); }
+          } catch (err) { showToast('❌ Unlock failed: ' + (err?.message || String(err))); }
         }} />
       </div>
     </div>
@@ -5681,6 +5881,7 @@ export default function Admin() {
             saveSiteControls={saveSiteControls}
             showToast={showToast}
             isSuper={isSuper}
+            books={books}
           />
         )}
 

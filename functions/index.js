@@ -533,6 +533,137 @@ async function unlockBooksForUser(userEmail, items, source = "auto") {
   );
 }
 
+// ── Admin Manual Unlock (callable — super admin / admin grants books to a user) ─
+// All client-side writes to /libraries are blocked by Firestore rules.
+// This Cloud Function uses the Admin SDK (bypasses rules) so it always works.
+// Accepts: { adminEmail, targetEmail, bookIds: string[] }
+// Returns: { success: true, unlocked: string[] }
+exports.adminManualUnlock = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const { adminEmail, targetEmail, bookIds } = request.data || {};
+
+    // ── Basic input validation ──────────────────────────────────────────────
+    if (!adminEmail || !targetEmail || !Array.isArray(bookIds) || bookIds.length === 0) {
+      throw new HttpsError("invalid-argument", "adminEmail, targetEmail, and bookIds[] are required.");
+    }
+
+    // ── Verify caller is an admin or super admin ────────────────────────────
+    const adminKey = adminEmail.toLowerCase().replace(/[^a-z0-9]/g, "_");
+    const SUPER_ADMIN = "ellines_haven_gmail_com";
+    let isAdmin = adminKey === SUPER_ADMIN;
+    if (!isAdmin) {
+      try {
+        const userSnap = await db.collection("site_data").doc("registered_users").get();
+        const users = userSnap.exists ? (userSnap.data().users || []) : [];
+        const caller = users.find(u => (u.email || "").toLowerCase() === adminEmail.toLowerCase());
+        isAdmin = caller && (caller.role === "admin" || caller.role === "super_admin");
+      } catch (_) {
+        throw new HttpsError("internal", "Could not verify admin role.");
+      }
+    }
+    if (!isAdmin) {
+      throw new HttpsError("permission-denied", "Caller is not an admin.");
+    }
+
+    // ── Fetch book data from the catalogue ─────────────────────────────────
+    let allBooks = [];
+    try {
+      const catSnap = await db.collection("site_data").doc("books_catalogue").get();
+      allBooks = catSnap.exists ? (catSnap.data().books || []) : [];
+    } catch (_) {}
+
+    const items = bookIds
+      .map(id => allBooks.find(b => b.id === id))
+      .filter(Boolean);
+
+    if (items.length === 0) {
+      throw new HttpsError("not-found", "None of the provided bookIds matched known books.");
+    }
+
+    // ── Unlock via Admin SDK (bypasses Firestore security rules) ───────────
+    await unlockBooksForUser(targetEmail, items, "admin_manual");
+
+    console.log("[adminManualUnlock] ✅ unlocked by:", adminEmail, "→ for:", targetEmail, "books:", items.map(b => b.title));
+
+    return { success: true, unlocked: items.map(b => b.title) };
+  }
+);
+
+// ── Admin Patch Library (callable — update/deactivate/reactivate/remove a book in a user's library) ─
+// Used by UserLibrariesTab for reactivate, deactivate, and remove operations.
+// Accepts: { adminEmail, targetEmail, patch: { op, bookId, bookData?, mode?, reason? } }
+// op: "add" | "update" | "remove"
+exports.adminPatchLibrary = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const { adminEmail, targetEmail, patch } = request.data || {};
+
+    if (!adminEmail || !targetEmail || !patch?.op) {
+      throw new HttpsError("invalid-argument", "adminEmail, targetEmail, and patch.op are required.");
+    }
+
+    // ── Verify admin role ───────────────────────────────────────────────────
+    const adminKey = adminEmail.toLowerCase().replace(/[^a-z0-9]/g, "_");
+    const SUPER_ADMIN = "ellines_haven_gmail_com";
+    let isAdmin = adminKey === SUPER_ADMIN;
+    if (!isAdmin) {
+      try {
+        const userSnap = await db.collection("site_data").doc("registered_users").get();
+        const users = userSnap.exists ? (userSnap.data().users || []) : [];
+        const caller = users.find(u => (u.email || "").toLowerCase() === adminEmail.toLowerCase());
+        isAdmin = caller && (caller.role === "admin" || caller.role === "super_admin");
+      } catch (_) {
+        throw new HttpsError("internal", "Could not verify admin role.");
+      }
+    }
+    if (!isAdmin) {
+      throw new HttpsError("permission-denied", "Caller is not an admin.");
+    }
+
+    const ref  = db.collection("libraries").doc(libDocId(targetEmail));
+    const snap = await ref.get();
+    const existing = snap.exists ? (snap.data().books || []) : [];
+
+    let updated;
+
+    if (patch.op === "add") {
+      // Add a book — same as unlock but without creating an order
+      if (!patch.bookData) throw new HttpsError("invalid-argument", "patch.bookData required for op=add");
+      const alreadyOwned = existing.find(b => b.id === patch.bookData.id);
+      if (alreadyOwned) return { success: true, note: "already_owned" };
+      updated = [...existing, { ...patch.bookData, downloadUnlocked: true, active: true, unlockedBy: "admin_add", unlockedAt: new Date().toISOString() }];
+      await ref.set({ email: targetEmail.toLowerCase(), books: updated }, { merge: true });
+
+    } else if (patch.op === "update") {
+      // Deactivate or reactivate a book entry
+      if (!patch.bookId) throw new HttpsError("invalid-argument", "patch.bookId required for op=update");
+      const { mode, reason, active } = patch;
+      updated = existing.map(b => {
+        if (b.id !== patch.bookId) return b;
+        if (mode === "full")     return { ...b, active: false, readDeactivated: true,  downloadDeactivated: true,  deactivationReason: reason || "Access restricted by administrator." };
+        if (mode === "read")     return { ...b, readDeactivated: true,  deactivationReason: reason || "Online reading restricted." };
+        if (mode === "download") return { ...b, downloadDeactivated: true, deactivationReason: reason || "Downloads restricted." };
+        // reactivate
+        if (active === true)     return { ...b, active: true, readDeactivated: false, downloadDeactivated: false, deactivationReason: "" };
+        return b;
+      });
+      await ref.set({ books: updated }, { merge: true });
+
+    } else if (patch.op === "remove") {
+      if (!patch.bookId) throw new HttpsError("invalid-argument", "patch.bookId required for op=remove");
+      updated = existing.filter(b => b.id !== patch.bookId);
+      await ref.set({ books: updated }, { merge: true });
+
+    } else {
+      throw new HttpsError("invalid-argument", "patch.op must be 'add', 'update', or 'remove'.");
+    }
+
+    console.log("[adminPatchLibrary] ✅", patch.op, "by:", adminEmail, "on:", targetEmail);
+    return { success: true };
+  }
+);
+
 // ── Query payment status (callable from frontend) ──────────────────────────────
 exports.queryPaymentStatus = onCall(
   {

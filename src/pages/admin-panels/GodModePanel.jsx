@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, collection, serverTimestamp, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db, callAdminManualUnlock } from '../../firebase';
 import { useApp } from '../../context/AppContext';
 
 /* ── Merge two user lists, deduped by email, Firestore wins for conflicts ── */
@@ -45,7 +45,7 @@ function ConfirmGate({ label, onConfirm, onCancel }) {
 }
 
 export default function GodModePanel({ showToast, books, users: propUsers, isSuper }) {
-  const { user, setUser, saveBook, setSuspended, isUserSuspended, manualUnlock } = useApp();
+  const { user, setUser, saveBook, setSuspended, isUserSuspended } = useApp();
   const [tab, setTab] = useState('overview');
   const [godLog, setGodLog] = useState(false);
   const [confirmGate, setConfirmGate] = useState(null);
@@ -266,12 +266,12 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
         updatedAt: serverTimestamp(),
       };
       await updateDoc(doc(db, 'orders', editingOrder.id), patch);
-      // If marking as Completed, also unlock books
+      // If marking as Completed, unlock ALL books via Cloud Function
       if (orderEditData.status === 'Completed' && editingOrder.status !== 'Completed' && orderEditData.userEmail) {
-        const resolved = (editingOrder.items || []).map(item => ({
-          ...(books?.find(b => b.id === item.id) || item), downloadUnlocked: true,
-        }));
-        await manualUnlock?.(orderEditData.userEmail, resolved[0]?.id).catch(() => {});
+        const bookIds = (editingOrder.items || []).map(item => item.id).filter(Boolean);
+        if (bookIds.length) {
+          await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: orderEditData.userEmail, bookIds }).catch(() => {});
+        }
       }
       // Refresh user orders
       setUserOrders(prev => prev.map(o => o.id === editingOrder.id ? { ...o, ...patch } : o));
@@ -304,9 +304,14 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
   };
 
   const unlockBook = async () => {
-    if (!selectedUser||!selectedBook) return;
-    const book = books?.find(b=>b.id===selectedBook);
-    if (book) { await manualUnlock?.(selectedUser.email, book.id); setUserLibrary(l=>[...l,{...book,downloadUnlocked:true}]); showToast?.('✅ Book unlocked'); }
+    if (!selectedUser || !selectedBook) return;
+    const book = books?.find(b => b.id === selectedBook);
+    if (!book) return;
+    try {
+      await callAdminManualUnlock({ adminEmail: user?.email, targetEmail: selectedUser.email, bookIds: [book.id] });
+      setUserLibrary(l => [...l, { ...book, downloadUnlocked: true }]);
+      showToast?.('✅ Book unlocked');
+    } catch (e) { showToast?.('❌ ' + (e?.message || 'Unlock failed')); }
   };
 
   const removeBook = async (bookId) => {
@@ -701,8 +706,8 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
                               <button className="adm-act-btn" style={{fontSize:'0.68rem',color:'#2ecc71',border:'1px solid rgba(46,204,113,0.25)'}}
                                 onClick={async()=>{
                                   await updateDoc(doc(db,'orders',o.id),{status:'Completed',confirmedAt:serverTimestamp(),confirmedBy:user?.email,updatedAt:serverTimestamp()});
-                                  const resolved=(o.items||[]).map(item=>({...(books?.find(b=>b.id===item.id)||item),downloadUnlocked:true}));
-                                  if(resolved.length) await manualUnlock?.(o.userEmail||selectedUser?.email,resolved[0].id).catch(()=>{});
+                                  const bookIds=(o.items||[]).map(item=>item.id).filter(Boolean);
+                                  if(bookIds.length) await callAdminManualUnlock({adminEmail:user?.email,targetEmail:o.userEmail||selectedUser?.email,bookIds}).catch(()=>{});
                                   setUserOrders(p=>p.map(x=>x.id===o.id?{...x,status:'Completed'}:x));
                                   showToast?.('✅ Order confirmed & books unlocked');
                                 }}>✅ Confirm</button>
@@ -822,7 +827,7 @@ export default function GodModePanel({ showToast, books, users: propUsers, isSup
               onClick={async()=>{
                 const book=(books||[]).find(b=>b.id===selectedBook);
                 if(!book||!transferEmail) return;
-                await manualUnlock?.(transferEmail.trim().toLowerCase(), book.id);
+                await callAdminManualUnlock({adminEmail:user?.email,targetEmail:transferEmail.trim().toLowerCase(),bookIds:[book.id]});
                 showToast?.(`✅ "${book.title}" gifted to ${transferEmail}`);
                 setTransferEmail(''); setSelectedBook('');
               }}>

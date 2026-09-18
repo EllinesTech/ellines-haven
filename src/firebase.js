@@ -71,6 +71,10 @@ export const callTrackVisitor     = (data) => httpsCallable(functions, 'trackVis
 export const callSendLoginOtp     = (data) => httpsCallable(functions, 'sendLoginOtp')(data);
 export const callVerifyAuthOtp    = (data) => httpsCallable(functions, 'verifyAuthOtp')(data);
 
+// Admin manual unlock (bypasses Firestore rules via Admin SDK)
+export const callAdminManualUnlock = (data) => httpsCallable(functions, 'adminManualUnlock')(data);
+export const callAdminPatchLibrary = (data) => httpsCallable(functions, 'adminPatchLibrary')(data);
+
 // Reading Challenges Cloud Functions (Phase 5-6)
 export const callStartChallenge      = (data) => httpsCallable(functions, 'startChallenge')(data);
 export const callCompleteChallenge   = (data) => httpsCallable(functions, 'completeChallenge')(data);

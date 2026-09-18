@@ -5,7 +5,7 @@ import { doc, onSnapshot, updateDoc, setDoc, getDoc, serverTimestamp } from 'fir
 import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder } from '../firebase';
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
-import { bookPath } from '../utils/slugify';
+import { bookPath, readPath } from '../utils/slugify';
 import { usePageMeta } from '../hooks/usePageMeta';
 import './Cart.css';
 
@@ -250,7 +250,7 @@ function VerifyingScreen({ orderId, paystackRef, userEmail, onDone, onGiveUp }) 
 
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
-  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount, addToCart, books: allBooks } = useApp();
+  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount, addToCart, books: allBooks, isOwned, library } = useApp();
   
   usePageMeta({
     title: 'Cart',
@@ -269,8 +269,24 @@ export default function Cart() {
   const [verifyRef,        setVerifyRef]       = useState(null); // paystack ref while verifying
   const [cancelledNotice,  setCancelledNotice] = useState('');
   const [refundAcked,      setRefundAcked]     = useState(false); // no-refund acknowledgement
+  const [booksReady,       setBooksReady]      = useState(false); // true once library onSnapshot confirms unlock
   const navigate = useNavigate();
   const total = cart.reduce((s, b) => s + b.price, 0);
+
+  // ── After payment: wait for onSnapshot to confirm library unlock ──────────
+  // Once step === 'done', we watch the library state for each purchased book.
+  // When all purchased books appear in the library, booksReady flips to true
+  // and the "Read Now" buttons become active. Falls back to ready after 8 s so
+  // the user is never stuck.
+  useEffect(() => {
+    if (step !== 'done' || !placedOrder?.items?.length) return;
+    const purchasedIds = new Set(placedOrder.items.map(i => i.bookId || i.id));
+    const allUnlocked  = [...purchasedIds].every(id => isOwned(id));
+    if (allUnlocked) { setBooksReady(true); return; }
+    // Fallback: mark ready after 8 s regardless, so button never stays disabled forever
+    const fallback = setTimeout(() => setBooksReady(true), 8000);
+    return () => clearTimeout(fallback);
+  }, [step, library, placedOrder]); // eslint-disable-line
 
   // ── Promo code — declared BEFORE the referral useEffect that reads it ───
   const [promoInput,     setPromoInput]     = useState('');
@@ -969,8 +985,28 @@ export default function Cart() {
           })()}
 
           <div className="done-box__actions">
-            <Link to="/my-library" className="btn btn-primary">Go to My Library</Link>
-            <Link to="/library" className="btn btn-outline">Browse More</Link>
+            {/* ── Read Now buttons — one per purchased book ── */}
+            {(placedOrder?.items || []).map(item => {
+              const book = allBooks.find(b => b.id === (item.bookId || item.id));
+              if (!book) return null;
+              const owned = isOwned(book.id);
+              return (
+                <Link
+                  key={book.id}
+                  to={readPath(book)}
+                  className="btn btn-primary"
+                  title={owned ? `Read ${book.title}` : 'Unlocking your book…'}
+                  style={!booksReady ? { opacity: 0.65, pointerEvents: 'none' } : {}}
+                  aria-disabled={!booksReady}
+                >
+                  {booksReady
+                    ? `Read "${book.title}" →`
+                    : '⏳ Unlocking…'}
+                </Link>
+              );
+            })}
+            <Link to="/my-library" className="btn btn-outline">My Library</Link>
+            <Link to="/library" className="btn btn-ghost">Browse More</Link>
           </div>
         </div>
       </div>
