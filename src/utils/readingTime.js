@@ -101,6 +101,38 @@ export function estimateWordCount(pages) {
 }
 
 /**
+ * Estimate page count from word count.
+ * Industry standard: 250 words per page (traditional publishing rule of thumb).
+ * Sources: Kindlepreneur, Weekend Publisher, creativindie.com, Quora publishers.
+ *
+ * @param {number} wordCount - Total words in the book
+ * @returns {number} Estimated page count
+ */
+export function estimatePagesFromWords(wordCount) {
+  if (!wordCount || wordCount <= 0) return 0;
+  return Math.round(wordCount / 250);
+}
+
+/**
+ * Get the best available page count for a book.
+ * Priority: calculated from live/provided word count > static book.pages
+ * This ensures pages stay accurate as chapters are added to Firestore.
+ *
+ * @param {Object} book - Book object from books.js
+ * @param {number|null} liveWordCount - Live word count from Firestore (optional)
+ * @returns {number|null} Page count, or null if unavailable
+ */
+export function getBookPages(book, liveWordCount = null) {
+  // Priority 1: calculate from live Firestore word count
+  if (liveWordCount > 0) return estimatePagesFromWords(liveWordCount);
+  // Priority 2: calculate from static wordCount in books.js
+  if (book?.wordCount > 0) return estimatePagesFromWords(book.wordCount);
+  // Priority 3: fall back to manually set pages field
+  if (book?.pages > 0) return book.pages;
+  return null;
+}
+
+/**
  * Get reading time display (what to show on book card/detail)
  * Priority: live chapter word count > book.wordCount > pages > readTime field
  *

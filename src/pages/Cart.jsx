@@ -6,6 +6,7 @@ import { db, callVerifyPaystack, callCreatePayPalOrder, callCapturePayPalOrder }
 import EditableField from '../components/EditableField';
 import { useEditMode } from '../context/EditModeContext';
 import { bookPath, readPath } from '../utils/slugify';
+import { getBookPages, getReadingTimeDisplay } from '../utils/readingTime';
 import { usePageMeta } from '../hooks/usePageMeta';
 import './Cart.css';
 
@@ -193,11 +194,13 @@ function VerifyingScreen({ orderId, paystackRef, userEmail, onDone, onGiveUp }) 
 
     // Periodically re-call verify so Haven unlocks even when the hub webhook
     // (ellines.co.ke) is the only Paystack webhook URL.
+    // Retries run every 5 s for up to 17 attempts = ~85 s, matching the 90 s giveUp
+    // timeout so there is never a silent gap where nothing is retrying.
     let verifyAttempts = 0;
     const verifyTimer = setInterval(async () => {
       if (stopped || !paystackRef || !userEmail) return;
       verifyAttempts += 1;
-      if (verifyAttempts > 12) return; // ~60s of retries
+      if (verifyAttempts > 17) return; // ~85 s of retries — covers full 90 s window
       try {
         await callVerifyPaystack({
           reference: paystackRef,
@@ -250,7 +253,7 @@ function VerifyingScreen({ orderId, paystackRef, userEmail, onDone, onGiveUp }) 
 
 // ── Main Cart component ────────────────────────────────────────────────────────
 export default function Cart() {
-  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount, addToCart, books: allBooks, isOwned, library } = useApp();
+  const { cart, removeFromCart, clearCart, user, placeOrder, settings, myPerms, siteControls, applyReferralDiscount, addToCart, books: allBooks, isOwned, library, libLoaded } = useApp();
   
   usePageMeta({
     title: 'Cart',
@@ -275,18 +278,22 @@ export default function Cart() {
 
   // ── After payment: wait for onSnapshot to confirm library unlock ──────────
   // Once step === 'done', we watch the library state for each purchased book.
+  // We also wait for libLoaded=true so we don't evaluate ownership against an
+  // empty library that hasn't fetched from Firestore yet.
   // When all purchased books appear in the library, booksReady flips to true
-  // and the "Read Now" buttons become active. Falls back to ready after 8 s so
-  // the user is never stuck.
+  // and the "Read Now" buttons become active. Falls back to ready after 12 s so
+  // the user is never stuck (increased from 8 s to give Firestore more time).
   useEffect(() => {
     if (step !== 'done' || !placedOrder?.items?.length) return;
+    // Don't evaluate until library has loaded from Firestore
+    if (!libLoaded) return;
     const purchasedIds = new Set(placedOrder.items.map(i => i.bookId || i.id));
     const allUnlocked  = [...purchasedIds].every(id => isOwned(id));
     if (allUnlocked) { setBooksReady(true); return; }
-    // Fallback: mark ready after 8 s regardless, so button never stays disabled forever
-    const fallback = setTimeout(() => setBooksReady(true), 8000);
+    // Fallback: mark ready after 12 s regardless, so button never stays disabled forever
+    const fallback = setTimeout(() => setBooksReady(true), 12000);
     return () => clearTimeout(fallback);
-  }, [step, library, placedOrder]); // eslint-disable-line
+  }, [step, library, placedOrder, libLoaded]); // eslint-disable-line
 
   // ── Promo code — declared BEFORE the referral useEffect that reads it ───
   const [promoInput,     setPromoInput]     = useState('');
@@ -1352,7 +1359,7 @@ export default function Cart() {
                           <span className="cart-item__genre">{b.genre}</span>
                           <h3><Link to={bookPath(b)}>{b.title}</Link></h3>
                           <p className="cart-item__author">by {b.author}</p>
-                          <p className="cart-item__meta">{b.pages} pages · {b.readTime}</p>
+                          <p className="cart-item__meta">{getBookPages(b) ? `${getBookPages(b)} pages` : ''}{getBookPages(b) && getReadingTimeDisplay(b) ? ' · ' : ''}{getReadingTimeDisplay(b)}</p>
                         </>
                       )}
                       <div className="cart-item__actions">

@@ -11,7 +11,7 @@ import WishlistButton from '../components/WishlistButton';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { findBookBySlugOrId, bookPath, readPath } from '../utils/slugify';
-import { getReadingTimeDisplay, countWordsFromChapters, formatWordCount, calculateReadingTime } from '../utils/readingTime';
+import { getReadingTimeDisplay, countWordsFromChapters, formatWordCount, calculateReadingTime, estimatePagesFromWords, getBookPages } from '../utils/readingTime';
 import { getFallbackChapters } from '../data/bookChapters';
 import { hasImageCover, coverBasePath } from '../utils/bookCovers';
 import { hasFreeSampleChapter } from '../utils/purchaseHelpers';
@@ -180,7 +180,7 @@ function CoverLightbox({ book, onClose }) {
   }, []);
 
   const pct = Math.round(scale * 100);
-  const isDragging = dragging.current;
+  const isDragging = dragging.current; // eslint-disable-line react-compiler/react-compiler
 
   return (
     <div className="lb-overlay" onClick={onClose} aria-modal="true" role="dialog" aria-label="Cover zoom">
@@ -344,9 +344,6 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
   const totalPlanned = book.totalChapters > 0 ? book.totalChapters
     : book.chapterCount > 0 ? book.chapterCount : releasedCount;
 
-  // Render for any ongoing book with at least 1 released chapter
-  if (book.status !== 'ongoing' || releasedCount < 1) return null;
-
   const wholeBookInCart = cart.some(b => b.id === book.id && !b.isChapter);
   const siteReadOnly = siteControls?.readOnlyMode;
 
@@ -357,6 +354,7 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
       ? Math.ceil((book.price / totalPlanned) / 5) * 5
       : 50;
 
+  // All hooks must be before any early return (Rules of Hooks)
   const [mode, setMode] = useState('all');
   const [addedMsg, setAddedMsg] = useState('');
   const [grantedChapters, setGrantedChapters] = useState([]);
@@ -364,16 +362,12 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
   // Load admin grants for this user's email if logged in
   useEffect(() => {
     if (!user?.email) {
-      // Even without login, show first chapter as free if enabled
-      if (book.freeFirstChapter) {
-        setGrantedChapters([0]);
-      }
+      if (book.freeFirstChapter) setGrantedChapters([0]);
       return;
     }
     const loadGrants = async () => {
       try {
         const chapters = book.freeFirstChapter ? [0] : [];
-        // Query user_chapter_grants for individually granted chapters
         const cached = localStorage.getItem('eh_chapter_grants');
         if (cached) {
           const allGrants = JSON.parse(cached);
@@ -397,6 +391,9 @@ function OngoingSeriesPurchase({ book, owned, libLoaded }) {
     };
     loadGrants();
   }, [user?.email, book.id, book.freeFirstChapter]);
+
+  // Early return after all hooks
+  if (book.status !== 'ongoing' || releasedCount < 1) return null;
 
   const flashMsg = (msg) => { setAddedMsg(msg); setTimeout(() => setAddedMsg(''), 2200); };
 
@@ -1016,6 +1013,10 @@ export default function BookDetail() {
     || (book?.chapterCount > 0 ? book.chapterCount : null)
     || (book?.tableOfContents?.filter(t => !/^(PART|ACT|BOOK|SECTION|VOLUME)\s/i.test(t)).length || null);
 
+  // Resolved page count: calculated from live word count (250 words/page industry standard)
+  // Falls back to static book.pages if no word count available
+  const resolvedPages = getBookPages(book, liveWordCount);
+
   const resolvedReadTime = resolvedWordCount
     ? calculateReadingTime(resolvedWordCount)
     : (book?.readTime || '—');
@@ -1145,10 +1146,6 @@ export default function BookDetail() {
     }
     schemaScript.textContent = JSON.stringify(bookSchema);
 
-    return () => {
-      // Cleanup on unmount
-      if (schemaScript) schemaScript.remove();
-    };
     setMetaName('twitter:title',       `${book.title} by ${book.author}`);
     setMetaName('twitter:description', bookDesc);
     setMetaName('twitter:image',       bookImg);
@@ -1175,7 +1172,7 @@ export default function BookDetail() {
       description:   book.description?.slice(0, 300) || '',
       genre:         book.genres ? book.genres.join(', ') : book.genre,
       inLanguage:    'en',
-      ...(book.pages > 0 && { numberOfPages: book.pages }),
+      ...(resolvedPages && { numberOfPages: String(resolvedPages) }),
       ...(hasImageCover(book) && book.cover.startsWith('/') && {
         image: `${window.location.origin}${coverBasePath(book.cover)}`,
       }),
@@ -1202,6 +1199,8 @@ export default function BookDetail() {
       document.title = 'Ellines Haven';
       const s = document.getElementById(schemaId);
       if (s) s.remove();
+      const sc = document.querySelector('script[data-book-schema="true"]');
+      if (sc) sc.remove();
     };
   }, [book]);
 
@@ -1369,7 +1368,7 @@ export default function BookDetail() {
                       <div><small>Read Time</small><strong>{resolvedReadTime}</strong></div>
                     </>
                   : <>
-                      <div><small>Pages</small><strong>{book.pages > 0 ? book.pages : '—'}</strong></div>
+                      <div><small>Pages</small><strong>{resolvedPages || '—'}</strong></div>
                       {resolvedWordCount && (
                         <div title={resolvedWordCount ? `${resolvedWordCount.toLocaleString()} words` : ''}>
                           <small>Words</small>

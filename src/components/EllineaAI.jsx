@@ -6,6 +6,7 @@ import {
   collection, serverTimestamp, deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getBookPages, getReadingTimeDisplay } from '../utils/readingTime';
 import './EllineaAI.css';
 
 const AI_NAME = 'Ellinea';
@@ -75,7 +76,8 @@ function bookCard(b, showDetails = false) {
   ];
   if (showDetails) {
     if (b.excerpt) lines.push(`_"${b.excerpt}"_`);
-    if (b.pages > 0) lines.push(`${b.pages} pages · ${b.readTime || ''}`);
+    const pg = getBookPages(b);
+    if (pg > 0) lines.push(`${pg} pages · ${getReadingTimeDisplay(b)}`);
     if (b.rating > 0) lines.push(`⭐ ${b.rating}/5 · ${b.reviews} reviews`);
     if (b.status === 'ongoing' && b.chaptersReleased) lines.push(`📖 ${b.chaptersReleased} of ${b.totalChapters || '?'} chapters released`);
     if (b.expectedDate) lines.push(`📅 Expected: ${b.expectedDate}`);
@@ -174,7 +176,7 @@ function offlineReply(msg, ctx) {
       const [a, b2] = found;
       const canBuyA = ['complete','premium','free-preview','ongoing'].includes(a.status);
       const canBuyB = ['complete','premium','free-preview','ongoing'].includes(b2.status);
-      return `Here's a quick comparison:\n\n**${a.title}** (${a.genre})\n• ${canBuyA ? `KSh ${a.price}` : a.status} · ${a.pages > 0 ? `${a.pages} pages` : a.readTime || ''} · ⭐ ${a.rating}\n• _"${a.excerpt}"_\n\n**${b2.title}** (${b2.genre})\n• ${canBuyB ? `KSh ${b2.price}` : b2.status} · ${b2.pages > 0 ? `${b2.pages} pages` : b2.readTime || ''} · ⭐ ${b2.rating}\n• _"${b2.excerpt}"_\n\nBoth are by Elijah Mwangi M. Which sounds more your style? I can tell you more about either one. 📚`;
+      return `Here's a quick comparison:\n\n**${a.title}** (${a.genre})\n• ${canBuyA ? `KSh ${a.price}` : a.status} · ${getBookPages(a) ? `${getBookPages(a)} pages` : getReadingTimeDisplay(a)} · ⭐ ${a.rating}\n• _"${a.excerpt}"_\n\n**${b2.title}** (${b2.genre})\n• ${canBuyB ? `KSh ${b2.price}` : b2.status} · ${getBookPages(b2) ? `${getBookPages(b2)} pages` : getReadingTimeDisplay(b2)} · ⭐ ${b2.rating}\n• _"${b2.excerpt}"_\n\nBoth are by Elijah Mwangi M. Which sounds more your style? I can tell you more about either one. 📚`;
     }
   }
 

@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getReadingStats, calculateReadingTime, countWordsFromChapters, formatWordCount } from '../../utils/readingTime';
+import { getReadingStats, calculateReadingTime, countWordsFromChapters, formatWordCount, estimatePagesFromWords } from '../../utils/readingTime';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import './BookEditPanel.css';
@@ -93,11 +93,16 @@ export default function BookEditPanel({ showToast, books = [] }) {
           const newReadTime = effectiveWc
             ? calculateReadingTime(effectiveWc)
             : (editData.pages ? calculateReadingTime(editData.pages * 250) : b.readTime);
+          // Auto-calculate pages from word count (250 words/page industry standard)
+          const newPages = effectiveWc
+            ? estimatePagesFromWords(effectiveWc)
+            : (editData.pages || b.pages || 0);
 
           return {
             ...b,
             ...editData,
             wordCount: effectiveWc, // always store the best available count
+            pages: newPages,        // auto-calculated from word count (250 words/page)
             readTime: newReadTime,
             updatedAt: new Date().toISOString(),
             lastEditedBy: user?.email,
@@ -330,6 +335,10 @@ export default function BookEditPanel({ showToast, books = [] }) {
                 <strong style={{ color: 'var(--text)' }}>Estimated Reading Time:</strong>{' '}
                 <strong style={{ color: 'var(--gold)' }}>
                   {calculateReadingTime(liveWc || editData.wordCount || editData.pages * 250)}
+                </strong>
+                {' · '}
+                <strong style={{ color: 'var(--gold)' }}>
+                  {estimatePagesFromWords(liveWc || editData.wordCount || editData.pages * 250)} pages
                 </strong>
                 {liveWc && (
                   <span style={{ color: 'var(--ok)', fontSize: '0.72rem', marginLeft: 8 }}>

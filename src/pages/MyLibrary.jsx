@@ -12,6 +12,7 @@ import {
   formatOfflineSize,
 } from '../hooks/useOfflineBook';
 import { bookPath, readPath } from '../utils/slugify';
+import { getBookPages, getReadingTimeDisplay } from '../utils/readingTime';
 import { getFallbackChapters } from '../data/bookChapters';
 import { usePageMeta } from '../hooks/usePageMeta';
 import ReferralDashboard from '../components/ReferralDashboard';
@@ -460,9 +461,30 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
       const orderData = snap.exists() ? snap.data() : null;
 
       if (orderData?.status === 'Completed') {
-        setRetryMsg('Order already completed. Refreshing…');
+        setRetryMsg('✅ Order already completed. Loading your library…');
         setRetryDone(true);
-        setTimeout(() => window.location.reload(), 1200);
+        // Poll until library has the books before reloading
+        const bookIds = (o.items || []).map(i => i.id).filter(Boolean);
+        let attempts = 0;
+        const poll = async () => {
+          attempts++;
+          try {
+            const { getDoc: fsGet, doc: fsDoc } = await import('firebase/firestore');
+            const { db: fsDb } = await import('../../firebase');
+            const libId = (userEmail || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const libSnap = await fsGet(fsDoc(fsDb, 'libraries', libId));
+            const ownedIds = libSnap.exists() ? (libSnap.data().books || []).map(b => b.id) : [];
+            const allPresent = bookIds.every(id => ownedIds.includes(id));
+            if (allPresent || attempts >= 6) {
+              window.location.reload();
+            } else {
+              setTimeout(poll, 1500);
+            }
+          } catch {
+            window.location.reload();
+          }
+        };
+        setTimeout(poll, 600);
         return;
       }
 
@@ -478,9 +500,31 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
           userEmail: userEmail,
         });
         if (result?.data?.success) {
-          setRetryMsg('Books unlocked! Refreshing…');
+          setRetryMsg('✅ Books unlocked! Loading your library…');
           setRetryDone(true);
-          setTimeout(() => window.location.reload(), 1500);
+          // Poll the Firestore library doc until the purchased books appear,
+          // rather than doing a blind reload that may arrive before Firestore replicates.
+          const bookIds = (o.items || []).map(i => i.id).filter(Boolean);
+          let attempts = 0;
+          const poll = async () => {
+            attempts++;
+            try {
+              const { getDoc: fsGet, doc: fsDoc } = await import('firebase/firestore');
+              const { db: fsDb } = await import('../../firebase');
+              const libId = (userEmail || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+              const libSnap = await fsGet(fsDoc(fsDb, 'libraries', libId));
+              const ownedIds = libSnap.exists() ? (libSnap.data().books || []).map(b => b.id) : [];
+              const allPresent = bookIds.every(id => ownedIds.includes(id));
+              if (allPresent || attempts >= 8) {
+                window.location.reload();
+              } else {
+                setTimeout(poll, 1500);
+              }
+            } catch {
+              window.location.reload();
+            }
+          };
+          setTimeout(poll, 800);
           return;
         }
         setRetryMsg('Payment not yet confirmed by Paystack. If money was deducted, please contact support.');
@@ -492,6 +536,14 @@ function PendingOrderRow({ order: o, userEmail, isPendingPaystack }) {
         }
         if (/too low|does not match|permission/i.test(msg)) {
           setRetryMsg(msg + ' — contact support with ref: ' + o.paystackRef);
+          return;
+        }
+        // "unlock failed" from Cloud Function means payment succeeded but library write had issues —
+        // treat it as success and let the Firestore listener deliver the books.
+        if (/unlock failed|Retry Activation/i.test(msg)) {
+          setRetryMsg('✅ Payment confirmed! Waiting for your books to appear…');
+          setRetryDone(true);
+          setTimeout(() => window.location.reload(), 3000);
           return;
         }
         setRetryMsg('Payment not yet confirmed by Paystack. If money was deducted, please contact support. Ref: ' + o.paystackRef);
@@ -1221,11 +1273,11 @@ export default function MyLibrary() {
                         <span className="mylib-card__genre">{b.genre}</span>
                         <h3 className="mylib-card__title">{b.title}</h3>
                         <p className="mylib-card__author">by {b.author}</p>
-                        {(b.pages > 0 || b.readTime) && (
+                        {(getBookPages(b) || b.readTime) && (
                           <p className="mylib-card__meta">
-                            {b.pages > 0 ? `${b.pages} pages` : ''}
-                            {b.pages > 0 && b.readTime ? ' · ' : ''}
-                            {b.readTime}
+                            {getBookPages(b) ? `${getBookPages(b)} pages` : ''}
+                            {getBookPages(b) && getReadingTimeDisplay(b) ? ' · ' : ''}
+                            {getReadingTimeDisplay(b)}
                           </p>
                         )}
 
@@ -1451,11 +1503,11 @@ export default function MyLibrary() {
                         <span className="mylib-card__genre">{b.genre}</span>
                         <h3 className="mylib-card__title">{b.title}</h3>
                         <p className="mylib-card__author">by {b.author}</p>
-                        {(b.pages > 0 || b.readTime) && (
+                        {(getBookPages(b) || b.readTime) && (
                           <p className="mylib-card__meta">
-                            {b.pages > 0 ? `${b.pages} pages` : ''}
-                            {b.pages > 0 && b.readTime ? ' · ' : ''}
-                            {b.readTime}
+                            {getBookPages(b) ? `${getBookPages(b)} pages` : ''}
+                            {getBookPages(b) && getReadingTimeDisplay(b) ? ' · ' : ''}
+                            {getReadingTimeDisplay(b)}
                           </p>
                         )}
                         
