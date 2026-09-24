@@ -2830,3 +2830,6 @@ exports.issueEhbookImportKey = onCall(
 );
 
 console.log("[CloudFunctions] ✅ ehbook anti-sharing license keys initialized");
+
+// ── EIP integration: public, read-only business catalogue API ───────────────
+exports.havenCatalogueApi = require("./havenCatalogueApi").havenCatalogueApi;
